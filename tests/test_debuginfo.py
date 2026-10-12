@@ -131,7 +131,7 @@ def test_lldb_formatters_show_values(tmp_path):
                           "-o", "b vals.gg:21", "-o", "run", "-o", "frame variable s o n sh t names", str(exe)],
                          capture_output=True, text=True, timeout=120)
     out = res.stdout
-    if "launch failed" in out or "not permitted" in out:
+    if "target create" not in out or "launch failed" in out or "not permitted" in out:  # lldb did not run
         pytest.skip("lldb could not run the program here")
     for line in ['(string) s = "hello"', "(Optional[i32]) o = Valid(7)", "(Optional[i32]) n = None",
                  "(Shape) sh = Rect(2, 3)", '(str) t = "view"', '(string[2]) names = ([0] = "x", [1] = "y")']:

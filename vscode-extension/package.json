@@ -63,6 +63,18 @@
         "path": "./syntaxes/gg.tmLanguage.json"
       }
     ],
+    "themes": [
+      {
+        "label": "Greengold Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/greengold-dark-color-theme.json"
+      },
+      {
+        "label": "Greengold Light",
+        "uiTheme": "vs",
+        "path": "./themes/greengold-light-color-theme.json"
+      }
+    ],
     "snippets": [
       {
         "language": "gg",

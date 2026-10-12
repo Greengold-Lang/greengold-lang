@@ -976,6 +976,16 @@ class LLVMGen:
             self.rt["counter"] = g  # type: ignore[assignment]
         return g  # type: ignore[return-value]
 
+    def count_allocs(self, delta: ir.Value, sub: bool = False) -> None:
+        """Adds to (or subtracts from) the live-block counter. Atomic when leak checking is on, because
+        threads allocate and free at the same time and a plain load/store would lose updates."""
+        cnt = self.rt_counter()
+        if self.leakcheck:
+            self.b.atomic_rmw("sub" if sub else "add", cnt, delta, "monotonic")
+        else:
+            cur = self.b.load(cnt)
+            self.b.store(self.b.sub(cur, delta) if sub else self.b.add(cur, delta), cnt)
+
     def _emit_text(self, text_ptr_fn: Callable[[], None]) -> None:
         text_ptr_fn()
 
@@ -1074,8 +1084,7 @@ class LLVMGen:
                 user = self.user_allocator(0)
                 p = self.b.call(user if user is not None else self.c_fn("malloc", I8P, [I64]), [n])
                 self._null_check(p)
-                cnt = self.rt_counter()
-                self.b.store(self.b.add(self.b.load(cnt), ir.Constant(I64, 1)), cnt)
+                self.count_allocs(ir.Constant(I64, 1))
                 self.b.ret(p)
                 self.finish_entry()
         return fn
@@ -1099,8 +1108,7 @@ class LLVMGen:
                 p = self.b.call(user if user is not None else self.c_fn("realloc", I8P, [I8P, I64]), [old, n])
                 self._null_check(p)
                 was_null = self.b.icmp_unsigned("==", old, ir.Constant(I8P, None))
-                cnt = self.rt_counter()
-                self.b.store(self.b.add(self.b.load(cnt), self.b.zext(was_null, I64)), cnt)
+                self.count_allocs(self.b.zext(was_null, I64))
                 self.b.ret(p)
                 self.finish_entry()
         return fn
@@ -1114,8 +1122,7 @@ class LLVMGen:
                 nz, done = self.new_block("nz"), self.new_block("done")
                 self.b.cbranch(self.b.icmp_unsigned("!=", fn.args[0], ir.Constant(I8P, None)), nz, done)
                 self.at(nz)
-                cnt = self.rt_counter()
-                self.b.store(self.b.sub(self.b.load(cnt), ir.Constant(I64, 1)), cnt)
+                self.count_allocs(ir.Constant(I64, 1), sub=True)
                 user = self.user_allocator(2)
                 self.b.call(user if user is not None else self.c_fn("free", VOID, [I8P]), [fn.args[0]])
                 self.b.branch(done)
