@@ -31,7 +31,7 @@ from dataclasses import dataclass, fields as dc_fields
 from .ast_nodes import (
     walk,
     FieldInit, StrLit,
-    Assign, BorrowExpr, Call, Defer, Expr, ExprStmt, FieldAccess, For, ForIn, FuncDecl, If, IndexAccess, Match,
+    Assign, BorrowExpr, Break, Call, Continue, Defer, Expr, ExprStmt, FieldAccess, For, ForIn, FuncDecl, If, IndexAccess, Match,
     MethodCall, Name, Node, Program, Return, SliceExpr, Stmt, StructDecl, StructLit, VarDecl, While, Yield, unparse,
 )
 from .diagnostics import DiagnosticBag, Fix, Label, Note
@@ -69,6 +69,11 @@ class BorrowChecker:
         # of argument j's memory inside argument i (`out.push(s.as_str())`).
         # The receiver of a method is argument 0. Computed to a fixpoint before diagnostics are reported.
         self.summaries: dict[int, set[tuple[int, int]]] = {}
+        # Which arguments the result of a call can point into (keyed by `id(FuncDecl)`): the parameters whose
+        # memory may reach one of the function's `return` values. A function not listed here is unknown, and
+        # its result may point into any argument.
+        self.ret_flow: dict[int, frozenset[int]] = {}
+        self.n_params: dict[int, int] = {}
         self.has_self: dict[int, bool] = {}
         self.silent = False
 
@@ -107,6 +112,12 @@ class BorrowChecker:
                  if isinstance(d, FuncDecl) and not d.type_params and not d.owner_params]
         # Summaries first, without reporting: a caller needs its callees' summaries, and recursion
         # needs a fixpoint. Summaries only grow, so this terminates.
+        for d in funcs:
+            self.has_self[id(d)] = bool(d.params) and d.params[0].name == "self"
+            self.n_params[id(d)] = len(d.params)
+            flow = self._return_flow(d)
+            if flow is not None:
+                self.ret_flow[id(d)] = flow
         self.silent = True
         # Only a function with a `lend` parameter that can hold a view can leave one behind.
         holders = [d for d in funcs if any(p.mode == "lend" and self._viewish(getattr(p, "ty", None))
@@ -159,6 +170,8 @@ class BorrowChecker:
                                 details={"name": p.name, "tied_to": p.tied_to})
         self.local_kinds = {}
         self.var_depth: dict[str, int] = {}
+        self._block_ends: list[frozenset[str] | None] = []
+        self._block_decls: list[set[str]] = []  # names declared by each block being checked
         self.ref_ties: dict[str, str] = {}
         self.bound = {p.name: p for p in d.params}
         for p in d.params:
@@ -188,8 +201,33 @@ class BorrowChecker:
 
     # -- body traversal -----------------------------------------------------
     def _block(self, stmts: list[Stmt], holders: dict[str, Holder], depth: int) -> None:
-        for s in stmts:
-            self._stmt(s, holders, depth)
+        self._block_ends.append(self.live.block_out.get(id(stmts)))
+        self._block_decls.append(set())
+        try:
+            for s in stmts:
+                self._stmt(s, holders, depth)
+            self._check_scope_end(holders, stmts)
+        finally:
+            self._block_ends.pop()
+            self._block_decls.pop()
+
+    def _check_scope_end(self, holders: dict[str, Holder], stmts: list[Stmt]) -> None:
+        """When a block ends, its variables are gone: a holder of an outer scope that still ties to one of them
+        and is read again afterwards (on some path, or by the next loop iteration) would dangle."""
+        end, decls = self._block_ends[-1], self._block_decls[-1]
+        if end is None or not decls:
+            return
+        last = stmts[-1] if stmts else None
+        if isinstance(last, Return):
+            return  # the block never reaches its end
+        if isinstance(last, (Break, Continue)):
+            end = self.live.after.get(id(last), end)  # it leaves through the loop exit or the next iteration
+        for name, h in holders.items():
+            if name in decls or name not in end:
+                continue
+            for root, _mode, src in h.refs:
+                if root in decls:
+                    self._report_escape(root, name, src)
 
     def _stmt(self, s: Stmt, holders: dict[str, Holder], depth: int) -> None:
         after = self.live.after.get(id(s), frozenset())
@@ -204,6 +242,8 @@ class BorrowChecker:
         self._store_views(s, holders, flat)
         if isinstance(s, VarDecl):
             self.var_depth[s.name] = depth
+            if self._block_decls:
+                self._block_decls[-1].add(s.name)
             self._bind_var(s, holders)
         elif isinstance(s, Assign) and s.op == "=" and isinstance(s.target, Name):
             self._bind_assign(s, holders)
@@ -374,6 +414,71 @@ class BorrowChecker:
     def _owns_heap(self, ty: object) -> bool:
         return isinstance(ty, str) and needs_drop(ty, self.program.struct_infos, self.program.enum_infos)
 
+    @staticmethod
+    def _return_flow(d: FuncDecl) -> frozenset[int] | None:
+        """The parameters (by position) whose memory a `return` value of `d` can point into, or None when that
+        is not known. Every parameter named in a returned expression counts, and so does every one named in
+        something stored into a local that is named there (`t = a`, `p = P{ name: b }`, `out.push(c)`)."""
+        names = {p.name: i for i, p in enumerate(d.params)}
+        nodes = list(walk(d.body))
+        if d.ret_view or d.ret_tied or any(isinstance(n, Yield) for n in nodes):
+            return None
+        returns = [n for n in nodes if isinstance(n, Return) and n.value is not None]
+        if not returns:
+            return None  # no body to read (an intrinsic), or nothing returned
+
+        taint: dict[str, set[int]] = {n: {i} for n, i in names.items()}
+
+        def flow(e: object) -> set[int]:
+            out: set[int] = set()
+            for n in walk(e):
+                if isinstance(n, Name):
+                    out |= taint.get(n.name, set())
+            return out
+
+        def root_of(t: object) -> str | None:
+            while isinstance(t, (FieldAccess, IndexAccess, SliceExpr, BorrowExpr)):
+                t = t.obj if not isinstance(t, BorrowExpr) else t.expr
+            return t.name if isinstance(t, Name) else None
+
+        def add(name: str | None, idx: set[int]) -> bool:
+            if name is None or not idx:
+                return False
+            cur = taint.setdefault(name, set())
+            if idx <= cur:
+                return False
+            cur |= idx
+            return True
+
+        changed = True
+        while changed:
+            changed = False
+            for n in nodes:
+                if isinstance(n, VarDecl):
+                    changed |= add(n.name, flow(n.value))
+                elif isinstance(n, Assign):
+                    changed |= add(root_of(n.target), flow(n.value))
+                elif isinstance(n, ForIn):
+                    f = flow(n.iterable)
+                    changed |= add(n.var, f)
+                    changed |= add(n.index_var, f)
+                elif isinstance(n, Match):
+                    f = flow(n.scrutinee)
+                    for arm in n.arms:
+                        for b in arm.bindings:
+                            changed |= add(b.name, f)
+                        changed |= add(arm.whole, f)
+                elif isinstance(n, (Call, MethodCall)):
+                    # a call may leave views of some arguments inside another one (`out.push(s)`)
+                    args = ([n.obj] if isinstance(n, MethodCall) else []) + list(n.args)
+                    every = set().union(*(flow(a) for a in args)) if args else set()
+                    for a in args:
+                        changed |= add(root_of(a), every)
+        result: set[int] = set()
+        for r in returns:
+            result |= flow(r.value)
+        return frozenset(result)
+
     def _view_refs(self, e: object, holders: dict[str, Holder]) -> list[tuple[str, str, Node]]:
         """Variables whose memory the value of `e` may point into (only for view types)."""
         if not isinstance(e, Node) or not self._viewish(getattr(e, "ty", None)):
@@ -395,29 +500,49 @@ class BorrowChecker:
                 root = self._root_name(arg) if isinstance(arg, (Name, FieldAccess, IndexAccess)) else None
                 if root and mode in ("read", "lend"):
                     out.append((root, mode, arg))
-        for f in dc_fields(e):
-            if f.name in ("ty", "inst_note"):
-                continue
-            val = getattr(e, f.name)
-            for child in (val if isinstance(val, list) else [val]):
-                if isinstance(child, FieldInit):
-                    child = child.value
-                if not isinstance(child, Expr) or getattr(child, "is_move", False):
-                    continue  # a moved value is owned by the result, not borrowed
-                cty = getattr(child, "ty", None)
-                root = self._root_name(child) if isinstance(child, (Name, FieldAccess, IndexAccess)) else None
-                through = self._slice_base(child)
-                if through is not None:  # `names[0].as_str()` of a `[]string`: points where `names` points
-                    out.extend(self._view_sources(through, holders))
-                elif root and isinstance(e, SliceExpr) and child is e.obj and isinstance(cty, str) and is_array_type(cty):
-                    out.append((root, "read", child))  # `xs[1..3]` of an array: points into `xs`'s own memory
-                elif root and self._owns_heap(cty) and not self._viewish(cty):
-                    out.append((root, "read", child))  # `s.as_str()`: points into `s`
-                elif self._viewish(cty):
-                    out.extend(self._view_sources(child, holders))
-                elif root and self._owns_heap(cty):
-                    out.append((root, "read", child))
+        restrict = self._returned_args(e)
+
+        def kids():
+            if restrict is not None:
+                yield from restrict
+                return
+            for f in dc_fields(e):
+                if f.name in ("ty", "inst_note"):
+                    continue
+                val = getattr(e, f.name)
+                for child in (val if isinstance(val, list) else [val]):
+                    yield child.value if isinstance(child, FieldInit) else child
+
+        for child in kids():
+            if not isinstance(child, Expr) or getattr(child, "is_move", False):
+                continue  # a moved value is owned by the result, not borrowed
+            cty = getattr(child, "ty", None)
+            root = self._root_name(child) if isinstance(child, (Name, FieldAccess, IndexAccess)) else None
+            through = self._slice_base(child)
+            if through is not None:  # `names[0].as_str()` of a `[]string`: points where `names` points
+                out.extend(self._view_sources(through, holders))
+            elif root and isinstance(e, SliceExpr) and child is e.obj and isinstance(cty, str) and is_array_type(cty):
+                out.append((root, "read", child))  # `xs[1..3]` of an array: points into `xs`'s own memory
+            elif root and self._owns_heap(cty) and not self._viewish(cty):
+                out.append((root, "read", child))  # `s.as_str()`: points into `s`
+            elif self._viewish(cty):
+                out.extend(self._view_sources(child, holders))
+            elif root and self._owns_heap(cty):
+                out.append((root, "read", child))
         return out
+
+    def _returned_args(self, e: Node) -> list[Expr] | None:
+        """The arguments of a call to a user function that its result can point into, or None when unknown."""
+        if not isinstance(e, (Call, MethodCall)):
+            return None
+        cid = getattr(e, "callee_id", None)
+        flow = self.ret_flow.get(cid) if cid else None
+        if flow is None:
+            return None
+        argv = ([e.obj] if isinstance(e, MethodCall) and self.has_self.get(cid) else []) + list(e.args)
+        if len(argv) != self.n_params.get(cid, -1):
+            return None
+        return [argv[i] for i in sorted(flow)]
 
     @staticmethod
     def _slice_base(e: object) -> Expr | None:
@@ -504,11 +629,15 @@ class BorrowChecker:
         for root, _mode, src in h.refs:
             rd = self.var_depth.get(root)
             if rd is not None and rd > hd:
-                where = src or node
-                self._error(where, f"`{root}` does not live long enough for `{holder_name or 'this value'}` to reference it.",
-                            f"`{root}` is declared in an inner scope; borrow a value from the outer scope.",
-                            rule="reference-escapes", labels=self._decl_label(root),
-                            details={"referent": root, "holder": holder_name or ""})
+                if holder_name and self._block_ends and self._block_ends[-1] is not None:
+                    continue  # judged where `root`'s block ends, by `_check_scope_end`: only if still tied and read again
+                self._report_escape(root, holder_name, src or node)
+
+    def _report_escape(self, root: str, holder_name: str, where: Node) -> None:
+        self._error(where, f"`{root}` does not live long enough for `{holder_name or 'this value'}` to reference it.",
+                    f"`{root}` is declared in an inner scope; borrow a value from the outer scope.",
+                    rule="reference-escapes", labels=self._decl_label(root),
+                    details={"referent": root, "holder": holder_name or ""})
 
     def _check_return(self, s: Return, holders: dict[str, Holder]) -> None:
         refs: list[tuple[str, str, Node]] = []

@@ -134,3 +134,76 @@ def test_view_made_in_a_branch_stays_tied_after_it():
 def test_view_made_in_a_branch_of_its_own_scope_is_not_kept():
     src = 'if true:\n    s = string("abc")\n    v = s.as_str()\n    print(v)\ns = string("q")\nprint(s.len)'
     assert messages(with_main(src)) == []
+
+
+# A view kept in a variable of an outer scope is only a problem if it is still tied to the inner variable
+# and read again after that variable is gone.
+def test_view_in_outer_variable_that_is_not_read_again_is_fine():
+    cases = {
+        "used_in_loop_only": 'line = ""\nfor i in 0..3:\n    s = string("  hi  ")\n    line = s.trim()\n    print(line)',
+        "used_in_branch_only": 'best = ""\nfor i in 0..3:\n    s = string("hi")\n    if s.len > 1:\n        best = s.trim()\n        print(best)\nprint("done")',
+        "never_used": 't = "x"\nif true:\n    s = string("hello")\n    t = s.as_str()',
+        "overwritten_in_block": 'if true:\n    s = string("abc")\n    v = "x"\n    v = s.as_str()\n    v = "lit"\nprint(1)',
+    }
+    for name, body in cases.items():
+        assert messages(with_main(body)) == [], name
+
+
+def test_view_in_outer_variable_read_again_is_rejected():
+    cases = {
+        "after_block": 't = "x"\nif true:\n    s = string("hi")\n    t = s.as_str()\nprint(t)',
+        "next_iteration": 'v = "lit"\nfor i in 0..2:\n    print(v)\n    s = string("hi")\n    v = s.as_str()',
+        "after_loop": 'v = "lit"\nfor i in 0..2:\n    s = string("hi")\n    v = s.as_str()\nprint(v)',
+        "held_by_list": 'xs = List[str]()\nfor i in 0..2:\n    s = string("hi")\n    xs.push(s.as_str())\nprint(xs.len)',
+    }
+    for name, body in cases.items():
+        assert has(messages(with_main(body)), "does not live long enough"), name
+
+
+# The result of a call to a user function points only into the arguments its `return` values can come from.
+_FLOW_FNS = {
+    "via_local": ("fn via_local(a: str, b: str) -> str:\n    x = b\n    return x\n", 't = via_local("q", s.as_str())'),
+    "via_struct": ("struct W:\n    name: str\nfn via_struct(a: str, b: str) -> str:\n    p = W{ name: b }\n    return p.name\n",
+                   't = via_struct("q", s.as_str())'),
+    "via_lend": ("fn via_lend(out: lend List[str], a: str, b: str) -> str:\n    out.push(b)\n    return out[0]\n",
+                 'xs = List[str]()\nt = via_lend(xs, "q", s.as_str())'),
+    "either": ("fn either(c: bool, a: str, b: str) -> str:\n    if c:\n        return a\n    return b\n",
+               't = either(false, "q", s.as_str())'),
+    "recursive": ("fn rec(n: i32, a: str, b: str) -> str:\n    if n == 0:\n        return b\n    return rec(n - 1, b, a)\n",
+                  't = rec(3, "q", s.as_str())'),
+    "closure": ("fn viaclo(a: str, b: str) -> str:\n    g = fn() -> str => b\n    return g()\n",
+                't = viaclo("q", s.as_str())'),
+    "generic": ("fn gen2[T](a: T, b: T) -> T:\n    return b\n", 't = gen2("q", s.as_str())'),
+    "nested": ("fn two(a: str, b: str) -> str:\n    return a\nfn nest(a: str, b: str) -> str:\n    return two(b, a)\n",
+               't = nest("q", s.as_str())'),
+}
+
+
+def _escape_case(fns: str, call: str) -> str:
+    inner = "\n".join("    " + l for l in call.splitlines())
+    return with_main(f't = "x"\nif true:\n    s = string("hello")\n{inner}\nprint(t)', PREAMBLE + fns)
+
+
+def test_call_result_ties_to_each_argument_it_can_return():
+    for name, (fns, call) in _FLOW_FNS.items():
+        assert has(messages(_escape_case(fns, call)), "does not live long enough"), name
+
+
+def test_call_result_does_not_tie_to_an_argument_it_never_returns():
+    fns = "fn first(a: str, b: str) -> str:\n    return a\nfn lit(a: str) -> str:\n    return \"static\"\n"
+    for call in ('t = first("q", s.as_str())', 't = lit(s.as_str())'):
+        assert messages(_escape_case(fns, call)) == [], call
+    # ... and the argument it does return still ties
+    assert has(messages(_escape_case(fns, 't = first(s.as_str(), "q")')), "does not live long enough")
+
+
+def test_storing_into_a_field_is_not_a_read_of_the_struct():
+    src = ('struct W:\n    name: str\n\nfn main():\n    w = W{ name: "x" }\n    for i in 0..3:\n'
+           '        s = string("hi")\n        w.name = s.as_str()\n')
+    assert messages(PREAMBLE + src) == []
+    assert has(messages(PREAMBLE + src + "    print(w.name)\n"), "does not live long enough")
+
+
+def test_block_that_returns_does_not_leak_its_views():
+    src = 'v = "x"\nfor i in 0..2:\n    s = string("hi")\n    v = s.as_str()\n    return\nprint(1)'
+    assert messages(with_main(src)) == []

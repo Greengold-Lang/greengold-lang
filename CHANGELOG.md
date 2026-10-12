@@ -2,6 +2,15 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
+## Unreleased
+
+Borrow checker
+- **Fix (soundness):** a view made in a branch of an `if` or `match` for a variable of the enclosing scope (`v = s.as_str()` when `v` held a literal) was forgotten after the branch, so `s.clear()` or a reassignment followed by a use of `v` was accepted, and so was a borrow carried to the next loop iteration behind an `if`. Both are now rejected (GG0316).
+- Fewer false errors. GG0315 ("does not live long enough") is now decided where the owner's block ends: it fires only if the holder is still tied to the owner and is read again afterwards. `line = s.trim()` in a loop body, used only inside that body, is accepted; so is a view that is overwritten before the block ends, and a block that ends in `return`, `break`, or `continue`.
+- `w.name = v` and `xs[i] = v` no longer count as a read of `w` / `xs`.
+- The result of a call to a Greengold function is tied only to the arguments its `return` values can come from, not to every argument: `pick(a, b)` that returns `a` no longer holds on to `b`. A function whose returns cannot be read (an intrinsic) keeps the old rule.
+- `tools/fuzz_views.py` is a soundness fuzzer: it generates random programs with views, loops, `break`/`continue`, `return`, lists, a struct field, `Optional[str]` and calls, runs every branch path in a model, and reports any program the checker accepts that uses a dangling view. On a random batch the false-error rate went from about 23 % to under 0.3 %, and no accepted program dangled in the last 40 000 programs.
+
 ## 0.5.0
 
 Getting started
