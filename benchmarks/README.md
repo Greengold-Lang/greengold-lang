@@ -5,6 +5,33 @@ algorithm and the same output. `run_benchmarks.py` builds each one, runs it five
 median wall time, peak memory, compile time, and binary size. `reports/latest/` holds the newest
 `benchmark_data.json`; the website is generated from that file.
 
+## Reproduce the numbers
+
+**You need**
+
+| What | Why |
+|---|---|
+| Greengold (`gg` on `PATH`, see the [install](../README.md#install) section; or a source checkout with `pip install -e .`) | builds the `.gg` files with `--release`. `GG=/path/to/gg` picks another `gg`; with none found the script runs `python -m greengold` |
+| Python 3.10+ and `pip install matplotlib` | the runner and the charts (`plotter.py`) |
+| `g++` (GCC) | C++ builds with `-O3`. The published numbers use GCC, not clang |
+| `rustc` (stable Rust) | Rust builds with `-C opt-level=3` (plain `rustc`, not `cargo build --release`) |
+| A C compiler or `zig` for `gg build` | `gg toolchain` shows what was found; the standalone `gg` carries zig |
+| For `gpumatmul` only: a GPU with an OpenCL driver | everything else runs without a GPU |
+
+Windows, Linux, and macOS are supported by the runner. The published results are from Windows 11 with MinGW GCC;
+`gg toolchain` and `g++ --version` and `rustc --version` print the versions to report next to your numbers.
+
+**To get comparable numbers**
+
+- Use the same flags: the runner does (`g++ -O3`, `rustc -C opt-level=3`, `gg build --release`).
+- Plug in a laptop, close other programs, and let it cool between runs. Use `-n 9` to take the median of nine runs.
+- Times include process start, and `primes` runs once because it is a fixed-length race.
+- Expect different absolute times on other CPUs. Compare the ratios between the three languages, not the seconds.
+- Peak memory is the working set on Windows and the maximum resident set on Linux and macOS; they are close but not the same measure.
+- The runner overwrites `benchmark_results.json` and `reports/latest/`, even for one workload. Use `git checkout benchmarks/benchmark_results.json benchmarks/reports/latest/` to restore the published files.
+
+**Run**
+
 ```bash
 python benchmarks/run_benchmarks.py                     # every workload
 python benchmarks/run_benchmarks.py wordfreq jsonparse  # some of them

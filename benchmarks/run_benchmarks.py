@@ -1,9 +1,8 @@
 import os
 import sys
 import time
-import ctypes
-from ctypes import wintypes
 import subprocess
+import tempfile
 import statistics
 import json
 import shutil
@@ -18,19 +17,61 @@ if sys.platform == "win32":
 
 from plotter import generate_charts
 
-class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
-    _fields_ = [
-        ('cb', wintypes.DWORD),
-        ('PageFaultCount', wintypes.DWORD),
-        ('PeakWorkingSetSize', ctypes.c_size_t),
-        ('WorkingSetSize', ctypes.c_size_t),
-        ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
-        ('QuotaPagedPoolUsage', ctypes.c_size_t),
-        ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
-        ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
-        ('PagefileUsage', ctypes.c_size_t),
-        ('PeakPagefileUsage', ctypes.c_size_t),
-    ]
+EXE = ".exe" if sys.platform == "win32" else ""
+
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
+
+    class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+        _fields_ = [
+            ('cb', wintypes.DWORD),
+            ('PageFaultCount', wintypes.DWORD),
+            ('PeakWorkingSetSize', ctypes.c_size_t),
+            ('WorkingSetSize', ctypes.c_size_t),
+            ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
+            ('QuotaPagedPoolUsage', ctypes.c_size_t),
+            ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
+            ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+            ('PagefileUsage', ctypes.c_size_t),
+            ('PeakPagefileUsage', ctypes.c_size_t),
+        ]
+
+
+def gg_command():
+    """`GG=/path/to/gg` if set, else `gg` on PATH, else this checkout through Python."""
+    found = os.environ.get("GG") or shutil.which("gg")
+    return [found] if found else [sys.executable, "-m", "greengold"]
+
+
+def run_once(exe_path):
+    """Runs the program once: (wall time in ms, peak memory in MB, stdout)."""
+    if sys.platform == "win32":
+        t0 = time.perf_counter()
+        p = subprocess.Popen([exe_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        h_process = ctypes.windll.kernel32.OpenProcess(0x0410, False, p.pid)
+        stdout, _ = p.communicate()
+        elapsed = (time.perf_counter() - t0) * 1000.0
+        mem_mb = 0.0
+        if h_process:
+            pmc = PROCESS_MEMORY_COUNTERS()
+            pmc.cb = ctypes.sizeof(pmc)
+            if ctypes.windll.psapi.GetProcessMemoryInfo(h_process, ctypes.byref(pmc), pmc.cb):
+                mem_mb = pmc.PeakWorkingSetSize / (1024 * 1024)
+            ctypes.windll.kernel32.CloseHandle(h_process)
+        return elapsed, mem_mb, stdout
+    # Linux and macOS: wait4 returns the child's resource usage (ru_maxrss: KB on Linux, bytes on macOS).
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        t0 = time.perf_counter()
+        p = subprocess.Popen([exe_path], stdout=out, stderr=err)
+        _, _, usage = os.wait4(p.pid, 0)
+        elapsed = (time.perf_counter() - t0) * 1000.0
+        p.returncode = 0  # already reaped; keeps Popen from waiting again
+        out.seek(0)
+        stdout = out.read().decode("utf-8", errors="replace")
+    divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
+    return elapsed, usage.ru_maxrss / divisor, stdout
+
 
 def compile_target(name, lang, cmd):
     t0 = time.perf_counter()
@@ -47,27 +88,12 @@ def run_executable(exe_path, iterations=5):
     output = None
     
     for i in range(iterations):
-        t0 = time.perf_counter()
-        p = subprocess.Popen([exe_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        pid = p.pid
-        h_process = ctypes.windll.kernel32.OpenProcess(0x0410, False, pid)
-        
-        stdout, stderr = p.communicate()
-        elapsed = (time.perf_counter() - t0) * 1000.0 # ms
-        
-        mem_mb = 0.0
-        if h_process:
-            pmc = PROCESS_MEMORY_COUNTERS()
-            pmc.cb = ctypes.sizeof(pmc)
-            if ctypes.windll.psapi.GetProcessMemoryInfo(h_process, ctypes.byref(pmc), pmc.cb):
-                mem_mb = pmc.PeakWorkingSetSize / (1024 * 1024)
-            ctypes.windll.kernel32.CloseHandle(h_process)
-            
+        elapsed, mem_mb, stdout = run_once(exe_path)
         times.append(elapsed)
         peak_mems.append(mem_mb)
         if output is None:
             output = stdout.strip()
-            
+
     median_time = statistics.median(times)
     mean_time = statistics.mean(times)
     max_mem = max(peak_mems)
@@ -128,16 +154,16 @@ def main():
             
             targets = {
                 "C++ (GCC -O3)": {
-                    "cmd": ["g++", "-O3", os.path.join(benchmarks_dir, f"{task}.cpp"), "-o", os.path.join(benchmarks_dir, f"{task}_cpp.exe")],
-                    "exe": os.path.join(benchmarks_dir, f"{task}_cpp.exe")
+                    "cmd": ["g++", "-O3", os.path.join(benchmarks_dir, f"{task}.cpp"), "-o", os.path.join(benchmarks_dir, f"{task}_cpp{EXE}")],
+                    "exe": os.path.join(benchmarks_dir, f"{task}_cpp{EXE}")
                 },
                 "Rust (opt-level=3)": {
-                    "cmd": ["rustc", "-C", "opt-level=3", os.path.join(benchmarks_dir, f"{task}.rs"), "-o", os.path.join(benchmarks_dir, f"{task}_rust.exe")],
-                    "exe": os.path.join(benchmarks_dir, f"{task}_rust.exe")
+                    "cmd": ["rustc", "-C", "opt-level=3", os.path.join(benchmarks_dir, f"{task}.rs"), "-o", os.path.join(benchmarks_dir, f"{task}_rust{EXE}")],
+                    "exe": os.path.join(benchmarks_dir, f"{task}_rust{EXE}")
                 },
                 "Greengold (Release)": {
-                    "cmd": [sys.executable, "-m", "greengold", "build", os.path.join(benchmarks_dir, f"{task}.gg"), "--release", "-o", os.path.join(benchmarks_dir, f"{task}_gg.exe")],
-                    "exe": os.path.join(benchmarks_dir, f"{task}_gg.exe")
+                    "cmd": [*gg_command(), "build", os.path.join(benchmarks_dir, f"{task}.gg"), "--release", "-o", os.path.join(benchmarks_dir, f"{task}_gg{EXE}")],
+                    "exe": os.path.join(benchmarks_dir, f"{task}_gg{EXE}")
                 }
             }
             
