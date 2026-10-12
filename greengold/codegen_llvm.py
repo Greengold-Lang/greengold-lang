@@ -184,6 +184,9 @@ class LLVMGen:
         self.freestanding = freestanding
         self.triple = native_triple(target)
         self.windows = "windows" in self.triple
+        self.wasi = self.triple.startswith("wasm32") and self.triple.endswith("wasi")
+        self.wasi_declared: dict[str, tuple[ir.Type, bool]] = {}  # wasm32 C function -> (declared result, signed)
+        self.size_t = I32 if self.triple.startswith(("wasm32", "i386", "i686", "arm", "thumb", "riscv32")) else I64
         self.mod = ir.Module(name=filename, context=ir.Context())  # fresh context: named types must not leak between compilations
         self.mod.triple = self.triple
         from .debuginfo import DebugInfo
@@ -203,6 +206,8 @@ class LLVMGen:
         else:
             from . import llvm_tools
             self.layout_text = llvm_tools.data_layout(self.triple)
+            if self.layout_text is None and self.triple.startswith("wasm32"):
+                self.layout_text = "e-m:e-p:32:32-i64:64-n32:64-S128"  # no LLVM here (the browser): the fixed layout
             if self.layout_text is not None:
                 self.mod.data_layout = self.layout_text
         self._abi_sizes: dict[str, int | None] = {}
@@ -685,6 +690,9 @@ class LLVMGen:
         else:
             rt = VOID if ret_plan.how == "sret" else ret_plan.coerced
         c_symbol = d.c_symbol or d.name
+        if self.wasi and c_symbol in self.WASI_UNSUPPORTED:
+            raise CodegenError(f"`{self.WASI_UNSUPPORTED[c_symbol]}` is not available on `wasm32-wasi` (the browser "
+                               f"playground has no threads, tasks, or sockets); use `gg run` to run it.")
         key = getattr(d, "lookup_key", None) or d.name
         existing = self.rt.get("c_" + c_symbol)
         if existing is None:
@@ -692,8 +700,13 @@ class LLVMGen:
                 if prev.name == c_symbol:
                     existing = prev
                     break
-        fn = existing or ir.Function(self.mod, ir.FunctionType(rt, args, var_arg=d.variadic), c_symbol)
-        if existing is None:
+        wasi_real = self.wasi and c_symbol in self.WASI_C_ABI and existing is None
+        if wasi_real:
+            fn = self._wasi_real(c_symbol, d.variadic)
+            self.wasi_declared[fn.name] = (rt, self.WASI_C_ABI[c_symbol][2])
+        else:
+            fn = existing or ir.Function(self.mod, ir.FunctionType(rt, args, var_arg=d.variadic), c_symbol)
+        if existing is None and not wasi_real:
             for i, attr in attrs:
                 fn.args[i].add_attribute(attr)
         if getattr(d, "weak", False) and not self.windows and existing is None:
@@ -941,9 +954,65 @@ class LLVMGen:
         self.b.position_at_end(blk)
 
     # -- C library / runtime ------------------------------------
+    # wasm32: `size_t` is 32 bits. The generator asks for i64 sizes, so on `wasm32-wasi` these C functions are
+    # called through an internal wrapper that narrows the sizes: (return type, argument types, return is signed).
+    WASI_C_ABI = {
+        "malloc": (I8P, [I32], False), "realloc": (I8P, [I8P, I32], False),
+        "memcmp": (I32, [I8P, I8P, I32], False), "memcpy": (I8P, [I8P, I8P, I32], False),
+        "memmove": (I8P, [I8P, I8P, I32], False), "memset": (I8P, [I8P, I32, I32], False),
+        "strlen": (I32, [I8P], False), "write": (I32, [I32, I8P, I32], True),
+        "calloc": (I8P, [I32, I32], False), "fread": (I32, [I8P, I32, I32, I8P], False),
+        "fwrite": (I32, [I8P, I32, I32, I8P], False), "snprintf": (I32, [I8P, I32, I8P], False),
+    }
+
+    WASI_UNSUPPORTED = {
+        "pthread_create": "std.thread", "makecontext": "std.tasks (async)", "socket": "std.net",
+    }
+
+    def _wasi_real(self, name: str, var_arg: bool) -> ir.Function:
+        """The C function with its wasm32 signature (declared once, shared with `extern` declarations)."""
+        real = self.rt.get("wasi_real_" + name)
+        if real is None:
+            real_ret, real_args, _signed = self.WASI_C_ABI[name]
+            real = self.mod.globals.get(name)
+            if real is None:
+                real = ir.Function(self.mod, ir.FunctionType(real_ret, real_args, var_arg=var_arg), name)
+            self.rt["wasi_real_" + name] = real
+        return real
+
+    def _wasi_narrow_call(self, real: ir.Function, args: list[ir.Value], ret: ir.Type, signed: bool) -> ir.Value:
+        """Calls `real` with integer arguments cut to its parameter widths; the result is widened to `ret`."""
+        b = self.b
+        fixed = real.function_type.args
+        call_args = [b.trunc(a, ra) if i < len(fixed) and isinstance(ra := fixed[i], ir.IntType)
+                     and isinstance(a.type, ir.IntType) and ra.width < a.type.width else a
+                     for i, a in enumerate(args)]
+        res = b.call(real, call_args)
+        rt = real.function_type.return_type
+        if isinstance(ret, ir.IntType) and isinstance(rt, ir.IntType) and ret.width > rt.width:
+            return b.sext(res, ret) if signed else b.zext(res, ret)
+        return res
+
+    def _wasi_c_fn(self, name: str, ret: ir.Type, args: list[ir.Type], var_arg: bool) -> ir.Function:
+        real = self._wasi_real(name, var_arg)
+        real_ret, real_args, signed = self.WASI_C_ABI[name]
+        if var_arg or ([str(a) for a in args] == [str(a) for a in real_args] and str(ret) == str(real_ret)):
+            return real  # callers of the variadic ones pass `size_t` as i32 already
+        wrap = ir.Function(self.mod, ir.FunctionType(ret, args), "gg_wasi_" + name)
+        wrap.linkage = "internal"
+        wrap.attributes.add("alwaysinline")
+        saved = self.b
+        self.b = ir.IRBuilder(wrap.append_basic_block("entry"))
+        res = self._wasi_narrow_call(real, list(wrap.args), ret, signed)
+        self.b.ret_void() if isinstance(ret, ir.VoidType) else self.b.ret(res)
+        self.b = saved
+        return wrap
+
     def c_fn(self, name: str, ret: ir.Type, args: list[ir.Type], var_arg: bool = False) -> ir.Function:
         key = "c_" + name
         fn = self.rt.get(key)
+        if fn is None and self.wasi and name in self.WASI_C_ABI:
+            fn = self._wasi_c_fn(name, ret, args, var_arg)
         if fn is None and name in self.externs:  # user declared same C function with `extern`
             fn = self.externs[name]
         if fn is None:
@@ -997,8 +1066,8 @@ class LLVMGen:
         b = self.b
         buf = b.alloca(ir.ArrayType(I8, 512))
         bufp = b.bitcast(buf, I8P)
-        snprintf = self.c_fn("snprintf", I32, [I8P, I64, I8P], var_arg=True)
-        n = b.call(snprintf, [bufp, ir.Constant(I64, 512), self.cstr(fmt or ("Runtime error: %s\n")),
+        snprintf = self.c_fn("snprintf", I32, [I8P, self.size_t, I8P], var_arg=True)
+        n = b.call(snprintf, [bufp, ir.Constant(self.size_t, 512), self.cstr(fmt or ("Runtime error: %s\n")),
                               *(args or [self.cstr(msg)])])
         b.call(self.c_fn("fflush", I32, [I8P]), [ir.Constant(I8P, None)])
         wr = self.c_fn("_write" if self.windows else "write", I32 if self.windows else I64,
@@ -1055,8 +1124,8 @@ class LLVMGen:
                 self.b.cbranch(self.b.icmp_signed("!=", n, ir.Constant(I64, 0)), leak, done)
                 self.at(leak)
                 buf = self.b.bitcast(self.b.alloca(ir.ArrayType(I8, 128)), I8P)
-                k = self.b.call(self.c_fn("snprintf", I32, [I8P, I64, I8P], var_arg=True),
-                                [buf, ir.Constant(I64, 128), self.cstr("LEAK: %lld block(s) not freed\n"), n])
+                k = self.b.call(self.c_fn("snprintf", I32, [I8P, self.size_t, I8P], var_arg=True),
+                                [buf, ir.Constant(self.size_t, 128), self.cstr("LEAK: %lld block(s) not freed\n"), n])
                 wr = self.c_fn("_write" if self.windows else "write", I32 if self.windows else I64,
                                [I32, I8P, I32 if self.windows else I64])
                 self.b.call(wr, [ir.Constant(I32, 2), buf, k if self.windows else self.b.sext(k, I64)])
@@ -1927,8 +1996,8 @@ class LLVMGen:
                f"right: {quote[1]}{self.scalar_spec(operands[1][0])}{quote[1]})")
         args = [a for ty, v in operands for a in self.scalar_args(ty, v)]
         buf = b.bitcast(self.alloca(ir.ArrayType(I8, 512)), I8P)
-        sn = self.c_fn("snprintf", I32, [I8P, I64, I8P], var_arg=True)
-        b.call(sn, [buf, ir.Constant(I64, 512), self.cstr(fmt), *args])
+        sn = self.c_fn("snprintf", I32, [I8P, self.size_t, I8P], var_arg=True)
+        b.call(sn, [buf, ir.Constant(self.size_t, 512), self.cstr(fmt), *args])
         call = b.call(self.rt_panic(), [buf, self.cstr(self.filename), ir.Constant(I32, s.line), ir.Constant(I32, s.col)])
         call.attributes.add("noreturn")
 
@@ -3379,6 +3448,9 @@ class LLVMGen:
             fn = self.externs[raw if raw in self.externs else callee]
             if fn.name in self.c_plans:
                 return self.c_call(fn, args)
+            if fn.name in self.wasi_declared:
+                declared_ret, signed = self.wasi_declared[fn.name]
+                return self._wasi_narrow_call(fn, args, declared_ret, signed)
         else:
             inst = getattr(e, "inst_key", None)
             key = func_cname(inst) if inst is not None else (func_cname(raw) if "::" in str(raw) else raw)
@@ -3651,8 +3723,8 @@ class LLVMGen:
             fval = b.fpext(v, F64) if ty == "f32" else v
             buf = self.alloca(ir.ArrayType(I8, 64), "flt_buf")
             buf_ptr = b.gep(buf, [ir.Constant(I32, 0), ir.Constant(I32, 0)], inbounds=True)
-            snprintf_fn = self.c_fn("snprintf", I32, [I8P, I64, I8P], var_arg=True)
-            n_written = b.call(snprintf_fn, [buf_ptr, ir.Constant(I64, 64), self.cstr("%.15g"), fval])
+            snprintf_fn = self.c_fn("snprintf", I32, [I8P, self.size_t, I8P], var_arg=True)
+            n_written = b.call(snprintf_fn, [buf_ptr, ir.Constant(self.size_t, 64), self.cstr("%.15g"), fval])
             view = b.insert_value(ir.Constant(self.llty("str"), ir.Undefined), buf_ptr, 0)
             view = b.insert_value(view, b.sext(n_written, I64), 1)
             b.call(self.funcs["string_append_str"], [out, view])
@@ -4477,8 +4549,8 @@ class LLVMGen:
     def _write_stderr(self, fmt: str, args: list[ir.Value]) -> ir.Value:
         """Format `fmt` and write the bytes to file descriptor 2. Avoids the `stderr` macro."""
         b = self.b
-        sn = self.c_fn("snprintf", I32, [I8P, I64, I8P], var_arg=True)
-        need = b.call(sn, [ir.Constant(I8P, None), ir.Constant(I64, 0), self.cstr(fmt), *args])
+        sn = self.c_fn("snprintf", I32, [I8P, self.size_t, I8P], var_arg=True)
+        need = b.call(sn, [ir.Constant(I8P, None), ir.Constant(self.size_t, 0), self.cstr(fmt), *args])
         n64 = b.sext(need, I64)
         size = b.add(n64, ir.Constant(I64, 1))
         buf = b.call(self.c_fn("malloc", I8P, [I64]), [size])

@@ -247,3 +247,6 @@ benchmarks/reports/*
 /.claude/
 /.zwork/
 benchmarks/reports/latest/*.png
+
+# Playground: LLVM wasm builds, fetched by tools/fetch_llvm.py
+website/playground/llvm/

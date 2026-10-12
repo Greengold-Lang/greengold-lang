@@ -710,8 +710,9 @@ def cmd_fix(paths: list[str], dry_run: bool = False, likely: bool = False) -> in
 
 
 def _is_freestanding(target: str | None, no_std: bool) -> bool:
-    from .targets import is_wasm, triple_of
-    return no_std or target == "bare-metal" or (target is not None and is_wasm(triple_of(target)))
+    from .targets import is_wasi, is_wasm, triple_of
+    wasm_free = target is not None and is_wasm(triple_of(target)) and not is_wasi(triple_of(target))
+    return no_std or target == "bare-metal" or wasm_free
 
 
 def _gen_llvm(program: Program, primary_file: str, release: bool, unchecked: bool, target: str | None = None,
@@ -909,6 +910,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     r = add("run", help="compile and run")
     r.add_argument("files", nargs="*", help="source file(s) (default: gg.toml main)")
+    r.add_argument("-e", "--eval", metavar="CODE",
+                   help="run a snippet instead of a file: the body of `main` (a last bare expression is printed)")
     r.add_argument("--release", action="store_true", help="optimize (LLVM -O3); bounds checks remain enabled")
     r.add_argument("--unchecked", action="store_true", help="UNSAFE: remove array/slice/string bounds checks")
     r.add_argument("--link", action="append", default=[], help="link C library (passed as -l)")
@@ -953,6 +956,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     lsp_p = add("lsp", help="start LSP (Language Server Protocol) server")
     lsp_p.add_argument("--stdio", action="store_true", help="communicate over stdio (default)")
     add("targets", help="list target names for --target and whether they can be linked here")
+    add("doctor", help="check this machine and package, and say how to fix each problem")
+    rp = add("repl", help="interactive prompt: type declarations, bindings, and expressions")
+    rp.add_argument("--release", action="store_true")
     add("toolchain", help="show the LLVM version, the linker, zig, and debuggers this compiler found")
     add("debug-scripts", help="print how to load the gdb/lldb printers for `string`, `List`, `HashMap`, enums")
     add("fetch", help="download the dependencies in gg.toml and pin them in gg.lock")
@@ -967,6 +973,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     nw = add("new", help="create a package (gg.toml + src/main.gg)")
     nw.add_argument("name")
     nw.add_argument("--path", help="directory (default: ./<name>)")
+    nw.add_argument("--template", choices=("bin", "lib", "cli"), default="bin",
+                    help="bin: hello world (default); lib: a library with tests; cli: reads arguments and input")
     fm = add("fmt", help="rewrite .gg files into the one canonical layout")
     fm.add_argument("paths", nargs="*", help="files or directories (default: .)")
     fm.add_argument("--check", action="store_true", help="only report files that would change (exit 1)")
@@ -1021,6 +1029,15 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_targets()
         if args.command == "toolchain":
             return cmd_toolchain()
+        if args.command == "doctor":
+            from . import doctor
+            return doctor.run()
+        if args.command == "repl":
+            from . import repl
+            return repl.repl(args.release)
+        if args.command == "run" and args.eval is not None:
+            from . import repl
+            return repl.run_snippet(args.eval, args.release)
         if args.command == "debug-scripts":
             return cmd_debug_scripts()
         if args.command == "update" and not args.deps:
@@ -1031,7 +1048,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command in ("new", "fmt", "test", "doc"):
             from . import tools
             if args.command == "new":
-                return tools.cmd_new(args.name, args.path)
+                return tools.cmd_new(args.name, args.path, args.template)
             if args.command == "fmt":
                 return tools.cmd_fmt(args.paths, args.check)
             if args.command == "test":

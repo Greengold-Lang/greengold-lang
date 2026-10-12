@@ -74,7 +74,20 @@ def activate_manifest(m: Manifest) -> None:
     editions.activate(m.edition)
 
 
-def cmd_new(name: str, path: str | None = None) -> int:
+_TEMPLATES = {
+    "bin": ('fn test_math():\n    if 1 + 1 != 2:\n        panic("math is broken")\n\n'
+            'fn main():\n    print("Hello from @NAME@!")\n'),
+    "lib": ('public\n# Adds two numbers.\nfn add(a: i32, b: i32) -> i32:\n    return a + b\n\nprivate\n'
+            'fn test_add():\n    require add(2, 3) == 5\n\n'
+            'fn main():\n    print("@NAME@: run `gg test` to check the library")\n'),
+    "cli": ('import std.process\n\n'
+            'fn main():\n    argv = process.args()\n'
+            '    if argv.len < 2:\n        print("usage: @NAME@ <name>")\n        return\n'
+            '    print(f"Hello, {argv[1]}!")\n'),
+}
+
+
+def cmd_new(name: str, path: str | None = None, template: str = "bin") -> int:
     root = Path(path or name)
     if root.exists() and any(root.iterdir()):
         print(f"Error: `{root}` already exists and is not empty.", file=sys.stderr)
@@ -83,10 +96,8 @@ def cmd_new(name: str, path: str | None = None) -> int:
     (root / MANIFEST).write_text(
         f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2026"\nmain = "src/main.gg"\n\n[dependencies]\n'
         '# mylib = { path = "../mylib" }   # then: import mylib.module\n', encoding="utf-8")
-    (root / "src" / "main.gg").write_text(
-        'fn test_math():\n    if 1 + 1 != 2:\n        panic("math is broken")\n\n'
-        'fn main():\n    print("Hello from ' + name + '!")\n', encoding="utf-8")
-    print(f"Created package `{name}` in {root}")
+    (root / "src" / "main.gg").write_text(_TEMPLATES[template].replace("@NAME@", name), encoding="utf-8")
+    print(f"Created package `{name}` in {root}\nNext: cd {root}; gg run   (also: gg test, gg fmt, gg doctor)")
     return 0
 
 

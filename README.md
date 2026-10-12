@@ -85,6 +85,9 @@ gg test  .                                           # run `test` blocks and `fn
 gg fmt   .                                           # canonical layout
 gg explain GG0301                                    # explain an error code
 gg toolchain                                         # LLVM version, linker, zig, debuggers found
+gg doctor                                            # check this machine and package, with a fix for each problem
+gg repl                                              # interactive prompt (or: gg run -e "6 * 7")
+gg new hello --template cli                          # bin (default), lib, or cli
 gg update                                            # update gg to the newest release
 ```
 

@@ -1,0 +1,248 @@
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var editor = $("pg-editor"), out = $("pg-out"), status = $("pg-status"), gutter = $("pg-gutter");
+  var runOut = $("pg-runout"), runBtn = $("pg-run"), stopBtn = $("pg-stop"), hl = $("pg-hl");
+  var release = false, H = window.GGHighlight;
+  var LIMIT_MS = 10000, LIMIT_CHARS = 200000;
+  var toolchain = null, runner = null, killTimer = null, running = false;
+  var examples = {}, seq = 0, pending = {}, ready = false, timer = null, version = 0;
+
+  var worker = new Worker("playground/worker.js");
+  worker.onmessage = function (ev) {
+    var m = ev.data;
+    if (m.type === "status") { setStatus(m.text, "busy"); if (!ready) out.textContent = m.text; }
+    else if (m.type === "ready") { ready = true; setStatus("Ready · gg " + m.version, "ok"); check(); }
+    else if (m.type === "fatal") setStatus("Could not load the compiler: " + m.text, "bad");
+    else if (pending[m.id]) { var p = pending[m.id]; delete pending[m.id]; m.type === "result" ? p.ok(m.result) : p.err(m.text); }
+  };
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (ok, err) { var id = ++seq; pending[id] = { ok: ok, err: err }; worker.postMessage({ id: id, fn: fn, args: args }); });
+  }
+  // A percentage in the text ("... 42%") also moves the thin progress bar above the editor.
+  var bar = $("pg-progress");
+  function setStatus(t, kind) {
+    status.textContent = t; status.dataset.kind = kind || "";
+    var m = kind === "busy" ? /(\d{1,3})%/.exec(t) : null;
+    bar.hidden = !m;
+    if (m) bar.firstElementChild.style.width = Math.min(100, +m[1]) + "%";
+  }
+  function esc(s) { return H.esc(s); }
+
+  function lines() {
+    var n = editor.value.split("\n").length, s = "";
+    for (var i = 1; i <= n; i++) s += i + "\n";
+    gutter.textContent = s;
+    hl.innerHTML = H.source(editor.value) + "\n";   // the colored copy under the transparent textarea
+    sync();
+  }
+  function sync() {
+    gutter.scrollTop = hl.scrollTop = editor.scrollTop;
+    hl.scrollLeft = editor.scrollLeft;
+  }
+
+  function show(text, ok) {
+    if (ok) { out.innerHTML = '<span class="pg-ok">No errors.</span>'; return; }
+    out.innerHTML = H.terminal(text);
+  }
+
+  function check() {
+    if (!ready) return;
+    var v = ++version;
+    setStatus("Checking…", "busy");
+    var t0 = performance.now();
+    call("check", editor.value).then(function (json) {
+      if (v !== version) return;
+      var d = JSON.parse(json);
+      show(d.text, d.ok);
+      var n = d.summary.errors, w = d.summary.warnings;
+      setStatus((n ? n + " error" + (n > 1 ? "s" : "") : "ok") + (w ? ", " + w + " warning" + (w > 1 ? "s" : "") : "") +
+        " · " + Math.round(performance.now() - t0) + " ms", n ? "bad" : "ok");
+    }).catch(function (e) { setStatus("Internal error: " + e, "bad"); });
+  }
+  function later() { clearTimeout(timer); timer = setTimeout(check, 350); }
+
+  // ---- Run: front end (Pyodide) -> LLVM IR -> clang + lld (WebAssembly) -> the program, in a worker ----
+  function tab(name) {
+    ["diag", "output"].forEach(function (n) {
+      $("pg-tab-" + n).setAttribute("aria-selected", String(n === name));
+      (n === "diag" ? out : runOut).hidden = n !== name;
+    });
+  }
+  $("pg-tab-diag").addEventListener("click", function () { tab("diag"); });
+  $("pg-tab-output").addEventListener("click", function () { tab("output"); });
+
+  function say(text, cls, colored) {
+    var span = document.createElement("span");
+    if (cls) span.className = cls;
+    if (colored) span.innerHTML = H.terminal(text) + (/\n$/.test(text) ? "\n" : ""); else span.textContent = text;
+    runOut.appendChild(span);
+    runOut.scrollTop = runOut.scrollHeight;
+  }
+  function finish(note, kind) {
+    if (!running) return;
+    running = false;
+    clearTimeout(killTimer);
+    runBtn.hidden = false; stopBtn.hidden = true;
+    if (runner) { runner.terminate(); runner = null; }
+    if (note) say("\n" + note + "\n", "pg-note");
+    setStatus(note || "Done", kind || "ok");
+  }
+  function run() {
+    if (running || !ready) return;
+    running = true;
+    runBtn.hidden = true; stopBtn.hidden = false;
+    runOut.textContent = "";
+    tab("output");
+    setStatus("Building…", "busy");
+    var t0 = performance.now();
+    call("build", editor.value, release).then(function (json) {
+      var r = JSON.parse(json);
+      if (!r.ok) {
+        runOut.innerHTML = H.terminal(r.text);
+        finish("Could not build.", "bad");
+        return null;
+      }
+      if (!toolchain) toolchain = new Worker("playground/toolchain.js");
+      return new Promise(function (ok, fail) {
+        toolchain.onmessage = function (m) {
+          if (m.data.type === "status") setStatus(m.data.text, "busy");
+          else if (m.data.type === "built") ok(m.data);
+          else if (m.data.type === "error") fail(m.data.text);
+        };
+        toolchain.onerror = function (e) { fail("Toolchain error: " + (e.message || e)); };
+        toolchain.postMessage({ type: "build", ir: r.ir });
+      });
+    }).then(function (built) {
+      if (!built || !running) return;
+      var buildMs = Math.round(performance.now() - t0), t1 = performance.now();
+      setStatus("Running…", "busy");
+      runner = new Worker("playground/runner.js");
+      killTimer = setTimeout(function () { finish("Stopped: the program ran longer than " + LIMIT_MS / 1000 + " s.", "bad"); }, LIMIT_MS);
+      var shown = 0;
+      runner.onmessage = function (m) {
+        var d = m.data;
+        if (d.type === "out") {
+          shown += d.text.length;
+          if (shown > LIMIT_CHARS) { finish("Stopped: more than " + LIMIT_CHARS / 1000 + "k characters of output.", "bad"); return; }
+          say(d.text, "", d.fd === 2);
+        } else if (d.type === "done") {
+          finish("exit code " + d.code + " · build " + buildMs + " ms · run " + Math.round(performance.now() - t1) + " ms",
+            d.code === 0 ? "ok" : "bad");
+        } else if (d.type === "error") {
+          finish(d.text, "bad");
+        }
+      };
+      runner.postMessage({ wasm: built.wasm, stdin: $("pg-stdin").value }, [built.wasm]);
+    }).catch(function (e) { runOut.textContent = String(e); finish("Build failed.", "bad"); });
+  }
+  runBtn.addEventListener("click", run);
+  stopBtn.addEventListener("click", function () { finish("Stopped.", "bad"); });
+  editor.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
+  });
+  function onLink(pane) {
+    return function (e) {
+      var a = e.target.closest("a");
+      if (!a) return;
+      e.preventDefault();
+      if (a.dataset.line) {
+        var ls = editor.value.split("\n"), pos = 0, n = +a.dataset.line - 1;
+        for (var i = 0; i < n && i < ls.length; i++) pos += ls[i].length + 1;
+        editor.focus();
+        editor.setSelectionRange(pos + (+a.dataset.col - 1), pos + (ls[n] || "").length);
+      } else if (a.dataset.explain) {
+        call("explain", a.dataset.explain).then(function (t) { pane.innerHTML = "<pre>" + H.esc(t) + "</pre>"; });
+      }
+    };
+  }
+  runOut.addEventListener("click", onLink(runOut));
+  out.addEventListener("click", onLink(out));
+
+  // Debug / Release
+  Array.prototype.forEach.call(document.querySelectorAll("#pg-mode button"), function (b) {
+    b.addEventListener("click", function () {
+      release = b.dataset.mode === "release";
+      Array.prototype.forEach.call(document.querySelectorAll("#pg-mode button"), function (o) {
+        o.setAttribute("aria-checked", String(o === b));
+      });
+    });
+  });
+
+  function put(src) { editor.value = src; lines(); saveHash(); check(); }
+
+  editor.addEventListener("input", function () { lines(); later(); saveHash(); });
+  editor.addEventListener("scroll", sync);
+  window.GGEditor.attach(editor);   // brackets, indentation, completion (editor.js)
+
+  $("pg-format").addEventListener("click", function () { call("format", editor.value).then(put); });
+  $("pg-fix").addEventListener("click", function () {
+    call("fix", editor.value, false).then(function (json) {
+      var r = JSON.parse(json);
+      put(r.source);
+      if (r.applied.length) setStatus("Applied " + r.applied.length + " fix" + (r.applied.length > 1 ? "es" : ""), "ok");
+    });
+  });
+  $("pg-fixlikely").addEventListener("click", function () {
+    call("fix", editor.value, true).then(function (json) { put(JSON.parse(json).source); });
+  });
+  $("pg-share").addEventListener("click", function () {
+    saveHash();
+    if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(
+      function () { setStatus("Link copied", "ok"); }, function () { setStatus("Copy the address bar", ""); });
+  });
+  // Examples menu: a button and a listbox, styled with the site (a native <select> cannot be).
+  var menuBtn = $("pg-examples-btn"), menu = $("pg-examples");
+  function menuOpen(open) {
+    menu.hidden = !open;
+    menuBtn.setAttribute("aria-expanded", String(open));
+    if (open) { var cur = menu.querySelector("li"); if (cur) cur.focus(); }
+  }
+  menuBtn.addEventListener("click", function () { menuOpen(menu.hidden); });
+  menu.addEventListener("click", function (e) {
+    var li = e.target.closest("li");
+    if (!li) return;
+    menuOpen(false);
+    menuBtn.focus();
+    if (examples[li.dataset.name]) put(examples[li.dataset.name]);
+  });
+  menu.addEventListener("keydown", function (e) {
+    var items = Array.prototype.slice.call(menu.querySelectorAll("li")), i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[Math.min(i + 1, items.length - 1)].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); items[Math.max(i - 1, 0)].focus(); }
+    else if (e.key === "Home") { e.preventDefault(); items[0].focus(); }
+    else if (e.key === "End") { e.preventDefault(); items[items.length - 1].focus(); }
+    else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (i >= 0) items[i].click(); }
+    else if (e.key === "Escape" || e.key === "Tab") { menuOpen(false); menuBtn.focus(); }
+  });
+  menuBtn.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); menuOpen(true); }
+  });
+  document.addEventListener("click", function (e) {
+    if (!menu.hidden && !e.target.closest(".pg-menu")) menuOpen(false);
+  });
+
+  function saveHash() {
+    try { history.replaceState(null, "", "#code=" + encodeURIComponent(btoa(unescape(encodeURIComponent(editor.value))))); } catch (e) { /* too long to share */ }
+  }
+  function loadHash() {
+    var m = /^#code=(.+)$/.exec(location.hash);
+    if (!m) return null;
+    try { return decodeURIComponent(escape(atob(decodeURIComponent(m[1])))); } catch (e) { return null; }
+  }
+
+  fetch("playground/examples.json").then(function (r) { return r.json(); }).then(function (ex) {
+    examples = ex;
+    Object.keys(ex).forEach(function (k) {
+      var li = document.createElement("li");
+      li.setAttribute("role", "option"); li.tabIndex = -1; li.dataset.name = k; li.textContent = k + ".gg";
+      menu.appendChild(li);
+    });
+    var shared = loadHash();
+    editor.value = shared !== null ? shared : ex.hello;
+    lines();
+    check();
+  });
+  setStatus("Loading…", "busy");
+})();

@@ -93,7 +93,10 @@ def esc(text: str) -> str:
     return html.escape(text, quote=False)
 
 
-def highlight_line(line: str) -> str:
+DECLARED_RE = re.compile(r"\b(?:struct|enum|feature|union|type|impl)\s+([A-Za-z_]\w*)")
+
+
+def highlight_line(line: str, declared: frozenset = frozenset()) -> str:
     out = []
     pos = 0
     for m in TOKEN_RE.finditer(line):
@@ -115,7 +118,7 @@ def highlight_line(line: str) -> str:
                 cls = "tok-kw"
             elif text in GG_CONSTANTS:
                 cls = "tok-num"
-            elif text in GG_TYPES or (text[0].isupper() and (len(text) == 1 or any(c.islower() for c in text))):
+            elif text in GG_TYPES or text in declared or (text[0].isupper() and (len(text) == 1 or any(c.islower() for c in text))):
                 cls = "tok-type"
             elif rest.startswith("(") or (rest.startswith("[") and re.match(r"\[[A-Za-z0-9_, \[\]]*\]\(", rest)):
                 cls = "tok-fn"
@@ -126,7 +129,8 @@ def highlight_line(line: str) -> str:
 
 
 def highlight(source: str) -> str:
-    return "\n".join(highlight_line(line) for line in source.strip("\n").split("\n"))
+    declared = frozenset(DECLARED_RE.findall(source))  # a type declared in lowercase is still a type
+    return "\n".join(highlight_line(line, declared) for line in source.strip("\n").split("\n"))
 
 
 C_KEYWORDS = {
@@ -254,6 +258,7 @@ NAV = [
     ("why", "why.html", "Why"),
     ("spec", "spec.html", "Spec"),
     ("benchmarks", "benchmarks.html", "Benchmarks"),
+    ("playground", "playground.html", "Playground"),
     ("diagnostics", "diagnostics.html", "Diagnostics"),
     ("roadmap", "roadmap.html", "Roadmap"),
     ("about", "about.html", "About"),
@@ -1073,6 +1078,68 @@ def build_roadmap() -> str:
                   f"Greengold {VERSION}: what shipped, what is next, and the state of self-hosting.", body)
 
 
+def playground_version() -> str:
+    """Hash of the playground scripts, so a changed script is never served from a stale cache."""
+    import hashlib
+    h = hashlib.sha256()
+    for name in ("highlight.js", "editor.js", "playground.js", "worker.js", "toolchain.js", "runner.js"):
+        h.update((SITE / "playground" / name).read_bytes())
+    return h.hexdigest()[:10]
+
+
+def build_playground() -> str:
+    body = page_hero("Playground", "Playground",
+                     "Write Greengold, see errors and checked fixes as you type, and run the program, all in the browser. "
+                     "The real compiler runs on your machine; nothing is uploaded.") + """
+    <section class="section tight" style="padding-top:8px">
+      <div class="wrap">
+        <div class="pg-bar">
+          <div class="pg-menu">
+            <button type="button" class="btn btn-ghost" id="pg-examples-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="pg-examples">Examples
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <ul class="pg-list" id="pg-examples" role="listbox" aria-label="Examples" hidden></ul>
+          </div>
+          <button type="button" class="btn btn-ghost" id="pg-fix" title="Apply every verified fix">Fix</button>
+          <button type="button" class="btn btn-ghost" id="pg-fixlikely" title="Also apply fixes that are probably what you meant">Fix (likely)</button>
+          <button type="button" class="btn btn-ghost" id="pg-format">Format</button>
+          <button type="button" class="btn btn-ghost" id="pg-share">Copy link</button>
+          <button type="button" class="btn btn-primary" id="pg-run" title="Compile and run in the browser (Ctrl+Enter)">Run</button>
+          <button type="button" class="btn btn-ghost" id="pg-stop" hidden>Stop</button>
+          <div class="pg-seg" id="pg-mode" role="radiogroup" aria-label="Build mode">
+            <button type="button" role="radio" aria-checked="true" data-mode="debug" title="Fast to build, with every runtime check">Debug</button>
+            <button type="button" role="radio" aria-checked="false" data-mode="release" title="Optimized (LLVM -O3); bounds and overflow checks stay on">Release</button>
+          </div>
+          <span class="pg-status" id="pg-status" role="status" aria-live="polite">Loading…</span>
+        </div>
+        <div class="pg-progress" id="pg-progress" role="presentation" hidden><span></span></div>
+        <div class="pg">
+          <div class="pg-pane"><pre class="pg-gutter" id="pg-gutter" aria-hidden="true">1</pre>
+            <div class="pg-code"><pre class="pg-hl" id="pg-hl" aria-hidden="true"></pre>
+              <textarea class="pg-editor" id="pg-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code"></textarea></div></div>
+          <div class="pg-pane pg-right">
+            <div class="pg-tabs" role="tablist">
+              <button type="button" role="tab" id="pg-tab-diag" aria-selected="true">Diagnostics</button>
+              <button type="button" role="tab" id="pg-tab-output" aria-selected="false">Output</button>
+            </div>
+            <pre class="pg-out" id="pg-out" aria-label="Diagnostics">Loading the compiler…</pre>
+            <pre class="pg-out" id="pg-runout" aria-label="Program output" hidden></pre>
+          </div>
+        </div>
+        <details class="pg-stdin"><summary>Input for the program (stdin)</summary>
+          <textarea id="pg-stdin" spellcheck="false" rows="3" aria-label="Program input"></textarea></details>
+        <p style="margin-top:16px">Programs run in your browser: <code>print</code>, strings, <code>List</code>, <code>HashMap</code>, and <code>input</code> work.
+          Threads, tasks, sockets, and files do not; to use them, <a href="https://github.com/Greengold-Lang/greengold-lang#install">install gg</a>.
+          The first Run downloads the compiler once (tens of MB; your browser keeps it).</p>
+        <p class="pg-keys">Editor: <kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs, <kbd>Tab</kbd> indents (<kbd>Shift</kbd>+<kbd>Tab</kbd> outdents), <kbd>Ctrl</kbd>+<kbd>/</kbd> comments lines, brackets and quotes close themselves, and <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the editor.</p>
+      </div>
+    </section>
+    <script src="playground/highlight.js?v=@V@" defer></script>
+    <script src="playground/editor.js?v=@V@" defer></script>
+    <script src="playground/playground.js?v=@V@" defer></script>""".replace("@V@", playground_version())
+    return layout("playground", "playground.html", "Playground",
+                  "Try Greengold in the browser: live diagnostics, checked fixes, and explanations from the real compiler.", body)
+
+
 def build_about() -> str:
     body = page_hero("About", "About",
                      "Greengold is designed by Umut Faruk Dilli: a systems language with C++ and Rust speed that stays friendly to read and to learn.", narrow=True) + f"""
@@ -1243,6 +1310,7 @@ def main() -> None:
         "benchmarks.html": build_benchmarks(rows),
         "diagnostics.html": build_diagnostics(),
         "roadmap.html": build_roadmap(),
+        "playground.html": build_playground(),
         "about.html": build_about(),
     }
     for name, text in pages.items():
@@ -1250,7 +1318,7 @@ def main() -> None:
     shutil.copyfile(SPEC, SITE / "spec.md")
     sitemap = ["<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"]
-    for path in ["", "why.html", "spec.html", "spec.md", "benchmarks.html", "diagnostics.html",
+    for path in ["", "why.html", "spec.html", "spec.md", "benchmarks.html", "playground.html", "diagnostics.html",
                  "roadmap.html", "about.html", "benchmarks/data.json"]:
         sitemap.append(f"  <url><loc>{DOMAIN}/{path}</loc><lastmod>{UPDATED}</lastmod></url>")
     sitemap.append("</urlset>")

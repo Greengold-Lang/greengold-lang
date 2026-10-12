@@ -1647,3 +1647,74 @@ button.contact {
   .panel { padding: 22px; }
   .bench-panel { padding: 20px 16px; }
 }
+
+/* Playground */
+.pg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pg-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.pg-bar [hidden] { display: none !important; }
+.pg-bar .btn, .pg-seg { min-height: 38px; border-radius: 10px; font-size: 0.9rem; }
+.pg-bar .btn { padding: 0 14px; }
+.pg-menu { position: relative; }
+.pg-menu .btn svg { width: 16px; height: 16px; opacity: .7; transition: transform .15s ease; }
+.pg-menu .btn[aria-expanded="true"] { border-color: var(--green); background: var(--surface); }
+.pg-menu .btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.pg-list { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; min-width: 100%; width: max-content; max-height: min(420px, 60vh); overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow); }
+.pg-list[hidden] { display: none; }
+.pg-list li { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .86rem; color: var(--text); white-space: nowrap; }
+.pg-list li:hover, .pg-list li:focus-visible { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); outline: 0; }
+.pg-seg { display: inline-flex; border: 1px solid var(--line-strong); overflow: hidden; background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.pg-seg button { background: none; border: 0; color: var(--text); font: inherit; font-weight: 600; padding: 0 14px; cursor: pointer; opacity: .65; transition: background .15s ease, color .15s ease, opacity .15s ease; }
+.pg-seg button + button { border-left: 1px solid var(--line-strong); }
+.pg-seg button:hover { opacity: 1; }
+.pg-seg button[aria-checked="true"] { opacity: 1; color: var(--green); background: color-mix(in srgb, var(--green) 16%, transparent); }
+.pg-seg button:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.pg-status { margin-left: auto; font-size: .9rem; }
+.pg-status[data-kind="ok"] { color: var(--t-help); }
+.pg-status[data-kind="bad"] { color: var(--t-err); }
+.pg-pane { display: flex; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg-soft); height: clamp(340px, 58vh, 560px); overflow: hidden; }
+.pg-gutter, .pg-hl, .pg-editor, .pg-out { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .92rem; line-height: 1.55; margin: 0; tab-size: 4; }
+.pg-gutter { padding: 12px 10px; text-align: right; color: var(--t-gutter); user-select: none; overflow: hidden; white-space: pre; border-right: 1px solid var(--line); }
+.pg-code { position: relative; flex: 1; min-width: 0; }
+.pg-hl, .pg-editor { position: absolute; inset: 0; padding: 12px 12px 36px; white-space: pre; border: 0; }
+.pg-hl { overflow: hidden; pointer-events: none; color: var(--text); }
+.pg-editor { resize: none; outline: 0; background: transparent; color: transparent; caret-color: var(--text); overflow: auto; }
+.pg-editor::selection { background: color-mix(in srgb, var(--green) 30%, transparent); color: transparent; }
+.pg-right { flex-direction: column; }
+.pg-tabs { display: flex; gap: 4px; padding: 6px 8px 0; border-bottom: 1px solid var(--line); }
+.pg-tabs button { background: none; border: 0; color: inherit; font: inherit; font-size: .9rem; padding: 6px 12px; cursor: pointer; opacity: .6; border-bottom: 2px solid transparent; }
+.pg-tabs button:hover { opacity: 1; }
+.pg-tabs button[aria-selected="true"] { opacity: 1; border-bottom-color: var(--green); }
+.pg-out { flex: 1; min-height: 0; padding: 12px; white-space: pre-wrap; overflow: auto; color: var(--text); }
+.pg-out[hidden] { display: none; }
+.pg-out a { text-decoration: none; }
+.pg-out a:hover { text-decoration: underline; }
+.pg-ok { color: var(--t-help); }
+.pg-err { color: var(--t-err); }
+.pg-note { color: var(--t-dim); }
+.pg-stdin { margin-top: 12px; }
+.pg-stdin summary { cursor: pointer; }
+.pg-stdin textarea { width: 100%; margin-top: 8px; background: var(--bg-soft); color: inherit; border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px; font-family: "JetBrains Mono", ui-monospace, monospace; }
+@media (max-width: 860px) { .pg { grid-template-columns: 1fr; } .pg-pane { height: 320px; } .pg-status { margin-left: 0; width: 100%; } }
+.pg-complete { position: absolute; z-index: 10; margin: 0; padding: 4px; list-style: none; min-width: 180px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: var(--shadow); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .86rem; }
+.pg-complete[hidden] { display: none; }
+.pg-complete li { display: flex; justify-content: space-between; gap: 18px; padding: 5px 10px; border-radius: 7px; cursor: pointer; color: var(--text); }
+.pg-complete li b { color: var(--green); font-weight: 600; }
+.pg-complete li[aria-selected="true"] { background: color-mix(in srgb, var(--green) 16%, transparent); }
+.pg-kind { color: var(--t-dim); font-size: .75rem; align-self: center; }
+.pg-keys { margin-top: 8px; font-size: .88rem; opacity: .8; }
+.pg-keys kbd { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .8rem; padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+.pg-progress { height: 3px; margin: -4px 0 10px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.pg-progress[hidden] { display: none; }
+.pg-progress span { display: block; height: 100%; width: 0; background: var(--green); transition: width .2s ease; }
+
+/* Scrollbars: thin and in the site's colors, in both themes. */
+:root { --scroll-thumb: color-mix(in srgb, var(--text) 22%, transparent); --scroll-thumb-hover: color-mix(in srgb, var(--text) 40%, transparent); scrollbar-color: var(--scroll-thumb) transparent; }
+* { scrollbar-width: thin; }
+html { scrollbar-width: auto; }
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+}
