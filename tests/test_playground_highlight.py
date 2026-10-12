@@ -42,3 +42,10 @@ def test_runtime_error_line():
     html = run('window.GGHighlight.terminal("Runtime error: boom\\n  --> main.gg:3:4\\n")')
     assert '<span class="t-err">Runtime error:</span> boom' in html
     assert 'data-line="3"' in html
+
+
+@pytest.mark.parametrize("name", ["editor", "highlight", "playground", "runner", "toolchain", "worker"])
+def test_playground_scripts_parse(name):
+    path = JS.parent / f"{name}.js"
+    r = subprocess.run(["node", "--check", str(path)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr

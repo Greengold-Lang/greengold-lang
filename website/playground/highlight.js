@@ -72,5 +72,6 @@
     }).join("\n");
   }
 
-  global.GGHighlight = { source: source, terminal: terminal, esc: esc };
+  global.GGHighlight = { source: source, terminal: terminal, esc: esc, keywords: Object.keys(KEYWORDS).concat(Object.keys(CONSTANTS)),
+    types: Object.keys(TYPES) };
 })(window);

@@ -1116,9 +1116,11 @@ def build_playground() -> str:
         <p style="margin-top:16px">Programs run in your browser: <code>print</code>, strings, <code>List</code>, <code>HashMap</code>, and <code>input</code> work.
           Threads, tasks, sockets, and files do not; to use them, <a href="https://github.com/Greengold-Lang/greengold-lang#install">install gg</a>.
           The first Run downloads the compiler once (tens of MB; your browser keeps it).</p>
+        <p class="pg-keys">Editor: <kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs, <kbd>Tab</kbd> indents (<kbd>Shift</kbd>+<kbd>Tab</kbd> outdents), <kbd>Ctrl</kbd>+<kbd>/</kbd> comments lines, brackets and quotes close themselves, and <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the editor.</p>
       </div>
     </section>
     <script src="playground/highlight.js" defer></script>
+    <script src="playground/editor.js" defer></script>
     <script src="playground/playground.js" defer></script>"""
     return layout("playground", "playground.html", "Playground",
                   "Try Greengold in the browser: live diagnostics, checked fixes, and explanations from the real compiler.", body)

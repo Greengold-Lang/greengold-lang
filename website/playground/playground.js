@@ -167,13 +167,7 @@
 
   editor.addEventListener("input", function () { lines(); later(); saveHash(); });
   editor.addEventListener("scroll", sync);
-  editor.addEventListener("keydown", function (e) {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      editor.setRangeText("    ", editor.selectionStart, editor.selectionEnd, "end");
-      editor.dispatchEvent(new Event("input"));
-    }
-  });
+  window.GGEditor.attach(editor);   // brackets, indentation, completion (editor.js)
 
   $("pg-format").addEventListener("click", function () { call("format", editor.value).then(put); });
   $("pg-fix").addEventListener("click", function () {
