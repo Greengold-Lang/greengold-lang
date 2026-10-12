@@ -191,8 +191,35 @@
     if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(
       function () { setStatus("Link copied", "ok"); }, function () { setStatus("Copy the address bar", ""); });
   });
-  $("pg-examples").addEventListener("change", function (e) {
-    if (examples[e.target.value]) put(examples[e.target.value]);
+  // Examples menu: a button and a listbox, styled with the site (a native <select> cannot be).
+  var menuBtn = $("pg-examples-btn"), menu = $("pg-examples");
+  function menuOpen(open) {
+    menu.hidden = !open;
+    menuBtn.setAttribute("aria-expanded", String(open));
+    if (open) { var cur = menu.querySelector("li"); if (cur) cur.focus(); }
+  }
+  menuBtn.addEventListener("click", function () { menuOpen(menu.hidden); });
+  menu.addEventListener("click", function (e) {
+    var li = e.target.closest("li");
+    if (!li) return;
+    menuOpen(false);
+    menuBtn.focus();
+    if (examples[li.dataset.name]) put(examples[li.dataset.name]);
+  });
+  menu.addEventListener("keydown", function (e) {
+    var items = Array.prototype.slice.call(menu.querySelectorAll("li")), i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[Math.min(i + 1, items.length - 1)].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); items[Math.max(i - 1, 0)].focus(); }
+    else if (e.key === "Home") { e.preventDefault(); items[0].focus(); }
+    else if (e.key === "End") { e.preventDefault(); items[items.length - 1].focus(); }
+    else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (i >= 0) items[i].click(); }
+    else if (e.key === "Escape" || e.key === "Tab") { menuOpen(false); menuBtn.focus(); }
+  });
+  menuBtn.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); menuOpen(true); }
+  });
+  document.addEventListener("click", function (e) {
+    if (!menu.hidden && !e.target.closest(".pg-menu")) menuOpen(false);
   });
 
   function saveHash() {
@@ -206,8 +233,11 @@
 
   fetch("playground/examples.json").then(function (r) { return r.json(); }).then(function (ex) {
     examples = ex;
-    var sel = $("pg-examples");
-    Object.keys(ex).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = k + ".gg"; sel.appendChild(o); });
+    Object.keys(ex).forEach(function (k) {
+      var li = document.createElement("li");
+      li.setAttribute("role", "option"); li.tabIndex = -1; li.dataset.name = k; li.textContent = k + ".gg";
+      menu.appendChild(li);
+    });
     var shared = loadHash();
     editor.value = shared !== null ? shared : ex.hello;
     lines();

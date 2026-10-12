@@ -1081,7 +1081,11 @@ def build_playground() -> str:
     <section class="section tight" style="padding-top:8px">
       <div class="wrap">
         <div class="pg-bar">
-          <select id="pg-examples" aria-label="Examples"><option value="">Examples…</option></select>
+          <div class="pg-menu">
+            <button type="button" class="btn btn-ghost" id="pg-examples-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="pg-examples">Examples
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <ul class="pg-list" id="pg-examples" role="listbox" aria-label="Examples" hidden></ul>
+          </div>
           <button type="button" class="btn btn-ghost" id="pg-fix" title="Apply every verified fix">Fix</button>
           <button type="button" class="btn btn-ghost" id="pg-fixlikely" title="Also apply fixes that are probably what you meant">Fix (likely)</button>
           <button type="button" class="btn btn-ghost" id="pg-format">Format</button>

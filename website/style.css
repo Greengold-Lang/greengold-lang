@@ -1652,10 +1652,16 @@ button.contact {
 .pg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .pg-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .pg-bar [hidden] { display: none !important; }
-.pg-bar .btn, .pg-bar select, .pg-seg { min-height: 38px; border-radius: 10px; font-size: 0.9rem; }
+.pg-bar .btn, .pg-seg { min-height: 38px; border-radius: 10px; font-size: 0.9rem; }
 .pg-bar .btn { padding: 0 14px; }
-.pg-bar select { background: color-mix(in srgb, var(--surface) 60%, transparent); color: var(--text); border: 1px solid var(--line-strong); padding: 0 10px; font-family: inherit; font-weight: 500; cursor: pointer; }
-.pg-bar select:hover, .pg-bar select:focus-visible { border-color: var(--green); outline: 0; }
+.pg-menu { position: relative; }
+.pg-menu .btn svg { width: 16px; height: 16px; opacity: .7; transition: transform .15s ease; }
+.pg-menu .btn[aria-expanded="true"] { border-color: var(--green); background: var(--surface); }
+.pg-menu .btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.pg-list { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; min-width: 100%; width: max-content; max-height: min(420px, 60vh); overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow); }
+.pg-list[hidden] { display: none; }
+.pg-list li { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .86rem; color: var(--text); white-space: nowrap; }
+.pg-list li:hover, .pg-list li:focus-visible { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); outline: 0; }
 .pg-seg { display: inline-flex; border: 1px solid var(--line-strong); overflow: hidden; background: color-mix(in srgb, var(--surface) 60%, transparent); }
 .pg-seg button { background: none; border: 0; color: var(--text); font: inherit; font-weight: 600; padding: 0 14px; cursor: pointer; opacity: .65; transition: background .15s ease, color .15s ease, opacity .15s ease; }
 .pg-seg button + button { border-left: 1px solid var(--line-strong); }
