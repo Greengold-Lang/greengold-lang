@@ -873,7 +873,7 @@ def build_benchmarks(rows: list[dict]) -> str:
         </article>""")
 
     body = page_hero("Benchmarks", "Greengold vs. C++ and Rust",
-                     f"{len(rows)} workloads, measured on {DATE_LONG}. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href=\"https://github.com/UmutFarukDilli/Greengold-lang/blob/master/benchmarks/README.md\">benchmarks/README.md</a> for how to read the numbers.",
+                     f"{len(rows)} workloads, measured on {DATE_LONG}. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href=\"https://github.com/Greengold-Lang/greengold-lang/blob/master/benchmarks/README.md\">benchmarks/README.md</a> for how to read the numbers.",
                      f'<div class="chip-row">{chips}</div>') + f"""
     <section class="section tight" style="padding-top:24px">
       <div class="wrap">

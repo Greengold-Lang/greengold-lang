@@ -28,8 +28,8 @@ standalone = ["pyinstaller>=6"]
 
 [project.urls]
 Homepage = "https://greengoldlang.com"
-Repository = "https://github.com/UmutFarukDilli/Greengold-lang"
-Issues = "https://github.com/UmutFarukDilli/Greengold-lang/issues"
+Repository = "https://github.com/Greengold-Lang/greengold-lang"
+Issues = "https://github.com/Greengold-Lang/greengold-lang/issues"
 
 [project.scripts]
 gg = "greengold.cli:main"

@@ -5,7 +5,7 @@ Thanks for taking an interest. Greengold is an early-stage language (see [Status
 ## Setting up
 
 ```bash
-git clone https://github.com/UmutFarukDilli/Greengold-lang
+git clone https://github.com/Greengold-Lang/greengold-lang
 cd Greengold-lang
 python -m venv .venv
 .venv/bin/pip install -e ".[test]"      # Windows: .venv\Scripts\pip
