@@ -2,7 +2,33 @@
 
 Static site in this directory: HTML, CSS, and JavaScript. Cloudflare Pages publishes this folder with an empty build command.
 
-## Cloudflare Pages
+## Updating the live site: checklist
+
+The site is published by uploading this folder directly to Cloudflare Pages (not through Git), so what is on disk when you upload is what goes live. From the repository root:
+
+1. **Compiler, standard library, or `docs/` changed?** Rebuild what the site embeds:
+   ```bash
+   python tools/build_playground.py   # playground/gg-bundle.zip: the compiler the playground runs
+   python tools/build_site.py         # every *.html page, spec.md, sitemap.xml
+   ```
+   Also regenerate `diagnostics/use-after-consume.txt` and `.json` with `gg check` when diagnostics output changed, and refresh `benchmarks/data.json` after a new benchmark run.
+2. **Check that the LLVM files are present** (they are git-ignored, so a fresh clone does not have them):
+   ```bash
+   ls website/playground/llvm      # clang.0.wasm clang.1.wasm lld.wasm memfs.wasm
+   python tools/fetch_llvm.py      # only if the folder is missing or empty
+   ```
+   Without them the playground's Run falls back to binji.github.io (uncompressed, about 50 MB, not under our control).
+3. **Run the tests:** `python -m pytest -q` (a test fails when `gg-bundle.zip` is older than the compiler).
+4. **Try the playground locally** before uploading: `python -m http.server 8765 -d website`, open `http://localhost:8765/playground.html`, press Run once.
+5. **Upload the whole `website/` folder** to the Pages project (Workers & Pages, the project, Create new deployment, upload the folder). Upload the folder itself, with `playground/llvm/` inside it; the single files are each under Pages' 25 MiB limit, and `_headers` goes with it.
+6. **After the upload,** open the live `/playground.html` in a private window and press Run: the first Run should download the compiler (about 20 MB) and print output; a second Run should be instant.
+7. Commit the generated files (`gg-bundle.zip`, the `*.html` pages) so the repository matches what is live. Do not commit `playground/llvm/`.
+
+Do not run `python tools/fetch_llvm.py` on every update; the files only change if the pinned versions in that script change.
+
+## Cloudflare Pages (connect to Git instead)
+
+Only for a Git-connected project. A Git-connected deploy does not contain `playground/llvm/` (it is git-ignored), so Run would use the slow fallback; to use Git, remove the `website/playground/llvm/` line from `.gitignore` and commit those files (about 51 MB).
 
 1. Open Workers & Pages, then Create application, Pages, Connect to Git.
 2. Select the Greengold-lang repository.
