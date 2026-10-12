@@ -3,7 +3,7 @@ import std.tasks
 import std.time
 
 async fn twice(n: i32) -> i32:
-    tasks.sleep(50)
+    tasks.sleep(100)
     return n * 2
 
 async fn greet(name: string, times: i32) -> string:
@@ -28,7 +28,7 @@ fn main():
     b = twice(2)
     c = twice(3)
     print(await a + await b + await c)
-    print(t.elapsed_millis() < 140)
+    print(t.elapsed_millis() < 250)
     g1 = greet(string.from("x"), 3)
     g2 = greet(string.from("y"), 3)
     print(await g1, await g2)
