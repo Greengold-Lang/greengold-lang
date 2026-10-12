@@ -56,6 +56,7 @@ ICONS = {
     "moon": icon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', ' class="moon"'),
     "menu": icon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     "code": icon('<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>'),
+    "github": icon('<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>'),
     "file": icon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'),
     "bolt": icon('<path d="M13 2L3 14h9l-1 8 10-12h-9z"/>'),
     "pause": icon('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
@@ -350,6 +351,9 @@ def layout(key: str, path: str, title: str, description: str, body: str) -> str:
         <div class="footer-col">
           <h4>Project</h4>
           <ul>
+            <li><a href="https://github.com/Greengold-Lang/greengold-lang">GitHub</a></li>
+            <li><a href="https://github.com/Greengold-Lang/greengold-lang/releases/latest">Download</a></li>
+            <li><a href="https://github.com/Greengold-Lang/greengold-lang#install">Install</a></li>
             <li><a href="roadmap.html">Roadmap</a></li>
             <li><a href="about.html">About</a></li>
             <li><a href="llms.txt">llms.txt</a></li>
@@ -358,7 +362,7 @@ def layout(key: str, path: str, title: str, description: str, body: str) -> str:
       </div>
       <div class="footer-bottom">
         <span>© 2026 Umut Faruk Dilli. Greengold is released under the MIT License.</span>
-        <span>Version {VERSION} · not yet released</span>
+        <span>Version {VERSION}</span>
       </div>
     </div>
   </footer>
@@ -597,6 +601,7 @@ def build_index(rows: list[dict]) -> str:
           <div class="hero-actions">
             <a class="btn btn-primary" href="spec.html">{ICONS["book"]} Read the spec</a>
             <a class="btn btn-ghost" href="benchmarks.html">{ICONS["chart"]} See benchmarks</a>
+            <a class="btn btn-ghost" href="https://github.com/Greengold-Lang/greengold-lang" rel="noopener">{ICONS["github"]} GitHub</a>
           </div>
           <div class="hero-cmd"><span><span class="prompt">$ </span>gg run hello.gg</span></div>
         </div>
@@ -873,7 +878,7 @@ def build_benchmarks(rows: list[dict]) -> str:
         </article>""")
 
     body = page_hero("Benchmarks", "Greengold vs. C++ and Rust",
-                     f"{len(rows)} workloads, measured on {DATE_LONG}. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href=\"https://github.com/Greengold-Lang/greengold-lang/blob/master/benchmarks/README.md\">benchmarks/README.md</a> for how to read the numbers.",
+                     f"{len(rows)} workloads, measured on {DATE_LONG}. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href=\"https://github.com/Greengold-Lang/greengold-lang/blob/main/benchmarks/README.md\">benchmarks/README.md</a> for how to read the numbers.",
                      f'<div class="chip-row">{chips}</div>') + f"""
     <section class="section tight" style="padding-top:24px">
       <div class="wrap">

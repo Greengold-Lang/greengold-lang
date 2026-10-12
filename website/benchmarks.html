@@ -50,7 +50,7 @@
       <div class="wrap">
         <span class="kicker">Benchmarks</span>
         <h1>Greengold vs. C++ and Rust</h1>
-        <p class="lede">18 workloads, measured on 9 October 2026. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href="https://github.com/Greengold-Lang/greengold-lang/blob/master/benchmarks/README.md">benchmarks/README.md</a> for how to read the numbers.</p>
+        <p class="lede">18 workloads, measured on 9 October 2026. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href="https://github.com/Greengold-Lang/greengold-lang/blob/main/benchmarks/README.md">benchmarks/README.md</a> for how to read the numbers.</p>
         <div class="chip-row"><span class="chip">AMD Ryzen 5 5600X · 6C/12T</span><span class="chip">32 GB DDR4-3600</span><span class="chip">Windows 11 Pro 26200</span><span class="chip">g++ 15.2.0</span><span class="chip">rustc 1.99.0-nightly</span><span class="chip">llvmlite 0.42.0</span></div>
       </div>
     </section>
@@ -1133,6 +1133,9 @@ __kernel <span class="tok-type">void</span> <span class="tok-fn">layer</span>(__
         <div class="footer-col">
           <h4>Project</h4>
           <ul>
+            <li><a href="https://github.com/Greengold-Lang/greengold-lang">GitHub</a></li>
+            <li><a href="https://github.com/Greengold-Lang/greengold-lang/releases/latest">Download</a></li>
+            <li><a href="https://github.com/Greengold-Lang/greengold-lang#install">Install</a></li>
             <li><a href="roadmap.html">Roadmap</a></li>
             <li><a href="about.html">About</a></li>
             <li><a href="llms.txt">llms.txt</a></li>
@@ -1141,7 +1144,7 @@ __kernel <span class="tok-type">void</span> <span class="tok-fn">layer</span>(__
       </div>
       <div class="footer-bottom">
         <span>© 2026 Umut Faruk Dilli. Greengold is released under the MIT License.</span>
-        <span>Version 0.3.3 · not yet released</span>
+        <span>Version 0.3.3</span>
       </div>
     </div>
   </footer>
