@@ -35,6 +35,13 @@ def test_debug_ir_has_functions_lines_and_locals(tmp_path):
     assert "DISubprogram" not in (tmp_path / "plain.ll").read_text(encoding="utf-8")
 
 
+def _skip_if_gdb_cannot_load(res):
+    """Some gdb builds (Cygwin/MSYS ones on CI) cannot open a native Windows .exe or path."""
+    err = res.stderr
+    if "No executable specified" in err or "not in executable format" in err or "Excess command line" in err:
+        pytest.skip(f"this gdb cannot load the program here: {err.strip()[:120]}")
+
+
 @pytest.mark.skipif(shutil.which("gdb") is None, reason="gdb is not installed")
 def test_gdb_stops_on_a_greengold_line(tmp_path):
     src = tmp_path / "dbg.gg"
@@ -46,6 +53,7 @@ def test_gdb_stops_on_a_greengold_line(tmp_path):
         main(["emit-ll", str(src), "-o", str(tmp_path / "plain.ll")])
     res = subprocess.run(["gdb", "-batch", "-ex", "break dbg.gg:7", "-ex", "run", "-ex", "print p", "-ex", "print total",
                           str(exe)], capture_output=True, text=True, timeout=60)
+    _skip_if_gdb_cannot_load(res)
     assert "dbg.gg:7" in res.stdout
     assert "{x = 3, y = 1.5}" in res.stdout
     assert "= 3" in res.stdout
@@ -109,6 +117,7 @@ def test_gdb_printers_show_values(tmp_path):
     for v in ("s", "xs", "p", "o", "n", "sh", "t", "names"):
         cmds += ["-ex", f"print {v}"]
     res = subprocess.run(["gdb", "-batch", *cmds, str(exe)], capture_output=True, text=True, timeout=60)
+    _skip_if_gdb_cannot_load(res)
     got = [ln.split(" = ", 1)[1] for ln in res.stdout.splitlines() if ln.startswith("$")]
     assert got == ['"hello"', "List[i32] (len 2) = {1, 2}", '{name = "pt", xs = List[i32] (len 0)}', "Valid(7)",
                    "None", "Rect(2, 3)", '"view"', '{"x", "y"}'], res.stdout + res.stderr
@@ -122,7 +131,7 @@ def test_lldb_formatters_show_values(tmp_path):
                           "-o", "b vals.gg:21", "-o", "run", "-o", "frame variable s o n sh t names", str(exe)],
                          capture_output=True, text=True, timeout=120)
     out = res.stdout
-    if "s = " not in out:
+    if "launch failed" in out or "not permitted" in out:
         pytest.skip("lldb could not run the program here")
     for line in ['(string) s = "hello"', "(Optional[i32]) o = Valid(7)", "(Optional[i32]) n = None",
                  "(Shape) sh = Rect(2, 3)", '(str) t = "view"', '(string[2]) names = ([0] = "x", [1] = "y")']:

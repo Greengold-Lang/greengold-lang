@@ -763,7 +763,7 @@ def _build_llvm(program: Program, primary_file: str, exe_path: Path, release: bo
     with tempfile.TemporaryDirectory(prefix="greengold_") as tmp:
         obj_path = Path(tmp) / "program.o"
         obj_path.write_bytes(obj)
-        return link_executable(obj_path, exe_path, triple, links, freestanding=free)
+        return link_executable(obj_path, exe_path, triple, links, freestanding=free, debug=DEBUG_INFO)
 
 
 def _link_cross(obj: bytes, exe_path: Path, triple: str, links: list[str] | None, free: bool) -> int:

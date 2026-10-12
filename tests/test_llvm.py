@@ -45,7 +45,8 @@ def test_emit_bc_writes_bitcode(tmp_path):
     r = gg("emit-bc", p)
     assert r.returncode == 0, r.stderr
     bc = list(tmp_path.glob("*.bc"))
-    assert bc and bc[0].read_bytes()[:2] == b"BC"
+    # raw bitcode starts with "BC"; for Apple targets LLVM writes the 0x0B17C0DE wrapper first
+    assert bc and bc[0].read_bytes()[:4] in (bytes.fromhex("4243c0de"), bytes.fromhex("dec0170b"))
 
 
 @needs_linker

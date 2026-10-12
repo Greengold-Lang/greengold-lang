@@ -186,7 +186,7 @@ def find_linker(triple: str) -> list[str] | None:
 
 
 def link_executable(obj_path: Path, exe_path: Path, triple: str, links: list[str] | None = None,
-                    freestanding: bool = False) -> int:
+                    freestanding: bool = False, debug: bool = False) -> int:
     cmd = find_linker(triple)
     if cmd is None:
         print("Error: no linker found. Install gcc or clang, or run `pip install ziglang` (zig cc links with "
@@ -206,4 +206,10 @@ def link_executable(obj_path: Path, exe_path: Path, triple: str, links: list[str
         print("Error: linking failed:", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         return 1
+    if debug and "apple" in triple:
+        # The linker leaves the DWARF in the object file, which is deleted; dsymutil copies it into exe.dSYM
+        # so lldb can find the lines and variables.
+        dsymutil = shutil.which("dsymutil")
+        if dsymutil:
+            subprocess.run([dsymutil, str(exe_path)], capture_output=True, text=True)
     return 0

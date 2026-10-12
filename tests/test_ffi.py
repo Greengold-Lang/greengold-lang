@@ -216,7 +216,7 @@ def test_rust_staticlib(tmp_path: Path):
         pytest.skip(f"rustc staticlib could not be compiled (target may not be installed): {res.stderr[-200:]}")
     (tmp_path / "main.gg").write_text(RUST_GG, encoding="utf-8")
     extra = ["--link", "ws2_32", "--link", "userenv", "--link", "ntdll", "--link", "bcrypt"] \
-        if sys.platform == "win32" else ["--link", "dl", "--link", "pthread", "--link", "m", "--link", "gcc_s"]
+        if sys.platform == "win32" else ["--link", "dl", "--link", "pthread", "--link", "m"] + ([] if sys.platform == "darwin" else ["--link", "gcc_s"])
     out = _gg(["run", "main.gg", "--link-file", "librs.a", *extra], tmp_path)
     assert out.returncode == 0, out.stderr
     assert out.stdout.split("\n")[:2] == ["42", "0 3 6 9"]

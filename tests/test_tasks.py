@@ -7,7 +7,7 @@ import std.tasks
 import std.time
 
 async fn twice(n: i32) -> i32:
-    tasks.sleep(50)
+    tasks.sleep(100)
     return n * 2
 
 async fn greet(name: string, times: i32) -> string:
@@ -32,7 +32,7 @@ fn main():
     b = twice(2)
     c = twice(3)
     print(await a + await b + await c)
-    print(t.elapsed_millis() < 140)
+    print(t.elapsed_millis() < 250)
     g1 = greet(string.from("x"), 3)
     g2 = greet(string.from("y"), 3)
     print(await g1, await g2)
@@ -145,7 +145,7 @@ def test_async_fn_await_sleep_and_yield(monkeypatch):
     r = run_built(BASICS, timeout=60)
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
-    # three 50 ms sleeps run at the same time: well under 150 ms in all
+    # three 100 ms sleeps run at the same time: well under 300 ms in all (loose, CI machines are slow)
     assert r.stdout.splitlines() == ["12", "true", "x0 x1 x2  y0 y1 y2 ", "log: done", "12", "false spawned"]
 
 
