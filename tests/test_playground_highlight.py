@@ -49,3 +49,17 @@ def test_playground_scripts_parse(name):
     path = JS.parent / f"{name}.js"
     r = subprocess.run(["node", "--check", str(path)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def test_lowercase_declared_types_are_colored():
+    code = "struct point:\n    x: i32\n\nfn make() -> point:\n    return point{ x: 1 }\n"
+    html = run(f"window.GGHighlight.source({json.dumps(code)})")
+    assert html.count('<span class="tok-type">point</span>') == 3, html
+
+
+def test_site_highlighter_colors_lowercase_types():
+    import sys
+    sys.path.insert(0, str(JS.parents[2] / "tools"))
+    import build_site
+    html = build_site.highlight("struct point:\n    x: i32\n\nfn make() -> point:\n    return point{ x: 1 }\n")
+    assert html.count('<span class="tok-type">point</span>') == 3, html

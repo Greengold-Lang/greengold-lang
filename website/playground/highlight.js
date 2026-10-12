@@ -13,7 +13,16 @@
   function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function span(cls, text) { return '<span class="' + cls + '">' + esc(text) + "</span>"; }
 
-  function line(src) {
+  // Names the file declares as types (`struct point:`, `enum shape:`, ...), so they are colored even in lowercase.
+  var DECL = /\b(?:struct|enum|feature|union|type|impl)\s+([A-Za-z_][A-Za-z0-9_]*)/g;
+  function declared(src) {
+    var names = {}, m;
+    DECL.lastIndex = 0;
+    while ((m = DECL.exec(src)) !== null) names[m[1]] = true;
+    return names;
+  }
+
+  function line(src, names) {
     var out = "", pos = 0, m;
     TOKEN.lastIndex = 0;
     while ((m = TOKEN.exec(src)) !== null) {
@@ -27,7 +36,7 @@
         var rest = src.slice(m.index + text.length);
         if (KEYWORDS[text]) cls = "tok-kw";
         else if (CONSTANTS[text]) cls = "tok-num";
-        else if (TYPES[text] || (/^[A-Z]/.test(text) && (text.length === 1 || /[a-z]/.test(text)))) cls = "tok-type";
+        else if (TYPES[text] || (names && names[text]) || (/^[A-Z]/.test(text) && (text.length === 1 || /[a-z]/.test(text)))) cls = "tok-type";
         else if (rest.charAt(0) === "(" || (rest.charAt(0) === "[" && /^\[[A-Za-z0-9_, \[\]]*\]\(/.test(rest))) cls = "tok-fn";
       }
       out += cls ? span(cls, text) : esc(text);
@@ -37,7 +46,10 @@
     return out + esc(src.slice(pos));
   }
 
-  function source(src) { return src.split("\n").map(line).join("\n"); }
+  function source(src) {
+    var names = declared(src);
+    return src.split("\n").map(function (l) { return line(l, names); }).join("\n");
+  }
 
   // Compiler output as the terminal shows it. Locations (`main.gg:5:9`) and codes (`GG0203`) become links.
   function terminal(text) {

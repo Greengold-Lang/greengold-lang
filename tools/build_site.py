@@ -93,7 +93,10 @@ def esc(text: str) -> str:
     return html.escape(text, quote=False)
 
 
-def highlight_line(line: str) -> str:
+DECLARED_RE = re.compile(r"\b(?:struct|enum|feature|union|type|impl)\s+([A-Za-z_]\w*)")
+
+
+def highlight_line(line: str, declared: frozenset = frozenset()) -> str:
     out = []
     pos = 0
     for m in TOKEN_RE.finditer(line):
@@ -115,7 +118,7 @@ def highlight_line(line: str) -> str:
                 cls = "tok-kw"
             elif text in GG_CONSTANTS:
                 cls = "tok-num"
-            elif text in GG_TYPES or (text[0].isupper() and (len(text) == 1 or any(c.islower() for c in text))):
+            elif text in GG_TYPES or text in declared or (text[0].isupper() and (len(text) == 1 or any(c.islower() for c in text))):
                 cls = "tok-type"
             elif rest.startswith("(") or (rest.startswith("[") and re.match(r"\[[A-Za-z0-9_, \[\]]*\]\(", rest)):
                 cls = "tok-fn"
@@ -126,7 +129,8 @@ def highlight_line(line: str) -> str:
 
 
 def highlight(source: str) -> str:
-    return "\n".join(highlight_line(line) for line in source.strip("\n").split("\n"))
+    declared = frozenset(DECLARED_RE.findall(source))  # a type declared in lowercase is still a type
+    return "\n".join(highlight_line(line, declared) for line in source.strip("\n").split("\n"))
 
 
 C_KEYWORDS = {
