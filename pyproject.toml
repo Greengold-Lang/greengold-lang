@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "greengold"
-version = "0.3.3"
+dynamic = ["version"]  # single source: greengold/__init__.py
 description = "Greengold language: compiler emitting LLVM IR for .gg files (read/lend/consume, comptime, soa, LLVM backend)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -33,6 +33,9 @@ Issues = "https://github.com/Greengold-Lang/greengold-lang/issues"
 
 [project.scripts]
 gg = "greengold.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "greengold.__version__" }
 
 [tool.setuptools]
 packages = ["greengold"]
