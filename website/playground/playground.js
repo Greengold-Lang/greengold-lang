@@ -11,7 +11,7 @@
   var worker = new Worker("playground/worker.js");
   worker.onmessage = function (ev) {
     var m = ev.data;
-    if (m.type === "status") setStatus(m.text, "busy");
+    if (m.type === "status") { setStatus(m.text, "busy"); if (!ready) out.textContent = m.text; }
     else if (m.type === "ready") { ready = true; setStatus("Ready · gg " + m.version, "ok"); check(); }
     else if (m.type === "fatal") setStatus("Could not load the compiler: " + m.text, "bad");
     else if (pending[m.id]) { var p = pending[m.id]; delete pending[m.id]; m.type === "result" ? p.ok(m.result) : p.err(m.text); }
@@ -20,7 +20,14 @@
     var args = Array.prototype.slice.call(arguments, 1);
     return new Promise(function (ok, err) { var id = ++seq; pending[id] = { ok: ok, err: err }; worker.postMessage({ id: id, fn: fn, args: args }); });
   }
-  function setStatus(t, kind) { status.textContent = t; status.dataset.kind = kind || ""; }
+  // A percentage in the text ("... 42%") also moves the thin progress bar above the editor.
+  var bar = $("pg-progress");
+  function setStatus(t, kind) {
+    status.textContent = t; status.dataset.kind = kind || "";
+    var m = kind === "busy" ? /(\d{1,3})%/.exec(t) : null;
+    bar.hidden = !m;
+    if (m) bar.firstElementChild.style.width = Math.min(100, +m[1]) + "%";
+  }
   function esc(s) { return H.esc(s); }
 
   function lines() {

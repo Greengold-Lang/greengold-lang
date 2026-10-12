@@ -1111,6 +1111,7 @@ def build_playground() -> str:
           </div>
           <span class="pg-status" id="pg-status" role="status" aria-live="polite">Loading…</span>
         </div>
+        <div class="pg-progress" id="pg-progress" role="presentation" hidden><span></span></div>
         <div class="pg">
           <div class="pg-pane"><pre class="pg-gutter" id="pg-gutter" aria-hidden="true">1</pre>
             <div class="pg-code"><pre class="pg-hl" id="pg-hl" aria-hidden="true"></pre>

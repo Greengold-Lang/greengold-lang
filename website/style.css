@@ -1703,3 +1703,6 @@ button.contact {
 .pg-kind { color: var(--t-dim); font-size: .75rem; align-self: center; }
 .pg-keys { margin-top: 8px; font-size: .88rem; opacity: .8; }
 .pg-keys kbd { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .8rem; padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+.pg-progress { height: 3px; margin: -4px 0 10px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.pg-progress[hidden] { display: none; }
+.pg-progress span { display: block; height: 100%; width: 0; background: var(--green); transition: width .2s ease; }
