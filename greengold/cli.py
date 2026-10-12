@@ -552,7 +552,7 @@ def cmd_targets() -> int:
 
 
 def cmd_packages(command: str, index: str | None = None) -> int:
-    """`gg fetch` (resolve and download, keep gg.lock), `gg update` (re-resolve), `gg publish`."""
+    """`gg fetch` (resolve and download, keep gg.lock), `gg update --deps` (re-resolve), `gg publish`."""
     from . import packages, tools
     mp = tools.find_manifest()
     if mp is None:
@@ -956,7 +956,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add("toolchain", help="show the LLVM version, the linker, zig, and debuggers this compiler found")
     add("debug-scripts", help="print how to load the gdb/lldb printers for `string`, `List`, `HashMap`, enums")
     add("fetch", help="download the dependencies in gg.toml and pin them in gg.lock")
-    add("update", help="resolve the dependencies again (newest allowed versions) and rewrite gg.lock")
+    up = add("update", help="update gg itself to the newest GitHub release (--deps: re-resolve gg.toml dependencies)")
+    up.add_argument("--deps", action="store_true",
+                    help="instead resolve the dependencies again (newest allowed versions) and rewrite gg.lock")
+    up.add_argument("--check", action="store_true", help="only say whether a newer gg exists")
+    up.add_argument("--force", action="store_true", help="install the release even if it is not newer")
+    up.add_argument("--tag", help="install this release (e.g. 0.3.3) instead of the latest")
     pb = add("publish", help="add this package's version (its current git commit) to a registry index")
     pb.add_argument("--index", help="registry index directory (default: GG_REGISTRY)")
     nw = add("new", help="create a package (gg.toml + src/main.gg)")
@@ -1018,6 +1023,9 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_toolchain()
         if args.command == "debug-scripts":
             return cmd_debug_scripts()
+        if args.command == "update" and not args.deps:
+            from . import selfupdate
+            return selfupdate.run(args.check, args.force, args.tag)
         if args.command in ("fetch", "update", "publish"):
             return cmd_packages(args.command, getattr(args, "index", None))
         if args.command in ("new", "fmt", "test", "doc"):

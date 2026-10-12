@@ -7,7 +7,7 @@
 
 A git dependency is cloned once into `~/.greengold/packages` (GG_HOME overrides the location) at the
 commit its tag, branch, or rev names, and that commit is written to `gg.lock`. Later builds use the
-locked commit until `gg update`. A version requirement is looked up in the registry index: a directory
+locked commit until `gg update --deps`. A version requirement is looked up in the registry index: a directory
 or git repository holding `<name>.toml` files with one `[[versions]]` entry per published version
 (`version`, `git`, `rev`). "1.4" means 1.4.0 or newer below 2.0.0 (below 1.0: "0.3" means 0.3.x);
 "=1.4.2" means exactly that version. The index is `[registry] index = ...` in gg.toml, else the

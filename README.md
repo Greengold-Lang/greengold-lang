@@ -41,10 +41,39 @@ Bug reports are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## Install
+
+No Python needed. The installers download the single-file `gg` for your platform from the
+[latest release](https://github.com/Greengold-Lang/greengold-lang/releases/latest), check its SHA-256, and add it to your `PATH`.
+The file includes the compiler, LLVM, and Zig, so `gg build` links programs without a C compiler installed.
+
+**Windows** (PowerShell), or download `gg-setup-windows-x64.exe` from the release page:
+
+```powershell
+irm https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/installer/install.ps1 | iex
+```
+
+**Linux and macOS:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/installer/install.sh | sh
+```
+
+Open a new terminal and run `gg --version`. Builds exist for Windows x64, Linux x64 and arm64, and macOS arm64 and x64.
+`GG_VERSION=0.3.3` picks a version, `GG_INSTALL_DIR` the folder, `GG_NO_MODIFY_PATH=1` leaves `PATH` alone.
+
+**Update:** `gg update` downloads the newest release, verifies it, and replaces the installed `gg` (`gg update --check` only looks;
+`gg update --tag 0.3.3` installs a given version). To re-resolve a package's dependencies, use `gg update --deps`.
+`gg update` works on the standalone install only; with `pip install` use `pip install -U git+https://github.com/Greengold-Lang/greengold-lang.git`.
+
+**Uninstall:** delete the folder (`%LOCALAPPDATA%\Greengoldin` or `~/.greengold/bin`) and its `PATH` entry, or use "Apps" on Windows if you used the setup program.
+
+---
+
 ## How to Run
 
 ```bash
-pip install -e .                                     # installs the `gg` command
+pip install -e .                                     # from a source checkout (see Install for the no-Python way)
 gg run   examples/numeric.gg                         # compile + run (debug)
 gg run   examples/numeric.gg --release               # compile + run (LLVM -O3)
 gg run   examples/rpg/main.gg                        # multi-file project (resolves imports)
@@ -56,6 +85,7 @@ gg test  .                                           # run `test` blocks and `fn
 gg fmt   .                                           # canonical layout
 gg explain GG0301                                    # explain an error code
 gg toolchain                                         # LLVM version, linker, zig, debuggers found
+gg update                                            # update gg to the newest release
 ```
 
 `python -m greengold <command>` works without installing.
