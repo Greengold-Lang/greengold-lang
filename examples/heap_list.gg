@@ -1,0 +1,37 @@
+# Heap: recursive linked list with Box, dynamic array with List. Ownership released via automatic drop.
+
+enum LinkedList:
+    Cons(i32, Box[LinkedList])
+    Nil
+
+fn sum(l: LinkedList) -> i32:
+    match l:
+        Cons(v, rest):
+            return v + sum(rest.value)
+        Nil:
+            return 0
+
+fn build(n: i32) -> LinkedList:
+    list = LinkedList.Nil
+    for i in 0..n:
+        list = LinkedList.Cons(i, Box[LinkedList](list))
+    return list
+
+fn main():
+    list = build(5)
+    print(sum(list))
+
+    v = List[i32]()
+    for i in 0..10:
+        v.push(i * i)
+    print(v.len)
+    print(v[3])
+    total = 0
+    for x in v:
+        total += x
+    print(total)
+    match v.pop():
+        Valid(x):
+            print(x)
+        None:
+            print(-1)

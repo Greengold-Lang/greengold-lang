@@ -1,0 +1,21 @@
+fn words(text: str) -> List[str]:
+    return text.split_whitespace()
+
+fn main():
+    owned = string.from("  Hello, World  ")
+    t = owned.trim()
+    print(t, owned.to_upper(), owned.contains("World"), owned.split(","))
+    parts = "a b c".split(" ")
+    print(parts.join("-"), words("x  y").join("+"))
+    nums = List[i32]()
+    nums.push(1)
+    nums.push(2)
+    print(nums.join(", "))
+    names = List[string]()
+    names.push("ann")
+    names.push("bob")
+    print(names.join(" & "))
+    total = 0
+    for w in "10 20 x 30".split(" "):
+        total += i32(w.parse_int().value_or(0))
+    print(total)

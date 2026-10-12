@@ -1,0 +1,12 @@
+# conformance: SPEC section 17, rejected form: `?` inside an argument
+# expect-error: GG0127 at line 8
+
+fn f() -> Optional[i32]:
+    return None
+
+fn g() -> Optional[i32]:
+    print(f()?)
+    return None
+
+fn main():
+    pass

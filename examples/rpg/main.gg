@@ -1,0 +1,85 @@
+# Greengold RPG Project: main.gg
+# Main executable entry point for multi-file sample project
+
+import "types.gg"
+import "combat.gg"
+
+fn print_player_status(p: types.Player):
+    print("====================================")
+    print("Hero:", p.name)
+    print("Health:", p.hp, "/", p.max_hp)
+    print("Attack:", p.stats.attack, "| Defense:", p.stats.defense)
+    print("Potions:", p.potions, "| Gold:", p.gold)
+    print("====================================")
+
+fn main():
+    print("=== Welcome to the Greengold Multi-file RPG Project! ===")
+
+    hero = types.Player{
+        name: "Arthur"
+        hp: 100
+        max_hp: 100
+        stats: types.Stats{ attack: 24, defense: 8 }
+        potions: 2
+        gold: 15
+    }
+
+    print_player_status(hero)
+
+    # Encounter 1: Forest Goblin
+    print("\n--- Encounter 1: A Forest Goblin approaches! ---")
+    goblin = types.Monster{
+        name: "Forest Goblin"
+        hp: 45
+        stats: types.Stats{ attack: 14, defense: 4 }
+        gold_reward: 20
+    }
+
+    # Round 1: Attack
+    print("\n[Round 1]")
+    res1 = combat.execute_round(hero, goblin, types.Action.Attack)
+
+    # Round 2: Potion attempt
+    print("\n[Round 2]")
+    res2 = combat.execute_round(hero, goblin, types.Action.DrinkPotion)
+
+    # Round 3: Final strike
+    print("\n[Round 3]")
+    res3 = combat.execute_round(hero, goblin, types.Action.Attack)
+
+    match res3:
+        Victory(reward):
+            print("Congratulations! Battle won, gold earned:", reward)
+        Defeat:
+            print("Game over, hero fell.")
+        Ongoing:
+            print("Battle continues...")
+
+    # Encounter 2: Mountain Troll
+    print("\n--- Encounter 2: An Angry Mountain Troll appears! ---")
+    troll = types.Monster{
+        name: "Angry Troll"
+        hp: 60
+        stats: types.Stats{ attack: 22, defense: 6 }
+        gold_reward: 50
+    }
+
+    print("\n[Troll Battle - Round 1: Defensive stance]")
+    combat.execute_round(hero, troll, types.Action.Defend)
+
+    print("\n[Troll Battle - Round 2: Powerful attack]")
+    res_troll = combat.execute_round(hero, troll, types.Action.Attack)
+
+    print("\n[Troll Battle - Round 3: Final blow]")
+    res_final = combat.execute_round(hero, troll, types.Action.Attack)
+
+    match res_final:
+        Victory(reward):
+            print("Legendary victory! Troll defeated, reward:", reward)
+        Defeat:
+            print("Hero was defeated by the troll.")
+        Ongoing:
+            print("Troll is still standing!")
+
+    print("\n=== End of Adventure Hero Status ===")
+    print_player_status(hero)

@@ -1,0 +1,22 @@
+fn collatz(n: i64) -> i32:
+    overflow: wrap
+    cur = n
+    steps: i32 = 0
+    while cur > 1:
+        if cur % 2 == 0:
+            cur = cur / 2
+        else:
+            cur = 3 * cur + 1
+        steps += 1
+    return steps
+
+fn main():
+    max_steps: i32 = 0
+    best_n: i64 = 0
+    for i in 1..4000000:
+        s = collatz(i64(i))
+        if s > max_steps:
+            max_steps = s
+            best_n = i64(i)
+    print(best_n)
+    print(max_steps)

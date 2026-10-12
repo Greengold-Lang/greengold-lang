@@ -1,0 +1,15 @@
+fn test_push_pop_len():
+    s = stack_new()
+    require stack_len(s) == 0
+    stack_push(s, 1)
+    stack_push(s, 2)
+    require stack_len(s) == 2
+    require stack_pop(s).value_or(-1) == 2
+    require stack_pop(s).value_or(-1) == 1
+    require stack_pop(s).is_none()
+
+fn test_consume_counts_items():
+    s = stack_new()
+    stack_push(s, 4)
+    stack_push(s, 5)
+    require stack_into_len(s) == 2

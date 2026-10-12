@@ -1,0 +1,8 @@
+# conformance: SPEC section 16 (Imports and the library), example 3
+# expect-output:
+#   2
+
+import std.math as numbers
+
+fn main():
+    print(numbers.sqrt(4.0))

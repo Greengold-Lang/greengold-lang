@@ -1,0 +1,19 @@
+﻿fn main():
+    for i in 3:
+        print("count", i)
+    n: i64 = 4
+    for j in n:
+        print("n", j)
+    for i in 0..10 step 3:
+        print("step", i)
+    for i in 0..=9 step 3:
+        print("step_incl", i)
+    for i in 10..0 step -4:
+        print("down", i)
+    for i in 10..=0 step -5:
+        print("down_incl", i)
+    nums = [10, 20, 30]
+    for k, x in nums:
+        print("indexed", k, x)
+    for c in "hi":
+        print("char", c)

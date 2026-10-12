@@ -1,0 +1,412 @@
+# std.tasks: tasks that take turns on one thread, for programs that wait on many things at once.
+#
+#     async fn fetch(n: i32) -> i32:
+#         tasks.sleep(10)                       # waits without blocking the other tasks
+#         return n * 2
+#
+#     fn main():
+#         a = fetch(1)                          # starts a task; returns a Task[i32] at once
+#         b = fetch(2)
+#         print(await a + await b)              # 6: both slept at the same time
+#
+# `async fn f(...) -> T` gives `fn f(...) -> Task[T]` (a `Task[bool]` without a result): calling it starts
+# the body as a task, with the arguments moved into it. `await t` waits for the task and returns its result.
+# `spawn(fn() -> T => ...)` starts any lambda as a task.
+#
+# Tasks run one at a time on the thread that uses them and switch only where one waits: `await`, `sleep`,
+# `yield_now`, or a wait for a socket (`wait_readable`, `wait_writable`, and the `_async` methods of
+# std.net). The program itself (`main`) is a task too. Each task has its own stack (a Windows fiber, or a
+# `ucontext` on Linux and macOS), so any function may wait, not only an `async fn`. When every task waits
+# for another task and nothing else can wake one, the program stops with a panic. A `Task` that goes away
+# without `await` is waited for there.
+import std.time
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+weak extern "windows.h" fn ConvertThreadToFiber(param: *u8) -> *mut u8
+weak extern "windows.h" fn CreateFiber(stack: usize, start: fn(*u8), param: *u8) -> *mut u8
+weak extern "windows.h" fn SwitchToFiber(fiber: *u8)
+weak extern "windows.h" fn DeleteFiber(fiber: *u8)
+weak extern "winsock2.h" fn WSAPoll(fds: *mut u8, n: u32, timeout: i32) -> i32
+weak extern "ucontext.h" fn getcontext(ctx: *mut u8) -> i32
+weak extern "ucontext.h" fn makecontext(ctx: *mut u8, start: fn(), argc: i32)
+weak extern "ucontext.h" fn swapcontext(from: *mut u8, to: *u8) -> i32
+weak extern "poll.h" fn poll(fds: *mut u8, n: u64, timeout: i32) -> i32
+
+const _READY: i32 = 0
+const _RUNNING: i32 = 1
+const _WAITING: i32 = 2
+const _DONE: i32 = 3
+const _STACK: usize = 262144     # bytes of stack per task on Linux and macOS (Windows: the default)
+const _CTX_BYTES: usize = 8192   # room for a ucontext_t on every supported system
+
+# One task, on the C heap. Pointers to records are kept as `u64` in statics.
+struct _Rec:
+    ctx: *mut u8      # the fiber (Windows) or the ucontext buffer
+    stack: *mut u8    # the stack (Linux, macOS)
+    job: *mut u8      # the boxed `Fn()` that runs the body and stores its result
+    result: *mut u8
+    state: i32
+    waiter: u64       # the task waiting for this one, or 0
+    next: u64         # next in the ready queue
+    bnext: u64        # next in the list of tasks waiting for time or a socket
+    wake_at: i64      # monotonic nanoseconds, or -1
+    fd: i64           # socket waited for, or -1
+    writable: bool
+
+static STARTED: bool = false
+static CURRENT: u64 = 0     # the running task
+static MAIN: u64 = 0        # the record of the program itself
+static SCHED: u64 = 0       # the scheduler's context (a fiber or a ucontext buffer)
+static RUN_HEAD: u64 = 0
+static RUN_TAIL: u64 = 0
+static BLOCKED: u64 = 0
+
+fn _r(p: u64) -> *mut _Rec:
+    unsafe:
+        return int_to_ptr[*mut _Rec](p)
+
+fn _p(p: *mut u8) -> u64:
+    unsafe:
+        return u64(ptr_to_int(p))
+
+fn _new_rec() -> u64:
+    unsafe:
+        raw = malloc(size_of[_Rec]())
+        if raw == null:
+            panic("tasks: out of memory")
+        p = _p(raw)
+        _r(p)[0] = _Rec{ ctx: null, stack: null, job: null, result: null, state: _READY, waiter: 0, next: 0,
+            bnext: 0, wake_at: -1, fd: -1, writable: false }
+        return p
+
+fn _start():
+    unsafe:
+        if STARTED:
+            return
+        unsafe:
+            if target_os() != "windows" and target_os() != "linux" and target_os() != "macos":
+                panic("std.tasks runs on Windows, Linux, and macOS")
+            STARTED = true
+            MAIN = _new_rec()
+            _r(MAIN)[0].state = _RUNNING
+            CURRENT = MAIN
+            if target_os() == "windows":
+                me = ConvertThreadToFiber(null)
+                if me == null:
+                    panic("tasks: this thread is a fiber already (made by other code)")
+                _r(MAIN)[0].ctx = me
+                SCHED = _p(CreateFiber(0, _fiber_scheduler, null))
+            else:
+                _r(MAIN)[0].ctx = malloc(_CTX_BYTES)
+                SCHED = _p(_posix_context(_posix_scheduler))
+
+# A fresh ucontext that starts `entry` on its own stack.
+fn _posix_context(entry: fn()) -> *mut u8:
+    unsafe:
+        ctx = malloc(_CTX_BYTES)
+        stack = malloc(_STACK)
+        if ctx == null or stack == null:
+            panic("tasks: out of memory")
+        if target_os() == "windows":
+            return ctx  # not used there: Windows has fibers
+        getcontext(ctx)
+        if target_os() == "macos":  # uc_stack.ss_sp at 8, ss_size at 16, uc_link at 32
+            ptr_cast[*mut u64](ptr_offset(ctx, 8))[0] = u64(ptr_to_int(stack))
+            ptr_cast[*mut u64](ptr_offset(ctx, 16))[0] = u64(_STACK)
+            ptr_cast[*mut u64](ptr_offset(ctx, 32))[0] = 0
+        else:  # glibc, 64-bit: uc_link at 8, uc_stack.ss_sp at 16, ss_size at 32
+            ptr_cast[*mut u64](ptr_offset(ctx, 8))[0] = 0
+            ptr_cast[*mut u64](ptr_offset(ctx, 16))[0] = u64(ptr_to_int(stack))
+            ptr_cast[*mut u64](ptr_offset(ctx, 32))[0] = u64(_STACK)
+        makecontext(ctx, entry, 0)
+        return ctx
+
+# Runs the context `to`, saving the current one in `from` (the record of the running task, or 0 for the
+# scheduler).
+fn _switch(from: u64, to: u64):
+    unsafe:
+        if target_os() == "windows":
+            SwitchToFiber(if to == 0 then int_to_ptr[*u8](SCHED) else ptr_cast[*u8](_r(to)[0].ctx))
+        else:
+            save = if from == 0 then int_to_ptr[*mut u8](SCHED) else _r(from)[0].ctx
+            next = if to == 0 then int_to_ptr[*u8](SCHED) else ptr_cast[*u8](_r(to)[0].ctx)
+            swapcontext(save, next)
+
+# The running task gives the thread to the scheduler; it continues when it is made ready again.
+fn _suspend():
+    unsafe:
+        _switch(CURRENT, 0)
+
+fn _push_ready(p: u64):
+    unsafe:
+        _r(p)[0].state = _READY
+        _r(p)[0].next = 0
+        if RUN_TAIL == 0:
+            RUN_HEAD = p
+        else:
+            _r(RUN_TAIL)[0].next = p
+        RUN_TAIL = p
+
+fn _pop_ready() -> u64:
+    unsafe:
+        p = RUN_HEAD
+        if p != 0:
+            RUN_HEAD = _r(p)[0].next
+            if RUN_HEAD == 0:
+                RUN_TAIL = 0
+        return p
+
+fn _block(p: u64):
+    unsafe:
+        _r(p)[0].state = _WAITING
+        _r(p)[0].bnext = BLOCKED
+        BLOCKED = p
+
+fn _fiber_scheduler(_arg: *u8):
+    _schedule()
+
+fn _posix_scheduler():
+    _schedule()
+
+fn _fiber_task(_arg: *u8):
+    _run_current()
+
+fn _posix_task():
+    _run_current()
+
+fn _schedule():
+    unsafe:
+        while true:
+            t = _pop_ready()
+            if t == 0:
+                if not _wait_blocked():
+                    panic("tasks: every task is waiting and nothing can wake one (a task waits for itself, or for a task that waits for it)")
+                continue
+            CURRENT = t
+            _r(t)[0].state = _RUNNING
+            _switch(0, t)
+            if _r(t)[0].state == _DONE and t != MAIN:  # its stack is no longer in use
+                unsafe:
+                    if target_os() == "windows":
+                        DeleteFiber(_r(t)[0].ctx)
+                    else:
+                        free(_r(t)[0].ctx)
+                        free(_r(t)[0].stack)
+                    _r(t)[0].ctx = null
+                    _r(t)[0].stack = null
+
+fn _run_current():
+    unsafe:
+        me = CURRENT
+        unsafe:
+            job = ptr_read[Fn()](_r(me)[0].job)
+            free(_r(me)[0].job)
+            _r(me)[0].job = null
+            job()
+        _r(me)[0].state = _DONE
+        w = _r(me)[0].waiter
+        if w != 0:
+            _push_ready(w)
+        _suspend()  # never continues
+
+# Waits until a sleeping task's time comes or a socket is ready, and makes those tasks ready.
+# False when no task waits for either.
+fn _wait_blocked() -> bool:
+    unsafe:
+        if BLOCKED == 0:
+            return false
+        now = time.monotonic_nanos()
+        earliest: i64 = -1
+        nfd: usize = 0
+        b = BLOCKED
+        while b != 0:
+            w = _r(b)[0].wake_at
+            if w >= 0 and (earliest < 0 or w < earliest):
+                earliest = w
+            if _r(b)[0].fd >= 0:
+                nfd += 1
+            b = _r(b)[0].bnext
+        timeout: i32 = -1
+        if earliest >= 0:
+            timeout = if earliest <= now then 0 else i32((earliest - now + 999999) / 1000000)
+        ready = List[i64]()
+        if nfd == 0:
+            time.sleep_millis(i64(timeout))
+        else:
+            ready = _poll(nfd, timeout)
+        now = time.monotonic_nanos()
+        prev: u64 = 0
+        b = BLOCKED
+        while b != 0:
+            next = _r(b)[0].bnext
+            w = _r(b)[0].wake_at
+            fd = _r(b)[0].fd
+            if (w >= 0 and now >= w) or (fd >= 0 and ready.contains(fd)):
+                if prev == 0:
+                    BLOCKED = next
+                else:
+                    _r(prev)[0].bnext = next
+                _r(b)[0].wake_at = -1
+                _r(b)[0].fd = -1
+                _push_ready(b)
+            else:
+                prev = b
+            b = next
+        return true
+
+# The sockets among the waiting tasks' that are ready, waiting at most `timeout` ms (-1: no limit).
+fn _poll(n: usize, timeout: i32) -> List[i64]:
+    unsafe:
+        win = target_os() == "windows"
+        size: usize = if win then 16 else 8
+        out = List[i64]()
+        unsafe:
+            fds = malloc(n * size)
+            i: usize = 0
+            b = BLOCKED
+            while b != 0:
+                fd = _r(b)[0].fd
+                if fd >= 0:
+                    at = ptr_offset(fds, i64(i * size))
+                    if win:
+                        ptr_cast[*mut i64](at)[0] = fd
+                        ptr_cast[*mut i16](ptr_offset(at, 8))[0] = if _r(b)[0].writable then 16 else 256
+                        ptr_cast[*mut i16](ptr_offset(at, 10))[0] = 0
+                    else:
+                        ptr_cast[*mut i32](at)[0] = i32(fd)
+                        ptr_cast[*mut i16](ptr_offset(at, 4))[0] = if _r(b)[0].writable then 4 else 1
+                        ptr_cast[*mut i16](ptr_offset(at, 6))[0] = 0
+                    i += 1
+                b = _r(b)[0].bnext
+            if target_os() == "windows":
+                WSAPoll(fds, u32(n), timeout)
+            else:
+                poll(fds, u64(n), timeout)
+            for k in 0..n:
+                at = ptr_offset(fds, i64(k * size))
+                revents = if win then ptr_cast[*mut i16](ptr_offset(at, 10))[0] else ptr_cast[*mut i16](ptr_offset(at, 6))[0]
+                if revents != 0:
+                    out.push(if win then ptr_cast[*mut i64](at)[0] else i64(ptr_cast[*mut i32](at)[0]))
+            free(fds)
+        return out
+
+fn _store[T](out: *mut u8, value: T):
+    unsafe:
+        ptr_write[T](out, value)
+
+# Waits until task `p` is done.
+fn _wait_done(p: u64):
+    unsafe:
+        if _r(p)[0].state == _DONE:
+            return
+        if p == CURRENT:
+            panic("tasks: a task cannot wait for itself")
+        _r(p)[0].waiter = CURRENT
+        _r(CURRENT)[0].state = _WAITING
+        _suspend()
+
+public
+# A running task and, once it is done, its result. `await t` (or `tasks.wait(t)`) takes the result.
+struct Task[T]:
+    private
+    rec: u64
+
+public
+impl Task[T]:
+    # True when the task has finished.
+    fn is_done(self: read Self) -> bool:
+        unsafe:
+            return self.rec == 0 or _r(self.rec)[0].state == _DONE
+
+    fn drop(self: lend Self):
+        unsafe:
+            if self.rec != 0:
+                _wait_done(self.rec)
+                unsafe:
+                    old = ptr_read[T](_r(self.rec)[0].result)
+                    free(_r(self.rec)[0].result)
+                    free(int_to_ptr[*u8](self.rec))
+                self.rec = 0
+
+public
+# Starts `body` as a task and returns at once; the task runs when the running one waits.
+fn spawn[T](body: send Fn() -> T) -> Task[T]:
+    unsafe:
+        _start()
+        p = _new_rec()
+        unsafe:
+            out = malloc(size_of[T]() + 1)
+            _r(p)[0].result = out
+            job: Fn() = fn() => _store[T](out, body())
+            raw = malloc(size_of[Fn()]())
+            ptr_write[Fn()](raw, job)
+            _r(p)[0].job = raw
+            if target_os() == "windows":
+                _r(p)[0].ctx = CreateFiber(0, _fiber_task, null)
+                if _r(p)[0].ctx == null:
+                    panic("tasks: cannot create a fiber")
+            else:
+                _r(p)[0].ctx = _posix_context(_posix_task)
+        _push_ready(p)
+        return Task[T]{ rec: p }
+
+# Used by `async fn`: moves an argument into a slot on the heap, for the task to take with `_unpark`.
+fn _park[T](value: T) -> u64:
+    unsafe:
+        p = malloc(size_of[T]() + 1)
+        ptr_write[T](p, value)
+        return u64(ptr_to_int(p))
+
+fn _unpark[T](slot: u64) -> T:
+    unsafe:
+        p = int_to_ptr[*mut u8](slot)
+        v = ptr_read[T](p)
+        free(p)
+        return v
+
+# Waits for the task to finish and returns its result (`await t`).
+fn wait[T](t: consume Task[T]) -> T:
+    unsafe:
+        _start()
+        p = t.rec
+        _wait_done(p)
+        t.rec = 0
+        unsafe:
+            v = ptr_read[T](_r(p)[0].result)
+            free(_r(p)[0].result)
+            free(int_to_ptr[*u8](p))
+            return v
+
+# Lets the other ready tasks run, then continues.
+fn yield_now():
+    unsafe:
+        _start()
+        _push_ready(CURRENT)
+        _suspend()
+
+# Waits `ms` milliseconds while the other tasks run.
+fn sleep(ms: i64):
+    unsafe:
+        _start()
+        _r(CURRENT)[0].wake_at = time.monotonic_nanos() + (if ms > 0 then ms else 0) * 1000000
+        _block(CURRENT)
+        _suspend()
+
+# Waits until socket `fd` has data to read (or a connection to accept, or is closed).
+fn wait_readable(fd: i64):
+    _wait_fd(fd, false)
+
+# Waits until socket `fd` can take more data.
+fn wait_writable(fd: i64):
+    _wait_fd(fd, true)
+
+private
+fn _wait_fd(fd: i64, writable: bool):
+    unsafe:
+        _start()
+        _r(CURRENT)[0].fd = fd
+        _r(CURRENT)[0].writable = writable
+        _block(CURRENT)
+        _suspend()

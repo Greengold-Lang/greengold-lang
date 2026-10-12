@@ -1,0 +1,43 @@
+# Word frequency: build a 3,000,000-word text from a 20,000-word vocabulary (skewed toward
+# short indices, like real text), split it on whitespace, count each word in a hash map, and
+# sort the distinct words by count (then by word). Strings, slices, hashing, and sorting.
+import std.collections
+
+struct Count:
+    word: str
+    n: i64
+
+fn by_count(a: Count, b: Count) -> bool:
+    if a.n != b.n:
+        return a.n > b.n
+    return a.word < b.word
+
+fn main():
+    overflow: wrap
+    syl = ["ka", "lo", "mi", "ne", "ru", "sa", "to", "vi"]
+    vocab = List[string]()
+    for i in 0..20000:
+        w = string.new()
+        k = i + 8
+        while k > 0:
+            w.append_str(syl[k % 8])
+            k = k / 8
+        vocab.push(w)
+    text = string.new()
+    seed: u64 = 42
+    for _i in 0..3000000:
+        seed = seed * 6364136223846793005 + 1442695040888963407
+        a = (seed >> 33) % 20000
+        seed = seed * 6364136223846793005 + 1442695040888963407
+        b = (seed >> 33) % (a + 1)
+        text.append(vocab[usize(b)])
+        text.append_byte(' ')
+    counts = collections.hashmap_str[i64]()
+    for w in text.as_str().split_whitespace():
+        counts.entry(w, 0) += 1
+    rows = List[Count]()
+    ks = counts.keys()
+    for w in ks:
+        rows.push(Count{ word: w, n: counts.get_or(w, 0) })
+    rows.sort_by(by_count)
+    print(rows.len, rows[0].word, rows[0].n, rows[1].word, rows[1].n, rows[rows.len - 1].word, rows[rows.len - 1].n)

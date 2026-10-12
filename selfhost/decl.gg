@@ -1,0 +1,1110 @@
+# Top-level declarations and the program entry.
+import std.string
+import ast
+import cursor
+import ty
+import expr
+import stmt
+
+public
+
+fn parse_program(p: lend cursor.Parser) -> usize:
+    decls = List[usize]()
+    while not cursor.at(p, "EOF"):
+        start = p.pos
+        if cursor.at(p, "public") or cursor.at(p, "private"):
+            visibility(p)
+            if p.bad:
+                cursor.sync_top(p, start)
+                p.bad = false
+            continue
+        export_here = p.export
+        made: usize = 0
+        if cursor.at(p, "struct"):
+            made = parse_struct(p, export_here)
+        elif cursor.at(p, "enum"):
+            made = parse_enum(p, export_here)
+        elif cursor.at(p, "feature"):
+            made = parse_feature(p, export_here)
+        elif cursor.at(p, "fn"):
+            made = parse_func(p, false, false, "", cursor.empty_span())
+            set_pub_func(p, made, export_here)
+        elif cursor.at(p, "comptime"):
+            cursor.advance(p)
+            if not cursor.at(p, "fn"):
+                cursor.fail_here(p, "Expected `fn` after `comptime`.", "Write in the form `comptime fn name() -> T:`.", true)
+            else:
+                made = parse_func(p, false, false, "", cursor.empty_span())
+                if made != 0:
+                    n = p.nodes[made]
+                    n.f3 = true
+                    n.f6 = export_here
+                    p.nodes[made] = n
+        elif cursor.at(p, "hot"):
+            cursor.advance(p)
+            if not cursor.at(p, "fn"):
+                cursor.fail_here(p, "Expected `fn` after `hot`.", "Write in the form `hot fn name(...):`.", true)
+            else:
+                made = parse_func(p, false, false, "", cursor.empty_span())
+                if made != 0:
+                    n2 = p.nodes[made]
+                    n2.f4 = true
+                    n2.f6 = export_here
+                    p.nodes[made] = n2
+        elif cursor.at(p, "const"):
+            made = parse_const(p, export_here, false)
+        elif cursor.at(p, "extern") and cursor.kind_is(p, cursor.peek_at(p, 1), "struct"):
+            cursor.advance(p)
+            made = parse_struct(p, export_here)
+            if made != 0:
+                n3 = p.nodes[made]
+                n3.f0 = true
+                p.nodes[made] = n3
+        elif cursor.at(p, "extern"):
+            made = parse_extern(p, export_here)
+        elif cursor.at(p, "import"):
+            made = parse_import(p)
+        elif cursor.cur_named(p, "impl") and cursor.kind_is(p, cursor.peek_at(p, 1), "NAME"):
+            parse_impl(p, decls)
+            made = 0
+        elif cursor.cur_named(p, "type") and cursor.kind_is(p, cursor.peek_at(p, 1), "NAME") and cursor.kind_is(p, cursor.peek_at(p, 2), "="):
+            parse_alias(p)
+            made = 0
+        elif cursor.at(p, "var"):
+            made = parse_const(p, export_here, true)
+        elif cursor.cur_named(p, "test") and (cursor.kind_is(p, cursor.peek_at(p, 1), ":") or cursor.kind_is(p, cursor.peek_at(p, 1), "NAME")):
+            made = parse_test(p)
+            set_pub_func(p, made, export_here)
+        else:
+            full = string.new()
+            full.append_str("Only `struct`, `enum`, `feature`, `impl`, `fn`, `test`, `const`, `extern`, and `import` can be declared at top-level (found ")
+            cursor.describe(p, cursor.cur(p), full)
+            full.append_str(").")
+            cursor.fail_here(p, full.as_str(), "Put code inside a `fn`; program entry point must be `fn main():`.", true)
+        if p.bad:
+            cursor.sync_top(p, start)
+            p.bad = false
+        elif made != 0:
+            decls.push(made)
+    i: usize = 0
+    while i < p.lifted.len:
+        decls.push(p.lifted[i])
+        i += 1
+    if p.ak.len > 0:
+        resolve_aliases(p, decls)
+    sp = cursor.flush(p, decls)
+    prog = ast.blank()
+    prog.kind = 1
+    prog.line = 1
+    prog.col = 1
+    prog.length = 1
+    prog.lo = sp.lo
+    prog.hi = sp.hi
+    return cursor.push_node(p, prog)
+
+fn set_pub_func(p: lend cursor.Parser, id: usize, is_pub: bool):
+    if id == 0:
+        return
+    n = p.nodes[id]
+    n.f6 = is_pub
+    p.nodes[id] = n
+
+fn visibility(p: lend cursor.Parser):
+    word = cursor.advance(p)
+    if not cursor.at(p, "NEWLINE") and not cursor.at(p, "EOF"):
+        msg = string.new()
+        msg.append_byte(96)
+        msg.append_str(p.lx.names.text(word.text))
+        msg.append_str("` stands on its own line.")
+        cursor.fail(p, word.line, word.col, word.length, msg.as_str(), "Write it alone. Declarations below stay public or private until the next line.", true)
+        return
+    p.export = cursor.kind_is(p, word, "public")
+    cursor.eat(p, "NEWLINE")
+
+fn parse_struct(p: lend cursor.Parser, is_pub: bool) -> usize:
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected struct name", "", false):
+        return 0
+    name = p.lx.tokens[p.pos - 1]
+    tparams = cursor.empty_span()
+    bk0: usize = 0
+    bk1: usize = 0
+    if cursor.at(p, "["):
+        bk0 = p.bkeys.len
+        tparams = ty.type_params(p)
+        bk1 = p.bkeys.len
+    cursor.expect_kind(p, ":", "Expected `:` after struct name", "Write in the form `struct Player:`.", true)
+    cursor.expect_kind(p, "NEWLINE", "Fields must be written on indented lines after `:`", "", false)
+    cursor.expect_kind(p, "INDENT", "Struct fields must be indented with 4 spaces", "", false)
+    if p.bad:
+        return 0
+    fields = List[usize]()
+    while not cursor.at(p, "DEDENT") and not cursor.at(p, "EOF"):
+        st = p.pos
+        if cursor.at(p, "public") or cursor.at(p, "private"):
+            visibility(p)
+            if p.bad:
+                cursor.sync_stmt(p)
+                p.bad = false
+            continue
+        fid = parse_field(p)
+        if p.bad:
+            cursor.sync_stmt(p)
+            if p.pos == st:
+                cursor.advance(p)
+            p.bad = false
+        elif fid != 0:
+            fields.push(fid)
+    cursor.eat(p, "DEDENT")
+    if fields.len == 0:
+        msg = string.new()
+        msg.append_str("Struct `")
+        msg.append_str(p.lx.names.text(name.text))
+        msg.append_str("` has no fields.")
+        cursor.soft(p, name.line, name.col, name.length, msg.as_str(), "Add at least one `field: type` line.", true)
+    sp = cursor.flush(p, fields)
+    n = ast.blank()
+    n.kind = 4
+    n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    n.lo = sp.lo
+    n.hi = sp.hi
+    n.slo = tparams.lo
+    n.shi = tparams.hi
+    n.bk0 = bk0
+    n.bk1 = bk1
+    n.f1 = is_pub
+    id = cursor.push_node(p, n)
+    cursor.header(p, id, name)
+    return id
+
+fn parse_field(p: lend cursor.Parser) -> usize:
+    if not cursor.expect_kind(p, "NAME", "Expected field name", "", false):
+        return 0
+    fname = p.lx.tokens[p.pos - 1]
+    cursor.expect_kind(p, ":", "Missing field type", "Write in the form `name: type`, e.g. `health: i32`.", true)
+    mode = p.z
+    tied_id: usize = 0
+    use_soa = false
+    if cursor.at(p, "read") or cursor.at(p, "lend"):
+        mt = cursor.advance(p)
+        mode = cursor.sid(p, p.lx.names.text(mt.text))
+    if cursor.eat(p, "soa"):
+        use_soa = true
+    tref = ty.parse_type(p, "field")
+    if not p.bad and cursor.eat(p, "tied"):
+        tied_id = ty.tied_target(p)
+    if p.bad:
+        return 0
+    mtxt = cursor.packed_text(p, mode)
+    if not string.str_eq(mtxt, "") and tied_id == 0:
+        msg = string.new()
+        msg.append_str("Reference field `")
+        msg.append_str(p.lx.names.text(fname.text))
+        msg.append_str("` requires a `tied to` binding.")
+        hint = string.new()
+        hint.append_byte(96)
+        hint.append_str(p.lx.names.text(fname.text))
+        hint.append_str(": ")
+        hint.append_str(mtxt)
+        hint.append_byte(32)
+        hint.append_str(cursor.packed_text(p, p.nodes[tref].s0))
+        hint.append_str(" tied to self`.")
+        cursor.soft(p, fname.line, fname.col, fname.length, msg.as_str(), hint.as_str(), true)
+    if tied_id != 0 and string.str_eq(mtxt, ""):
+        cursor.soft(p, fname.line, fname.col, fname.length, "`tied to` can only be used on `read`/`lend` reference fields.", "", false)
+    cursor.end_stmt(p)
+    if p.bad:
+        return 0
+    n = ast.blank()
+    n.kind = 5
+    n.s0 = cursor.sid(p, p.lx.names.text(fname.text))
+    n.c0 = tref
+    n.s1 = mode
+    n.s2 = tied_id
+    n.f0 = use_soa
+    n.f1 = p.export
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, fname)
+    return id
+
+fn parse_enum(p: lend cursor.Parser, is_pub: bool) -> usize:
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected enum name", "", false):
+        return 0
+    name = p.lx.tokens[p.pos - 1]
+    tparams = cursor.empty_span()
+    bk0: usize = 0
+    bk1: usize = 0
+    if cursor.at(p, "["):
+        bk0 = p.bkeys.len
+        tparams = ty.type_params(p)
+        bk1 = p.bkeys.len
+    cursor.expect_kind(p, ":", "Expected `:` after enum name", "Write in the form `enum Shape:`.", true)
+    cursor.expect_kind(p, "NEWLINE", "Variants must be written on indented lines after `:`", "", false)
+    cursor.expect_kind(p, "INDENT", "Enum variants must be indented with 4 spaces", "", false)
+    if p.bad:
+        return 0
+    vars = List[usize]()
+    while not cursor.at(p, "DEDENT") and not cursor.at(p, "EOF"):
+        st = p.pos
+        if cursor.at(p, "public") or cursor.at(p, "private"):
+            visibility(p)
+            if p.bad:
+                cursor.sync_stmt(p)
+                p.bad = false
+            continue
+        vid = parse_variant(p)
+        if p.bad:
+            cursor.sync_stmt(p)
+            if p.pos == st:
+                cursor.advance(p)
+            p.bad = false
+        elif vid != 0:
+            vars.push(vid)
+    cursor.eat(p, "DEDENT")
+    if vars.len == 0:
+        msg = string.new()
+        msg.append_str("Enum `")
+        msg.append_str(p.lx.names.text(name.text))
+        msg.append_str("` has no variants.")
+        cursor.soft(p, name.line, name.col, name.length, msg.as_str(), "Add at least one variant, e.g. `Empty` or `Circle(f32)`.", true)
+    sp = cursor.flush(p, vars)
+    n = ast.blank()
+    n.kind = 6
+    n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    n.lo = sp.lo
+    n.hi = sp.hi
+    n.slo = tparams.lo
+    n.shi = tparams.hi
+    n.bk0 = bk0
+    n.bk1 = bk1
+    n.f0 = is_pub
+    id = cursor.push_node(p, n)
+    cursor.header(p, id, name)
+    return id
+
+fn parse_variant(p: lend cursor.Parser) -> usize:
+    if not cursor.expect_kind(p, "NAME", "Expected variant name", "", false):
+        return 0
+    vname = p.lx.tokens[p.pos - 1]
+    payload = List[usize]()
+    if cursor.at(p, "="):
+        cursor.fail_here(p, "Explicit discriminant value (`A = 1`) is not supported.", "Variants are automatically numbered in order; remove `= value`.", true)
+        return 0
+    if cursor.eat(p, "("):
+        if cursor.at(p, ")"):
+            msg = string.new()
+            msg.append_byte(96)
+            msg.append_str(p.lx.names.text(vname.text))
+            msg.append_str("()` contains empty payload parentheses.")
+            hint = string.new()
+            hint.append_str("If there is no payload, write `")
+            hint.append_str(p.lx.names.text(vname.text))
+            hint.append_str("` without parentheses.")
+            cursor.fail_here(p, msg.as_str(), hint.as_str(), true)
+            return 0
+        while not p.bad:
+            if cursor.at(p, "NAME") and cursor.kind_is(p, cursor.peek_at(p, 1), ":"):
+                cursor.fail_here(p, "Named variant fields are not supported.", "Use positional payload only: `Circle(f32)`.", true)
+                return 0
+            payload.push(ty.parse_type(p, "payload"))
+            if not cursor.eat(p, ","):
+                break
+        cursor.expect_kind(p, ")", "Expected `)`", "", false)
+    cursor.end_stmt(p)
+    if p.bad:
+        return 0
+    sp = cursor.flush(p, payload)
+    n = ast.blank()
+    n.kind = 7
+    n.s0 = cursor.sid(p, p.lx.names.text(vname.text))
+    n.lo = sp.lo
+    n.hi = sp.hi
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, vname)
+    return id
+
+fn parse_feature(p: lend cursor.Parser, is_pub: bool) -> usize:
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected feature name", "", false):
+        return 0
+    name = p.lx.tokens[p.pos - 1]
+    cursor.expect_kind(p, ":", "Expected `:` after feature name", "Write in the form `feature Shape:`.", true)
+    cursor.expect_kind(p, "NEWLINE", "Signatures must be written on indented lines after `:`", "", false)
+    cursor.expect_kind(p, "INDENT", "Feature signatures must be indented with 4 spaces", "", false)
+    if p.bad:
+        return 0
+    methods = List[usize]()
+    while not cursor.at(p, "DEDENT") and not cursor.at(p, "EOF"):
+        st = p.pos
+        if cursor.at(p, "public") or cursor.at(p, "private"):
+            visibility(p)
+            if p.bad:
+                cursor.sync_stmt(p)
+                p.bad = false
+            continue
+        if not cursor.at(p, "fn"):
+            cursor.fail_here(p, "Only `fn name(...)` signatures or methods can be written inside a feature.", "E.g. `fn area(self: Self) -> f64`", true)
+        else:
+            mid = parse_func(p, true, false, "", cursor.empty_span())
+            if not p.bad and mid != 0:
+                methods.push(mid)
+        if p.bad:
+            cursor.sync_stmt(p)
+            if p.pos == st:
+                cursor.advance(p)
+            p.bad = false
+    cursor.eat(p, "DEDENT")
+    if methods.len == 0:
+        msg = string.new()
+        msg.append_str("Feature `")
+        msg.append_str(p.lx.names.text(name.text))
+        msg.append_str("` has no signatures.")
+        cursor.soft(p, name.line, name.col, name.length, msg.as_str(), "Add at least one `fn ...` signature.", true)
+    sp = cursor.flush(p, methods)
+    n = ast.blank()
+    n.kind = 8
+    n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    n.lo = sp.lo
+    n.hi = sp.hi
+    n.f0 = is_pub
+    id = cursor.push_node(p, n)
+    cursor.header(p, id, name)
+    return id
+
+fn parse_func(p: lend cursor.Parser, in_feature: bool, has_impl: bool, owner: str, owners: cursor.Span) -> usize:
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected function name", "", false):
+        return 0
+    first = p.lx.tokens[p.pos - 1]
+    type_params = cursor.empty_span()
+    owner_params = owners
+    bk0: usize = 0
+    bk1: usize = 0
+    if in_feature and cursor.at(p, "["):
+        cursor.fail_here(p, "Feature methods cannot have their own type parameters.", "", false)
+        return 0
+    if has_impl and cursor.at(p, "["):
+        cursor.fail_here(p, "Methods cannot have their own type parameters.", "", false)
+        return 0
+    if not has_impl and not in_feature and cursor.at(p, "["):
+        bk0 = p.bkeys.len
+        type_params = ty.type_params(p)
+        bk1 = p.bkeys.len
+        if p.bad:
+            return 0
+        if not cursor.at(p, "(") and not cursor.at(p, "."):
+            full = string.new()
+            full.append_str("Expected `(` after type parameter list (found ")
+            cursor.describe(p, cursor.cur(p), full)
+            full.append_str(").")
+            cursor.fail_here(p, full.as_str(), "Generic function: `fn max[T](...)`. For methods, use `impl Type[...]:`.", true)
+            return 0
+    if not has_impl and cursor.eat(p, "."):
+        if not cursor.expect_kind(p, "NAME", "Expected method name", "", false):
+            return 0
+        second = p.lx.tokens[p.pos - 1]
+        type_name = string.new()
+        type_name.append_str(p.lx.names.text(first.text))
+        if type_params.lo != type_params.hi:
+            type_name.append_byte(91)
+            i = type_params.lo
+            first_p = true
+            while i < type_params.hi:
+                if not first_p:
+                    type_name.append_str(", ")
+                first_p = false
+                type_name.append_str(p.lx.names.text(p.strs[i]))
+                i += 1
+            type_name.append_byte(93)
+        msg = string.new()
+        msg.append_str("Direct method declaration `fn ")
+        msg.append_str(type_name.as_str())
+        msg.append_byte(46)
+        msg.append_str(p.lx.names.text(second.text))
+        msg.append_str("` is not supported.")
+        hint = string.new()
+        hint.append_str("Define methods inside an `impl ")
+        hint.append_str(type_name.as_str())
+        hint.append_str(":` block instead:\n    impl ")
+        hint.append_str(type_name.as_str())
+        hint.append_str(":\n        fn ")
+        hint.append_str(p.lx.names.text(second.text))
+        hint.append_str("(self): ...")
+        cursor.fail(p, first.line, first.col, first.length, msg.as_str(), hint.as_str(), true)
+        return 0
+    cursor.expect_kind(p, "(", "Expected `(` for parameter list", "", false)
+    params = List[usize]()
+    if not p.bad and not cursor.at(p, ")"):
+        while not p.bad:
+            params.push(ty.parse_param(p))
+            if not cursor.eat(p, ","):
+                break
+    cursor.expect_kind(p, ")", "Expected `)`", "", false)
+    ret: usize = 0
+    ret_view = false
+    ret_lend = false
+    ret_tied: usize = 0
+    if not p.bad and cursor.eat(p, "->"):
+        is_ref = cursor.cur_named(p, "ref")
+        is_lend = cursor.at(p, "lend")
+        nxt = cursor.peek_at(p, 1)
+        if (is_ref or is_lend) and not cursor.kind_is(p, nxt, ":"):
+            cursor.advance(p)
+            ret_view = true
+            ret_lend = is_lend
+        ret = ty.parse_type(p, "return")
+        if ret_view and not p.bad and cursor.eat(p, "tied"):
+            ret_tied = ty.tied_target(p)
+    overflow: usize = 0
+    if not p.bad and cursor.cur_named(p, "overflow") and cursor.kind_is(p, cursor.peek_at(p, 1), ":"):
+        cursor.advance(p)
+        cursor.advance(p)
+        if not cursor.expect_kind(p, "NAME", "Expected overflow mode ('wrap' or 'trap')", "", false):
+            return 0
+        mode = p.lx.tokens[p.pos - 1]
+        overflow = cursor.sid(p, p.lx.names.text(mode.text))
+    body = List[usize]()
+    if in_feature:
+        if cursor.at(p, ":"):
+            stmt.block_into(p, body)
+        else:
+            cursor.end_stmt(p)
+    else:
+        stmt.block_into(p, body)
+    if p.bad:
+        return 0
+    if overflow == 0:
+        bi: usize = 0
+        while bi < body.len:
+            if p.nodes[body[bi]].kind == 33:
+                overflow = p.nodes[body[bi]].s0
+                break
+            bi += 1
+    psp = cursor.flush(p, params)
+    bsp = cursor.flush(p, body)
+    n = ast.blank()
+    n.kind = 9
+    n.s0 = cursor.sid(p, p.lx.names.text(first.text))
+    n.lo = psp.lo
+    n.hi = psp.hi
+    n.c0 = ret
+    n.lo2 = bsp.lo
+    n.hi2 = bsp.hi
+    n.slo = type_params.lo
+    n.shi = type_params.hi
+    n.slo2 = owner_params.lo
+    n.shi2 = owner_params.hi
+    n.bk0 = bk0
+    n.bk1 = bk1
+    n.f1 = ret_view
+    n.f2 = ret_lend
+    n.s1 = ret_tied
+    n.s2 = overflow
+    n.s3 = p.z
+    if owner.len > 0:
+        n.i0 = i64(cursor.sid(p, owner))
+    if has_impl:
+        n.s4 = 0
+    id = cursor.push_node(p, n)
+    cursor.header(p, id, first)
+    if has_impl:
+        subst_func(p, id, owner, owner_params)
+        tgt = string.new()
+        if owner.len > 0:
+            tgt.append_str(owner)
+            tgt.append_byte(46)
+        tgt.append_str(p.lx.names.text(first.text))
+        p.test_target = cursor.sid(p, tgt.as_str())
+    elif not in_feature:
+        p.test_target = cursor.sid(p, p.lx.names.text(first.text))
+    return id
+
+fn parse_impl(p: lend cursor.Parser, decls: lend List[usize]):
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected type name after `impl`", "", false):
+        return
+    name = p.lx.tokens[p.pos - 1]
+    qual: usize = 0
+    if cursor.at(p, ".") and cursor.kind_is(p, cursor.peek_at(p, 1), "NAME"):
+        cursor.advance(p)
+        if not cursor.expect_kind(p, "NAME", "Expected type name after `.`", "", false):
+            return
+        member = p.lx.tokens[p.pos - 1]
+        qual = cursor.sid(p, p.lx.names.text(name.text))
+        name = member
+    owners = cursor.empty_span()
+    if cursor.at(p, "["):
+        owners = ty.type_params(p)
+    cursor.expect_kind(p, ":", "Expected `:` after impl header", "Write in the form `impl Player:`.", true)
+    cursor.expect_kind(p, "NEWLINE", "Methods must be written on indented lines after `:`", "", false)
+    cursor.expect_kind(p, "INDENT", "Methods must be indented with 4 spaces", "", false)
+    if p.bad:
+        return
+    while not cursor.at(p, "DEDENT") and not cursor.at(p, "EOF"):
+        st = p.pos
+        if cursor.at(p, "public") or cursor.at(p, "private"):
+            visibility(p)
+            if p.bad:
+                cursor.sync_stmt(p)
+                if p.pos == st:
+                    cursor.advance(p)
+                p.bad = false
+            continue
+        is_hot = false
+        if cursor.at(p, "hot"):
+            cursor.advance(p)
+            is_hot = true
+        if not cursor.at(p, "fn"):
+            cursor.fail_here(p, "Only `fn` definitions can be written inside an `impl` block.", "", false)
+        else:
+            fd = parse_func(p, false, true, p.lx.names.text(name.text), owners)
+            if not p.bad and fd != 0:
+                n = p.nodes[fd]
+                n.f4 = is_hot
+                n.f6 = p.export
+                n.s4 = qual
+                p.nodes[fd] = n
+                decls.push(fd)
+        if p.bad:
+            cursor.sync_stmt(p)
+            if p.pos == st:
+                cursor.advance(p)
+            p.bad = false
+    cursor.eat(p, "DEDENT")
+
+fn parse_import(p: lend cursor.Parser) -> usize:
+    imp = cursor.advance(p)
+    path = string.new()
+    if cursor.at(p, "STRING"):
+        tok = cursor.advance(p)
+        path.append_str(p.lx.names.text(tok.text))
+    elif cursor.at(p, "NAME"):
+        tok2 = cursor.advance(p)
+        path.append_str(p.lx.names.text(tok2.text))
+        while cursor.at(p, ".") and cursor.kind_is(p, cursor.peek_at(p, 1), "NAME"):
+            cursor.advance(p)
+            part = cursor.advance(p)
+            path.append_byte(47)
+            path.append_str(p.lx.names.text(part.text))
+        path.append_str(".gg")
+    else:
+        cursor.fail_here(p, "Expected file name (string) or module name after import.", "Example: `import \"file.gg\"` or `import module`", true)
+        return 0
+    alias: usize = 0
+    names = List[usize]()
+    if cursor.cur_named(p, "as"):
+        cursor.advance(p)
+        if not cursor.expect_kind(p, "NAME", "Expected module name after `as`", "Example: `import std.math as m`.", true):
+            return 0
+        al = p.lx.tokens[p.pos - 1]
+        alias = cursor.sid(p, p.lx.names.text(al.text))
+    elif cursor.eat(p, "{"):
+        if cursor.at(p, "}"):
+            cursor.fail_here(p, "Selective import list cannot be empty.", "Example: `import std.math { sqrt, sin }`.", true)
+            return 0
+        while not p.bad:
+            if not cursor.expect_kind(p, "NAME", "Expected name in import list", "", false):
+                return 0
+            item = p.lx.tokens[p.pos - 1]
+            names.push(item.text)
+            if not cursor.eat(p, ","):
+                break
+        cursor.expect_kind(p, "}", "Expected `}`", "", false)
+    cursor.end_stmt(p)
+    if p.bad:
+        return 0
+    sp = cursor.flush_str(p, names)
+    n = ast.blank()
+    n.kind = 2
+    n.s0 = cursor.sid(p, path.as_str())
+    n.s1 = alias
+    n.slo = sp.lo
+    n.shi = sp.hi
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, imp)
+    return id
+
+fn parse_extern(p: lend cursor.Parser, is_pub: bool) -> usize:
+    ext = cursor.advance(p)
+    header: usize = 0
+    if cursor.at(p, "STRING"):
+        ht = cursor.advance(p)
+        header = cursor.sid(p, p.lx.names.text(ht.text))
+    cursor.expect_kind(p, "fn", "Expected `fn` in extern declaration", "Example: `extern \"math.h\" fn sqrt(x: f64) -> f64` or `extern fn func(x: i32) -> i32`", true)
+    if not cursor.expect_kind(p, "NAME", "Expected function name", "", false):
+        return 0
+    name_tok = p.lx.tokens[p.pos - 1]
+    cursor.expect_kind(p, "(", "Expected `(`", "", false)
+    params = List[usize]()
+    variadic = false
+    if not p.bad and not cursor.at(p, ")"):
+        while not p.bad:
+            if cursor.at(p, "..") or cursor.at(p, "."):
+                cursor.advance(p)
+                if not cursor.eat(p, "."):
+                    cursor.fail_here(p, "Variadic marker must be `...` (ellipsis).", "", false)
+                    return 0
+                variadic = true
+                if params.len == 0:
+                    cursor.fail_here(p, "Variadic extern function requires at least one fixed parameter.", "Example: `extern fn printf(fmt: *u8, ...) -> i32`", true)
+                    return 0
+                break
+            params.push(ty.parse_param(p))
+            if not cursor.eat(p, ","):
+                break
+    cursor.expect_kind(p, ")", "Expected `)`", "", false)
+    ret: usize = 0
+    if not p.bad and cursor.eat(p, "->"):
+        ret = ty.parse_type(p, "return")
+    local = p.lx.names.text(name_tok.text)
+    c_symbol = p.z
+    if not p.bad and cursor.cur_named(p, "as"):
+        cursor.advance(p)
+        if not cursor.expect_kind(p, "NAME", "Expected Greengold name after `as`", "Example: `extern \"math.h\" fn sqrt(x: f64) -> f64 as c_sqrt`.", true):
+            return 0
+        local_tok = p.lx.tokens[p.pos - 1]
+        c_symbol = cursor.sid(p, p.lx.names.text(name_tok.text))
+        local = p.lx.names.text(local_tok.text)
+    if cursor.at(p, ":"):
+        cursor.fail_here(p, "extern functions cannot have a body; do not write `:` or a block.", "", false)
+        return 0
+    cursor.end_stmt(p)
+    if p.bad:
+        return 0
+    sp = cursor.flush(p, params)
+    n = ast.blank()
+    n.kind = 10
+    n.s0 = header
+    n.s1 = cursor.sid(p, local)
+    n.lo = sp.lo
+    n.hi = sp.hi
+    n.c0 = ret
+    n.f0 = variadic
+    n.s2 = c_symbol
+    n.f1 = is_pub
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, ext)
+    return id
+
+fn parse_const(p: lend cursor.Parser, is_pub: bool, top_var: bool) -> usize:
+    ctok = cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected constant name", "", false):
+        return 0
+    name = p.lx.tokens[p.pos - 1]
+    type_ref: usize = 0
+    val: usize = 0
+    if cursor.eat(p, "="):
+        val = expr.parse_expr(p, 0)
+        cursor.end_stmt(p)
+    elif cursor.eat(p, ":"):
+        type_ref = ty.parse_type(p, "variable")
+        cursor.expect_kind(p, "=", "Expected `=` in constant declaration", "", false)
+        val = expr.parse_expr(p, 0)
+        cursor.end_stmt(p)
+    else:
+        hint = string.new()
+        hint.append_str("Write `const ")
+        hint.append_str(p.lx.names.text(name.text))
+        hint.append_str(" = value` or `const ")
+        hint.append_str(p.lx.names.text(name.text))
+        hint.append_str(": type = value`.")
+        cursor.fail_here(p, "Expected `=` or `:` in constant declaration", hint.as_str(), true)
+        return 0
+    if p.bad:
+        return 0
+    n = ast.blank()
+    n.kind = 3
+    n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    n.c0 = type_ref
+    n.c1 = val
+    n.f0 = is_pub
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, ctok)
+    return id
+
+fn parse_test(p: lend cursor.Parser) -> usize:
+    start = cursor.cur(p)
+    cursor.advance(p)
+    explicit = ""
+    if cursor.at(p, "NAME"):
+        nm = cursor.advance(p)
+        explicit = p.lx.names.text(nm.text)
+    body = List[usize]()
+    stmt.block_into(p, body)
+    if p.bad:
+        return 0
+    p.test_serial += 1
+    base = string.new()
+    target = cursor.packed_text(p, p.test_target)
+    if explicit.len > 0:
+        if target.len > 0:
+            base.append_str(target)
+            base.append_byte(46)
+        base.append_str(explicit)
+    else:
+        if target.len > 0:
+            base.append_str(target)
+            base.append_str(".test")
+        else:
+            base.append_str("test")
+    label = string.new()
+    label.append_str(base.as_str())
+    n = cursor.label_bump(p, cursor.raw(cursor.sid(p, base.as_str())))
+    if n > 1:
+        label.append_byte(46)
+        label.append_i64(i64(n))
+    bsp = cursor.flush(p, body)
+    fnm = string.new()
+    fnm.append_str("gg_test_")
+    fnm.append_i64(i64(p.test_serial))
+    d = ast.blank()
+    d.kind = 9
+    d.s0 = cursor.sid(p, fnm.as_str())
+    d.lo2 = bsp.lo
+    d.hi2 = bsp.hi
+    d.f5 = true
+    d.s3 = cursor.sid(p, label.as_str())
+    id = cursor.push_node(p, d)
+    cursor.header(p, id, start)
+    return id
+
+fn parse_alias(p: lend cursor.Parser):
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected alias name", "", false):
+        return
+    name = p.lx.tokens[p.pos - 1]
+    cursor.expect_kind(p, "=", "Expected `=` in type alias", "", false)
+    target = ty.parse_type(p, "variable")
+    cursor.end_stmt(p)
+    if p.bad:
+        return
+    text = p.lx.names.text(name.text)
+    if cursor.find_alias(p, name.text) != 0 or ty.is_prim(text) or ty.is_builtin_alias(text):
+        msg = string.new()
+        msg.append_str("Type alias `")
+        msg.append_str(text)
+        msg.append_str("` is already defined.")
+        cursor.fail(p, name.line, name.col, name.length, msg.as_str(), "", false)
+        return
+    cursor.put_alias(p, name.text, target)
+
+fn subst_func(p: lend cursor.Parser, id: usize, owner: str, owners: cursor.Span):
+    if owner.len == 0:
+        return
+    full = string.new()
+    full.append_str(owner)
+    if owners.lo != owners.hi:
+        full.append_byte(91)
+        i = owners.lo
+        first = true
+        while i < owners.hi:
+            if not first:
+                full.append_str(", ")
+            first = false
+            full.append_str(p.lx.names.text(p.strs[i]))
+            i += 1
+        full.append_byte(93)
+    walk_self(p, id, owner, full.as_str(), owners)
+
+fn walk_self(p: lend cursor.Parser, id: usize, owner: str, full: str, owners: cursor.Span):
+    if id == 0:
+        return
+    k = p.nodes[id].kind
+    if k == 12:
+        fix_type(p, id, owner, full, owners)
+        return
+    if k == 45:
+        if string.str_eq(cursor.packed_text(p, p.nodes[id].s0), "Self"):
+            n = p.nodes[id]
+            n.s0 = cursor.sid(p, full)
+            p.nodes[id] = n
+        walk_self(p, p.nodes[id].c0, owner, full, owners)
+        return
+    if k == 52:
+        if string.str_eq(cursor.packed_text(p, p.nodes[id].s0), "Self"):
+            n2 = p.nodes[id]
+            n2.s0 = cursor.sid(p, owner)
+            if owners.lo != owners.hi and n2.lo2 == n2.hi2:
+                sp = clone_param_types(p, owners)
+                n2.lo2 = sp.lo
+                n2.hi2 = sp.hi
+            p.nodes[id] = n2
+        walk_list(p, p.nodes[id].lo, p.nodes[id].hi, owner, full, owners)
+        walk_list(p, p.nodes[id].lo2, p.nodes[id].hi2, owner, full, owners)
+        return
+    if k == 54:
+        if string.str_eq(cursor.packed_text(p, p.nodes[id].s0), "Self"):
+            n3 = p.nodes[id]
+            n3.s0 = cursor.sid(p, owner)
+            p.nodes[id] = n3
+        walk_list(p, p.nodes[id].lo, p.nodes[id].hi, owner, full, owners)
+        return
+    if k == 49:
+        if string.str_eq(cursor.packed_text(p, p.nodes[id].s0), "Self"):
+            n4 = p.nodes[id]
+            n4.s0 = cursor.sid(p, owner)
+            p.nodes[id] = n4
+        walk_list(p, p.nodes[id].lo, p.nodes[id].hi, owner, full, owners)
+        walk_list(p, p.nodes[id].lo2, p.nodes[id].hi2, owner, full, owners)
+        return
+    walk_self(p, p.nodes[id].c0, owner, full, owners)
+    walk_self(p, p.nodes[id].c1, owner, full, owners)
+    walk_self(p, p.nodes[id].c2, owner, full, owners)
+    walk_self(p, p.nodes[id].c3, owner, full, owners)
+    walk_list(p, p.nodes[id].lo, p.nodes[id].hi, owner, full, owners)
+    walk_list(p, p.nodes[id].lo2, p.nodes[id].hi2, owner, full, owners)
+    walk_list(p, p.nodes[id].lo3, p.nodes[id].hi3, owner, full, owners)
+
+fn walk_list(p: lend cursor.Parser, lo: usize, hi: usize, owner: str, full: str, owners: cursor.Span):
+    i = lo
+    while i < hi:
+        walk_self(p, p.ids[i], owner, full, owners)
+        i += 1
+
+fn fix_type(p: lend cursor.Parser, id: usize, owner: str, full: str, owners: cursor.Span):
+    n = p.nodes[id]
+    simple = string.str_eq(cursor.packed_text(p, n.s0), "Self") and n.s1 == 0 and n.lo == n.hi and n.c1 == 0 and not n.f4
+    if simple:
+        m = n
+        m.s0 = cursor.sid(p, full)
+        if owners.lo != owners.hi:
+            m.s1 = cursor.sid(p, owner)
+            sp = clone_param_types(p, owners)
+            m.lo = sp.lo
+            m.hi = sp.hi
+        p.nodes[id] = m
+        return
+    walk_self(p, n.c1, owner, full, owners)
+    walk_list(p, n.lo, n.hi, owner, full, owners)
+    walk_list(p, n.lo2, n.hi2, owner, full, owners)
+    walk_self(p, n.c2, owner, full, owners)
+    t = p.nodes[id]
+    if t.f4:
+        shown = string.new()
+        shown.append_str("fn(")
+        i = t.lo2
+        first = true
+        while i < t.hi2:
+            if not first:
+                shown.append_str(", ")
+            first = false
+            shown.append_str(cursor.packed_text(p, p.nodes[p.ids[i]].s0))
+            i += 1
+        shown.append_str(")")
+        if t.c2 != 0:
+            shown.append_str(" -> ")
+            shown.append_str(cursor.packed_text(p, p.nodes[t.c2].s0))
+        t.s0 = cursor.sid(p, shown.as_str())
+        p.nodes[id] = t
+        return
+    if t.lo != t.hi and t.s1 != 0:
+        shown2 = string.new()
+        shown2.append_str(cursor.packed_text(p, t.s1))
+        shown2.append_byte(91)
+        j = t.lo
+        first2 = true
+        while j < t.hi:
+            if not first2:
+                shown2.append_str(", ")
+            first2 = false
+            shown2.append_str(cursor.packed_text(p, p.nodes[p.ids[j]].s0))
+            j += 1
+        shown2.append_byte(93)
+        t.s0 = cursor.sid(p, shown2.as_str())
+        p.nodes[id] = t
+        return
+    if t.c1 != 0 and t.f2:
+        shown3 = string.new()
+        if t.f3:
+            shown3.append_str("*mut ")
+        else:
+            shown3.append_byte(42)
+        shown3.append_str(cursor.packed_text(p, p.nodes[t.c1].s0))
+        t.s0 = cursor.sid(p, shown3.as_str())
+        p.nodes[id] = t
+        return
+    if t.c1 != 0 and t.f0:
+        shown4 = string.new()
+        shown4.append_str("[]")
+        shown4.append_str(cursor.packed_text(p, p.nodes[t.c1].s0))
+        t.s0 = cursor.sid(p, shown4.as_str())
+        p.nodes[id] = t
+
+fn clone_param_types(p: lend cursor.Parser, owners: cursor.Span) -> cursor.Span:
+    tmp = List[usize]()
+    i = owners.lo
+    while i < owners.hi:
+        n = ast.blank()
+        n.kind = 12
+        n.s0 = cursor.sid(p, p.lx.names.text(p.strs[i]))
+        tmp.push(cursor.push_node(p, n))
+        i += 1
+    return cursor.flush(p, tmp)
+
+fn busy_has(p: read cursor.Parser, name: usize) -> bool:
+    i: usize = 0
+    while i < p.busy.len:
+        if p.busy[i] == name:
+            return true
+        i += 1
+    return false
+
+fn resolve_aliases(p: lend cursor.Parser, decls: read List[usize]):
+    i: usize = 0
+    while i < p.av.len:
+        walk_alias(p, p.av[i])
+        i += 1
+    d: usize = 0
+    while d < decls.len:
+        walk_alias(p, decls[d])
+        d += 1
+
+fn put_child(p: lend cursor.Parser, id: usize, slot: i32, nid: usize):
+    if nid == 0:
+        return
+    n = p.nodes[id]
+    old: usize = n.c0
+    if slot == 1:
+        old = n.c1
+    elif slot == 2:
+        old = n.c2
+    elif slot == 3:
+        old = n.c3
+    if nid == old:
+        return
+    if slot == 0:
+        n.c0 = nid
+    elif slot == 1:
+        n.c1 = nid
+    elif slot == 2:
+        n.c2 = nid
+    else:
+        n.c3 = nid
+    p.nodes[id] = n
+
+fn clone_ids(p: lend cursor.Parser, lo: usize, hi: usize) -> cursor.Span:
+    tmp = List[usize]()
+    i = lo
+    while i < hi:
+        n = p.nodes[p.ids[i]]
+        tmp.push(cursor.push_node(p, n))
+        i += 1
+    return cursor.flush(p, tmp)
+
+fn retarget(p: lend cursor.Parser, id: usize, alt: usize):
+    target = p.nodes[alt]
+    n = p.nodes[id]
+    if target.s1 != 0:
+        n.s0 = cursor.sid(p, cursor.packed_text(p, target.s1))
+        sp = clone_ids(p, target.lo, target.hi)
+        n.lo2 = sp.lo
+        n.hi2 = sp.hi
+    else:
+        n.s0 = target.s0
+    p.nodes[id] = n
+
+fn walk_alias(p: lend cursor.Parser, id: usize) -> usize:
+    if id == 0:
+        return 0
+    k = p.nodes[id].kind
+    if k == 12:
+        expand_type(p, id)
+        if p.nodes[id].c0 != 0:
+            put_child(p, id, 0, walk_alias(p, p.nodes[id].c0))
+        return id
+    if k == 49:
+        name = cursor.packed_text(p, p.nodes[id].s0)
+        raw_id = p.lx.names.put(name)
+        alt = cursor.find_alias(p, raw_id)
+        if alt != 0 and p.nodes[id].lo2 == p.nodes[id].hi2:
+            walk_list_alias(p, p.nodes[id].lo, p.nodes[id].hi)
+            if p.nodes[alt].s1 == 0 and ty.is_numeric(cursor.packed_text(p, p.nodes[alt].s0)) and p.nodes[id].hi == p.nodes[id].lo + 1:
+                c = ast.blank()
+                c.kind = 45
+                c.s0 = p.nodes[alt].s0
+                c.c0 = p.ids[p.nodes[id].lo]
+                c.line = p.nodes[id].line
+                c.col = p.nodes[id].col
+                c.length = p.nodes[id].length
+                return cursor.push_node(p, c)
+            retarget(p, id, alt)
+            return id
+        walk_list_alias(p, p.nodes[id].lo, p.nodes[id].hi)
+        walk_list_alias(p, p.nodes[id].lo2, p.nodes[id].hi2)
+        return id
+    if k == 52:
+        walk_list_alias(p, p.nodes[id].lo, p.nodes[id].hi)
+        lit_name = cursor.packed_text(p, p.nodes[id].s0)
+        lit_raw = p.lx.names.put(lit_name)
+        lit_alt = cursor.find_alias(p, lit_raw)
+        if lit_alt != 0 and p.nodes[id].lo2 == p.nodes[id].hi2:
+            retarget(p, id, lit_alt)
+        else:
+            walk_list_alias(p, p.nodes[id].lo2, p.nodes[id].hi2)
+        return id
+    put_child(p, id, 0, walk_alias(p, p.nodes[id].c0))
+    put_child(p, id, 1, walk_alias(p, p.nodes[id].c1))
+    put_child(p, id, 2, walk_alias(p, p.nodes[id].c2))
+    put_child(p, id, 3, walk_alias(p, p.nodes[id].c3))
+    walk_list_alias(p, p.nodes[id].lo, p.nodes[id].hi)
+    walk_list_alias(p, p.nodes[id].lo2, p.nodes[id].hi2)
+    walk_list_alias(p, p.nodes[id].lo3, p.nodes[id].hi3)
+    return id
+
+fn walk_list_alias(p: lend cursor.Parser, lo: usize, hi: usize):
+    i = lo
+    while i < hi:
+        nid = walk_alias(p, p.ids[i])
+        if nid != p.ids[i] and nid != 0:
+            p.ids[i] = nid
+        i += 1
+
+fn expand_type(p: lend cursor.Parser, id: usize):
+    walk_alias(p, p.nodes[id].c1)
+    walk_list_alias(p, p.nodes[id].lo, p.nodes[id].hi)
+    walk_list_alias(p, p.nodes[id].lo2, p.nodes[id].hi2)
+    walk_alias(p, p.nodes[id].c2)
+    t = p.nodes[id]
+    if t.s1 == 0 and t.lo == t.hi:
+        raw_id = p.lx.names.put(cursor.packed_text(p, t.s0))
+        alt = cursor.find_alias(p, raw_id)
+        if alt != 0:
+            if busy_has(p, raw_id):
+                msg = string.new()
+                msg.append_str("Type alias `")
+                msg.append_str(cursor.packed_text(p, t.s0))
+                msg.append_str("` refers to itself.")
+                cursor.soft(p, t.line, t.col, t.length, msg.as_str(), "", false)
+                return
+            p.busy.push(raw_id)
+            cloned = p.nodes[alt]
+            cid = cursor.push_node(p, cloned)
+            expand_type(p, cid)
+            src = p.nodes[cid]
+            keep_line = t.line
+            keep_col = t.col
+            keep_len = t.length
+            t.s0 = src.s0
+            t.s1 = src.s1
+            t.s2 = src.s2
+            t.c0 = src.c0
+            t.c1 = src.c1
+            t.c2 = src.c2
+            t.lo = src.lo
+            t.hi = src.hi
+            t.lo2 = src.lo2
+            t.hi2 = src.hi2
+            t.f0 = src.f0
+            t.f1 = src.f1
+            t.f2 = src.f2
+            t.f3 = src.f3
+            t.f4 = src.f4
+            t.f5 = src.f5
+            t.i0 = src.i0
+            t.j0 = src.j0
+            t.line = keep_line
+            t.col = keep_col
+            t.length = keep_len
+            p.nodes[id] = t
+            gone = p.busy.pop()

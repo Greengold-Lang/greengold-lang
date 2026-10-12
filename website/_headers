@@ -1,0 +1,32 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: document-domain=(), camera=(), microphone=()
+
+/style.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/app.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/spec.md
+  Content-Type: text/markdown; charset=utf-8
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+
+/diagnostics/use-after-consume.txt
+  Content-Type: text/plain; charset=utf-8
+
+/benchmarks/data.json
+  Content-Type: application/json; charset=utf-8
+
+/benchmarks/src/*
+  Content-Type: text/plain; charset=utf-8
+
+/diagnostics/*.json
+  Content-Type: application/json; charset=utf-8

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://greengoldlang.com/schemas/diagnostics-1.json",
+  "title": "Greengold diagnostics (gg check --json)",
+  "description": "Machine-readable compiler output. Offsets are 0-based UTF-8 byte offsets; line and column are 1-based, columns count Unicode characters. Every span end is exclusive. Fix edits all refer to the ORIGINAL file contents and never overlap.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "command", "ok", "summary", "diagnostics"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "gg" },
+        "version": { "type": "string" }
+      }
+    },
+    "command": { "enum": ["check", "build", "run", "test"] },
+    "ok": {
+      "type": "boolean",
+      "description": "true only if there are zero errors."
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errors", "warnings", "notes", "suppressed"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "integer", "minimum": 0 },
+        "suppressed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Cascade errors hidden because they are caused by a listed root diagnostic."
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "description": "Root causes first, then by file and position.",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "column", "offset"],
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "offset": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "start", "end"],
+      "properties": {
+        "file": { "type": "string" },
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" }
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "message", "span"],
+      "properties": {
+        "role": {
+          "enum": ["cause", "context", "definition", "expected"],
+          "description": "cause: where the problem was set up (e.g. the consume). context: related code. definition: where a name/type is declared. expected: where the expectation comes from."
+        },
+        "message": { "type": "string" },
+        "span": { "$ref": "#/$defs/span" }
+      }
+    },
+    "edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "start", "end", "replacement"],
+      "properties": {
+        "file": { "type": "string" },
+        "start": { "$ref": "#/$defs/position" },
+        "end": { "$ref": "#/$defs/position" },
+        "replacement": {
+          "type": "string",
+          "description": "Text that replaces [start, end). Empty string deletes; start == end inserts."
+        }
+      }
+    },
+    "fix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "applicability", "verified", "edits"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^f[0-9]+$" },
+        "description": { "type": "string" },
+        "applicability": {
+          "enum": ["safe", "likely", "manual"],
+          "description": "safe: behavior-preserving, apply without asking. likely: probably what the author meant, but changes meaning. manual: needs a human/model decision; edits may be empty."
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "true if gg applied the edits to a scratch copy and this diagnostic disappeared without introducing new errors."
+        },
+        "edits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/edit" }
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "code", "rule", "severity", "category", "message", "span"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^d[0-9]+$",
+          "description": "Unique within this run only."
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^GG[0-9]{4}$",
+          "description": "Stable forever. Never reused for a different rule."
+        },
+        "rule": {
+          "type": "string",
+          "pattern": "^[a-z]+(-[a-z]+)*$",
+          "description": "Stable slug, e.g. use-after-consume."
+        },
+        "severity": { "enum": ["error", "warning", "note"] },
+        "category": {
+          "enum": [
+            "syntax", "resolution", "type", "cast", "mutability",
+            "ownership", "reference", "bounds", "effect", "extern", "other"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "description": "One line, uses the language's own words (read, lend, consume)."
+        },
+        "explanation": {
+          "type": "string",
+          "description": "The rule in one or two sentences, so a reader does not need the spec."
+        },
+        "span": { "$ref": "#/$defs/span" },
+        "labels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/label" }
+        },
+        "details": {
+          "type": "object",
+          "description": "Rule-specific structured data. Shape is fixed per rule and documented by `gg explain <code> --json`."
+        },
+        "caused_by": {
+          "type": ["string", "null"],
+          "pattern": "^d[0-9]+$",
+          "description": "id of the root diagnostic this one follows from; null if it is a root cause."
+        },
+        "fixes": {
+          "type": "array",
+          "description": "Best first.",
+          "items": { "$ref": "#/$defs/fix" }
+        },
+        "doc": {
+          "type": "string",
+          "description": "Command that prints the full explanation, e.g. gg explain GG0301."
+        }
+      }
+    }
+  }
+}

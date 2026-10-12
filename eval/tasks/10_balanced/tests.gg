@@ -1,0 +1,11 @@
+fn test_balanced_yes():
+    require balanced("")
+    require balanced("()")
+    require balanced("(())")
+    require balanced("()()")
+
+fn test_balanced_no():
+    require not balanced("(")
+    require not balanced(")(")
+    require not balanced("(()")
+    require not balanced("(a)")

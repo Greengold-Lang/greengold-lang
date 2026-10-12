@@ -1,0 +1,5 @@
+# In debug mode None.value_or_panic() terminates with a runtime error (exit code 101).
+
+fn main():
+    x: Optional[i32] = None
+    print(x.value_or_panic())

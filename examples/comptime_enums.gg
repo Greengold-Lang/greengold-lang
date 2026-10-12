@@ -1,0 +1,32 @@
+enum Op:
+    Add
+    Mul
+    Neg(i64)
+
+comptime fn apply(op: Op, a: i64, b: i64) -> i64:
+    match op:
+        Add: return a + b
+        Mul: return a * b
+        Neg(k): return 0 - k
+
+comptime fn classify(n: i32) -> i32:
+    match n:
+        0: return 0
+        1..=9: return 1
+        v if v < 0: return -1
+        _: return 2
+
+comptime fn pick(i: i32) -> Optional[i64]:
+    if i > 2:
+        return None
+    return Valid(i64(i) * 10)
+
+const A = apply(Op.Mul, 6, 7)
+const B = apply(Op.Neg(5), 0, 0)
+const C = [classify(0), classify(5), classify(-3), classify(50)]
+const D: Optional[i64] = pick(1)
+const E: Optional[i64] = pick(7)
+const F = Op.Neg(9)
+
+fn main():
+    print(A, B, C, D, E, F)

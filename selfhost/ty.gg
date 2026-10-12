@@ -1,0 +1,477 @@
+# Types, type arguments, type parameters, and function parameters.
+import std.string
+import lex
+import ast
+import cursor
+import dump
+import expr
+
+public
+
+fn is_numeric(s: str) -> bool:
+    if string.str_eq(s, "i8") or string.str_eq(s, "i16") or string.str_eq(s, "i32") or string.str_eq(s, "i64"):
+        return true
+    if string.str_eq(s, "u8") or string.str_eq(s, "u16") or string.str_eq(s, "u32") or string.str_eq(s, "u64"):
+        return true
+    if string.str_eq(s, "isize") or string.str_eq(s, "usize") or string.str_eq(s, "f32") or string.str_eq(s, "f64"):
+        return true
+    return false
+
+fn is_prim(s: str) -> bool:
+    if is_numeric(s):
+        return true
+    if string.str_eq(s, "bool") or string.str_eq(s, "str"):
+        return true
+    return false
+
+fn is_builtin_alias(s: str) -> bool:
+    if string.str_eq(s, "int") or string.str_eq(s, "uint"):
+        return true
+    if string.str_eq(s, "float") or string.str_eq(s, "double"):
+        return true
+    return false
+
+fn is_cast_name(s: str) -> bool:
+    if is_numeric(s) or is_builtin_alias(s):
+        return true
+    return false
+
+fn canon(s: str) -> str:
+    if string.str_eq(s, "int"):
+        return "i32"
+    if string.str_eq(s, "uint"):
+        return "u32"
+    if string.str_eq(s, "float"):
+        return "f32"
+    if string.str_eq(s, "double"):
+        return "f64"
+    return s
+
+fn ref_banned(p: lend cursor.Parser, ctx: str) -> bool:
+    if not (cursor.at(p, "consume") or cursor.at(p, "read") or cursor.at(p, "lend")):
+        return false
+    kw = cursor.cur(p)
+    msg = string.new()
+    msg.append_byte(96)
+    msg.append_str(p.lx.names.text(kw.text))
+    msg.append_str(" T")
+    msg.append_byte(96)
+    full = string.new()
+    if string.str_eq(ctx, "variable"):
+        full.append_str(msg.as_str())
+        full.append_str(" cannot be stored as an owned value; write `name: read T = ...` or `name: lend T = ...`.")
+    elif string.str_eq(ctx, "field"):
+        full.append_str(msg.as_str())
+        full.append_str(" cannot be a struct field; it can only be a function parameter (use `tied to` for field).")
+    elif string.str_eq(ctx, "return"):
+        full.append_str(msg.as_str())
+        full.append_str(" cannot be a return type; it can only be a function parameter.")
+    elif string.str_eq(ctx, "payload"):
+        full.append_str(msg.as_str())
+        full.append_str(" cannot be an enum payload; it can only be a function parameter.")
+    elif string.str_eq(ctx, "type argument"):
+        full.append_str(msg.as_str())
+        full.append_str(" cannot be a type argument; it can only be a function parameter.")
+    else:
+        full.append_str(msg.as_str())
+        full.append_str(" cannot be a parameter type; write without ")
+        full.append_str(msg.as_str())
+        full.append_byte(46)
+    cursor.fail(p, kw.line, kw.col, kw.length, full.as_str(), "Write the type without the keyword.", true)
+    return true
+
+fn finish_ty(p: lend cursor.Parser, n: ast.Node, start: lex.Token) -> usize:
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, start)
+    return id
+
+fn parse_type(p: lend cursor.Parser, ctx: str) -> usize:
+    if p.bad:
+        return 0
+    if ref_banned(p, ctx):
+        return 0
+    if cursor.at(p, "fn"):
+        start = cursor.advance(p)
+        cursor.expect_kind(p, "(", "Expected `(` in function type", "Write in the form `fn(i32, i32) -> i32`.", true)
+        tmp = List[usize]()
+        if not cursor.at(p, ")") and not p.bad:
+            tmp.push(parse_type(p, ctx))
+            while not p.bad and cursor.eat(p, ","):
+                tmp.push(parse_type(p, ctx))
+        cursor.expect_kind(p, ")", "Expected `)` in function type", "", false)
+        fret: usize = 0
+        if not p.bad and cursor.eat(p, "->"):
+            fret = parse_type(p, ctx)
+        if p.bad:
+            return 0
+        sp = cursor.flush(p, tmp)
+        shown = string.new()
+        shown.append_str("fn(")
+        i: usize = 0
+        while i < tmp.len:
+            if i > 0:
+                shown.append_str(", ")
+            tn = p.nodes[tmp[i]]
+            shown.append_str(cursor.packed_text(p, tn.s0))
+            i += 1
+        shown.append_str(")")
+        if fret != 0:
+            shown.append_str(" -> ")
+            shown.append_str(cursor.packed_text(p, p.nodes[fret].s0))
+        n = ast.blank()
+        n.kind = 12
+        n.s0 = cursor.sid(p, shown.as_str())
+        n.f4 = true
+        n.lo2 = sp.lo
+        n.hi2 = sp.hi
+        n.c2 = fret
+        return finish_ty(p, n, start)
+    if cursor.at(p, "("):
+        start2 = cursor.advance(p)
+        elems = List[usize]()
+        elems.push(parse_type(p, ctx))
+        while not p.bad and cursor.eat(p, ","):
+            if cursor.at(p, ")"):
+                break
+            elems.push(parse_type(p, ctx))
+        cursor.expect_kind(p, ")", "Expected `)` in tuple type", "", false)
+        if p.bad:
+            return 0
+        if elems.len < 2 or elems.len > 6:
+            cursor.fail(p, start2.line, start2.col, start2.length, "Tuple types must have 2 to 6 elements.", "Use a struct for larger groups.", true)
+            return 0
+        sp2 = cursor.flush(p, elems)
+        base = string.new()
+        base.append_str("Tuple")
+        base.append_i64(i64(elems.len))
+        shown2 = string.new()
+        shown2.append_str(base.as_str())
+        shown2.append_byte(91)
+        j: usize = 0
+        while j < elems.len:
+            if j > 0:
+                shown2.append_str(", ")
+            shown2.append_str(cursor.packed_text(p, p.nodes[elems[j]].s0))
+            j += 1
+        shown2.append_byte(93)
+        n2 = ast.blank()
+        n2.kind = 12
+        n2.s0 = cursor.sid(p, shown2.as_str())
+        n2.s1 = cursor.sid(p, base.as_str())
+        n2.lo = sp2.lo
+        n2.hi = sp2.hi
+        return finish_ty(p, n2, start2)
+    if cursor.at(p, "*"):
+        start3 = cursor.advance(p)
+        is_mut = false
+        if cursor.cur_named(p, "mut"):
+            cursor.advance(p)
+            is_mut = true
+        elem = parse_type(p, ctx)
+        if p.bad:
+            return 0
+        shown3 = string.new()
+        if is_mut:
+            shown3.append_str("*mut ")
+        else:
+            shown3.append_byte(42)
+        shown3.append_str(cursor.packed_text(p, p.nodes[elem].s0))
+        n3 = ast.blank()
+        n3.kind = 12
+        n3.s0 = cursor.sid(p, shown3.as_str())
+        n3.c1 = elem
+        n3.f2 = true
+        n3.f3 = is_mut
+        return finish_ty(p, n3, start3)
+    if cursor.at(p, "["):
+        start4 = cursor.advance(p)
+        if cursor.eat(p, "]"):
+            elem2 = parse_type(p, ctx)
+            if p.bad:
+                return 0
+            shown4 = string.new()
+            shown4.append_str("[]")
+            shown4.append_str(cursor.packed_text(p, p.nodes[elem2].s0))
+            n4 = ast.blank()
+            n4.kind = 12
+            n4.s0 = cursor.sid(p, shown4.as_str())
+            n4.c1 = elem2
+            n4.f0 = true
+            return finish_ty(p, n4, start4)
+        size_expr = expr.parse_expr(p, 0)
+        cursor.expect_kind(p, "]", "Expected `]`", "", false)
+        elem3 = parse_type(p, ctx)
+        if p.bad:
+            return 0
+        piece = dump.unparse(p, size_expr)
+        shown5 = string.new()
+        shown5.append_byte(91)
+        shown5.append_str(piece.as_str())
+        shown5.append_byte(93)
+        shown5.append_str(cursor.packed_text(p, p.nodes[elem3].s0))
+        n5 = ast.blank()
+        n5.kind = 12
+        n5.s0 = cursor.sid(p, shown5.as_str())
+        n5.c0 = size_expr
+        n5.c1 = elem3
+        n5.f1 = true
+        return finish_ty(p, n5, start4)
+    if not cursor.expect_kind(p, "NAME", "Expected type name", "", false):
+        return 0
+    tok = p.lx.tokens[p.pos - 1]
+    qual: usize = 0
+    if cursor.at(p, ".") and cursor.kind_is(p, cursor.peek_at(p, 1), "NAME"):
+        cursor.advance(p)
+        if not cursor.expect_kind(p, "NAME", "Expected type name after `.`", "", false):
+            return 0
+        member = p.lx.tokens[p.pos - 1]
+        qual = cursor.sid(p, p.lx.names.text(tok.text))
+        tok = member
+    if cursor.text_is(p, tok, "Array") and cursor.at(p, "["):
+        cursor.advance(p)
+        elem4 = parse_type(p, ctx)
+        cursor.expect_kind(p, ",", "Expected `,` after element type in `Array[T, N]`", "", false)
+        size2 = expr.parse_expr(p, 0)
+        cursor.expect_kind(p, "]", "Expected `]`", "", false)
+        if p.bad:
+            return 0
+        piece2 = dump.unparse(p, size2)
+        shown6 = string.new()
+        shown6.append_byte(91)
+        shown6.append_str(piece2.as_str())
+        shown6.append_byte(93)
+        shown6.append_str(cursor.packed_text(p, p.nodes[elem4].s0))
+        n6 = ast.blank()
+        n6.kind = 12
+        n6.s0 = cursor.sid(p, shown6.as_str())
+        n6.c0 = size2
+        n6.c1 = elem4
+        n6.f1 = true
+        return finish_ty(p, n6, tok)
+    base_s = canon(p.lx.names.text(tok.text))
+    if cursor.at(p, "["):
+        sp3 = type_args(p)
+        if p.bad:
+            return 0
+        shown7 = string.new()
+        shown7.append_str(base_s)
+        shown7.append_byte(91)
+        k: usize = 0
+        first = true
+        a = sp3.lo
+        while a < sp3.hi:
+            if not first:
+                shown7.append_str(", ")
+            first = false
+            shown7.append_str(cursor.packed_text(p, p.nodes[p.ids[a]].s0))
+            a += 1
+            k += 1
+        shown7.append_byte(93)
+        n7 = ast.blank()
+        n7.kind = 12
+        n7.s0 = cursor.sid(p, shown7.as_str())
+        n7.s1 = cursor.sid(p, base_s)
+        n7.s2 = qual
+        n7.lo = sp3.lo
+        n7.hi = sp3.hi
+        return finish_ty(p, n7, tok)
+    if cursor.eat(p, "in"):
+        lo_neg = cursor.eat(p, "-")
+        if not cursor.expect_kind(p, "INT", "Expected lower bound integer in range type", "", false):
+            return 0
+        lo_tok = p.lx.tokens[p.pos - 1]
+        cursor.expect_kind(p, "..", "Expected `..` in range type", "", false)
+        hi_neg = cursor.eat(p, "-")
+        if not cursor.expect_kind(p, "INT", "Expected upper bound integer in range type", "", false):
+            return 0
+        hi_tok = p.lx.tokens[p.pos - 1]
+        if p.bad:
+            return 0
+        lo: i64 = 0
+        hi: i64 = 0
+        match string.parse_i64(p.lx.names.text(lo_tok.text)):
+            Valid(v):
+                lo = v
+            None:
+                lo = 0
+        match string.parse_i64(p.lx.names.text(hi_tok.text)):
+            Valid(v2):
+                hi = v2
+            None:
+                hi = 0
+        if lo_neg:
+            lo = 0 - lo
+        if hi_neg:
+            hi = 0 - hi
+        shown8 = string.new()
+        shown8.append_str(p.lx.names.text(tok.text))
+        shown8.append_str(" in ")
+        shown8.append_i64(lo)
+        shown8.append_str("..")
+        shown8.append_i64(hi)
+        n8 = ast.blank()
+        n8.kind = 12
+        n8.s0 = cursor.sid(p, shown8.as_str())
+        n8.f5 = true
+        n8.i0 = lo
+        n8.j0 = hi
+        n8.s2 = qual
+        return finish_ty(p, n8, tok)
+    n9 = ast.blank()
+    n9.kind = 12
+    n9.s0 = cursor.sid(p, base_s)
+    n9.s2 = qual
+    return finish_ty(p, n9, tok)
+
+fn type_args(p: lend cursor.Parser) -> cursor.Span:
+    tmp = List[usize]()
+    if p.bad:
+        return cursor.empty_span()
+    cursor.expect_kind(p, "[", "Expected `[`", "", false)
+    if p.bad:
+        return cursor.empty_span()
+    if cursor.at(p, "]"):
+        cursor.fail_here(p, "Type argument list cannot be empty.", "Write in the form `Pair[i32, f64]`.", true)
+        return cursor.empty_span()
+    tmp.push(parse_type(p, "type argument"))
+    while not p.bad and cursor.eat(p, ","):
+        tmp.push(parse_type(p, "type argument"))
+    cursor.expect_kind(p, "]", "Expected `]`", "", false)
+    if p.bad:
+        return cursor.empty_span()
+    return cursor.flush(p, tmp)
+
+fn type_params(p: lend cursor.Parser) -> cursor.Span:
+    names = List[usize]()
+    if p.bad:
+        return cursor.empty_span()
+    cursor.expect_kind(p, "[", "Expected `[`", "", false)
+    if p.bad:
+        return cursor.empty_span()
+    while not p.bad:
+        if not cursor.expect_kind(p, "NAME", "Expected type parameter name", "Write in the form `[T]` or `[A, B]`.", true):
+            return cursor.empty_span()
+        tok = p.lx.tokens[p.pos - 1]
+        text = p.lx.names.text(tok.text)
+        if text.len == 0 or text[0] < 65 or text[0] > 90:
+            msg = string.new()
+            msg.append_str("Type parameter `")
+            msg.append_str(text)
+            msg.append_str("` must start with an uppercase letter.")
+            hint = string.new()
+            hint.append_str("Write as `")
+            if text.len > 0 and text[0] >= 97 and text[0] <= 122:
+                hint.append_byte(text[0] - 32)
+            elif text.len > 0:
+                hint.append_byte(text[0])
+            if text.len > 1:
+                hint.append_str(string.substr(text, 1, text.len))
+            hint.append_str("`.")
+            cursor.soft(p, tok.line, tok.col, tok.length, msg.as_str(), hint.as_str(), true)
+        names.push(tok.text)
+        if cursor.eat(p, ":"):
+            bl = List[usize]()
+            while not p.bad:
+                if not cursor.expect_kind(p, "NAME", "Expected feature name", "Write in the form `[T: Ord]` or `[T: Ord + Show]`.", true):
+                    break
+                b = p.lx.tokens[p.pos - 1]
+                bn = ast.blank()
+                bn.kind = 25
+                bn.s0 = cursor.sid(p, p.lx.names.text(b.text))
+                bid = cursor.push_node(p, bn)
+                cursor.anchor(p, bid, b)
+                bl.push(bid)
+                if not cursor.eat(p, "+"):
+                    break
+            if p.bad:
+                return cursor.empty_span()
+            bsp = cursor.flush(p, bl)
+            p.bkeys.push(tok.text)
+            p.bvlo.push(bsp.lo)
+            p.bvhi.push(bsp.hi)
+        if not cursor.eat(p, ","):
+            break
+    cursor.expect_kind(p, "]", "Expected `]`", "", false)
+    if p.bad:
+        return cursor.empty_span()
+    return cursor.flush_str(p, names)
+
+fn tied_target(p: lend cursor.Parser) -> usize:
+    if not cursor.expect_kind(p, "NAME", "Expected `to` after `tied`", "`tied to self` format.", true):
+        return 0
+    to = p.lx.tokens[p.pos - 1]
+    if not cursor.text_is(p, to, "to"):
+        cursor.fail(p, to.line, to.col, to.length, "Expected `to` after `tied`.", "`tied to self` format.", true)
+        return 0
+    if not cursor.expect_kind(p, "NAME", "Expected name after `tied to`", "`tied to self` format.", true):
+        return 0
+    target = p.lx.tokens[p.pos - 1]
+    return cursor.sid(p, p.lx.names.text(target.text))
+
+fn parse_param(p: lend cursor.Parser) -> usize:
+    if p.bad:
+        return 0
+    if not cursor.expect_kind(p, "NAME", "Expected parameter name", "", false):
+        return 0
+    name = p.lx.tokens[p.pos - 1]
+    if cursor.text_is(p, name, "self") and (cursor.at(p, ",") or cursor.at(p, ")")):
+        tr = ast.blank()
+        tr.kind = 12
+        tr.s0 = cursor.sid(p, "Self")
+        tid = cursor.push_node(p, tr)
+        cursor.anchor(p, tid, name)
+        pn = ast.blank()
+        pn.kind = 11
+        pn.s0 = cursor.sid(p, "self")
+        pn.c0 = tid
+        pn.s1 = p.z
+        id = cursor.push_node(p, pn)
+        cursor.anchor(p, id, name)
+        return id
+    cursor.expect_kind(p, ":", "Missing parameter type", "Write in the form `name: type`, e.g. `amount: i32`.", true)
+    is_excl = cursor.eat(p, "exclusive")
+    mode = p.z
+    mode_tok_line: i32 = 0
+    mode_tok_col: i32 = 0
+    mode_tok_len: i32 = 0
+    saw = false
+    if not p.bad and (cursor.at(p, "consume") or cursor.at(p, "read") or cursor.at(p, "lend")):
+        mt = cursor.advance(p)
+        mode = cursor.sid(p, p.lx.names.text(mt.text))
+        mode_tok_line = mt.line
+        mode_tok_col = mt.col
+        mode_tok_len = mt.length
+        saw = true
+    tref = parse_type(p, "parameter")
+    if is_excl:
+        mtxt = cursor.packed_text(p, mode)
+        if not string.str_eq(mtxt, "read") and not string.str_eq(mtxt, "lend"):
+            cursor.soft(p, name.line, name.col, name.length, "`exclusive` can only be used on `read`/`lend` parameters.", "`a: exclusive lend []f32` format.", true)
+    mlen: i32 = 0
+    if saw and tref != 0:
+        trn = p.nodes[tref]
+        if trn.line == mode_tok_line and trn.col > mode_tok_col:
+            mlen = trn.col - mode_tok_col
+        else:
+            mlen = mode_tok_len
+    tied_id: usize = 0
+    if not p.bad and cursor.eat(p, "tied"):
+        tied_id = tied_target(p)
+        mtxt2 = cursor.packed_text(p, mode)
+        if string.str_eq(mtxt2, "") or string.str_eq(mtxt2, "consume"):
+            cursor.soft(p, name.line, name.col, name.length, "`tied to` can only be used on `read`/`lend` parameters.", "", false)
+    if p.bad:
+        return 0
+    pn2 = ast.blank()
+    pn2.kind = 11
+    pn2.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    pn2.c0 = tref
+    pn2.s1 = mode
+    pn2.s2 = tied_id
+    pn2.f0 = is_excl
+    pn2.i1 = mode_tok_line
+    pn2.i2 = mode_tok_col
+    pn2.i3 = mlen
+    id2 = cursor.push_node(p, pn2)
+    cursor.anchor(p, id2, name)
+    return id2

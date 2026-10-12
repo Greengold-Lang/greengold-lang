@@ -1,0 +1,15 @@
+# conformance: SPEC section 9 (Optional, Result, and `?`), example 2
+# expect-output:
+#   4
+
+fn div(a: i32, b: i32) -> Result[i32, str]:
+    if b == 0:
+        return Err("zero")
+    return Ok(a / b)
+
+fn run() -> Result[i32, str]:
+    q = div(8, 2)?
+    return Ok(q)
+
+fn main():
+    print(run().value_or_panic())

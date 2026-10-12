@@ -1,0 +1,10 @@
+fn test_parse_numbers():
+    require parse_i32("0").value_or(-99) == 0
+    require parse_i32("42").value_or(-99) == 42
+    require parse_i32("-7").value_or(-99) == -7
+
+fn test_parse_rejects():
+    require parse_i32("").is_none()
+    require parse_i32("-").is_none()
+    require parse_i32("12a").is_none()
+    require parse_i32("+3").is_none()

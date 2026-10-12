@@ -1,0 +1,8 @@
+# conformance: SPEC section 17 (Widths, precedence, and rejected forms), example 1
+# expect-output:
+#   ab
+#   65 10
+
+fn main():
+    print("""ab""")
+    print('A', '\n')

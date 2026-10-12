@@ -1,0 +1,1581 @@
+# Greengold lexer written in Greengold.
+# Reads gg_selfhost_in.txt and prints one line per token:
+#   LINE:COL:LEN KIND TEXT
+# TEXT escapes backslash, newline, tab, and carriage return.
+# On a lexical error it prints LEX ERROR, then DIAG / HINT / FIX lines, and exits 1.
+import std.string
+import std.intern
+
+public
+
+struct Token:
+    kind: usize
+    text: usize
+    line: i32
+    col: i32
+    length: i32
+
+struct Diag:
+    code: usize
+    msg: usize
+    hint: usize
+    has_hint: bool
+    line: i32
+    col: i32
+    length: i32
+    has_fix: bool
+    fix_desc: usize
+    esl: i32
+    esc: i32
+    eel: i32
+    eec: i32
+    repl: usize
+    app: usize
+
+struct Bracket:
+    ch: u8
+    line: i32
+    col: i32
+
+struct Frame:
+    indent: i32
+    word: usize
+
+struct Decision:
+    has_indent: bool
+    indent: i32
+    visual: i32
+    lead: i32
+    unambiguous: bool
+
+struct ScanInfo:
+    depth: i32
+    word: usize
+    has_word: bool
+    opens: bool
+    comment: bool
+    enter_multi: bool
+
+struct Place:
+    indent: i32
+    unambiguous: bool
+
+struct Lead:
+    chars: i32
+    visual: i32
+
+struct Lexer:
+    src: str
+    names: intern.Intern
+    tokens: List[Token]
+    diags: List[Diag]
+    indents: List[i32]
+    brackets: List[Bracket]
+    keywords: List[usize]
+    cps: List[u32]
+    digs: List[u8]
+    digs2: List[u8]
+    multi: bool
+    multi_fmt: bool
+    multi_line: i32
+    multi_col: i32
+    multi_buf: string
+    multi_cps: i32
+    multi_suppress: bool
+    frames: List[Frame]
+    lay_pending: bool
+    lay_pending_id: usize
+    lay_depth: i32
+    lay_multi: bool
+    lay_cont: i32
+    has_fix: bool
+    fix_spaces: i32
+    fix_lead: i32
+    id_empty: usize
+    id_if: usize
+    id_elif: usize
+    id_else: usize
+    id_block: usize
+    id_newline: usize
+
+fn is_digit_cp(c: u32) -> bool:
+    return c >= 48 and c <= 57
+
+fn is_ascii_alpha(c: u32) -> bool:
+    if c >= 65 and c <= 90:
+        return true
+    return c >= 97 and c <= 122
+
+fn is_ascii_alnum(c: u32) -> bool:
+    if is_digit_cp(c):
+        return true
+    return is_ascii_alpha(c)
+
+fn is_alpha_u(c: u32) -> bool:
+    if is_ascii_alpha(c):
+        return true
+    return c >= 128
+
+fn hex_val(c: u32) -> i32:
+    if c >= 48 and c <= 57:
+        return i32(c - 48)
+    if c >= 97 and c <= 102:
+        return i32(c - 97) + 10
+    if c >= 65 and c <= 70:
+        return i32(c - 65) + 10
+    return -1
+
+fn iabs(x: i32) -> i32:
+    if x < 0:
+        return 0 - x
+    return x
+
+fn append_cp(buf: lend string, cp: u32):
+    if cp < 128:
+        buf.append_byte(u8(cp))
+        return
+    if cp < 2048:
+        buf.append_byte(u8(u32(192) + cp / u32(64)))
+        buf.append_byte(u8(u32(128) + cp % u32(64)))
+        return
+    if cp < 65536:
+        buf.append_byte(u8(u32(224) + cp / u32(4096)))
+        buf.append_byte(u8(u32(128) + (cp / u32(64)) % u32(64)))
+        buf.append_byte(u8(u32(128) + cp % u32(64)))
+        return
+    buf.append_byte(u8(u32(240) + cp / u32(262144)))
+    buf.append_byte(u8(u32(128) + (cp / u32(4096)) % u32(64)))
+    buf.append_byte(u8(u32(128) + (cp / u32(64)) % u32(64)))
+    buf.append_byte(u8(u32(128) + cp % u32(64)))
+
+fn string_escape(cp: u32) -> i32:
+    if cp == 110:
+        return 10
+    if cp == 116:
+        return 9
+    if cp == 114:
+        return 13
+    if cp == 92:
+        return 92
+    if cp == 34:
+        return 34
+    if cp == 39:
+        return 39
+    return -1
+
+fn char_escape(cp: u32) -> i32:
+    if cp == 48:
+        return 0
+    return string_escape(cp)
+
+fn classify_code(msg: str) -> str:
+    if string.str_contains(msg, "Tab characters are not allowed"):
+        return "GG0101"
+    if string.str_contains(msg, "// is not a comment"):
+        return "GG0102"
+    if string.str_contains(msg, "Indentation must be a multiple"):
+        return "GG0103"
+    if string.str_contains(msg, "Indentation must increase"):
+        return "GG0104"
+    if string.str_contains(msg, "Indentation does not match"):
+        return "GG0105"
+    if string.str_contains(msg, "Unexpected indentation"):
+        return "GG0106"
+    if string.str_contains(msg, "opened but never closed"):
+        return "GG0107"
+    if string.str_contains(msg, "no matching open bracket"):
+        return "GG0108"
+    if string.str_contains(msg, "closes wrong bracket"):
+        return "GG0109"
+    if string.str_contains(msg, "Unterminated"):
+        return "GG0110"
+    if string.str_contains(msg, "Empty char literal"):
+        return "GG0112"
+    if string.str_contains(msg, "multi-byte UTF-8"):
+        return "GG0113"
+    if string.str_contains(msg, "single character"):
+        return "GG0114"
+    if string.str_contains(msg, "Unknown escape"):
+        return "GG0115"
+    if string.str_contains(msg, "escape sequence can only be used in char"):
+        return "GG0115"
+    if string.str_contains(msg, "Invalid hexadecimal"):
+        return "GG0116"
+    if string.str_contains(msg, "Invalid binary"):
+        return "GG0116"
+    if string.str_contains(msg, "Invalid number"):
+        return "GG0116"
+    if string.str_contains(msg, "Unrecognized character"):
+        return "GG0117"
+    return "GG0000"
+
+fn hint_string_escapes() -> string:
+    s = string.new()
+    s.append_str("Valid escapes: ")
+    s.append_byte(92)
+    s.append_str("n ")
+    s.append_byte(92)
+    s.append_str("t ")
+    s.append_byte(92)
+    s.append_str("r ")
+    s.append_byte(92)
+    s.append_byte(92)
+    s.append_str(" ")
+    s.append_byte(92)
+    s.append_byte(34)
+    s.append_str(" ")
+    s.append_byte(92)
+    s.append_byte(39)
+    return s
+
+fn hint_char_escapes() -> string:
+    s = hint_string_escapes()
+    s.append_str(" ")
+    s.append_byte(92)
+    s.append_str("0")
+    return s
+
+fn msg_nul_string() -> string:
+    s = string.new()
+    s.append_byte(96)
+    s.append_byte(92)
+    s.append_str("0` escape sequence can only be used in char literals.")
+    return s
+
+fn hint_nul_string() -> string:
+    s = string.new()
+    s.append_byte(96)
+    s.append_byte(92)
+    s.append_str("0` cannot be used in strings.")
+    return s
+
+fn msg_tab_string() -> string:
+    s = string.new()
+    s.append_str("Tab characters are not allowed (write ")
+    s.append_byte(96)
+    s.append_byte(92)
+    s.append_str("t` in string).")
+    return s
+
+fn msg_tab_char() -> string:
+    s = string.new()
+    s.append_str("Tab characters are not allowed (write ")
+    s.append_byte(96)
+    s.append_byte(92)
+    s.append_str("t` in char literal).")
+    return s
+
+fn hint_close_string() -> string:
+    s = string.new()
+    s.append_str("Add closing ")
+    s.append_byte(96)
+    s.append_byte(34)
+    s.append_byte(96)
+    s.append_str(" before end of line.")
+    return s
+
+fn hint_close_multi() -> string:
+    s = string.new()
+    s.append_str("Add closing ")
+    s.append_byte(96)
+    n: i32 = 0
+    while n < 3:
+        s.append_byte(34)
+        n += 1
+    s.append_byte(96)
+    s.append_str(".")
+    return s
+
+fn hint_close_char() -> string:
+    s = string.new()
+    s.append_str("Add closing ")
+    s.append_byte(96)
+    s.append_byte(39)
+    s.append_byte(96)
+    s.append_str(" before end of line.")
+    return s
+
+fn hint_char_many() -> string:
+    s = string.new()
+    s.append_str("Use string ")
+    s.append_byte(96)
+    s.append_byte(34)
+    s.append_str("...")
+    s.append_byte(34)
+    s.append_byte(96)
+    s.append_str(" for multiple characters.")
+    return s
+
+fn append_escaped(out: lend string, text: str):
+    i: usize = 0
+    while i < text.len:
+        c = text[i]
+        if c == 92:
+            out.append_byte(92)
+            out.append_byte(92)
+        elif c == 10:
+            out.append_byte(92)
+            out.append_byte(110)
+        elif c == 9:
+            out.append_byte(92)
+            out.append_byte(116)
+        elif c == 13:
+            out.append_byte(92)
+            out.append_byte(114)
+        else:
+            out.append_byte(c)
+        i += 1
+
+fn lexer_new(src: str) -> Lexer:
+    lx = Lexer{
+        src: src,
+        names: intern.intern_new(),
+        tokens: List[Token](),
+        diags: List[Diag](),
+        indents: List[i32](),
+        brackets: List[Bracket](),
+        keywords: List[usize](),
+        cps: List[u32](),
+        digs: List[u8](),
+        digs2: List[u8](),
+        multi: false,
+        multi_fmt: false,
+        multi_line: 1,
+        multi_col: 1,
+        multi_buf: string.new(),
+        multi_cps: 0,
+        multi_suppress: false,
+        frames: List[Frame](),
+        lay_pending: false,
+        lay_pending_id: 0,
+        lay_depth: 0,
+        lay_multi: false,
+        lay_cont: 0,
+        has_fix: false,
+        fix_spaces: 0,
+        fix_lead: 0,
+        id_empty: 0,
+        id_if: 0,
+        id_elif: 0,
+        id_else: 0,
+        id_block: 0,
+        id_newline: 0,
+    }
+    lx.prepare()
+    return lx
+
+impl Lexer:
+    fn prepare(self: lend Lexer):
+        self.id_empty = self.names.put("")
+        self.id_block = self.names.put("block")
+        self.id_newline = self.names.put("NEWLINE")
+        self.add_kw("fn")
+        self.add_kw("struct")
+        self.add_kw("if")
+        self.add_kw("elif")
+        self.add_kw("else")
+        self.add_kw("while")
+        self.add_kw("for")
+        self.add_kw("in")
+        self.add_kw("return")
+        self.add_kw("break")
+        self.add_kw("continue")
+        self.add_kw("var")
+        self.add_kw("const")
+        self.add_kw("and")
+        self.add_kw("or")
+        self.add_kw("not")
+        self.add_kw("public")
+        self.add_kw("private")
+        self.add_kw("true")
+        self.add_kw("false")
+        self.add_kw("extern")
+        self.add_kw("pass")
+        self.add_kw("match")
+        self.add_kw("enum")
+        self.add_kw("import")
+        self.add_kw("then")
+        self.add_kw("defer")
+        self.add_kw("feature")
+        self.add_kw("consume")
+        self.add_kw("read")
+        self.add_kw("lend")
+        self.add_kw("comptime")
+        self.add_kw("copy")
+        self.add_kw("soa")
+        self.add_kw("exclusive")
+        self.add_kw("hot")
+        self.add_kw("trust")
+        self.add_kw("tied")
+        self.add_kw("unsafe")
+        self.indents.push(0)
+        self.frames.push(Frame{ indent: 0, word: self.id_empty })
+
+    fn add_kw(self: lend Lexer, w: str):
+        id = self.names.put(w)
+        self.keywords.push(id)
+        if string.str_eq(w, "if"):
+            self.id_if = id
+        elif string.str_eq(w, "elif"):
+            self.id_elif = id
+        elif string.str_eq(w, "else"):
+            self.id_else = id
+
+    fn is_kw(self: read Lexer, id: usize) -> bool:
+        i: usize = 0
+        while i < self.keywords.len:
+            if self.keywords[i] == id:
+                return true
+            i += 1
+        return false
+
+    fn emit_ids(self: lend Lexer, kind: str, text_id: usize, line: i32, col: i32, length: i32):
+        kid = self.names.put(kind)
+        self.tokens.push(Token{ kind: kid, text: text_id, line: line, col: col, length: length })
+
+    fn emit_lit(self: lend Lexer, kind: str, text: str, line: i32, col: i32, length: i32):
+        tid = self.names.put(text)
+        self.emit_ids(kind, tid, line, col, length)
+
+    fn add_err(self: lend Lexer, msg: str, line: i32, col: i32, length: i32, hint: str, has_hint: bool, has_fix: bool, desc: str, sl: i32, sc: i32, el: i32, ec: i32, repl: str):
+        ln = length
+        if ln < 1:
+            ln = 1
+        code = classify_code(msg)
+        self.diags.push(Diag{
+            code: self.names.put(code),
+            msg: self.names.put(msg),
+            hint: self.names.put(hint),
+            has_hint: has_hint,
+            line: line,
+            col: col,
+            length: ln,
+            has_fix: has_fix,
+            fix_desc: self.names.put(desc),
+            esl: sl,
+            esc: sc,
+            eel: el,
+            eec: ec,
+            repl: self.names.put(repl),
+            app: 0,
+        })
+
+    fn err_msg(self: lend Lexer, msg: str, line: i32, col: i32, length: i32, hint: str, has_hint: bool, take: bool):
+        has_fix = false
+        spaces: i32 = 0
+        lead: i32 = 0
+        if take and self.has_fix:
+            has_fix = true
+            spaces = self.fix_spaces
+            lead = self.fix_lead
+            self.has_fix = false
+        repl = string.new()
+        desc = string.new()
+        if has_fix:
+            k: i32 = 0
+            while k < spaces:
+                repl.append_byte(32)
+                k += 1
+            desc.append_str("Indent with ")
+            desc.append_i64(i64(spaces))
+            desc.append_str(" spaces")
+        self.add_err(msg, line, col, length, hint, has_hint, has_fix, desc.as_str(), line, 1, line, lead + 1, repl.as_str())
+
+    fn slice_text(self: read Lexer, lo: usize, hi: usize) -> string:
+        s = string.new()
+        i = lo
+        while i < hi:
+            append_cp(s, self.cps[i])
+            i += 1
+        return s
+
+    fn load_line(self: lend Lexer, lo: usize, hi: usize):
+        self.cps.clear()
+        i = lo
+        while i < hi:
+            b0 = self.src[i]
+            if b0 < 128:
+                self.cps.push(u32(b0))
+                i += 1
+            elif b0 < 224 and i + 1 < hi:
+                b1 = self.src[i + 1]
+                cp = (u32(b0) - u32(192)) * u32(64) + (u32(b1) - u32(128))
+                self.cps.push(cp)
+                i += 2
+            elif b0 < 240 and i + 2 < hi:
+                b1 = self.src[i + 1]
+                b2 = self.src[i + 2]
+                cp = (u32(b0) - u32(224)) * u32(4096) + (u32(b1) - u32(128)) * u32(64) + (u32(b2) - u32(128))
+                self.cps.push(cp)
+                i += 3
+            elif b0 < 248 and i + 3 < hi:
+                b1 = self.src[i + 1]
+                b2 = self.src[i + 2]
+                b3 = self.src[i + 3]
+                cp = (u32(b0) - u32(240)) * u32(262144) + (u32(b1) - u32(128)) * u32(4096) + (u32(b2) - u32(128)) * u32(64) + (u32(b3) - u32(128))
+                self.cps.push(cp)
+                i += 4
+            else:
+                self.cps.push(u32(b0))
+                i += 1
+
+    fn rstrip_end(self: read Lexer) -> usize:
+        end = self.cps.len
+        while end > 0:
+            c = self.cps[end - 1]
+            if c == 32 or c == 9:
+                end -= 1
+            else:
+                break
+        return end
+
+    fn lead_of(self: read Lexer, end: usize) -> Lead:
+        chars: i32 = 0
+        visual: i32 = 0
+        i: usize = 0
+        while i < end:
+            c = self.cps[i]
+            if c == 32:
+                chars += 1
+                visual += 1
+            elif c == 9:
+                chars += 1
+                visual += 4
+            else:
+                break
+            i += 1
+        return Lead{ chars: chars, visual: visual }
+
+    fn close_until(self: read Lexer, start: usize, hi: usize) -> i32:
+        j = start
+        while j < hi:
+            if self.cps[j] == 92 and j + 1 < hi:
+                j += 2
+                continue
+            if j + 2 < hi and self.cps[j] == 34 and self.cps[j + 1] == 34 and self.cps[j + 2] == 34:
+                return i32(j + 3)
+            j += 1
+        return -1
+
+    fn skip_quotes(self: read Lexer, i: usize, hi: usize) -> usize:
+        j = i + 1
+        while j < hi:
+            if self.cps[j] == 92 and j + 1 < hi:
+                j += 2
+                continue
+            if self.cps[j] == 34:
+                return j + 1
+            j += 1
+        return hi
+
+    fn skip_char(self: read Lexer, i: usize, hi: usize) -> usize:
+        j = i + 1
+        while j < hi:
+            if self.cps[j] == 92 and j + 1 < hi:
+                j += 2
+                continue
+            if self.cps[j] == 39:
+                return j + 1
+            j += 1
+        return hi
+
+    fn triple_at(self: read Lexer, i: usize, hi: usize) -> bool:
+        if i + 2 >= hi:
+            return false
+        return self.cps[i] == 34 and self.cps[i + 1] == 34 and self.cps[i + 2] == 34
+
+    fn fmt_triple(self: read Lexer, i: usize, hi: usize) -> bool:
+        if i + 3 >= hi:
+            return false
+        c = self.cps[i]
+        if c != 102 and c != 36:
+            return false
+        return self.cps[i + 1] == 34 and self.cps[i + 2] == 34 and self.cps[i + 3] == 34
+
+    fn scan(self: lend Lexer, lo: usize, hi: usize, depth0: i32) -> ScanInfo:
+        i = lo
+        depth = depth0
+        word: usize = self.id_empty
+        has_word = false
+        seen = false
+        last: u32 = 0
+        comment = false
+        if lo < hi and self.cps[lo] == 35:
+            comment = true
+        enter = false
+        while i < hi:
+            c = self.cps[i]
+            if c == 35:
+                break
+            if c == 32 or c == 9:
+                i += 1
+                continue
+            if self.triple_at(i, hi) or self.fmt_triple(i, hi):
+                start = i + 3
+                if not self.triple_at(i, hi):
+                    start = i + 4
+                end = self.close_until(start, hi)
+                if end < 0:
+                    enter = true
+                    last = 0
+                    break
+                i = usize(end)
+                last = 34
+                seen = true
+                continue
+            if (c == 102 or c == 36) and i + 1 < hi and self.cps[i + 1] == 34:
+                i = self.skip_quotes(i + 1, hi)
+                last = 34
+                seen = true
+                continue
+            if c == 34:
+                i = self.skip_quotes(i, hi)
+                last = 34
+                seen = true
+                continue
+            if c == 39:
+                i = self.skip_char(i, hi)
+                last = 39
+                seen = true
+                continue
+            if c == 40 or c == 91 or c == 123:
+                depth += 1
+                last = c
+                seen = true
+                i += 1
+                continue
+            if c == 41 or c == 93 or c == 125:
+                if depth > 0:
+                    depth -= 1
+                last = c
+                seen = true
+                i += 1
+                continue
+            if c < 128 and (is_ascii_alpha(c) or c == 95):
+                j = i + 1
+                while j < hi:
+                    d = self.cps[j]
+                    if d < 128 and (is_ascii_alnum(d) or d == 95):
+                        j += 1
+                    else:
+                        break
+                if not seen and depth == 0:
+                    w = self.slice_text(i, j)
+                    word = self.names.put(w.as_str())
+                    has_word = true
+                seen = true
+                last = self.cps[j - 1]
+                i = j
+                continue
+            last = c
+            seen = true
+            i += 1
+        opens = false
+        if depth == 0 and not enter and last == 58:
+            opens = true
+        return ScanInfo{ depth: depth, word: word, has_word: has_word, opens: opens, comment: comment, enter_multi: enter }
+
+    fn pop_frame(self: lend Lexer):
+        match self.frames.pop():
+            None:
+                pass
+            Valid(_):
+                pass
+
+    fn place(self: lend Lexer, info: ScanInfo, depth_before: i32, visual: i32) -> Place:
+        if depth_before > 0:
+            return Place{ indent: self.lay_cont, unambiguous: false }
+        is_else = false
+        if info.has_word and (info.word == self.id_else or info.word == self.id_elif):
+            is_else = true
+        if is_else and not info.comment:
+            pending_if = false
+            if self.lay_pending and (self.lay_pending_id == self.id_if or self.lay_pending_id == self.id_elif):
+                pending_if = true
+            if pending_if:
+                self.lay_pending = false
+            else:
+                while self.frames.len > 1:
+                    top = self.frames[self.frames.len - 1]
+                    if top.word == self.id_if or top.word == self.id_elif:
+                        break
+                    self.pop_frame()
+                if self.frames.len > 1:
+                    top2 = self.frames[self.frames.len - 1]
+                    if top2.word == self.id_if or top2.word == self.id_elif:
+                        self.pop_frame()
+            top3 = self.frames[self.frames.len - 1]
+            return Place{ indent: top3.indent, unambiguous: true }
+        if self.lay_pending and not info.comment:
+            top = self.frames[self.frames.len - 1]
+            indent = top.indent + 4
+            self.frames.push(Frame{ indent: indent, word: self.lay_pending_id })
+            self.lay_pending = false
+            return Place{ indent: indent, unambiguous: true }
+        if info.comment:
+            top = self.frames[self.frames.len - 1]
+            shown = top.indent
+            if self.lay_pending:
+                shown += 4
+            return Place{ indent: shown, unambiguous: false }
+        best = self.frames[0].indent
+        best_dist = iabs(visual - best)
+        oi: usize = 1
+        while oi < self.frames.len:
+            level = self.frames[oi].indent
+            dist = iabs(visual - level)
+            if dist < best_dist or (dist == best_dist and level > best):
+                best = level
+                best_dist = dist
+            oi += 1
+        count: i32 = 0
+        uj: usize = 0
+        while uj < self.frames.len:
+            level = self.frames[uj].indent
+            if iabs(visual - level) == best_dist:
+                count += 1
+            uj += 1
+        while self.frames.len > 1:
+            if self.frames[self.frames.len - 1].indent <= best:
+                break
+            self.pop_frame()
+        return Place{ indent: best, unambiguous: count == 1 }
+
+    fn feed(self: lend Lexer) -> Decision:
+        if self.lay_multi:
+            end = self.close_until(0, self.cps.len)
+            if end < 0:
+                return Decision{ has_indent: false, indent: 0, visual: 0, lead: 0, unambiguous: false }
+            self.lay_multi = false
+            info = self.scan(usize(end), self.cps.len, 0)
+            self.lay_depth = info.depth
+            if info.opens:
+                self.lay_pending = true
+                if info.has_word:
+                    self.lay_pending_id = info.word
+                else:
+                    self.lay_pending_id = self.id_block
+            return Decision{ has_indent: false, indent: 0, visual: 0, lead: 0, unambiguous: false }
+        end = self.rstrip_end()
+        led = self.lead_of(end)
+        if usize(led.chars) >= end:
+            return Decision{ has_indent: true, indent: 0, visual: led.visual, lead: led.chars, unambiguous: false }
+        depth_before = self.lay_depth
+        info = self.scan(usize(led.chars), end, self.lay_depth)
+        if info.enter_multi:
+            self.lay_multi = true
+        self.lay_depth = info.depth
+        placed = self.place(info, depth_before, led.visual)
+        if depth_before == 0 and self.lay_depth > 0:
+            self.lay_cont = placed.indent + 4
+        if info.opens and not info.comment:
+            self.lay_pending = true
+            if info.has_word:
+                self.lay_pending_id = info.word
+            else:
+                self.lay_pending_id = self.id_block
+        unamb = placed.unambiguous
+        if info.comment:
+            unamb = false
+        return Decision{ has_indent: true, indent: placed.indent, visual: led.visual, lead: led.chars, unambiguous: unamb }
+
+    fn handle_indent(self: lend Lexer, width: i32, lineno: i32):
+        reported = false
+        if width % 4 != 0:
+            msg = string.new()
+            msg.append_str("Indentation must be a multiple of 4 spaces (currently ")
+            msg.append_i64(i64(width))
+            msg.append_str(" spaces).")
+            span = width
+            if span < 1:
+                span = 1
+            self.err_msg(msg.as_str(), lineno, 1, span, "Use 4-space indentation.", true, true)
+            reported = true
+        current = self.indents[self.indents.len - 1]
+        if width > current:
+            if width - current != 4:
+                span = width
+                if span < 1:
+                    span = 1
+                self.err_msg("Indentation must increase by 4 spaces at a time.", lineno, 1, span, "", false, true)
+                reported = true
+            self.indents.push(width)
+            self.emit_lit("INDENT", "", lineno, 1, 0)
+        elif width < current:
+            while self.indents[self.indents.len - 1] > width:
+                match self.indents.pop():
+                    None:
+                        pass
+                    Valid(_):
+                        pass
+                self.emit_lit("DEDENT", "", lineno, 1, 0)
+            if self.indents[self.indents.len - 1] != width:
+                span = width
+                if span < 1:
+                    span = 1
+                self.err_msg("Indentation does not match any outer block.", lineno, 1, span, "", false, true)
+                reported = true
+                self.indents.push(width)
+        elif self.has_fix and not reported:
+            span = width
+            if span < 1:
+                span = 1
+            self.err_msg("Indentation must increase by 4 spaces at a time.", lineno, 1, span, "Use 4-space indentation.", true, true)
+
+    fn dig_clear(self: lend Lexer):
+        self.digs.clear()
+
+    fn dig_mul_add(self: lend Lexer, base: i32, add: i32):
+        self.digs2.clear()
+        carry: i32 = add
+        i: usize = 0
+        while i < self.digs.len:
+            v = i32(self.digs[i]) * base + carry
+            self.digs2.push(u8(v % 10))
+            carry = v / 10
+            i += 1
+        while carry > 0:
+            self.digs2.push(u8(carry % 10))
+            carry = carry / 10
+        self.digs.clear()
+        j: usize = 0
+        while j < self.digs2.len:
+            self.digs.push(self.digs2[j])
+            j += 1
+
+    fn dig_text(self: read Lexer) -> string:
+        s = string.new()
+        if self.digs.len == 0:
+            s.append_byte(48)
+            return s
+        i = self.digs.len
+        while i > 0:
+            i -= 1
+            s.append_byte(48 + self.digs[i])
+        return s
+
+    fn span_empty(self: read Lexer, lo: usize, hi: usize) -> bool:
+        i = lo
+        while i < hi:
+            if self.cps[i] != 95:
+                return false
+            i += 1
+        return true
+
+    fn eat_suffix(self: read Lexer, j: usize) -> usize:
+        k = j
+        n = self.cps.len
+        while k < n:
+            c = self.cps[k]
+            if is_ascii_alnum(c) or c == 95 or c >= 128:
+                k += 1
+            else:
+                break
+        return k
+
+    fn err_number(self: lend Lexer, kind: str, lo: usize, hi: usize, lineno: i32):
+        msg = string.new()
+        msg.append_str(kind)
+        lexeme = self.slice_text(lo, hi)
+        msg.append_str(lexeme.as_str())
+        msg.append_str("`.")
+        self.err_msg(msg.as_str(), lineno, i32(lo) + 1, i32(hi - lo), "", false, false)
+
+    fn convert_span(self: lend Lexer, lo: usize, hi: usize, base: i32) -> string:
+        self.dig_clear()
+        p = lo
+        while p < hi:
+            c = self.cps[p]
+            if c != 95:
+                self.dig_mul_add(base, hex_val(c))
+            p += 1
+        return self.dig_text()
+
+    fn number(self: lend Lexer, i: usize, lineno: i32) -> usize:
+        n = self.cps.len
+        j = i
+        if j + 1 < n and self.cps[j] == 48 and (self.cps[j + 1] == 120 or self.cps[j + 1] == 88):
+            j += 2
+            start = j
+            while j < n:
+                c = self.cps[j]
+                if c == 95:
+                    j += 1
+                    continue
+                if is_ascii_alnum(c):
+                    if hex_val(c) < 0:
+                        break
+                    j += 1
+                    continue
+                break
+            if self.span_empty(start, j):
+                self.err_number("Invalid hexadecimal number: `", i, j, lineno)
+                return j
+            if j < n and (is_alpha_u(self.cps[j]) or self.cps[j] == 95):
+                k = self.eat_suffix(j)
+                self.err_number("Invalid number: `", i, k, lineno)
+                return k
+            text = self.convert_span(start, j, 16)
+            tid = self.names.put(text.as_str())
+            self.emit_ids("INT", tid, lineno, i32(i) + 1, i32(j - i))
+            return j
+        if j + 1 < n and self.cps[j] == 48 and (self.cps[j + 1] == 98 or self.cps[j + 1] == 66):
+            j += 2
+            start = j
+            while j < n and (self.cps[j] == 48 or self.cps[j] == 49 or self.cps[j] == 95):
+                j += 1
+            if self.span_empty(start, j):
+                self.err_number("Invalid binary number: `", i, j, lineno)
+                return j
+            if j < n and (is_alpha_u(self.cps[j]) or self.cps[j] == 95):
+                k = self.eat_suffix(j)
+                self.err_number("Invalid number: `", i, k, lineno)
+                return k
+            text = self.convert_span(start, j, 2)
+            tid = self.names.put(text.as_str())
+            self.emit_ids("INT", tid, lineno, i32(i) + 1, i32(j - i))
+            return j
+        while j < n and self.cps[j] < 128 and (is_digit_cp(self.cps[j]) or self.cps[j] == 95):
+            j += 1
+        kind = "INT"
+        if j + 1 < n and self.cps[j] == 46 and self.cps[j + 1] != 46 and self.cps[j + 1] < 128 and is_digit_cp(self.cps[j + 1]):
+            j += 1
+            while j < n and self.cps[j] < 128 and (is_digit_cp(self.cps[j]) or self.cps[j] == 95):
+                j += 1
+            kind = "FLOAT"
+        if j < n and (is_alpha_u(self.cps[j]) or self.cps[j] == 95):
+            k = self.eat_suffix(j)
+            self.err_number("Invalid number: `", i, k, lineno)
+            return k
+        if string.str_eq(kind, "INT"):
+            text = self.convert_span(i, j, 10)
+            tid = self.names.put(text.as_str())
+            self.emit_ids("INT", tid, lineno, i32(i) + 1, i32(j - i))
+        else:
+            text = string.new()
+            p = i
+            while p < j:
+                if self.cps[p] != 95:
+                    text.append_byte(u8(self.cps[p]))
+                p += 1
+            tid = self.names.put(text.as_str())
+            self.emit_ids("FLOAT", tid, lineno, i32(i) + 1, i32(j - i))
+        return j
+
+    fn unknown_escape(self: lend Lexer, esc: u32, lineno: i32, col: i32, for_char: bool):
+        msg = string.new()
+        msg.append_str("Unknown escape sequence: ")
+        msg.append_byte(96)
+        msg.append_byte(92)
+        append_cp(msg, esc)
+        msg.append_byte(96)
+        msg.append_str(".")
+        if for_char:
+            hint = hint_char_escapes()
+            self.err_msg(msg.as_str(), lineno, col, 2, hint.as_str(), true, false)
+        else:
+            hint = hint_string_escapes()
+            self.err_msg(msg.as_str(), lineno, col, 2, hint.as_str(), true, false)
+
+    fn lex_string(self: lend Lexer, i: usize, lineno: i32) -> usize:
+        n = self.cps.len
+        j = i + 1
+        buf = string.new()
+        closed = false
+        while j < n:
+            ch = self.cps[j]
+            if ch == 34:
+                closed = true
+                break
+            if ch == 92:
+                j += 1
+                if j >= n:
+                    break
+                esc = self.cps[j]
+                if esc == 48:
+                    m = msg_nul_string()
+                    h = hint_nul_string()
+                    self.err_msg(m.as_str(), lineno, i32(j), 2, h.as_str(), true, false)
+                else:
+                    decoded = string_escape(esc)
+                    if decoded >= 0:
+                        buf.append_byte(u8(decoded))
+                    else:
+                        self.unknown_escape(esc, lineno, i32(j), false)
+                j += 1
+                continue
+            if ch == 9:
+                m = msg_tab_string()
+                self.err_msg(m.as_str(), lineno, i32(j) + 1, 1, "", false, false)
+                j += 1
+                continue
+            append_cp(buf, ch)
+            j += 1
+        if not closed:
+            h = hint_close_string()
+            self.err_msg("Unterminated String literal.", lineno, i32(i) + 1, i32(n - i), h.as_str(), true, false)
+            return n
+        tid = self.names.put(buf.as_str())
+        self.emit_ids("STRING", tid, lineno, i32(i) + 1, i32(j - i) + 1)
+        return j + 1
+
+    fn lex_char(self: lend Lexer, i: usize, lineno: i32) -> usize:
+        n = self.cps.len
+        j = i + 1
+        buf = string.new()
+        count: i32 = 0
+        only: u32 = 0
+        closed = false
+        while j < n:
+            ch = self.cps[j]
+            if ch == 39:
+                closed = true
+                break
+            if ch == 92:
+                j += 1
+                if j >= n:
+                    break
+                esc = self.cps[j]
+                decoded = char_escape(esc)
+                if decoded >= 0:
+                    buf.append_byte(u8(decoded))
+                    only = u32(decoded)
+                    count += 1
+                else:
+                    self.unknown_escape(esc, lineno, i32(j), true)
+                j += 1
+                continue
+            if ch == 9:
+                m = msg_tab_char()
+                self.err_msg(m.as_str(), lineno, i32(j) + 1, 1, "", false, false)
+                j += 1
+                continue
+            append_cp(buf, ch)
+            only = ch
+            count += 1
+            j += 1
+        if not closed:
+            h = hint_close_char()
+            self.err_msg("Unterminated char literal.", lineno, i32(i) + 1, i32(n - i), h.as_str(), true, false)
+            return n
+        span = i32(j - i) + 1
+        if count == 0:
+            self.err_msg("Empty char literal.", lineno, i32(i) + 1, span, "Char literal must contain a single character, e.g. `'A'`.", true, false)
+        elif count == 1 and only >= 128:
+            self.err_msg("Char literal cannot contain multi-byte UTF-8 character.", lineno, i32(i) + 1, span, "Char literal must be single-byte (ASCII).", true, false)
+        elif count != 1:
+            h = hint_char_many()
+            self.err_msg("Char literal can only contain a single character.", lineno, i32(i) + 1, span, h.as_str(), true, false)
+        else:
+            text = string.new()
+            text.append_u64(u64(only))
+            tid = self.names.put(text.as_str())
+            self.emit_ids("CHAR", tid, lineno, i32(i) + 1, span)
+        return j + 1
+
+    fn lex_format(self: lend Lexer, quote_at: usize, lineno: i32, start_col: i32) -> usize:
+        n = self.cps.len
+        j = quote_at + 1
+        buf = string.new()
+        depth: i32 = 0
+        closed = false
+        while j < n:
+            ch = self.cps[j]
+            if ch == 34 and depth == 0:
+                closed = true
+                break
+            if ch == 123 and j + 1 < n and self.cps[j + 1] == 123:
+                buf.append_byte(123)
+                buf.append_byte(123)
+                j += 2
+                continue
+            if ch == 125 and j + 1 < n and self.cps[j + 1] == 125:
+                buf.append_byte(125)
+                buf.append_byte(125)
+                j += 2
+                continue
+            if ch == 123:
+                depth += 1
+                buf.append_byte(123)
+                j += 1
+                continue
+            if ch == 125:
+                if depth > 0:
+                    depth -= 1
+                buf.append_byte(125)
+                j += 1
+                continue
+            if ch == 92:
+                j += 1
+                if j >= n:
+                    break
+                esc = self.cps[j]
+                if esc == 34:
+                    buf.append_byte(34)
+                elif esc == 92:
+                    buf.append_byte(92)
+                else:
+                    decoded = string_escape(esc)
+                    if decoded >= 0:
+                        buf.append_byte(u8(decoded))
+                    else:
+                        buf.append_byte(92)
+                        append_cp(buf, esc)
+                j += 1
+                continue
+            if ch == 9:
+                m = msg_tab_string()
+                self.err_msg(m.as_str(), lineno, i32(j) + 1, 1, "", false, false)
+                j += 1
+                continue
+            append_cp(buf, ch)
+            j += 1
+        if not closed:
+            h = hint_close_string()
+            self.err_msg("Unterminated format string literal.", lineno, start_col, i32(n) - start_col + 1, h.as_str(), true, false)
+            return n
+        tid = self.names.put(buf.as_str())
+        self.emit_ids("FSTRING", tid, lineno, start_col, i32(j) - start_col + 1)
+        return j + 1
+
+    fn multi_add(self: lend Lexer, cp: u32):
+        append_cp(self.multi_buf, cp)
+        self.multi_cps += 1
+
+    fn multi_add_byte(self: lend Lexer, b: u8):
+        self.multi_buf.append_byte(b)
+        self.multi_cps += 1
+
+    fn multi_emit(self: lend Lexer, is_format: bool, line: i32, col: i32, length: i32, use_text_len: bool):
+        tmp = string.new()
+        tmp.append(self.multi_buf)
+        tid = self.names.put(tmp.as_str())
+        ln = length
+        if use_text_len:
+            ln = self.multi_cps
+        if is_format:
+            self.emit_ids("FSTRING", tid, line, col, ln)
+        else:
+            self.emit_ids("STRING", tid, line, col, ln)
+        self.multi_buf.clear()
+        self.multi_cps = 0
+        self.multi = false
+
+    fn multi_escape(self: lend Lexer, j: usize) -> usize:
+        esc = self.cps[j + 1]
+        decoded = string_escape(esc)
+        if decoded >= 0:
+            self.multi_add_byte(u8(decoded))
+        else:
+            self.multi_add_byte(92)
+            self.multi_add(esc)
+        return j + 2
+
+    fn fill_multi(self: lend Lexer, start: usize, lineno: i32, start_col: i32, is_format: bool, first: bool) -> usize:
+        n = self.cps.len
+        j = start
+        while j < n:
+            if self.triple_at(j, n):
+                if first:
+                    self.multi_emit(is_format, lineno, start_col, i32(j + 3) - start_col + 1, false)
+                else:
+                    self.multi_emit(is_format, self.multi_line, self.multi_col, 0, true)
+                return j + 3
+            if self.cps[j] == 92:
+                if j + 1 < n:
+                    j = self.multi_escape(j)
+                    continue
+                self.multi = true
+                self.multi_fmt = is_format
+                if first:
+                    self.multi_line = lineno
+                    self.multi_col = start_col
+                self.multi_suppress = true
+                return n
+            if self.cps[j] == 9:
+                k: i32 = 0
+                while k < 4:
+                    self.multi_add_byte(32)
+                    k += 1
+                j += 1
+                continue
+            self.multi_add(self.cps[j])
+            j += 1
+        if first:
+            self.multi_add_byte(10)
+            self.multi = true
+            self.multi_fmt = is_format
+            self.multi_line = lineno
+            self.multi_col = start_col
+            self.multi_suppress = false
+            return n
+        if not self.multi_suppress:
+            self.multi_add_byte(10)
+        self.multi_suppress = false
+        self.multi = true
+        return n
+
+    fn start_multi(self: lend Lexer, content: usize, lineno: i32, start_col: i32, is_format: bool) -> usize:
+        self.multi_buf.clear()
+        self.multi_cps = 0
+        self.multi = false
+        return self.fill_multi(content, lineno, start_col, is_format, true)
+
+    fn continue_multi(self: lend Lexer, lineno: i32) -> usize:
+        return self.fill_multi(0, lineno, self.multi_col, self.multi_fmt, false)
+
+    fn is_op3(self: read Lexer, i: usize) -> bool:
+        if i + 2 >= self.cps.len:
+            return false
+        a = self.cps[i]
+        b = self.cps[i + 1]
+        c = self.cps[i + 2]
+        if a == 46 and b == 46 and c == 61:
+            return true
+        if a == 60 and b == 60 and c == 61:
+            return true
+        if a == 62 and b == 62 and c == 61:
+            return true
+        return false
+
+    fn is_op2(self: read Lexer, i: usize) -> bool:
+        if i + 1 >= self.cps.len:
+            return false
+        a = self.cps[i]
+        b = self.cps[i + 1]
+        if b == 61:
+            if a == 58 or a == 61 or a == 33 or a == 60 or a == 62:
+                return true
+            if a == 43 or a == 45 or a == 42 or a == 47 or a == 37:
+                return true
+            if a == 38 or a == 124 or a == 94:
+                return true
+            return false
+        if a == 45 and b == 62:
+            return true
+        if a == 46 and b == 46:
+            return true
+        if a == 60 and b == 60:
+            return true
+        if a == 62 and b == 62:
+            return true
+        if a == 61 and b == 62:
+            return true
+        return false
+
+    fn is_op1(self: read Lexer, c: u32) -> bool:
+        if c == 43 or c == 45 or c == 42 or c == 47 or c == 37:
+            return true
+        if c == 60 or c == 62 or c == 61 or c == 58 or c == 44 or c == 46:
+            return true
+        if c == 40 or c == 41 or c == 123 or c == 125:
+            return true
+        if c == 38 or c == 124 or c == 94 or c == 126:
+            return true
+        if c == 91 or c == 93 or c == 59 or c == 63:
+            return true
+        return false
+
+    fn close_bracket(self: lend Lexer, ch: u8, lineno: i32, col: i32):
+        expected: u8 = 40
+        if ch == 125:
+            expected = 123
+        elif ch == 93:
+            expected = 91
+        if self.brackets.len == 0:
+            msg = string.new()
+            msg.append_str("Extra `")
+            msg.append_byte(ch)
+            msg.append_str("`: no matching open bracket.")
+            self.err_msg(msg.as_str(), lineno, col, 1, "", false, false)
+            return
+        top = self.brackets[self.brackets.len - 1]
+        if top.ch != expected:
+            msg = string.new()
+            msg.append_byte(96)
+            msg.append_byte(ch)
+            msg.append_str("` closes wrong bracket.")
+            self.err_msg(msg.as_str(), lineno, col, 1, "", false, false)
+            match self.brackets.pop():
+                None:
+                    pass
+                Valid(_):
+                    pass
+            return
+        match self.brackets.pop():
+            None:
+                pass
+            Valid(_):
+                pass
+
+    fn emit_op(self: lend Lexer, i: usize, size: usize, lineno: i32):
+        spelling = self.slice_text(i, i + size)
+        id = self.names.put(spelling.as_str())
+        col = i32(i) + 1
+        self.tokens.push(Token{ kind: id, text: id, line: lineno, col: col, length: i32(size) })
+        if size == 1:
+            c = u8(self.cps[i])
+            if c == 40 or c == 91 or c == 123:
+                self.brackets.push(Bracket{ ch: c, line: lineno, col: col })
+            elif c == 41 or c == 93 or c == 125:
+                self.close_bracket(c, lineno, col)
+
+    fn lex_line(self: lend Lexer, lineno: i32):
+        n = self.cps.len
+        i: usize = 0
+        emitted: i32 = 0
+        dec = self.feed()
+        self.has_fix = false
+        if dec.has_indent and dec.unambiguous and dec.indent != dec.visual:
+            self.has_fix = true
+            self.fix_spaces = dec.indent
+            self.fix_lead = dec.lead
+        if self.multi:
+            i = self.continue_multi(lineno)
+            if self.multi:
+                return
+            emitted = 1
+        if self.brackets.len == 0 and not self.multi and i == 0:
+            width: i32 = 0
+            saw_tab = false
+            while i < n and (self.cps[i] == 32 or self.cps[i] == 9):
+                if self.cps[i] == 9:
+                    if not saw_tab:
+                        col = i32(i) + 1
+                        self.add_err("Tab characters are not allowed.", lineno, col, 1, "Use 4 spaces for indentation.", true, true, "Replace this tab with 4 spaces", lineno, col, lineno, col + 1, "    ")
+                        saw_tab = true
+                    width += 4
+                else:
+                    width += 1
+                i += 1
+            if i >= n or self.cps[i] == 35:
+                return
+            self.handle_indent(width, lineno)
+        while i < n:
+            c = self.cps[i]
+            if c == 32:
+                i += 1
+            elif c == 9:
+                self.err_msg("Tab characters are not allowed.", lineno, i32(i) + 1, 1, "Use 4 spaces for indentation and spacing.", true, false)
+                i += 1
+            elif c == 35:
+                break
+            elif c == 47 and i + 1 < n and self.cps[i + 1] == 47:
+                self.err_msg("// is not a comment, use # for comments.", lineno, i32(i) + 1, 2, "Write `# text` instead of `// text`.", true, false)
+                break
+            elif self.fmt_triple(i, n):
+                i = self.start_multi(i + 4, lineno, i32(i) + 1, true)
+                if self.multi:
+                    return
+                emitted += 1
+            elif self.triple_at(i, n):
+                i = self.start_multi(i + 3, lineno, i32(i) + 1, false)
+                if self.multi:
+                    return
+                emitted += 1
+            elif (c == 102 or c == 36) and i + 1 < n and self.cps[i + 1] == 34:
+                i = self.lex_format(i + 1, lineno, i32(i) + 1)
+                emitted += 1
+            elif c < 128 and is_digit_cp(c):
+                i = self.number(i, lineno)
+                emitted += 1
+            elif c < 128 and (is_ascii_alpha(c) or c == 95):
+                j = i
+                while j < n:
+                    d = self.cps[j]
+                    if d < 128 and (is_ascii_alnum(d) or d == 95):
+                        j += 1
+                    else:
+                        break
+                w = self.slice_text(i, j)
+                id = self.names.put(w.as_str())
+                if self.is_kw(id):
+                    self.tokens.push(Token{ kind: id, text: id, line: lineno, col: i32(i) + 1, length: i32(j - i) })
+                else:
+                    self.emit_ids("NAME", id, lineno, i32(i) + 1, i32(j - i))
+                i = j
+                emitted += 1
+            elif c == 34:
+                i = self.lex_string(i, lineno)
+                emitted += 1
+            elif c == 39:
+                i = self.lex_char(i, lineno)
+                emitted += 1
+            else:
+                size: usize = 0
+                if self.is_op3(i):
+                    size = 3
+                elif self.is_op2(i):
+                    size = 2
+                elif self.is_op1(c):
+                    size = 1
+                if size == 0:
+                    msg = string.new()
+                    msg.append_str("Unrecognized character: ")
+                    msg.append_byte(96)
+                    append_cp(msg, c)
+                    msg.append_byte(96)
+                    msg.append_str(".")
+                    self.err_msg(msg.as_str(), lineno, i32(i) + 1, 1, "", false, false)
+                    i += 1
+                else:
+                    self.emit_op(i, size, lineno)
+                    i += size
+                emitted += 1
+        if emitted > 0 and self.brackets.len == 0 and not self.multi:
+            self.emit_lit("NEWLINE", "", lineno, i32(n) + 1, 0)
+
+    fn rebind(self: lend Lexer, src: str):
+        self.src = src
+        self.tokens.clear()
+        self.brackets.clear()
+        self.indents.clear()
+        self.indents.push(0)
+        self.frames.clear()
+        self.frames.push(Frame{ indent: 0, word: self.id_empty })
+        self.multi = false
+        self.multi_fmt = false
+        self.multi_line = 1
+        self.multi_col = 1
+        self.multi_buf.clear()
+        self.multi_cps = 0
+        self.multi_suppress = false
+        self.lay_pending = false
+        self.lay_pending_id = 0
+        self.lay_depth = 0
+        self.lay_multi = false
+        self.lay_cont = 0
+        self.has_fix = false
+        self.fix_spaces = 0
+        self.fix_lead = 0
+        self.cps.clear()
+        self.digs.clear()
+        self.digs2.clear()
+        self.run()
+
+    fn finish(self: lend Lexer, end_line: i32, last_len: i32):
+        if self.multi:
+            h = hint_close_multi()
+            self.err_msg("Unterminated multiline string literal.", self.multi_line, self.multi_col, 1, h.as_str(), true, false)
+        bi: usize = 0
+        while bi < self.brackets.len:
+            b = self.brackets[bi]
+            msg = string.new()
+            msg.append_byte(96)
+            msg.append_byte(b.ch)
+            msg.append_str("` opened but never closed.")
+            self.err_msg(msg.as_str(), b.line, b.col, 1, "Add the matching closing bracket.", true, false)
+            bi += 1
+        need_nl = false
+        if self.tokens.len > 0:
+            last = self.tokens[self.tokens.len - 1]
+            if last.kind != self.id_newline:
+                need_nl = true
+        if need_nl:
+            self.emit_lit("NEWLINE", "", end_line, last_len + 1, 0)
+        while self.indents.len > 1:
+            match self.indents.pop():
+                None:
+                    pass
+                Valid(_):
+                    pass
+            self.emit_lit("DEDENT", "", end_line, 1, 0)
+        self.emit_lit("EOF", "", end_line, 1, 0)
+
+    fn run(self: lend Lexer):
+        pos: usize = 0
+        lineno: i32 = 0
+        last_len: i32 = 0
+        src_len = self.src.len
+        while true:
+            if pos > src_len:
+                break
+            if pos == src_len:
+                extra = false
+                if src_len == 0:
+                    extra = true
+                elif self.src[src_len - 1] == 10:
+                    extra = true
+                if extra:
+                    lineno += 1
+                    self.cps.clear()
+                    last_len = 0
+                    self.lex_line(lineno)
+                break
+            end = pos
+            while end < src_len and self.src[end] != 10:
+                end += 1
+            hi = end
+            while hi > pos and self.src[hi - 1] == 13:
+                hi -= 1
+            self.load_line(pos, hi)
+            lineno += 1
+            last_len = i32(self.cps.len)
+            self.lex_line(lineno)
+            if end == src_len:
+                break
+            pos = end + 1
+        self.finish(lineno, last_len)
+
+    fn print_all(self: read Lexer):
+        i: usize = 0
+        while i < self.tokens.len:
+            t = self.tokens[i]
+            kind_s = string.from(self.names.text(t.kind))
+            text_s = string.from(self.names.text(t.text))
+            line = string.new()
+            line.append_i64(i64(t.line))
+            line.append_str(":")
+            line.append_i64(i64(t.col))
+            line.append_str(":")
+            line.append_i64(i64(t.length))
+            line.append_str(" ")
+            line.append_str(kind_s.as_str())
+            line.append_str(" ")
+            append_escaped(line, text_s.as_str())
+            print(line.as_str())
+            i += 1
+        if self.diags.len == 0:
+            return
+        print("LEX ERROR")
+        d: usize = 0
+        while d < self.diags.len:
+            item = self.diags[d]
+            code_s = string.from(self.names.text(item.code))
+            msg_s = string.from(self.names.text(item.msg))
+            row = string.new()
+            row.append_str("DIAG ")
+            row.append_str(code_s.as_str())
+            row.append_str(" ")
+            row.append_i64(i64(item.line))
+            row.append_str(" ")
+            row.append_i64(i64(item.col))
+            row.append_str(" ")
+            row.append_i64(i64(item.length))
+            row.append_str(" ")
+            row.append_str(msg_s.as_str())
+            print(row.as_str())
+            if item.has_hint:
+                hint_s = string.from(self.names.text(item.hint))
+                hrow = string.new()
+                hrow.append_str("HINT ")
+                hrow.append_str(hint_s.as_str())
+                print(hrow.as_str())
+            if item.has_fix:
+                desc_s = string.from(self.names.text(item.fix_desc))
+                repl_s = string.from(self.names.text(item.repl))
+                frow = string.new()
+                frow.append_str("FIX safe|")
+                frow.append_str(desc_s.as_str())
+                frow.append_str("|")
+                frow.append_i64(i64(item.esl))
+                frow.append_str(":")
+                frow.append_i64(i64(item.esc))
+                frow.append_str(":")
+                frow.append_i64(i64(item.eel))
+                frow.append_str(":")
+                frow.append_i64(i64(item.eec))
+                frow.append_str("|")
+                frow.append_str(repl_s.as_str())
+                print(frow.as_str())
+            d += 1

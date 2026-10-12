@@ -1,0 +1,709 @@
+# std.collections: HashMap, HashSet, a handle-based Arena, Deque, Heap, PriorityQueue, and SortedMap.
+#
+# Keys and values may be any type, including heap-owning ones (`string`, `List[T]`). Keys are hashed with
+# the built-in `hash(key)` and compared with `==`: integers, bool, text, and structs, enums, and lists of
+# them (no floats), or a type that defines `fn hash(self: Self) -> u64` and `fn eq(self: Self, other: Self) -> bool`.
+#     m = collections.hashmap_new[str, i32]()
+#     pts = collections.hashmap_new[Point, str]()
+#
+# Layout: see the HashMap section.
+
+# -- hash and equality helpers ------------------------------------------------------------------
+
+private
+fn mix64(x: u64) -> u64:
+    overflow: wrap
+    h = x
+    h = h ^ (h >> 33)
+    h = h * 0xFF51AFD7ED558CCD
+    h = h ^ (h >> 33)
+    h = h * 0xC4CEB9FE1A85EC53
+    h = h ^ (h >> 33)
+    return h
+
+public
+fn hash_u64(k: u64) -> u64:
+    return mix64(k)
+
+fn hash_i64(k: i64) -> u64:
+    return mix64(u64(k))
+
+fn hash_i32(k: i32) -> u64:
+    return mix64(u64(u32(k)))
+
+fn hash_u32(k: u32) -> u64:
+    return mix64(u64(k))
+
+fn hash_usize(k: usize) -> u64:
+    return mix64(u64(k))
+
+fn hash_u8(k: u8) -> u64:
+    return mix64(u64(k))
+
+fn hash_bool(k: bool) -> u64:
+    if k:
+        return mix64(1)
+    return mix64(0)
+
+fn hash_str(s: str) -> u64:
+    overflow: wrap
+    # FNV-1a
+    h: u64 = 0xCBF29CE484222325
+    for i in 0..s.len:
+        h = h ^ u64(s[i])
+        h = h * 0x100000001B3
+    return mix64(h)
+
+fn eq_u64(a: u64, b: u64) -> bool:
+    return a == b
+
+fn eq_i64(a: i64, b: i64) -> bool:
+    return a == b
+
+fn eq_i32(a: i32, b: i32) -> bool:
+    return a == b
+
+fn eq_u32(a: u32, b: u32) -> bool:
+    return a == b
+
+fn eq_usize(a: usize, b: usize) -> bool:
+    return a == b
+
+fn eq_u8(a: u8, b: u8) -> bool:
+    return a == b
+
+fn eq_bool(a: bool, b: bool) -> bool:
+    return a == b
+
+fn eq_str(a: str, b: str) -> bool:
+    return a == b
+
+# -- HashMap ----------------------------------------------------------------------------------
+# Keys and values live in two parallel lists in insertion order (removal moves the last entry into the
+# gap). `table` is open addressing: each slot holds a key's hash and its entry index (-1 empty, -2
+# deleted), so a probe compares hashes without touching the entries.
+# Keys and values may own heap memory (`string`, `List[T]` ...): nothing is copied behind your back.
+# `get` returns a copy of the value (`clone`), `get_ref` a view of it.
+
+private
+struct _Slot:
+    h: u64
+    i: i64
+
+public
+struct HashMap[K: Key, V]:
+    private
+    ks: List[K]
+    vs: List[V]
+    table: List[_Slot]
+    used: usize  # table slots that are not empty (live + deleted)
+
+public
+fn hashmap_new[K: Key, V]() -> HashMap[K, V]:
+    return HashMap[K, V]{ ks: List[K](), vs: List[V](), table: List[_Slot](), used: 0 }
+
+fn hashmap_i32[V]() -> HashMap[i32, V]:
+    return hashmap_new[i32, V]()
+
+fn hashmap_i64[V]() -> HashMap[i64, V]:
+    return hashmap_new[i64, V]()
+
+fn hashmap_u64[V]() -> HashMap[u64, V]:
+    return hashmap_new[u64, V]()
+
+fn hashmap_usize[V]() -> HashMap[usize, V]:
+    return hashmap_new[usize, V]()
+
+fn hashmap_str[V]() -> HashMap[str, V]:
+    return hashmap_new[str, V]()
+
+impl HashMap[K, V]:
+    fn len(self: read HashMap[K, V]) -> usize:
+        return self.ks.len
+
+    fn is_empty(self: read HashMap[K, V]) -> bool:
+        return self.ks.len == 0
+
+# Table slot holding entry index `want` for hash `h`, or -1 when the key is not there.
+impl HashMap[K, V]:
+    private
+    fn slot_of(self: read HashMap[K, V], key: K, h: u64) -> i64:
+        cap = self.table.len
+        if cap == 0:
+            return -1
+        mask = cap - 1
+        idx: usize = usize(h) & mask
+        probes: usize = 0
+        while probes < cap:
+            t = self.table[idx]
+            if t.i == -1:
+                return -1
+            if t.h == h and t.i >= 0:
+                if self.ks[usize(t.i)] == key:
+                    return i64(idx)
+            idx = (idx + 1) & mask
+            probes += 1
+        return -1
+
+    fn index_of(self: read HashMap[K, V], key: K) -> i64:
+        s = self.slot_of(key, hash(key))
+        if s < 0:
+            return -1
+        return self.table[usize(s)].i
+
+    fn slot_pointing_at(self: read HashMap[K, V], entry: usize) -> usize:
+        mask = self.table.len - 1
+        idx: usize = usize(hash(self.ks[entry].clone())) & mask
+        while self.table[idx].i != i64(entry):
+            idx = (idx + 1) & mask
+        return idx
+
+    # Rebuilds the index table with `cap` slots (power of two); entries do not move.
+    fn rebuild(self: lend HashMap[K, V], cap: usize):
+        table = List[_Slot]()
+        table.reserve(cap)
+        for _i in 0..cap:
+            table.push(_Slot{ h: 0, i: -1 })
+        mask = cap - 1
+        for s in 0..self.table.len:
+            old = self.table[s]
+            if old.i >= 0:
+                idx: usize = usize(old.h) & mask
+                while table[idx].i != -1:
+                    idx = (idx + 1) & mask
+                table[idx] = old
+        self.table = table
+        self.used = self.ks.len
+
+    public
+    fn contains(self: read HashMap[K, V], key: K) -> bool:
+        return self.index_of(key) >= 0
+
+    # A copy of the value for `key` (`clone` for heap values).
+    fn get(self: read HashMap[K, V], key: K) -> Optional[V]:
+        i = self.index_of(key)
+        if i < 0:
+            return None
+        return Valid(self.vs[usize(i)].clone())
+
+    fn get_or(self: read HashMap[K, V], key: K, fallback: V) -> V:
+        i = self.index_of(key)
+        if i < 0:
+            return fallback
+        return self.vs[usize(i)].clone()
+
+    # A view of the value for `key`; stops the program when `key` is missing (check `contains` first).
+    fn get_ref(self: read HashMap[K, V], key: K) -> ref V:
+        i = self.index_of(key)
+        if i < 0:
+            panic("HashMap.get_ref: key not found")
+        return self.vs.get(usize(i))
+
+    fn insert(self: lend HashMap[K, V], key: K, val: V):
+        h = hash(key)
+        s = self.slot_of(key, h)
+        if s >= 0:
+            self.vs[usize(self.table[usize(s)].i)] = val
+            return
+        cap = self.table.len
+        if cap == 0:
+            self.rebuild(8)
+        elif (self.used + 1) * 4 > cap * 3:
+            if self.ks.len * 2 > cap:
+                self.rebuild(cap * 2)
+            else:
+                self.rebuild(cap)
+        mask = self.table.len - 1
+        idx: usize = usize(h) & mask
+        while self.table[idx].i >= 0:
+            idx = (idx + 1) & mask
+        if self.table[idx].i == -1:
+            self.used += 1
+        self.table[idx] = _Slot{ h: h, i: i64(self.ks.len) }
+        self.ks.push(key)
+        self.vs.push(val)
+
+    # The value for `key`, to change in place with one lookup; inserts `fallback` first when `key` is
+    # missing: `counts.entry(word, 0) += 1`.
+    fn entry(self: lend HashMap[K, V], key: K, fallback: V) -> lend V:
+        i = self.index_of(key.clone())
+        if i < 0:
+            self.insert(key, fallback)
+            i = i64(self.ks.len - 1)
+        return self.vs[usize(i)]
+
+    # Removes `key` and returns its value.
+    fn remove(self: lend HashMap[K, V], key: K) -> Optional[V]:
+        s = self.slot_of(key, hash(key))
+        if s < 0:
+            return None
+        i = usize(self.table[usize(s)].i)
+        self.table[usize(s)].i = -2
+        last = self.ks.len - 1
+        if i != last:
+            self.table[self.slot_pointing_at(last)].i = i64(i)
+        old_key = self.ks.swap_remove(i)
+        return Valid(self.vs.swap_remove(i))
+
+    fn clear(self: lend HashMap[K, V]):
+        self.ks.clear()
+        self.vs.clear()
+        self.table.clear()
+        self.used = 0
+
+    # Copies of the keys / values, in insertion order (until a removal moves the last entry).
+    fn keys(self: read HashMap[K, V]) -> List[K]:
+        return self.ks.clone()
+
+    fn values(self: read HashMap[K, V]) -> List[V]:
+        return self.vs.clone()
+
+# -- HashSet ------------------------------------------------------------------------------------
+
+struct HashSet[K: Key]:
+    private
+    map: HashMap[K, u8]
+
+public
+fn hashset_new[K: Key]() -> HashSet[K]:
+    return HashSet[K]{ map: hashmap_new[K, u8]() }
+
+fn hashset_i32() -> HashSet[i32]:
+    return hashset_new[i32]()
+
+fn hashset_i64() -> HashSet[i64]:
+    return hashset_new[i64]()
+
+fn hashset_u64() -> HashSet[u64]:
+    return hashset_new[u64]()
+
+fn hashset_str() -> HashSet[str]:
+    return hashset_new[str]()
+
+impl HashSet[K]:
+    fn len(self: read HashSet[K]) -> usize:
+        return self.map.len()
+
+    fn contains(self: read HashSet[K], key: K) -> bool:
+        return self.map.contains(key)
+
+# Returns true if the key was newly added.
+impl HashSet[K]:
+    fn insert(self: lend HashSet[K], key: K) -> bool:
+        if self.map.contains(key):
+            return false
+        self.map.insert(key, 1)
+        return true
+
+    fn remove(self: lend HashSet[K], key: K) -> bool:
+        return self.map.remove(key).has_value()
+
+    fn to_list(self: read HashSet[K]) -> List[K]:
+        return self.map.keys()
+
+# -- Arena (typed, handle based) ---------------------------------------------------------------
+# Values live in one growing buffer and are referred to by `usize` handles (indices), which stay valid
+# when the arena grows. Everything is released at once when the arena goes out of scope.
+
+struct Arena[T]:
+    private
+    items: List[T]
+
+public
+fn arena_new[T]() -> Arena[T]:
+    return Arena[T]{ items: List[T]() }
+
+impl Arena[T]:
+    fn alloc(self: lend Arena[T], value: T) -> usize:
+        h = self.items.len
+        self.items.push(value)
+        return h
+
+    fn get(self: read Arena[T], h: usize) -> T:
+        return self.items[h]
+
+    fn set(self: lend Arena[T], h: usize, value: T):
+        self.items[h] = value
+
+    fn len(self: read Arena[T]) -> usize:
+        return self.items.len
+
+    fn clear(self: lend Arena[T]):
+        self.items.clear()
+
+# -- Deque (ring buffer) ------------------------------------------------------------------------
+# Adds and removes at both ends in O(1); `d[i]` style access with `get(i)`. The elements live in one
+# buffer on the C heap that wraps around, and doubles when it is full.
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+
+public
+struct Deque[T]:
+    private
+    buf: *mut u8
+    head: usize
+    count: usize
+    cap: usize
+
+impl Deque[T]:
+    public
+    fn new() -> Deque[T]:
+        return Deque[T]{ buf: null, head: 0, count: 0, cap: 0 }
+
+    fn len(self: read Self) -> usize:
+        return self.count
+
+    fn is_empty(self: read Self) -> bool:
+        return self.count == 0
+
+    fn push_back(self: lend Self, value: T):
+        self.make_room()
+        unsafe:
+            ptr_write[T](self.addr(self.slot(self.count)), value)
+        self.count += 1
+
+    fn push_front(self: lend Self, value: T):
+        self.make_room()
+        self.head = if self.head == 0 then self.cap - 1 else self.head - 1
+        unsafe:
+            ptr_write[T](self.addr(self.head), value)
+        self.count += 1
+
+    fn pop_front(self: lend Self) -> Optional[T]:
+        if self.count == 0:
+            return None
+        unsafe:
+            v = ptr_read[T](self.addr(self.head))
+            self.head = self.slot(1)
+            self.count -= 1
+            return Valid(v)
+
+    fn pop_back(self: lend Self) -> Optional[T]:
+        if self.count == 0:
+            return None
+        self.count -= 1
+        unsafe:
+            return Valid(ptr_read[T](self.addr(self.slot(self.count))))
+
+    # A view of the element `i` places from the front; stops the program when `i >= len()`.
+    fn get(self: read Self, i: usize) -> ref T:
+        if i >= self.count:
+            panic("Deque.get: index out of range")
+        unsafe:
+            return ptr_cast[*mut T](self.buf)[self.slot(i)]
+
+    # The element `i` places from the front, to change in place (`d.at(0) += 1`).
+    fn at(self: lend Self, i: usize) -> lend T:
+        if i >= self.count:
+            panic("Deque.at: index out of range")
+        unsafe:
+            return ptr_cast[*mut T](self.buf)[self.slot(i)]
+
+    # Copies of the elements, front to back.
+    fn to_list(self: read Self) -> List[T]:
+        out = List[T]()
+        for i in 0..self.count:
+            out.push(self.get(i).clone())
+        return out
+
+    fn clear(self: lend Self):
+        while self.count > 0:
+            old = self.pop_back()
+        self.head = 0
+
+    fn drop(self: lend Self):
+        self.clear()
+        unsafe:
+            if self.buf != null:
+                free(self.buf)
+
+    private
+    fn addr(self: read Self, slot: usize) -> *mut u8:
+        unsafe:
+            return ptr_offset(self.buf, i64(slot * size_of[T]()))
+
+    fn slot(self: read Self, i: usize) -> usize:
+        j = self.head + i
+        return if j >= self.cap then j - self.cap else j
+
+    fn make_room(self: lend Self):
+        if self.count < self.cap:
+            return
+        cap: usize = if self.cap == 0 then 8 else self.cap * 2
+        unsafe:
+            nb = malloc(cap * size_of[T]())
+            if nb == null:
+                panic("Deque: out of memory")
+            for i in 0..self.count:
+                ptr_write[T](ptr_offset(nb, i64(i * size_of[T]())), ptr_read[T](self.addr(self.slot(i))))
+            if self.buf != null:
+                free(self.buf)
+            self.buf = nb
+        self.head = 0
+        self.cap = cap
+
+# -- Heap and PriorityQueue (binary heaps) ------------------------------------------------------
+# `Heap[T: Ord]` gives the smallest element first (`heap_max` the largest); push and pop are O(log n).
+# `PriorityQueue[P: Ord, V]` orders values of any type by a separate priority, smallest first.
+
+public
+struct Heap[T: Ord]:
+    private
+    items: List[T]
+    largest: bool
+
+public
+fn heap_min[T: Ord]() -> Heap[T]:
+    return Heap[T]{ items: List[T](), largest: false }
+
+fn heap_max[T: Ord]() -> Heap[T]:
+    return Heap[T]{ items: List[T](), largest: true }
+
+impl Heap[T]:
+    fn len(self: read Self) -> usize:
+        return self.items.len
+
+    fn is_empty(self: read Self) -> bool:
+        return self.items.len == 0
+
+    fn push(self: lend Self, value: T):
+        self.items.push(value)
+        i = self.items.len - 1
+        while i > 0:
+            parent = (i - 1) / 2
+            if not self.first(i, parent):
+                break
+            self.items.swap(i, parent)
+            i = parent
+
+    # Removes and returns the first element (the smallest, or the largest for `heap_max`).
+    fn pop(self: lend Self) -> Optional[T]:
+        n = self.items.len
+        if n == 0:
+            return None
+        self.items.swap(0, n - 1)
+        top = self.items.pop()
+        self.sift_down(0)
+        return top
+
+    # A view of the element `pop` would return; stops the program when the heap is empty.
+    fn peek(self: read Self) -> ref T:
+        if self.items.len == 0:
+            panic("Heap.peek: the heap is empty")
+        return self.items.get(0)
+
+    fn clear(self: lend Self):
+        self.items.clear()
+
+    private
+    fn first(self: read Self, a: usize, b: usize) -> bool:
+        if self.largest:
+            return self.items.get(a) > self.items.get(b)
+        return self.items.get(a) < self.items.get(b)
+
+    fn sift_down(self: lend Self, start: usize):
+        i = start
+        n = self.items.len
+        while true:
+            best = i
+            l = i * 2 + 1
+            if l < n and self.first(l, best):
+                best = l
+            if l + 1 < n and self.first(l + 1, best):
+                best = l + 1
+            if best == i:
+                return
+            self.items.swap(i, best)
+            i = best
+
+public
+struct PriorityQueue[P: Ord, V]:
+    private
+    prios: List[P]
+    vals: List[V]
+
+public
+fn priority_queue[P: Ord, V]() -> PriorityQueue[P, V]:
+    return PriorityQueue[P, V]{ prios: List[P](), vals: List[V]() }
+
+impl PriorityQueue[P, V]:
+    fn len(self: read Self) -> usize:
+        return self.prios.len
+
+    fn is_empty(self: read Self) -> bool:
+        return self.prios.len == 0
+
+    fn push(self: lend Self, priority: P, value: V):
+        self.prios.push(priority)
+        self.vals.push(value)
+        i = self.prios.len - 1
+        while i > 0:
+            parent = (i - 1) / 2
+            if not (self.prios.get(i) < self.prios.get(parent)):
+                break
+            self.swap(i, parent)
+            i = parent
+
+    # Removes and returns the value with the smallest priority (any one of them on a tie).
+    fn pop(self: lend Self) -> Optional[V]:
+        n = self.prios.len
+        if n == 0:
+            return None
+        self.swap(0, n - 1)
+        p = self.prios.pop()
+        v = self.vals.pop()
+        self.sift_down()
+        return v
+
+    # The smallest priority; stops the program when the queue is empty.
+    fn peek_priority(self: read Self) -> ref P:
+        if self.prios.len == 0:
+            panic("PriorityQueue.peek_priority: the queue is empty")
+        return self.prios.get(0)
+
+    fn clear(self: lend Self):
+        self.prios.clear()
+        self.vals.clear()
+
+    private
+    fn swap(self: lend Self, a: usize, b: usize):
+        self.prios.swap(a, b)
+        self.vals.swap(a, b)
+
+    fn sift_down(self: lend Self):
+        i: usize = 0
+        n = self.prios.len
+        while true:
+            best = i
+            l = i * 2 + 1
+            if l < n and self.prios.get(l) < self.prios.get(best):
+                best = l
+            if l + 1 < n and self.prios.get(l + 1) < self.prios.get(best):
+                best = l + 1
+            if best == i:
+                return
+            self.swap(i, best)
+            i = best
+
+# -- SortedMap (keys kept in order) -------------------------------------------------------------
+# Keys stay sorted, so iteration, `first_key`, `last_key`, `floor`, `ceiling`, and `keys_between` are in key
+# order. Lookups are a binary search, O(log n); `insert` and `remove` move the later entries, O(n), which
+# is fast up to about a hundred thousand entries.
+
+public
+struct SortedMap[K: Ord, V]:
+    private
+    ks: List[K]
+    vs: List[V]
+
+public
+fn sorted_map[K: Ord, V]() -> SortedMap[K, V]:
+    return SortedMap[K, V]{ ks: List[K](), vs: List[V]() }
+
+impl SortedMap[K, V]:
+    fn len(self: read Self) -> usize:
+        return self.ks.len
+
+    fn is_empty(self: read Self) -> bool:
+        return self.ks.len == 0
+
+    fn contains(self: read Self, key: K) -> bool:
+        i = self.lower_bound(key)
+        return i < self.ks.len and self.ks.get(i) == key
+
+    fn get(self: read Self, key: K) -> Optional[V]:
+        i = self.lower_bound(key)
+        if i < self.ks.len and self.ks.get(i) == key:
+            return Valid(self.vs[i].clone())
+        return None
+
+    fn get_or(self: read Self, key: K, fallback: V) -> V:
+        i = self.lower_bound(key)
+        if i < self.ks.len and self.ks.get(i) == key:
+            return self.vs[i].clone()
+        return fallback
+
+    # Sets the value for `key`, replacing an old one.
+    fn insert(self: lend Self, key: K, val: V):
+        i = self.lower_bound(key)
+        if i < self.ks.len and self.ks.get(i) == key:
+            self.vs[i] = val
+            return
+        self.ks.insert(i, key)
+        self.vs.insert(i, val)
+
+    # The value for `key`, to change in place; inserts `fallback` first when `key` is missing.
+    fn entry(self: lend Self, key: K, fallback: V) -> lend V:
+        i = self.lower_bound(key)
+        if i >= self.ks.len or self.ks.get(i) != key:
+            self.ks.insert(i, key)
+            self.vs.insert(i, fallback)
+        return self.vs[i]
+
+    fn remove(self: lend Self, key: K) -> Optional[V]:
+        i = self.lower_bound(key)
+        if i < self.ks.len and self.ks.get(i) == key:
+            old = self.ks.remove(i)
+            return Valid(self.vs.remove(i))
+        return None
+
+    fn first_key(self: read Self) -> Optional[K]:
+        if self.ks.len == 0:
+            return None
+        return Valid(self.ks[0].clone())
+
+    fn last_key(self: read Self) -> Optional[K]:
+        if self.ks.len == 0:
+            return None
+        return Valid(self.ks[self.ks.len - 1].clone())
+
+    # The largest key `<= key`.
+    fn floor(self: read Self, key: K) -> Optional[K]:
+        i = self.lower_bound(key.clone())
+        if i < self.ks.len and self.ks.get(i) == key:
+            return Valid(self.ks[i].clone())
+        if i == 0:
+            return None
+        return Valid(self.ks[i - 1].clone())
+
+    # The smallest key `>= key`.
+    fn ceiling(self: read Self, key: K) -> Optional[K]:
+        i = self.lower_bound(key)
+        if i == self.ks.len:
+            return None
+        return Valid(self.ks[i].clone())
+
+    # Copies of the keys `k` with `lo <= k < hi`, in order.
+    fn keys_between(self: read Self, lo: K, hi: K) -> List[K]:
+        out = List[K]()
+        i = self.lower_bound(lo)
+        while i < self.ks.len and self.ks.get(i) < hi:
+            out.push(self.ks[i].clone())
+            i += 1
+        return out
+
+    # Copies of the keys / values, in key order.
+    fn keys(self: read Self) -> List[K]:
+        return self.ks.clone()
+
+    fn values(self: read Self) -> List[V]:
+        return self.vs.clone()
+
+    fn clear(self: lend Self):
+        self.ks.clear()
+        self.vs.clear()
+
+    private
+    # The first index whose key is not below `key`.
+    fn lower_bound(self: read Self, key: K) -> usize:
+        lo: usize = 0
+        hi = self.ks.len
+        while lo < hi:
+            mid = (lo + hi) / 2
+            if self.ks.get(mid) < key:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo

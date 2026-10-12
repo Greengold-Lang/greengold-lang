@@ -1,0 +1,15 @@
+# conformance: SPEC section 10 (Heap, text, arrays, slices), example 3
+# expect-output:
+#   1 4
+
+struct Point:
+    x: f32
+
+hot fn first(xs: read [2]i32) -> i32:
+    unsafe:
+        return trust xs[0]
+
+fn main():
+    ps = soa Array[Point, 1]
+    ps[0].x = 1.0
+    print(ps[0].x, first([4, 5]))

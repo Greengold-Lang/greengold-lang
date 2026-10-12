@@ -1,0 +1,8 @@
+Error: `Q` cannot be hashed: it contains `f64`.
+ --> <source>:5:11  GG0243 not-hashable
+  |
+5 |     print(hash(Q{ a: 1.0 }))
+  |           ^^^^^^^^^^^^^^^^^
+  = help: Values hash field by field, and a float has no exact hash. Define `fn hash(self: Self) -> u64` in `impl Q:` (and `fn eq` for `==`).
+
+1 error found.

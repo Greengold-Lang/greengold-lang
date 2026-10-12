@@ -1,0 +1,19 @@
+# conformance: SPEC section 8 (Generics and features), example 4
+# expect-output:
+#   gem
+
+feature Named:
+    fn name(self: Self) -> str
+
+struct Item:
+    title: str
+
+impl Item:
+    fn name(self) -> str:
+        return self.title
+
+fn announce[T: Named](x: T):
+    print(x.name())
+
+fn main():
+    announce[Item](Item{ title: "gem" })

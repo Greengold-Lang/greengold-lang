@@ -1,0 +1,20 @@
+Error: `c` variable was moved (`consume`), can no longer be used.
+  --> website\diagnostics\use-after-consume.gg:10:11  GG0301 use-after-consume
+   |
+10 |     print(c.value)
+   |           ^^^^^^^
+   |
+ 9 |     finish(c)
+   |            ^ `c` is consumed here
+   |
+ 8 |     c = Counter{ value: 1 }
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ `c` is declared here
+   |
+ 4 | fn finish(c: consume Counter):
+   |              ^^^^^^^^ `finish` takes `c` as `consume`
+   = help: Move a copy with `c.clone()` to keep using `c`, use it before the move, or reassign it after the move.
+   = fix (verified): Remove `consume` from `c` so the caller keeps ownership
+   = fix (verified): Move a copy instead: `c.clone()`
+   = fix (manual): Use `c` before it is consumed, or do not use it afterwards
+
+1 error found.

@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: `else if`
+# expect-error: GG0119 at line 8
+
+fn main():
+    x = 1
+    if x == 1:
+        pass
+    else if x == 2:
+        pass

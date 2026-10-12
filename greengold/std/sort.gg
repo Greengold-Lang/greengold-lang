@@ -1,0 +1,88 @@
+# std.sort: in-place sorting and searching for `List[T]` of copyable elements.
+#
+#   sort(v)                      ascending, uses `<` (T needs `Ord`)
+#   sort_by(v, fn(a, b) -> bool) custom "a goes before b" predicate
+#   binary_search(v, x)          index of x in an ascending list, if present
+
+public
+fn sort_by[T](v: lend List[T], before: fn(T, T) -> bool):
+    # Heap sort: O(n log n) worst case, no recursion, no extra memory.
+    n = v.len
+    if n < 2:
+        return
+    start = n / 2
+    while start > 0:
+        start -= 1
+        sift_down_by(v, start, n, before)
+    end = n
+    while end > 1:
+        end -= 1
+        tmp = v[0]
+        v[0] = v[end]
+        v[end] = tmp
+        sift_down_by(v, 0, end, before)
+
+private
+fn sift_down_by[T](v: lend List[T], start: usize, end: usize, before: fn(T, T) -> bool):
+    root = start
+    while true:
+        child = root * 2 + 1
+        if child >= end:
+            return
+        if child + 1 < end and before(v[child], v[child + 1]):
+            child += 1
+        if before(v[root], v[child]):
+            tmp = v[root]
+            v[root] = v[child]
+            v[child] = tmp
+            root = child
+        else:
+            return
+
+public
+fn sort[T: Ord](v: lend List[T]):
+    n = v.len
+    if n < 2:
+        return
+    start = n / 2
+    while start > 0:
+        start -= 1
+        sift_down(v, start, n)
+    end = n
+    while end > 1:
+        end -= 1
+        tmp = v[0]
+        v[0] = v[end]
+        v[end] = tmp
+        sift_down(v, 0, end)
+
+private
+fn sift_down[T: Ord](v: lend List[T], start: usize, end: usize):
+    root = start
+    while true:
+        child = root * 2 + 1
+        if child >= end:
+            return
+        if child + 1 < end and v[child] < v[child + 1]:
+            child += 1
+        if v[root] < v[child]:
+            tmp = v[root]
+            v[root] = v[child]
+            v[child] = tmp
+            root = child
+        else:
+            return
+
+public
+fn binary_search[T: Ord](v: read List[T], x: T) -> Optional[usize]:
+    lo: usize = 0
+    hi: usize = v.len
+    while lo < hi:
+        mid = lo + (hi - lo) / 2
+        if v[mid] < x:
+            lo = mid + 1
+        elif x < v[mid]:
+            hi = mid
+        else:
+            return Valid(mid)
+    return None

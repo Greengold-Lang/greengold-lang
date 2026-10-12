@@ -1,0 +1,40 @@
+# Using a C library. Compilation:
+#   gcc -c mylib.c -o mylib.o && ar rcs libmylib.a mylib.o
+#   python -m greengold run main.gg -L. --link mylib
+# (or: python -m greengold run main.gg --link-file mylib.o)
+
+extern struct Vec2:
+    x: f64
+    y: f64
+
+extern fn my_add(a: i32, b: i32) -> i32
+extern fn my_sum(data: *i32, n: usize) -> i64
+extern fn my_double_all(data: *mut i32, n: usize)
+extern fn vec2_scale(v: lend Vec2, k: f64)
+extern fn vec2_dot(a: read Vec2, b: read Vec2) -> f64
+extern fn my_greeting() -> *u8
+extern fn my_alloc_ints(n: usize) -> *mut i32
+extern fn my_free(p: *void)
+
+fn main():
+    # Numeric call is safe: no `unsafe` needed.
+    print("2 + 3 =", my_add(2, 3))
+
+    nums = [1, 2, 3, 4, 5]
+    unsafe:
+        print("total:", my_sum(addr(nums), 5))
+        my_double_all(addr_mut(nums), 5)
+    print("doubled:", nums[0], nums[1], nums[2], nums[3], nums[4])
+
+    a = Vec2{ x: 1.0, y: 2.0 }
+    b = Vec2{ x: 3.0, y: 4.0 }
+    vec2_scale(a, 10.0)
+    print("a:", a.x, a.y, " a.b =", vec2_dot(a, b))
+
+    unsafe:
+        print(cstr_to_string(my_greeting()))
+        sq = my_alloc_ints(6)
+        print("squares:", sq[0], sq[1], sq[2], sq[5])
+        sq[0] = 99
+        print("sq[0] =", sq[0])
+        my_free(ptr_cast[*void](sq))

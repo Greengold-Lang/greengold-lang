@@ -1,0 +1,11 @@
+# conformance: SPEC section 7 (Structs, methods, enums), example 8
+# expect-output:
+#   3
+
+fn main():
+    n: Optional[i32] = Valid(3)
+    match consume n:
+        Valid(v):
+            print(v)
+        None:
+            print(0)

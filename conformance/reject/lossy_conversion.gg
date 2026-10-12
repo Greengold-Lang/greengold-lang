@@ -1,0 +1,6 @@
+# conformance: SPEC section 17, rejected form: a numeric conversion that can lose information
+# expect-error: GG0201 at line 6
+
+fn main():
+    big: i64 = 5
+    small: i32 = big

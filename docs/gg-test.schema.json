@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://greengoldlang.com/schemas/test-1.json",
+  "title": "Greengold test report (gg test --json)",
+  "description": "One object per test. kind function is fn test_*():. kind block is a test declaration. message is empty when the test passed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "command", "ok", "summary", "tests"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "gg" },
+        "version": { "type": "string" }
+      }
+    },
+    "command": { "const": "test" },
+    "ok": { "type": "boolean" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "failed"],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/test" }
+    }
+  },
+  "$defs": {
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "file", "line", "kind", "status", "message"],
+      "properties": {
+        "name": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["function", "block"] },
+        "status": { "enum": ["passed", "failed"] },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

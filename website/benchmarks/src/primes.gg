@@ -1,0 +1,97 @@
+extern "windows.h" fn QueryPerformanceCounter(out: *mut i64) -> i32
+extern "windows.h" fn QueryPerformanceFrequency(out: *mut i64) -> i32
+extern "stdio.h" fn printf(fmt: str, ...) -> i32
+
+fn now_sec() -> f64:
+    count: i64 = 0
+    freq: i64 = 0
+    unsafe:
+        QueryPerformanceCounter(addr_mut(count))
+        QueryPerformanceFrequency(addr_mut(freq))
+    return f64(count) / f64(freq)
+
+struct PrimeSieve:
+    sieve_size: usize
+    words: List[u64]
+
+impl PrimeSieve:
+    hot fn run_sieve(self: lend PrimeSieve):
+        overflow: wrap
+        factor: usize = 3
+        q: usize = 1000
+
+        while factor <= q:
+            num: usize = factor
+            while num <= q:
+                idx: usize = num / 2
+                w: usize = idx >> 6
+                b: usize = idx & 63
+                mask: u64 = u64(1) << b
+                if (trust self.words[w] & mask) != 0:
+                    factor = num
+                    break
+                num += 2
+
+            k: usize = factor * factor
+            step: usize = factor * 2
+            while k < self.sieve_size:
+                kidx: usize = k / 2
+                kw: usize = kidx >> 6
+                kb: usize = kidx & 63
+                kmask: u64 = ~(u64(1) << kb)
+                trust self.words[kw] = trust self.words[kw] & kmask
+                k += step
+
+            factor += 2
+
+    hot fn count_primes(self: lend PrimeSieve) -> usize:
+        overflow: wrap
+        count: usize = 1
+        num: usize = 3
+        while num < self.sieve_size:
+            idx: usize = num / 2
+            w: usize = idx >> 6
+            b: usize = idx & 63
+            mask: u64 = u64(1) << b
+            if (trust self.words[w] & mask) != 0:
+                count += 1
+            num += 2
+        return count
+
+    fn validate_results(self: lend PrimeSieve) -> bool:
+        if self.sieve_size == 1000000:
+            return self.count_primes() == 78498
+        return false
+
+    fn print_results(self: lend PrimeSieve, duration: f64, passes: usize):
+        count = self.count_primes()
+        valid = self.validate_results()
+        avg = duration / f64(passes)
+        v_int: i32 = if valid then 1 else 0
+        unsafe:
+            printf("Passes: %zu, Time: %lf, Avg: %lf, Limit: %zu, Count1: %zu, Count2: %zu, Valid: %d\n\n",
+                   passes, duration, avg, self.sieve_size, count, count, v_int)
+            printf("davepl_gg;%zu;%lf;1;algorithm=base,faithful=yes,bits=1\n", passes, duration)
+
+fn new_sieve(limit: usize) -> PrimeSieve:
+    num_bits: usize = limit / 2
+    num_words: usize = (num_bits + 63) / 64
+    words = List[u64]()
+    for i in 0..num_words:
+        words.push(0xFFFFFFFFFFFFFFFF)
+    return PrimeSieve{sieve_size: limit, words: words}
+
+fn main():
+    overflow: wrap
+    t0 = now_sec()
+    passes: usize = 0
+    last_sieve = new_sieve(1000000)
+
+    while now_sec() - t0 < 20.0:
+        s = new_sieve(1000000)
+        s.run_sieve()
+        passes += 1
+        last_sieve = s
+
+    duration = now_sec() - t0
+    last_sieve.print_results(duration, passes)

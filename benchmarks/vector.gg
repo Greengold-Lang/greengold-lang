@@ -1,0 +1,10 @@
+fn main():
+    overflow: wrap
+    v = List[i64]()
+    for i in 0..20000000:
+        v.push(i64(i))
+    total: i64 = 0
+    for x in v:
+        total += x
+    print(v.len)
+    print(total)

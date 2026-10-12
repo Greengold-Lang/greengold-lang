@@ -1,0 +1,8 @@
+# conformance: SPEC section 17, rejected form: a write through a slice stored in a variable
+# expect-error: GG0319 at line 8
+
+fn main():
+    xs = List[i32]()
+    xs.push(1)
+    s = xs[0..1]
+    s[0] = 5

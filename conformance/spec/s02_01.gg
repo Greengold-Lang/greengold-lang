@@ -1,0 +1,12 @@
+# conformance: SPEC section 2 (Names, types, and literals), example 1
+# expect-output:
+#   1000 15 3.14 65 gg true
+
+fn main():
+    n: i32 = 1_000
+    bits: u8 = 0b1111
+    pi: f64 = 3.14
+    letter: u8 = 'A'
+    text: str = "gg"
+    flag: bool = true
+    print(n, bits, pi, letter, text, flag)

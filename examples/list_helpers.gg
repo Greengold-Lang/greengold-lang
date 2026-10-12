@@ -1,0 +1,28 @@
+struct P:
+    x: i32
+
+fn main():
+    xs = List[i32]()
+    for v in [5, 3, 9, 1]:
+        xs.push(v)
+    k = 10
+    print(xs.map(fn(v: i32) -> i64 => i64(v * k)), xs.filter(fn(v: i32) -> bool => v > 2))
+    print(xs.sum(), xs.min(), xs.max(), xs.contains(9), xs.index_of(3), xs.is_empty())
+    print(xs.any(fn(v: i32) -> bool => v > 8), xs.all(fn(v: i32) -> bool => v > 0), xs.count(fn(v: i32) -> bool => v > 2))
+    print(xs.fold(0, fn(a: i32, v: i32) -> i32 => a + v), xs.find(fn(v: i32) -> bool => v > 4), xs.first(), xs.last())
+    xs.sort()
+    print(xs)
+    xs.reverse()
+    print(xs)
+    ps = List[P]()
+    ps.push(P{x: 2})
+    ps.push(P{x: 1})
+    ps.sort_by(fn(a: P, b: P) -> bool => a.x < b.x)
+    print(ps)
+    ys = List[i32]()
+    for i in 0..40:
+        ys.push((i * 37) % 41)
+    ys.sort()
+    print(ys.first(), ys.last(), ys.position(fn(v: i32) -> bool => v == 20))
+    xs.extend(ys)
+    print(xs.len)

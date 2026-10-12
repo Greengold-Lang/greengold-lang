@@ -1,0 +1,27 @@
+struct Particle:
+    x: f32
+    y: f32
+    vx: f32
+    vy: f32
+
+hot fn update(steps: usize) -> f32:
+    unsafe:
+        ps = soa Array[Particle, 20000]
+        for i in 0..20000:
+            (trust ps[i]).x = f32(i) * 0.1
+            (trust ps[i]).y = f32(i) * 0.2
+            (trust ps[i]).vx = 1.0
+            (trust ps[i]).vy = 2.0
+
+        for step in 0..steps:
+            for i in 0..20000:
+                (trust ps[i]).x = (trust ps[i]).x + (trust ps[i]).vx
+                (trust ps[i]).y = (trust ps[i]).y + (trust ps[i]).vy
+
+        total: f32 = 0.0
+        for i in 0..20000:
+            total += (trust ps[i]).x
+        return total
+
+fn main():
+    print(update(2000))

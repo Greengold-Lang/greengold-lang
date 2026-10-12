@@ -1,0 +1,32 @@
+# Naive i-k-j product of two 1216x1216 f64 matrices.
+# Entries are small integers, so the printed sum is exact.
+
+hot fn multiply(a: exclusive lend List[f64], b: exclusive lend List[f64], c: exclusive lend List[f64], n: usize):
+    overflow: wrap
+    for i in 0..n:
+        for k in 0..n:
+            aik = trust a[i * n + k]
+            j: usize = 0
+            while j < n:
+                idx = i * n + j
+                trust c[idx] = trust c[idx] + aik * trust b[k * n + j]
+                j += 1
+
+fn main():
+    n: usize = 1216
+    cells = n * n
+    a = List[f64]()
+    b = List[f64]()
+    c = List[f64]()
+    for i in 0..n:
+        for j in 0..n:
+            a.push(f64((i + j) % 17))
+            b.push(f64((i * 3 + j) % 13))
+            c.push(0.0)
+    multiply(a, b, c, n)
+    sum: f64 = 0.0
+    for i in 0..cells:
+        sum += c[i]
+    print(i64(sum))
+    print(i64(c[0]))
+    print(i64(c[cells - 1]))

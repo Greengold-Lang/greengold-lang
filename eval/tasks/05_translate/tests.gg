@@ -1,0 +1,11 @@
+fn test_translate_moves():
+    p = Point{ x: 1, y: 2 }
+    translate(p, 3, -1)
+    require p.x == 4
+    require p.y == 1
+
+fn test_translate_zero():
+    p = Point{ x: 5, y: 5 }
+    translate(p, 0, 0)
+    require p.x == 5
+    require p.y == 5

@@ -1,0 +1,16 @@
+# conformance: SPEC section 13 (Expressions), example 3
+# expect-output:
+#   7 2
+#   2 3
+
+type Pair = (i32, i32)
+
+fn both(a: i32, b: i32) -> Pair:
+    return (a, b)
+
+fn main():
+    q, r = both(7, 2)
+    print(q, r)
+    a, _, c = (1, 2, 3)
+    a += 1
+    print(a, c)

@@ -1,0 +1,15 @@
+# conformance: SPEC section 14 (Constants and compile-time functions), example 1
+# expect-output:
+#   2
+
+static CALLS: i64 = 0
+
+fn count():
+    unsafe:
+        CALLS += 1
+
+fn main():
+    count()
+    count()
+    unsafe:
+        print(CALLS)

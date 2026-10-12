@@ -1,0 +1,9 @@
+# conformance: SPEC section 6 (Statements), example 2
+# expect-output:
+#   2
+
+fn main():
+    total = 0
+    for i in 0..4 step 2:
+        total += i
+    print(total)

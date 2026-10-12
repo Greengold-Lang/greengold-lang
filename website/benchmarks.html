@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmarks — Greengold</title>
+  <meta name="description" content="Greengold, C++, and Rust on 18 workloads, measured on 9 October 2026.">
+  <meta name="theme-color" content="#090d0b">
+  <link rel="canonical" href="https://greengoldlang.com/benchmarks.html">
+  <meta property="og:title" content="Benchmarks — Greengold">
+  <meta property="og:description" content="Greengold, C++, and Rust on 18 workloads, measured on 9 October 2026.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://greengoldlang.com/benchmarks.html">
+  <meta property="og:image" content="https://greengoldlang.com/assets/greengold_logo.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/png" href="assets/greengold_logo.png">
+  <link rel="apple-touch-icon" href="assets/greengold_logo.png">
+  <script>(function(){try{var t=localStorage.getItem('gg-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4fb0d72f15">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="brand" aria-label="Greengold home">
+        <img src="assets/greengold_logo.png" alt="" width="30" height="30">
+        <span>Greengold</span>
+        <span class="brand-version">v0.3.3</span>
+      </a>
+      <nav id="site-nav" class="site-nav" aria-label="Main">
+        <a href="why.html">Why</a>
+        <a href="spec.html">Spec</a>
+        <a href="benchmarks.html" aria-current="page">Benchmarks</a>
+        <a href="diagnostics.html">Diagnostics</a>
+        <a href="roadmap.html">Roadmap</a>
+        <a href="about.html">About</a>
+      </nav>
+      <div class="header-tools">
+        <button type="button" class="icon-btn theme-toggle" aria-label="Switch colour theme"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="moon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <button type="button" class="icon-btn menu-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">Benchmarks</span>
+        <h1>Greengold vs. C++ and Rust</h1>
+        <p class="lede">18 workloads, measured on 9 October 2026. Greengold builds with <code>--release</code>, which keeps bounds checks and integer overflow traps. Kernels that opt out say so: <code>trust</code> skips a bounds check inside <code>unsafe:</code>, and <code>overflow: wrap</code> wraps instead of trapping. JSON and Trees use neither; Word count wraps only in its random-number generator. See <a href="https://github.com/UmutFarukDilli/Greengold-lang/blob/master/benchmarks/README.md">benchmarks/README.md</a> for how to read the numbers.</p>
+        <div class="chip-row"><span class="chip">AMD Ryzen 5 5600X · 6C/12T</span><span class="chip">32 GB DDR4-3600</span><span class="chip">Windows 11 Pro 26200</span><span class="chip">g++ 15.2.0</span><span class="chip">rustc 1.99.0-nightly</span><span class="chip">llvmlite 0.42.0</span></div>
+      </div>
+    </section>
+    <section class="section tight" style="padding-top:24px">
+      <div class="wrap">
+        <div class="summary-cards">
+          <div class="summary-card faster reveal"><div class="stat-value">7</div><p><strong>Faster than both.</strong> <a href="#fib">Fibonacci</a>, <a href="#matmul">Matmul</a>, <a href="#qsort">Quicksort</a>, <a href="#dijkstra">Dijkstra</a>, <a href="#primes">Primes</a>, <a href="#vector">Vector</a>, <a href="#particle">Particle</a>.</p></div>
+          <div class="summary-card within reveal"><div class="stat-value">8</div><p><strong>Within 5% of the faster one.</strong> <a href="#collatz">Collatz</a>, <a href="#mandel">Mandelbrot</a>, <a href="#spectral">Spectral</a>, <a href="#heat">Heat</a>, <a href="#monte">Monte Carlo</a>, <a href="#fnv">FNV</a>, <a href="#trees">Trees</a>, <a href="#gpumatmul">GPU matmul</a>.</p></div>
+          <div class="summary-card slower reveal"><div class="stat-value">3</div><p><strong>More than 5% behind.</strong> <a href="#fannkuch">Fannkuch</a>, <a href="#nbody">N-body</a>, <a href="#sieve">Sieve</a>.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight" id="overview">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Every workload at a glance</h2>
+          <p>Each row is scaled to its slowest build. The badge compares Greengold with the faster of C++ and Rust; a gap of 5% or less is treated as noise.</p>
+        </div>
+        <div class="bench-panel reveal">
+          <div class="legend"><span><i class="lg-cpp"></i>C++ · g++ -O3</span><span><i class="lg-rust"></i>Rust · opt-level=3</span><span><i class="lg-gg"></i>Greengold · --release</span></div>
+          <div class="overview-grid"><div class="brow"><div class="brow-head"><a href="#fib">Fibonacci <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">84% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:67.2%"></span></span><span class="bar-val">260.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">387.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:10.9%"></span></span><span class="bar-val">42.27 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#collatz">Collatz <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 3.5%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">479.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:90.3%"></span></span><span class="bar-val">432.8 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:93.4%"></span></span><span class="bar-val">447.8 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#fannkuch">Fannkuch <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge slower">24.2% slower</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:93.7%"></span></span><span class="bar-val">450.9 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:80.5%"></span></span><span class="bar-val">387.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">481.0 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#mandel">Mandelbrot <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 3.2%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:96.9%"></span></span><span class="bar-val">322.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.0%"></span></span><span class="bar-val">326.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">332.7 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#nbody">N-body <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge slower">14.3% slower</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:89.6%"></span></span><span class="bar-val">257.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:87.5%"></span></span><span class="bar-val">251.3 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">287.3 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#spectral">Spectral <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 2.3%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">221.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:95.8%"></span></span><span class="bar-val">211.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:97.9%"></span></span><span class="bar-val">216.5 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#matmul">Matmul <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">18% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">427.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:96.4%"></span></span><span class="bar-val">411.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:79.2%"></span></span><span class="bar-val">338.0 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#heat">Heat <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 2.5%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:97.5%"></span></span><span class="bar-val">135.8 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.0%"></span></span><span class="bar-val">136.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">139.3 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#monte">Monte Carlo <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 0.9%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">425.7 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:91.5%"></span></span><span class="bar-val">389.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:92.3%"></span></span><span class="bar-val">393.1 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#fnv">FNV <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 0.1%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:87.0%"></span></span><span class="bar-val">301.6 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">346.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:87.0%"></span></span><span class="bar-val">301.6 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#qsort">Quicksort <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">12% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">563.9 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:90.9%"></span></span><span class="bar-val">512.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:80.3%"></span></span><span class="bar-val">452.8 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#dijkstra">Dijkstra <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">5% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">191.7 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:91.4%"></span></span><span class="bar-val">175.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:86.5%"></span></span><span class="bar-val">165.9 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#sieve">Sieve <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge slower">24.9% slower</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:83.9%"></span></span><span class="bar-val">18.07 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:80.1%"></span></span><span class="bar-val">17.24 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">21.53 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#primes">Primes <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· passes, higher is better</span></a><span class="badge faster">1.9% more passes</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:91.1%"></span></span><span class="bar-val">29,365</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.1%"></span></span><span class="bar-val">31,641</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">32,240</span></div></div></div><div class="brow"><div class="brow-head"><a href="#vector">Vector <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">3% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.7%"></span></span><span class="bar-val">83.23 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">84.29 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:95.3%"></span></span><span class="bar-val">80.36 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#trees">Trees <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 1.9%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.9%"></span></span><span class="bar-val">487.6 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.2%"></span></span><span class="bar-val">484.0 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">493.2 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#particle">Particle <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">38% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:99.1%"></span></span><span class="bar-val">19.64 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">19.81 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:61.8%"></span></span><span class="bar-val">12.25 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="#gpumatmul">GPU matmul <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 2.4%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:99.8%"></span></span><span class="bar-val">473.3 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:97.7%"></span></span><span class="bar-val">463.1 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">474.1 ms</span></div></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Workloads</h2>
+          <p>Each program prints a result that is checked, so the work cannot be optimized away. Open a workload for the full numbers and the Greengold source.</p>
+        </div>
+        <nav class="toc-pills reveal" aria-label="Workloads" style="margin-bottom:28px"><a href="#fib">Fibonacci</a><a href="#collatz">Collatz</a><a href="#fannkuch">Fannkuch</a><a href="#mandel">Mandelbrot</a><a href="#nbody">N-body</a><a href="#spectral">Spectral</a><a href="#matmul">Matmul</a><a href="#heat">Heat</a><a href="#monte">Monte Carlo</a><a href="#fnv">FNV</a><a href="#qsort">Quicksort</a><a href="#dijkstra">Dijkstra</a><a href="#sieve">Sieve</a><a href="#primes">Primes</a><a href="#vector">Vector</a><a href="#trees">Trees</a><a href="#particle">Particle</a><a href="#gpumatmul">GPU matmul</a></nav>
+        <div class="workloads">
+        <article class="workload reveal" id="fib">
+          <div class="workload-head"><h3><a href="#fib">Fibonacci</a></h3><span class="badge faster">84% faster</span></div>
+          <p class="workload-desc">Recursive <code>fib(41)</code>. Each program printed <code>165580141</code>. The Greengold version uses <code>overflow: wrap</code>. This measures one inlining decision: GCC inlines a small recursive function into itself a few levels deep, LLVM (and so Rust) does not, and Greengold clones the body twice before LLVM runs so that it does the same as GCC. It says little about real programs.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:67.2%"></span></span><span class="bar-val">260.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">387.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:10.9%"></span></span><span class="bar-val">42.27 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>260.5 ms</td><td>269.8 ms</td><td>4.66 MB</td><td>0.45 s</td><td>64.0 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>387.7 ms</td><td>412.7 ms</td><td>4.19 MB</td><td>0.26 s</td><td>137.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>42.27 ms</td><td>44.13 ms</td><td>4.07 MB</td><td>0.33 s</td><td>58.2 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">fib.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">fib</span>(n: <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    <span class="tok-kw">if</span> n &lt; <span class="tok-num">2</span>:
+        <span class="tok-kw">return</span> n
+    <span class="tok-kw">return</span> <span class="tok-fn">fib</span>(n - <span class="tok-num">1</span>) + <span class="tok-fn">fib</span>(n - <span class="tok-num">2</span>)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    res <span class="tok-op">=</span> <span class="tok-fn">fib</span>(<span class="tok-num">41</span>)
+    <span class="tok-fn">print</span>(res)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/fib.gg">fib.gg</a><a href="benchmarks/src/fib.cpp">fib.cpp</a><a href="benchmarks/src/fib.rs">fib.rs</a></div>
+        </article>
+        <article class="workload reveal" id="collatz">
+          <div class="workload-head"><h3><a href="#collatz">Collatz</a></h3><span class="badge within">within 3.5%</span></div>
+          <p class="workload-desc">For each integer from 1 up to, but not including, 4,000,000, count the steps until the value reaches 1. All three programs printed <code>3732423</code> and <code>596</code>. Greengold is about the same as Rust.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">479.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:90.3%"></span></span><span class="bar-val">432.8 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:93.4%"></span></span><span class="bar-val">447.8 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>479.5 ms</td><td>492.3 ms</td><td>4.63 MB</td><td>0.40 s</td><td>59.4 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>432.8 ms</td><td>448.7 ms</td><td>4.17 MB</td><td>0.17 s</td><td>128.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>447.8 ms</td><td>451.2 ms</td><td>4.07 MB</td><td>0.33 s</td><td>58.2 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">collatz.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">collatz</span>(n: <span class="tok-type">i64</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    cur <span class="tok-op">=</span> n
+    steps: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">while</span> cur &gt; <span class="tok-num">1</span>:
+        <span class="tok-kw">if</span> cur % <span class="tok-num">2</span> <span class="tok-op">==</span> <span class="tok-num">0</span>:
+            cur <span class="tok-op">=</span> cur / <span class="tok-num">2</span>
+        <span class="tok-kw">else</span>:
+            cur <span class="tok-op">=</span> <span class="tok-num">3</span> * cur + <span class="tok-num">1</span>
+        steps <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">return</span> steps
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    max_steps: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    best_n: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">1</span><span class="tok-op">..</span><span class="tok-num">4000000</span>:
+        s <span class="tok-op">=</span> <span class="tok-fn">collatz</span>(<span class="tok-type">i64</span>(i))
+        <span class="tok-kw">if</span> s &gt; max_steps:
+            max_steps <span class="tok-op">=</span> s
+            best_n <span class="tok-op">=</span> <span class="tok-type">i64</span>(i)
+    <span class="tok-fn">print</span>(best_n)
+    <span class="tok-fn">print</span>(max_steps)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/collatz.gg">collatz.gg</a><a href="benchmarks/src/collatz.cpp">collatz.cpp</a><a href="benchmarks/src/collatz.rs">collatz.rs</a></div>
+        </article>
+        <article class="workload reveal" id="fannkuch">
+          <div class="workload-head"><h3><a href="#fannkuch">Fannkuch</a></h3><span class="badge slower">24.2% slower</span></div>
+          <p class="workload-desc">Every permutation of ten items, repeated four times. Each program printed <code>292784</code> and <code>38</code>. Greengold indexes with <code>trust</code> inside <code>hot fn</code>, and the checksum uses <code>overflow: wrap</code>.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:93.7%"></span></span><span class="bar-val">450.9 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:80.5%"></span></span><span class="bar-val">387.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">481.0 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>450.9 ms</td><td>457.8 ms</td><td>4.62 MB</td><td>0.43 s</td><td>59.8 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>387.2 ms</td><td>408.4 ms</td><td>4.18 MB</td><td>0.20 s</td><td>128.5 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>481.0 ms</td><td>491.1 ms</td><td>4.07 MB</td><td>0.37 s</td><td>59.4 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">fannkuch.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Pancake flips over all permutations of 0..9.</span>
+<span class="tok-comment"># The pass is repeated four times. Prints the summed checksum, then the maximum flip count.</span>
+<span class="tok-comment"># Indexes are trusted. The flip counts fit in i32, so wrapping matches the checked sum.</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">fannkuch</span>():
+    <span class="tok-kw">overflow</span>: wrap
+    n: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">10</span>
+    perm: [<span class="tok-num">12</span>]<span class="tok-type">i32</span> <span class="tok-op">=</span> [<span class="tok-num">0</span>; <span class="tok-num">12</span>]
+    perm1: [<span class="tok-num">12</span>]<span class="tok-type">i32</span> <span class="tok-op">=</span> [<span class="tok-num">0</span>; <span class="tok-num">12</span>]
+    count: [<span class="tok-num">12</span>]<span class="tok-type">i32</span> <span class="tok-op">=</span> [<span class="tok-num">0</span>; <span class="tok-num">12</span>]
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">10</span>:
+        <span class="tok-kw">trust</span> perm1[i] <span class="tok-op">=</span> <span class="tok-type">i32</span>(i)
+    max_flips: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    checksum: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    nperm: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    passes: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    r: <span class="tok-type">i32</span> <span class="tok-op">=</span> n
+    <span class="tok-kw">while</span> <span class="tok-num">true</span>:
+        <span class="tok-kw">while</span> r <span class="tok-op">!=</span> <span class="tok-num">1</span>:
+            <span class="tok-kw">trust</span> count[r - <span class="tok-num">1</span>] <span class="tok-op">=</span> r
+            r <span class="tok-op">-=</span> <span class="tok-num">1</span>
+        <span class="tok-kw">if</span> <span class="tok-kw">trust</span> perm1[<span class="tok-num">0</span>] <span class="tok-op">!=</span> <span class="tok-num">0</span>:
+            <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">10</span>:
+                <span class="tok-kw">trust</span> perm[i] <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm1[i]
+            flips: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+            k: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm[<span class="tok-num">0</span>]
+            <span class="tok-kw">while</span> k <span class="tok-op">!=</span> <span class="tok-num">0</span>:
+                a: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+                b: <span class="tok-type">i32</span> <span class="tok-op">=</span> k
+                <span class="tok-kw">while</span> a &lt; b:
+                    tmp <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm[a]
+                    <span class="tok-kw">trust</span> perm[a] <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm[b]
+                    <span class="tok-kw">trust</span> perm[b] <span class="tok-op">=</span> tmp
+                    a <span class="tok-op">+=</span> <span class="tok-num">1</span>
+                    b <span class="tok-op">-=</span> <span class="tok-num">1</span>
+                flips <span class="tok-op">+=</span> <span class="tok-num">1</span>
+                k <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm[<span class="tok-num">0</span>]
+            <span class="tok-kw">if</span> flips &gt; max_flips:
+                max_flips <span class="tok-op">=</span> flips
+            <span class="tok-kw">if</span> nperm % <span class="tok-num">2</span> <span class="tok-op">==</span> <span class="tok-num">0</span>:
+                checksum <span class="tok-op">+=</span> flips
+            <span class="tok-kw">else</span>:
+                checksum <span class="tok-op">-=</span> flips
+        advanced: <span class="tok-type">bool</span> <span class="tok-op">=</span> <span class="tok-num">false</span>
+        restarted: <span class="tok-type">bool</span> <span class="tok-op">=</span> <span class="tok-num">false</span>
+        <span class="tok-kw">while</span> <span class="tok-kw">not</span> advanced:
+            <span class="tok-kw">if</span> r <span class="tok-op">==</span> n:
+                passes <span class="tok-op">+=</span> <span class="tok-num">1</span>
+                <span class="tok-kw">if</span> passes <span class="tok-op">==</span> <span class="tok-num">4</span>:
+                    <span class="tok-fn">print</span>(checksum)
+                    <span class="tok-fn">print</span>(max_flips)
+                    <span class="tok-kw">return</span>
+                <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">10</span>:
+                    <span class="tok-kw">trust</span> perm1[i] <span class="tok-op">=</span> <span class="tok-type">i32</span>(i)
+                r <span class="tok-op">=</span> n
+                nperm <span class="tok-op">=</span> <span class="tok-num">0</span>
+                restarted <span class="tok-op">=</span> <span class="tok-num">true</span>
+                <span class="tok-kw">break</span>
+            p0 <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm1[<span class="tok-num">0</span>]
+            i: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+            <span class="tok-kw">while</span> i &lt; r:
+                <span class="tok-kw">trust</span> perm1[i] <span class="tok-op">=</span> <span class="tok-kw">trust</span> perm1[i + <span class="tok-num">1</span>]
+                i <span class="tok-op">+=</span> <span class="tok-num">1</span>
+            <span class="tok-kw">trust</span> perm1[r] <span class="tok-op">=</span> p0
+            <span class="tok-kw">trust</span> count[r] <span class="tok-op">=</span> <span class="tok-kw">trust</span> count[r] - <span class="tok-num">1</span>
+            <span class="tok-kw">if</span> <span class="tok-kw">trust</span> count[r] &gt; <span class="tok-num">0</span>:
+                advanced <span class="tok-op">=</span> <span class="tok-num">true</span>
+            <span class="tok-kw">else</span>:
+                r <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        <span class="tok-kw">if</span> <span class="tok-kw">not</span> restarted:
+            nperm <span class="tok-op">+=</span> <span class="tok-num">1</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-fn">fannkuch</span>()</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/fannkuch.gg">fannkuch.gg</a><a href="benchmarks/src/fannkuch.cpp">fannkuch.cpp</a><a href="benchmarks/src/fannkuch.rs">fannkuch.rs</a></div>
+        </article>
+        <article class="workload reveal" id="mandel">
+          <div class="workload-head"><h3><a href="#mandel">Mandelbrot</a></h3><span class="badge within">within 3.2%</span></div>
+          <p class="workload-desc">2048 by 2048 pixels, at most 80 iterations, on the plane [−1.5, 0.5] × [−1, 1]. Each program printed <code>1632341</code>, the count of pixels that reached 80 iterations. The Greengold iterator is <code>hot fn</code> with <code>overflow: wrap</code>. Greengold is about the same as C++.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:96.9%"></span></span><span class="bar-val">322.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.0%"></span></span><span class="bar-val">326.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">332.7 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>322.5 ms</td><td>327.3 ms</td><td>4.63 MB</td><td>0.41 s</td><td>59.7 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>326.2 ms</td><td>356.5 ms</td><td>4.17 MB</td><td>0.17 s</td><td>127.5 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>332.7 ms</td><td>335.0 ms</td><td>4.07 MB</td><td>0.35 s</td><td>59.4 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">mandel.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Count pixels that stay inside the Mandelbrot set.</span>
+<span class="tok-comment"># 2048 by 2048, at most 80 iterations. The plane is [-1.5, 0.5] x [-1, 1].</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">mandel</span>(cx: <span class="tok-type">f64</span>, cy: <span class="tok-type">f64</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    x: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    y: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    n: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">while</span> n &lt; <span class="tok-num">80</span>:
+        xx <span class="tok-op">=</span> x * x
+        yy <span class="tok-op">=</span> y * y
+        <span class="tok-kw">if</span> xx + yy &gt; <span class="tok-num">4.0</span>:
+            <span class="tok-kw">return</span> n
+        y <span class="tok-op">=</span> <span class="tok-num">2.0</span> * x * y + cy
+        x <span class="tok-op">=</span> xx - yy + cx
+        n <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">return</span> <span class="tok-num">80</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    width: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">2048</span>
+    height: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">2048</span>
+    inside: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> row <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>height:
+        cy <span class="tok-op">=</span> -<span class="tok-num">1.0</span> + <span class="tok-num">2.0</span> * <span class="tok-type">f64</span>(row) / <span class="tok-type">f64</span>(height)
+        <span class="tok-kw">for</span> col <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>width:
+            cx <span class="tok-op">=</span> -<span class="tok-num">1.5</span> + <span class="tok-num">2.0</span> * <span class="tok-type">f64</span>(col) / <span class="tok-type">f64</span>(width)
+            <span class="tok-kw">if</span> <span class="tok-fn">mandel</span>(cx, cy) <span class="tok-op">==</span> <span class="tok-num">80</span>:
+                inside <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-fn">print</span>(inside)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/mandel.gg">mandel.gg</a><a href="benchmarks/src/mandel.cpp">mandel.cpp</a><a href="benchmarks/src/mandel.rs">mandel.rs</a></div>
+        </article>
+        <article class="workload reveal" id="nbody">
+          <div class="workload-head"><h3><a href="#nbody">N-body</a></h3><span class="badge slower">14.3% slower</span></div>
+          <p class="workload-desc">768 bodies, 160 steps, softening 0.05. Positions are parallel arrays in all three programs. Greengold uses <code>hot fn</code>, <code>exclusive lend</code>, <code>trust</code>, and <code>overflow: wrap</code>. Each program printed <code>-51022</code>, <code>15923</code>, and <code>45852</code>.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:89.6%"></span></span><span class="bar-val">257.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:87.5%"></span></span><span class="bar-val">251.3 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">287.3 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>257.5 ms</td><td>265.1 ms</td><td>4.66 MB</td><td>0.55 s</td><td>65.3 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>251.3 ms</td><td>258.3 ms</td><td>4.20 MB</td><td>0.22 s</td><td>132.5 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>287.3 ms</td><td>279.7 ms</td><td>4.11 MB</td><td>0.46 s</td><td>62.2 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">nbody.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Gravitational step of 768 bodies, 160 times.</span>
+<span class="tok-comment"># Parallel arrays, softening 0.05, dt 0.01. Prints the position sums, scaled by 1000.</span>
+
+<span class="tok-kw">import</span> std.math
+
+<span class="tok-kw">fn</span> <span class="tok-fn">zeros</span>(n: <span class="tok-type">usize</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]:
+    xs <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        xs.<span class="tok-fn">push</span>(<span class="tok-num">0.0</span>)
+    <span class="tok-kw">return</span> xs
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">advance</span>(x: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], y: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], z: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], vx: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], vy: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], vz: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], mass: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], n: <span class="tok-type">usize</span>):
+    <span class="tok-kw">overflow</span>: wrap
+    i: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">while</span> i &lt; n:
+        j: <span class="tok-type">usize</span> <span class="tok-op">=</span> i + <span class="tok-num">1</span>
+        <span class="tok-kw">while</span> j &lt; n:
+            dx <span class="tok-op">=</span> <span class="tok-kw">trust</span> x[i] - <span class="tok-kw">trust</span> x[j]
+            dy <span class="tok-op">=</span> <span class="tok-kw">trust</span> y[i] - <span class="tok-kw">trust</span> y[j]
+            dz <span class="tok-op">=</span> <span class="tok-kw">trust</span> z[i] - <span class="tok-kw">trust</span> z[j]
+            dist2 <span class="tok-op">=</span> dx * dx + dy * dy + dz * dz + <span class="tok-num">0.05</span>
+            inv <span class="tok-op">=</span> <span class="tok-num">1.0</span> / math.<span class="tok-fn">sqrt</span>(dist2)
+            scale <span class="tok-op">=</span> inv * inv * inv * <span class="tok-num">0.01</span>
+            mi <span class="tok-op">=</span> <span class="tok-kw">trust</span> mass[i]
+            mj <span class="tok-op">=</span> <span class="tok-kw">trust</span> mass[j]
+            <span class="tok-kw">trust</span> vx[i] <span class="tok-op">=</span> <span class="tok-kw">trust</span> vx[i] - dx * mj * scale
+            <span class="tok-kw">trust</span> vy[i] <span class="tok-op">=</span> <span class="tok-kw">trust</span> vy[i] - dy * mj * scale
+            <span class="tok-kw">trust</span> vz[i] <span class="tok-op">=</span> <span class="tok-kw">trust</span> vz[i] - dz * mj * scale
+            <span class="tok-kw">trust</span> vx[j] <span class="tok-op">=</span> <span class="tok-kw">trust</span> vx[j] + dx * mi * scale
+            <span class="tok-kw">trust</span> vy[j] <span class="tok-op">=</span> <span class="tok-kw">trust</span> vy[j] + dy * mi * scale
+            <span class="tok-kw">trust</span> vz[j] <span class="tok-op">=</span> <span class="tok-kw">trust</span> vz[j] + dz * mi * scale
+            j <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        i <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">for</span> k <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        <span class="tok-kw">trust</span> x[k] <span class="tok-op">=</span> <span class="tok-kw">trust</span> x[k] + <span class="tok-kw">trust</span> vx[k] * <span class="tok-num">0.01</span>
+        <span class="tok-kw">trust</span> y[k] <span class="tok-op">=</span> <span class="tok-kw">trust</span> y[k] + <span class="tok-kw">trust</span> vy[k] * <span class="tok-num">0.01</span>
+        <span class="tok-kw">trust</span> z[k] <span class="tok-op">=</span> <span class="tok-kw">trust</span> z[k] + <span class="tok-kw">trust</span> vz[k] * <span class="tok-num">0.01</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    n: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">768</span>
+    x <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    y <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    z <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    vx <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    vy <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    vz <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    mass <span class="tok-op">=</span> <span class="tok-fn">zeros</span>(n)
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        ang <span class="tok-op">=</span> <span class="tok-type">f64</span>(i) * <span class="tok-num">0.17</span>
+        x[i] <span class="tok-op">=</span> math.<span class="tok-fn">cos</span>(ang) * (<span class="tok-num">1.0</span> + <span class="tok-type">f64</span>(i % <span class="tok-num">9</span>) * <span class="tok-num">0.03</span>)
+        y[i] <span class="tok-op">=</span> math.<span class="tok-fn">sin</span>(ang) * (<span class="tok-num">1.0</span> + <span class="tok-type">f64</span>(i % <span class="tok-num">5</span>) * <span class="tok-num">0.02</span>)
+        z[i] <span class="tok-op">=</span> <span class="tok-type">f64</span>(i % <span class="tok-num">7</span>) * <span class="tok-num">0.02</span>
+        vx[i] <span class="tok-op">=</span> math.<span class="tok-fn">sin</span>(ang) * <span class="tok-num">0.01</span>
+        vy[i] <span class="tok-op">=</span> math.<span class="tok-fn">cos</span>(ang) * <span class="tok-num">0.01</span>
+        mass[i] <span class="tok-op">=</span> <span class="tok-num">0.2</span> + <span class="tok-type">f64</span>(i % <span class="tok-num">5</span>) * <span class="tok-num">0.15</span>
+    <span class="tok-kw">for</span> <span class="tok-kw">step</span> <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">160</span>:
+        <span class="tok-fn">advance</span>(x, y, z, vx, vy, vz, mass, n)
+    sx: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    sy: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    sz: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        sx <span class="tok-op">+=</span> x[i]
+        sy <span class="tok-op">+=</span> y[i]
+        sz <span class="tok-op">+=</span> z[i]
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(sx * <span class="tok-num">1000.0</span>))
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(sy * <span class="tok-num">1000.0</span>))
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(sz * <span class="tok-num">1000.0</span>))</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/nbody.gg">nbody.gg</a><a href="benchmarks/src/nbody.cpp">nbody.cpp</a><a href="benchmarks/src/nbody.rs">nbody.rs</a></div>
+        </article>
+        <article class="workload reveal" id="spectral">
+          <div class="workload-head"><h3><a href="#spectral">Spectral</a></h3><span class="badge within">within 2.3%</span></div>
+          <p class="workload-desc">Power iteration on an implicit matrix, n = 1600, forty applications of A twice. Greengold uses <code>hot fn</code>, <code>exclusive lend</code>, <code>trust</code>, and <code>overflow: wrap</code>. Each program printed <code>1122277722</code>. Greengold is about the same as Rust.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">221.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:95.8%"></span></span><span class="bar-val">211.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:97.9%"></span></span><span class="bar-val">216.5 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>221.1 ms</td><td>226.2 ms</td><td>4.66 MB</td><td>0.54 s</td><td>62.1 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>211.7 ms</td><td>243.3 ms</td><td>4.18 MB</td><td>0.26 s</td><td>129.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>216.5 ms</td><td>223.4 ms</td><td>4.09 MB</td><td>0.67 s</td><td>60.8 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">spectral.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Spectral norm of the Hilbert-like matrix used by the language benchmarks game.</span>
+<span class="tok-comment"># A(i, j) = 1 / ((i+j)(i+j+1)/2 + i + 1). Forty applications of A twice. n = 1600.</span>
+
+<span class="tok-kw">import</span> std.math
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">apply</span>(out: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], v: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], n: <span class="tok-type">usize</span>):
+    <span class="tok-kw">overflow</span>: wrap
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        sum: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+        j: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        <span class="tok-kw">while</span> j &lt; n:
+            ij <span class="tok-op">=</span> i + j
+            den <span class="tok-op">=</span> ij * (ij + <span class="tok-num">1</span>) / <span class="tok-num">2</span> + i + <span class="tok-num">1</span>
+            sum <span class="tok-op">+=</span> (<span class="tok-num">1.0</span> / <span class="tok-type">f64</span>(den)) * <span class="tok-kw">trust</span> v[j]
+            j <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        <span class="tok-kw">trust</span> out[i] <span class="tok-op">=</span> sum
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    n: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">1600</span>
+    u <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    v <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        u.<span class="tok-fn">push</span>(<span class="tok-num">1.0</span>)
+        v.<span class="tok-fn">push</span>(<span class="tok-num">0.0</span>)
+    <span class="tok-kw">for</span> iter <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">40</span>:
+        <span class="tok-fn">apply</span>(v, u, n)
+        <span class="tok-fn">apply</span>(u, v, n)
+    uv: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    vv: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        uv <span class="tok-op">+=</span> u[i] * v[i]
+        vv <span class="tok-op">+=</span> v[i] * v[i]
+    norm <span class="tok-op">=</span> math.<span class="tok-fn">sqrt</span>(uv / vv)
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(norm * <span class="tok-num">1000000000.0</span>))</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/spectral.gg">spectral.gg</a><a href="benchmarks/src/spectral.cpp">spectral.cpp</a><a href="benchmarks/src/spectral.rs">spectral.rs</a></div>
+        </article>
+        <article class="workload reveal" id="matmul">
+          <div class="workload-head"><h3><a href="#matmul">Matmul</a></h3><span class="badge faster">18% faster</span></div>
+          <p class="workload-desc">Naive i-k-j product of two 1216×1216 <code>f64</code> matrices. Greengold uses <code>hot fn</code>, <code>exclusive lend</code>, <code>trust</code>, and <code>overflow: wrap</code>. Each program printed <code>86306145685</code>, <code>58018</code>, and <code>58672</code>. Greengold’s peak memory is 39.66 MB; C++ is 38.01 MB and Rust is 37.58 MB.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">427.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:96.4%"></span></span><span class="bar-val">411.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:79.2%"></span></span><span class="bar-val">338.0 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>427.1 ms</td><td>406.2 ms</td><td>38.01 MB</td><td>0.55 s</td><td>63.2 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>411.7 ms</td><td>480.2 ms</td><td>37.58 MB</td><td>0.22 s</td><td>130.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>338.0 ms</td><td>348.3 ms</td><td>39.66 MB</td><td>0.37 s</td><td>60.7 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">matmul.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Naive i-k-j product of two 1216x1216 f64 matrices.</span>
+<span class="tok-comment"># Entries are small integers, so the printed sum is exact.</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">multiply</span>(a: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], b: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], c: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], n: <span class="tok-type">usize</span>):
+    <span class="tok-kw">overflow</span>: wrap
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        <span class="tok-kw">for</span> k <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+            aik <span class="tok-op">=</span> <span class="tok-kw">trust</span> a[i * n + k]
+            j: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+            <span class="tok-kw">while</span> j &lt; n:
+                idx <span class="tok-op">=</span> i * n + j
+                <span class="tok-kw">trust</span> c[idx] <span class="tok-op">=</span> <span class="tok-kw">trust</span> c[idx] + aik * <span class="tok-kw">trust</span> b[k * n + j]
+                j <span class="tok-op">+=</span> <span class="tok-num">1</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    n: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">1216</span>
+    cells <span class="tok-op">=</span> n * n
+    a <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    b <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    c <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        <span class="tok-kw">for</span> j <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+            a.<span class="tok-fn">push</span>(<span class="tok-type">f64</span>((i + j) % <span class="tok-num">17</span>))
+            b.<span class="tok-fn">push</span>(<span class="tok-type">f64</span>((i * <span class="tok-num">3</span> + j) % <span class="tok-num">13</span>))
+            c.<span class="tok-fn">push</span>(<span class="tok-num">0.0</span>)
+    <span class="tok-fn">multiply</span>(a, b, c, n)
+    sum: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>cells:
+        sum <span class="tok-op">+=</span> c[i]
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(sum))
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(c[<span class="tok-num">0</span>]))
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(c[cells - <span class="tok-num">1</span>]))</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/matmul.gg">matmul.gg</a><a href="benchmarks/src/matmul.cpp">matmul.cpp</a><a href="benchmarks/src/matmul.rs">matmul.rs</a></div>
+        </article>
+        <article class="workload reveal" id="heat">
+          <div class="workload-head"><h3><a href="#heat">Heat</a></h3><span class="badge within">within 2.5%</span></div>
+          <p class="workload-desc">Jacobi stencil on a 1024×1024 grid, 320 steps. Greengold uses <code>hot fn</code>, <code>exclusive lend</code>, <code>trust</code>, and <code>overflow: wrap</code>. Each program printed <code>9259564379</code>. Greengold is about the same as C++ and Rust.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:97.5%"></span></span><span class="bar-val">135.8 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.0%"></span></span><span class="bar-val">136.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">139.3 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>135.8 ms</td><td>144.3 ms</td><td>20.16 MB</td><td>0.51 s</td><td>62.2 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>136.5 ms</td><td>192.3 ms</td><td>19.73 MB</td><td>0.22 s</td><td>130.5 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>139.3 ms</td><td>168.9 ms</td><td>20.69 MB</td><td>0.41 s</td><td>60.7 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">heat.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Jacobi stencil on a 1024x1024 grid. Three hundred twenty steps, as one hundred sixty pairs, so the result stays in the first grid.</span>
+<span class="tok-comment"># Interior points are the average of the four neighbours. Prints the scaled cell sum.</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">jacobi</span>(cur: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], nxt: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>], n: <span class="tok-type">usize</span>):
+    <span class="tok-kw">overflow</span>: wrap
+    last <span class="tok-op">=</span> n - <span class="tok-num">1</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">1</span><span class="tok-op">..</span>last:
+        <span class="tok-kw">for</span> j <span class="tok-kw">in</span> <span class="tok-num">1</span><span class="tok-op">..</span>last:
+            idx <span class="tok-op">=</span> i * n + j
+            up <span class="tok-op">=</span> (i - <span class="tok-num">1</span>) * n + j
+            down <span class="tok-op">=</span> (i + <span class="tok-num">1</span>) * n + j
+            left <span class="tok-op">=</span> i * n + (j - <span class="tok-num">1</span>)
+            right <span class="tok-op">=</span> i * n + (j + <span class="tok-num">1</span>)
+            <span class="tok-kw">trust</span> nxt[idx] <span class="tok-op">=</span> <span class="tok-num">0.25</span> * (<span class="tok-kw">trust</span> cur[up] + <span class="tok-kw">trust</span> cur[down] + <span class="tok-kw">trust</span> cur[left] + <span class="tok-kw">trust</span> cur[right])
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    n: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">1024</span>
+    cells <span class="tok-op">=</span> n * n
+    a <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    b <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f64</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        <span class="tok-kw">for</span> j <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+            a.<span class="tok-fn">push</span>(<span class="tok-type">f64</span>((i * <span class="tok-num">13</span> + j * <span class="tok-num">7</span>) % <span class="tok-num">19</span>))
+            b.<span class="tok-fn">push</span>(<span class="tok-num">0.0</span>)
+    <span class="tok-kw">for</span> <span class="tok-kw">step</span> <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">160</span>:
+        <span class="tok-fn">jacobi</span>(a, b, n)
+        <span class="tok-fn">jacobi</span>(b, a, n)
+    sum: <span class="tok-type">f64</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>cells:
+        sum <span class="tok-op">+=</span> a[i]
+    <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(sum * <span class="tok-num">1000.0</span>))</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/heat.gg">heat.gg</a><a href="benchmarks/src/heat.cpp">heat.cpp</a><a href="benchmarks/src/heat.rs">heat.rs</a></div>
+        </article>
+        <article class="workload reveal" id="monte">
+          <div class="workload-head"><h3><a href="#monte">Monte Carlo</a></h3><span class="badge within">within 0.9%</span></div>
+          <p class="workload-desc">One hundred twenty million xorshift64* samples. The printed value is the number of points inside the unit circle. Greengold keeps the generator in one <code>hot fn</code> with <code>overflow: wrap</code>. Each program printed <code>94241925</code>. Greengold is about the same as Rust.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">425.7 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:91.5%"></span></span><span class="bar-val">389.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:92.3%"></span></span><span class="bar-val">393.1 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>425.7 ms</td><td>432.0 ms</td><td>4.63 MB</td><td>0.45 s</td><td>59.3 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>389.5 ms</td><td>395.5 ms</td><td>4.17 MB</td><td>0.17 s</td><td>128.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>393.1 ms</td><td>405.5 ms</td><td>4.07 MB</td><td>0.32 s</td><td>58.2 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">monte.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Points of an xorshift64* stream that land in the unit circle.</span>
+<span class="tok-comment"># The generator matches std.rand. The printed value is the hit count.</span>
+<span class="tok-comment"># One hot function, so the multiply wraps and the generator stays in the loop.</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">count_hits</span>() <span class="tok-op">-&gt;</span> <span class="tok-type">i64</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    x: <span class="tok-type">u64</span> <span class="tok-op">=</span> <span class="tok-num">88172645463325252</span>
+    hits: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    i: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">while</span> i &lt; <span class="tok-num">120000000</span>:
+        x <span class="tok-op">=</span> x ^ (x &gt;&gt; <span class="tok-num">12</span>)
+        x <span class="tok-op">=</span> x ^ (x &lt;&lt; <span class="tok-num">25</span>)
+        x <span class="tok-op">=</span> x ^ (x &gt;&gt; <span class="tok-num">27</span>)
+        fx <span class="tok-op">=</span> <span class="tok-type">f64</span>((x * <span class="tok-num">2685821657736338717</span>) &gt;&gt; <span class="tok-num">11</span>) / <span class="tok-num">9007199254740992.0</span> * <span class="tok-num">2.0</span> - <span class="tok-num">1.0</span>
+        x <span class="tok-op">=</span> x ^ (x &gt;&gt; <span class="tok-num">12</span>)
+        x <span class="tok-op">=</span> x ^ (x &lt;&lt; <span class="tok-num">25</span>)
+        x <span class="tok-op">=</span> x ^ (x &gt;&gt; <span class="tok-num">27</span>)
+        fy <span class="tok-op">=</span> <span class="tok-type">f64</span>((x * <span class="tok-num">2685821657736338717</span>) &gt;&gt; <span class="tok-num">11</span>) / <span class="tok-num">9007199254740992.0</span> * <span class="tok-num">2.0</span> - <span class="tok-num">1.0</span>
+        <span class="tok-kw">if</span> fx * fx + fy * fy <span class="tok-op">&lt;=</span> <span class="tok-num">1.0</span>:
+            hits <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        i <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">return</span> hits
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-fn">print</span>(<span class="tok-fn">count_hits</span>())</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/monte.gg">monte.gg</a><a href="benchmarks/src/monte.cpp">monte.cpp</a><a href="benchmarks/src/monte.rs">monte.rs</a></div>
+        </article>
+        <article class="workload reveal" id="fnv">
+          <div class="workload-head"><h3><a href="#fnv">FNV</a></h3><span class="badge within">within 0.1%</span></div>
+          <p class="workload-desc">FNV-1a 64 over eight million generated bytes, forty salted passes. Greengold hashes inside <code>hot fn</code> with wrapping arithmetic. Each program printed <code>16483032082770582304</code>. Greengold is about the same as C++.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:87.0%"></span></span><span class="bar-val">301.6 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">346.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:87.0%"></span></span><span class="bar-val">301.6 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>301.6 ms</td><td>307.2 ms</td><td>11.79 MB</td><td>0.51 s</td><td>61.5 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>346.5 ms</td><td>359.4 ms</td><td>11.35 MB</td><td>0.20 s</td><td>128.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>301.6 ms</td><td>308.2 ms</td><td>12.66 MB</td><td>0.34 s</td><td>59.6 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">fnv.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># FNV-1a 64 over eight million generated bytes, repeated with a changing salt.</span>
+<span class="tok-comment"># The salt keeps each pass live. The printed value is the xor of the digests.</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">lcg</span>(s: <span class="tok-type">u32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">u32</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    <span class="tok-kw">return</span> s * <span class="tok-num">1664525</span> + <span class="tok-num">1013904223</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">mix</span>(data: <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">u8</span>], salt: <span class="tok-type">u64</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">u64</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    h: <span class="tok-type">u64</span> <span class="tok-op">=</span> <span class="tok-num">14695981039346656037</span> ^ salt
+    <span class="tok-kw">for</span> b <span class="tok-kw">in</span> data:
+        h <span class="tok-op">=</span> (h ^ <span class="tok-type">u64</span>(b)) * <span class="tok-num">1099511628211</span>
+    <span class="tok-kw">return</span> h
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    data <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">u8</span>]()
+    state: <span class="tok-type">u32</span> <span class="tok-op">=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">8000000</span>:
+        state <span class="tok-op">=</span> <span class="tok-fn">lcg</span>(state)
+        data.<span class="tok-fn">push</span>(<span class="tok-type">u8</span>(state &gt;&gt; <span class="tok-num">24</span>))
+    acc: <span class="tok-type">u64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> round <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">40</span>:
+        acc <span class="tok-op">=</span> acc ^ <span class="tok-fn">mix</span>(data, <span class="tok-type">u64</span>(round))
+    <span class="tok-fn">print</span>(acc)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/fnv.gg">fnv.gg</a><a href="benchmarks/src/fnv.cpp">fnv.cpp</a><a href="benchmarks/src/fnv.rs">fnv.rs</a></div>
+        </article>
+        <article class="workload reveal" id="qsort">
+          <div class="workload-head"><h3><a href="#qsort">Quicksort</a></h3><span class="badge faster">12% faster</span></div>
+          <p class="workload-desc">Iterative quicksort of eight million <code>i32</code> values, with insertion sort below 16 elements. Greengold uses <code>hot fn</code>, <code>trust</code>, and <code>overflow: wrap</code>. Each program printed <code>14</code>, <code>1073845253</code>, <code>2147483383</code>, <code>8590112052113664</code>, and <code>0</code>. The last value is 0 when the array is sorted.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">563.9 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:90.9%"></span></span><span class="bar-val">512.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:80.3%"></span></span><span class="bar-val">452.8 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>563.9 ms</td><td>574.7 ms</td><td>34.68 MB</td><td>0.53 s</td><td>63.8 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>512.5 ms</td><td>546.1 ms</td><td>34.24 MB</td><td>0.24 s</td><td>130.5 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>452.8 ms</td><td>447.5 ms</td><td>36.64 MB</td><td>0.41 s</td><td>60.7 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">qsort.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Quicksort eight million i32 values from a numerical-recipes LCG, low 31 bits.</span>
+<span class="tok-comment"># Ranges shorter than 16 use insertion sort. Prints ends, the middle, the sum, and 0 when sorted.</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">lcg</span>(s: <span class="tok-type">u32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">u32</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    <span class="tok-kw">return</span> s * <span class="tok-num">1664525</span> + <span class="tok-num">1013904223</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">swap</span>(a: <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>], i: <span class="tok-type">usize</span>, j: <span class="tok-type">usize</span>):
+    tmp <span class="tok-op">=</span> <span class="tok-kw">trust</span> a[i]
+    <span class="tok-kw">trust</span> a[i] <span class="tok-op">=</span> <span class="tok-kw">trust</span> a[j]
+    <span class="tok-kw">trust</span> a[j] <span class="tok-op">=</span> tmp
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">insertion</span>(a: <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>], lo: <span class="tok-type">usize</span>, hi: <span class="tok-type">usize</span>):
+    <span class="tok-kw">overflow</span>: wrap
+    <span class="tok-kw">if</span> hi &lt; lo + <span class="tok-num">2</span>:
+        <span class="tok-kw">return</span>
+    i: <span class="tok-type">usize</span> <span class="tok-op">=</span> lo + <span class="tok-num">1</span>
+    <span class="tok-kw">while</span> i &lt; hi:
+        j: <span class="tok-type">usize</span> <span class="tok-op">=</span> i
+        <span class="tok-kw">while</span> j &gt; lo:
+            <span class="tok-kw">if</span> <span class="tok-kw">trust</span> a[j] &lt; <span class="tok-kw">trust</span> a[j - <span class="tok-num">1</span>]:
+                <span class="tok-fn">swap</span>(a, j, j - <span class="tok-num">1</span>)
+                j <span class="tok-op">-=</span> <span class="tok-num">1</span>
+            <span class="tok-kw">else</span>:
+                <span class="tok-kw">break</span>
+        i <span class="tok-op">+=</span> <span class="tok-num">1</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">partition</span>(a: <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>], lo: <span class="tok-type">usize</span>, hi: <span class="tok-type">usize</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">usize</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    mid <span class="tok-op">=</span> lo + (hi - lo) / <span class="tok-num">2</span>
+    <span class="tok-fn">swap</span>(a, mid, hi - <span class="tok-num">1</span>)
+    pivot <span class="tok-op">=</span> <span class="tok-kw">trust</span> a[hi - <span class="tok-num">1</span>]
+    store: <span class="tok-type">usize</span> <span class="tok-op">=</span> lo
+    j: <span class="tok-type">usize</span> <span class="tok-op">=</span> lo
+    <span class="tok-kw">while</span> j &lt; hi - <span class="tok-num">1</span>:
+        <span class="tok-kw">if</span> <span class="tok-kw">trust</span> a[j] &lt; pivot:
+            <span class="tok-fn">swap</span>(a, store, j)
+            store <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        j <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-fn">swap</span>(a, store, hi - <span class="tok-num">1</span>)
+    <span class="tok-kw">return</span> store
+
+<span class="tok-kw">fn</span> <span class="tok-fn">qsort</span>(a: <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>]):
+    n <span class="tok-op">=</span> a.len
+    <span class="tok-kw">if</span> n &lt; <span class="tok-num">2</span>:
+        <span class="tok-kw">return</span>
+    slo <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">usize</span>]()
+    shi <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">usize</span>]()
+    slo.<span class="tok-fn">push</span>(<span class="tok-num">0</span>)
+    shi.<span class="tok-fn">push</span>(n)
+    <span class="tok-kw">while</span> slo.len &gt; <span class="tok-num">0</span>:
+        lo: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        hi: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        <span class="tok-kw">match</span> slo.<span class="tok-fn">pop</span>():
+            <span class="tok-type">Valid</span>(v):
+                lo <span class="tok-op">=</span> v
+            <span class="tok-type">None</span>:
+                <span class="tok-kw">return</span>
+        <span class="tok-kw">match</span> shi.<span class="tok-fn">pop</span>():
+            <span class="tok-type">Valid</span>(v):
+                hi <span class="tok-op">=</span> v
+            <span class="tok-type">None</span>:
+                <span class="tok-kw">return</span>
+        <span class="tok-kw">if</span> hi - lo &lt; <span class="tok-num">16</span>:
+            <span class="tok-fn">insertion</span>(a, lo, hi)
+        <span class="tok-kw">else</span>:
+            p <span class="tok-op">=</span> <span class="tok-fn">partition</span>(a, lo, hi)
+            <span class="tok-kw">if</span> p &gt; lo:
+                slo.<span class="tok-fn">push</span>(lo)
+                shi.<span class="tok-fn">push</span>(p)
+            <span class="tok-kw">if</span> p + <span class="tok-num">1</span> &lt; hi:
+                slo.<span class="tok-fn">push</span>(p + <span class="tok-num">1</span>)
+                shi.<span class="tok-fn">push</span>(hi)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    a <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>]()
+    state: <span class="tok-type">u32</span> <span class="tok-op">=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">8000000</span>:
+        state <span class="tok-op">=</span> <span class="tok-fn">lcg</span>(state)
+        a.<span class="tok-fn">push</span>(<span class="tok-type">i32</span>(state &amp; <span class="tok-num">2147483647</span>))
+    <span class="tok-fn">qsort</span>(a)
+    sum: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    bad: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    i: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">while</span> i &lt; a.len:
+        sum <span class="tok-op">+=</span> <span class="tok-type">i64</span>(a[i])
+        <span class="tok-kw">if</span> i &gt; <span class="tok-num">0</span>:
+            <span class="tok-kw">if</span> a[i] &lt; a[i - <span class="tok-num">1</span>]:
+                bad <span class="tok-op">=</span> <span class="tok-num">1</span>
+        i <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-fn">print</span>(a[<span class="tok-num">0</span>])
+    <span class="tok-fn">print</span>(a[<span class="tok-num">4000000</span>])
+    <span class="tok-fn">print</span>(a[<span class="tok-num">7999999</span>])
+    <span class="tok-fn">print</span>(sum)
+    <span class="tok-fn">print</span>(bad)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/qsort.gg">qsort.gg</a><a href="benchmarks/src/qsort.cpp">qsort.cpp</a><a href="benchmarks/src/qsort.rs">qsort.rs</a></div>
+        </article>
+        <article class="workload reveal" id="dijkstra">
+          <div class="workload-head"><h3><a href="#dijkstra">Dijkstra</a></h3><span class="badge faster">5% faster</span></div>
+          <p class="workload-desc">Eight dense shortest-path searches on 4,000 nodes. Edge weights are computed, not stored. Greengold uses <code>hot fn</code>, <code>exclusive lend</code>, <code>trust</code>, and <code>overflow: wrap</code>. Each program printed <code>251696</code>.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">191.7 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:91.4%"></span></span><span class="bar-val">175.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:86.5%"></span></span><span class="bar-val">165.9 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>191.7 ms</td><td>197.9 ms</td><td>4.65 MB</td><td>0.48 s</td><td>62.0 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>175.2 ms</td><td>210.9 ms</td><td>4.20 MB</td><td>0.26 s</td><td>129.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>165.9 ms</td><td>169.1 ms</td><td>4.07 MB</td><td>0.42 s</td><td>60.2 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">dijkstra.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Dense Dijkstra on an implicit graph. Edge i-&gt;j weighs (131*i + 17*j) mod 97, plus 1.</span>
+<span class="tok-comment"># Eight searches from node 0. The printed value is the sum of distances.</span>
+<span class="tok-comment"># The search is one hot function. The two lists do not alias.</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">search</span>(dist: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>], used: <span class="tok-kw">exclusive</span> <span class="tok-kw">lend</span> <span class="tok-type">List</span>[<span class="tok-type">u8</span>], n: <span class="tok-type">usize</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i64</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    inf: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">1000000000</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        <span class="tok-kw">trust</span> dist[i] <span class="tok-op">=</span> inf
+        <span class="tok-kw">trust</span> used[i] <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">trust</span> dist[<span class="tok-num">0</span>] <span class="tok-op">=</span> <span class="tok-num">0</span>
+    placed: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">while</span> placed &lt; n:
+        best: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        best_d: <span class="tok-type">i32</span> <span class="tok-op">=</span> inf
+        found: <span class="tok-type">bool</span> <span class="tok-op">=</span> <span class="tok-num">false</span>
+        <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+            <span class="tok-kw">if</span> <span class="tok-kw">trust</span> used[i] <span class="tok-op">==</span> <span class="tok-num">0</span>:
+                d <span class="tok-op">=</span> <span class="tok-kw">trust</span> dist[i]
+                <span class="tok-kw">if</span> d &lt; best_d:
+                    best_d <span class="tok-op">=</span> d
+                    best <span class="tok-op">=</span> i
+                    found <span class="tok-op">=</span> <span class="tok-num">true</span>
+        <span class="tok-kw">if</span> <span class="tok-kw">not</span> found:
+            placed <span class="tok-op">=</span> n
+        <span class="tok-kw">else</span>:
+            <span class="tok-kw">trust</span> used[best] <span class="tok-op">=</span> <span class="tok-num">1</span>
+            placed <span class="tok-op">+=</span> <span class="tok-num">1</span>
+            <span class="tok-kw">for</span> j <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+                <span class="tok-kw">if</span> <span class="tok-kw">trust</span> used[j] <span class="tok-op">==</span> <span class="tok-num">0</span>:
+                    <span class="tok-kw">if</span> best <span class="tok-op">!=</span> j:
+                        w <span class="tok-op">=</span> <span class="tok-type">i32</span>((best * <span class="tok-num">131</span> + j * <span class="tok-num">17</span>) % <span class="tok-num">97</span> + <span class="tok-num">1</span>)
+                        alt <span class="tok-op">=</span> <span class="tok-kw">trust</span> dist[best] + w
+                        <span class="tok-kw">if</span> alt &lt; <span class="tok-kw">trust</span> dist[j]:
+                            <span class="tok-kw">trust</span> dist[j] <span class="tok-op">=</span> alt
+    sum: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        sum <span class="tok-op">+=</span> <span class="tok-type">i64</span>(<span class="tok-kw">trust</span> dist[i])
+    <span class="tok-kw">return</span> sum
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    n: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">4000</span>
+    dist <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">i32</span>]()
+    used <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">u8</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>n:
+        dist.<span class="tok-fn">push</span>(<span class="tok-num">0</span>)
+        used.<span class="tok-fn">push</span>(<span class="tok-num">0</span>)
+    total: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> round <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">8</span>:
+        total <span class="tok-op">+=</span> <span class="tok-fn">search</span>(dist, used, n)
+    <span class="tok-fn">print</span>(total)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/dijkstra.gg">dijkstra.gg</a><a href="benchmarks/src/dijkstra.cpp">dijkstra.cpp</a><a href="benchmarks/src/dijkstra.rs">dijkstra.rs</a></div>
+        </article>
+        <article class="workload reveal" id="sieve">
+          <div class="workload-head"><h3><a href="#sieve">Sieve</a></h3><span class="badge slower">24.9% slower</span></div>
+          <p class="workload-desc">Count the primes below 8,000,000. Each program printed <code>539777</code>. The Greengold program indexes with <code>trust</code>. Rust’s mean, 76.62 ms, sits well above its median, 17.24 ms.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:83.9%"></span></span><span class="bar-val">18.07 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:80.1%"></span></span><span class="bar-val">17.24 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">21.53 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>18.07 ms</td><td>25.67 ms</td><td>11.74 MB</td><td>0.52 s</td><td>61.6 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>17.24 ms</td><td>76.62 ms</td><td>11.32 MB</td><td>0.19 s</td><td>128.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>21.53 ms</td><td>27.85 ms</td><td>12.65 MB</td><td>0.35 s</td><td>59.6 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">sieve.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">sieve</span>(limit: <span class="tok-type">usize</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">usize</span>:
+    <span class="tok-kw">overflow</span>: wrap
+    is_prime <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">u8</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>limit:
+        is_prime.<span class="tok-fn">push</span>(<span class="tok-num">1</span>)
+
+    p: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">2</span>
+    <span class="tok-kw">while</span> p * p &lt; limit:
+        <span class="tok-kw">if</span> <span class="tok-kw">trust</span> is_prime[p] <span class="tok-op">==</span> <span class="tok-num">1</span>:
+            k: <span class="tok-type">usize</span> <span class="tok-op">=</span> p * p
+            <span class="tok-kw">while</span> k &lt; limit:
+                <span class="tok-kw">trust</span> is_prime[k] <span class="tok-op">=</span> <span class="tok-num">0</span>
+                k <span class="tok-op">+=</span> p
+        p <span class="tok-op">+=</span> <span class="tok-num">1</span>
+
+    count: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">2</span><span class="tok-op">..</span>limit:
+        <span class="tok-kw">if</span> <span class="tok-kw">trust</span> is_prime[i] <span class="tok-op">==</span> <span class="tok-num">1</span>:
+            count <span class="tok-op">+=</span> <span class="tok-num">1</span>
+    <span class="tok-kw">return</span> count
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    cnt <span class="tok-op">=</span> <span class="tok-fn">sieve</span>(<span class="tok-num">8000000</span>)
+    <span class="tok-fn">print</span>(cnt)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/sieve.gg">sieve.gg</a><a href="benchmarks/src/sieve.cpp">sieve.cpp</a><a href="benchmarks/src/sieve.rs">sieve.rs</a></div>
+        </article>
+        <article class="workload reveal" id="primes">
+          <div class="workload-head"><h3><a href="#primes">Primes</a></h3><span class="badge faster">1.9% more passes</span></div>
+          <p class="workload-desc">A one-bit sieve of limit 1,000,000, repeated for about 20 seconds. The score is completed passes. Each program counted 78,498 primes. Greengold indexes the bit words with <code>trust</code>.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Completed passes in about 20 seconds. Longer is better.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:91.1%"></span></span><span class="bar-val">29,365</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.1%"></span></span><span class="bar-val">31,641</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">32,240</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Passes</th><th>Passes/s</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>29,365</td><td>1,462</td><td>4.61 MB</td><td>0.64 s</td><td>94.3 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>31,641</td><td>1,578</td><td>4.17 MB</td><td>0.21 s</td><td>155.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>32,240</td><td>1,610</td><td>4.43 MB</td><td>0.39 s</td><td>60.6 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">primes.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">extern</span> <span class="tok-str">"windows.h"</span> <span class="tok-kw">fn</span> <span class="tok-type">QueryPerformanceCounter</span>(out: *<span class="tok-kw">mut</span> <span class="tok-type">i64</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>
+<span class="tok-kw">extern</span> <span class="tok-str">"windows.h"</span> <span class="tok-kw">fn</span> <span class="tok-type">QueryPerformanceFrequency</span>(out: *<span class="tok-kw">mut</span> <span class="tok-type">i64</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>
+<span class="tok-kw">extern</span> <span class="tok-str">"stdio.h"</span> <span class="tok-kw">fn</span> <span class="tok-fn">printf</span>(fmt: <span class="tok-type">str</span>, <span class="tok-op">..</span>.) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">now_sec</span>() <span class="tok-op">-&gt;</span> <span class="tok-type">f64</span>:
+    count: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    freq: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">unsafe</span>:
+        <span class="tok-type">QueryPerformanceCounter</span>(<span class="tok-fn">addr_mut</span>(count))
+        <span class="tok-type">QueryPerformanceFrequency</span>(<span class="tok-fn">addr_mut</span>(freq))
+    <span class="tok-kw">return</span> <span class="tok-type">f64</span>(count) / <span class="tok-type">f64</span>(freq)
+
+<span class="tok-kw">struct</span> <span class="tok-type">PrimeSieve</span>:
+    sieve_size: <span class="tok-type">usize</span>
+    words: <span class="tok-type">List</span>[<span class="tok-type">u64</span>]
+
+<span class="tok-kw">impl</span> <span class="tok-type">PrimeSieve</span>:
+    <span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">run_sieve</span>(<span class="tok-kw">self</span>: <span class="tok-kw">lend</span> <span class="tok-type">PrimeSieve</span>):
+        <span class="tok-kw">overflow</span>: wrap
+        factor: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">3</span>
+        q: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">1000</span>
+
+        <span class="tok-kw">while</span> factor <span class="tok-op">&lt;=</span> q:
+            num: <span class="tok-type">usize</span> <span class="tok-op">=</span> factor
+            <span class="tok-kw">while</span> num <span class="tok-op">&lt;=</span> q:
+                idx: <span class="tok-type">usize</span> <span class="tok-op">=</span> num / <span class="tok-num">2</span>
+                w: <span class="tok-type">usize</span> <span class="tok-op">=</span> idx &gt;&gt; <span class="tok-num">6</span>
+                b: <span class="tok-type">usize</span> <span class="tok-op">=</span> idx &amp; <span class="tok-num">63</span>
+                mask: <span class="tok-type">u64</span> <span class="tok-op">=</span> <span class="tok-type">u64</span>(<span class="tok-num">1</span>) &lt;&lt; b
+                <span class="tok-kw">if</span> (<span class="tok-kw">trust</span> <span class="tok-kw">self</span>.words[w] &amp; mask) <span class="tok-op">!=</span> <span class="tok-num">0</span>:
+                    factor <span class="tok-op">=</span> num
+                    <span class="tok-kw">break</span>
+                num <span class="tok-op">+=</span> <span class="tok-num">2</span>
+
+            k: <span class="tok-type">usize</span> <span class="tok-op">=</span> factor * factor
+            <span class="tok-kw">step</span>: <span class="tok-type">usize</span> <span class="tok-op">=</span> factor * <span class="tok-num">2</span>
+            <span class="tok-kw">while</span> k &lt; <span class="tok-kw">self</span>.sieve_size:
+                kidx: <span class="tok-type">usize</span> <span class="tok-op">=</span> k / <span class="tok-num">2</span>
+                kw: <span class="tok-type">usize</span> <span class="tok-op">=</span> kidx &gt;&gt; <span class="tok-num">6</span>
+                kb: <span class="tok-type">usize</span> <span class="tok-op">=</span> kidx &amp; <span class="tok-num">63</span>
+                kmask: <span class="tok-type">u64</span> <span class="tok-op">=</span> ~(<span class="tok-type">u64</span>(<span class="tok-num">1</span>) &lt;&lt; kb)
+                <span class="tok-kw">trust</span> <span class="tok-kw">self</span>.words[kw] <span class="tok-op">=</span> <span class="tok-kw">trust</span> <span class="tok-kw">self</span>.words[kw] &amp; kmask
+                k <span class="tok-op">+=</span> <span class="tok-kw">step</span>
+
+            factor <span class="tok-op">+=</span> <span class="tok-num">2</span>
+
+    <span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">count_primes</span>(<span class="tok-kw">self</span>: <span class="tok-kw">lend</span> <span class="tok-type">PrimeSieve</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">usize</span>:
+        <span class="tok-kw">overflow</span>: wrap
+        count: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">1</span>
+        num: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">3</span>
+        <span class="tok-kw">while</span> num &lt; <span class="tok-kw">self</span>.sieve_size:
+            idx: <span class="tok-type">usize</span> <span class="tok-op">=</span> num / <span class="tok-num">2</span>
+            w: <span class="tok-type">usize</span> <span class="tok-op">=</span> idx &gt;&gt; <span class="tok-num">6</span>
+            b: <span class="tok-type">usize</span> <span class="tok-op">=</span> idx &amp; <span class="tok-num">63</span>
+            mask: <span class="tok-type">u64</span> <span class="tok-op">=</span> <span class="tok-type">u64</span>(<span class="tok-num">1</span>) &lt;&lt; b
+            <span class="tok-kw">if</span> (<span class="tok-kw">trust</span> <span class="tok-kw">self</span>.words[w] &amp; mask) <span class="tok-op">!=</span> <span class="tok-num">0</span>:
+                count <span class="tok-op">+=</span> <span class="tok-num">1</span>
+            num <span class="tok-op">+=</span> <span class="tok-num">2</span>
+        <span class="tok-kw">return</span> count
+
+    <span class="tok-kw">fn</span> <span class="tok-fn">validate_results</span>(<span class="tok-kw">self</span>: <span class="tok-kw">lend</span> <span class="tok-type">PrimeSieve</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">bool</span>:
+        <span class="tok-kw">if</span> <span class="tok-kw">self</span>.sieve_size <span class="tok-op">==</span> <span class="tok-num">1000000</span>:
+            <span class="tok-kw">return</span> <span class="tok-kw">self</span>.<span class="tok-fn">count_primes</span>() <span class="tok-op">==</span> <span class="tok-num">78498</span>
+        <span class="tok-kw">return</span> <span class="tok-num">false</span>
+
+    <span class="tok-kw">fn</span> <span class="tok-fn">print_results</span>(<span class="tok-kw">self</span>: <span class="tok-kw">lend</span> <span class="tok-type">PrimeSieve</span>, duration: <span class="tok-type">f64</span>, passes: <span class="tok-type">usize</span>):
+        count <span class="tok-op">=</span> <span class="tok-kw">self</span>.<span class="tok-fn">count_primes</span>()
+        valid <span class="tok-op">=</span> <span class="tok-kw">self</span>.<span class="tok-fn">validate_results</span>()
+        avg <span class="tok-op">=</span> duration / <span class="tok-type">f64</span>(passes)
+        v_int: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-kw">if</span> valid <span class="tok-kw">then</span> <span class="tok-num">1</span> <span class="tok-kw">else</span> <span class="tok-num">0</span>
+        <span class="tok-kw">unsafe</span>:
+            <span class="tok-fn">printf</span>(<span class="tok-str">"Passes: %zu, Time: %lf, Avg: %lf, Limit: %zu, Count1: %zu, Count2: %zu, Valid: %d\n\n"</span>,
+                   passes, duration, avg, <span class="tok-kw">self</span>.sieve_size, count, count, v_int)
+            <span class="tok-fn">printf</span>(<span class="tok-str">"davepl_gg;%zu;%lf;1;algorithm=base,faithful=yes,bits=1\n"</span>, passes, duration)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">new_sieve</span>(limit: <span class="tok-type">usize</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">PrimeSieve</span>:
+    num_bits: <span class="tok-type">usize</span> <span class="tok-op">=</span> limit / <span class="tok-num">2</span>
+    num_words: <span class="tok-type">usize</span> <span class="tok-op">=</span> (num_bits + <span class="tok-num">63</span>) / <span class="tok-num">64</span>
+    words <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">u64</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>num_words:
+        words.<span class="tok-fn">push</span>(<span class="tok-num">0xFFFFFFFFFFFFFFFF</span>)
+    <span class="tok-kw">return</span> <span class="tok-type">PrimeSieve</span>{sieve_size: limit, words: words}
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-kw">overflow</span>: wrap
+    t0 <span class="tok-op">=</span> <span class="tok-fn">now_sec</span>()
+    passes: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    last_sieve <span class="tok-op">=</span> <span class="tok-fn">new_sieve</span>(<span class="tok-num">1000000</span>)
+
+    <span class="tok-kw">while</span> <span class="tok-fn">now_sec</span>() - t0 &lt; <span class="tok-num">20.0</span>:
+        s <span class="tok-op">=</span> <span class="tok-fn">new_sieve</span>(<span class="tok-num">1000000</span>)
+        s.<span class="tok-fn">run_sieve</span>()
+        passes <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        last_sieve <span class="tok-op">=</span> s
+
+    duration <span class="tok-op">=</span> <span class="tok-fn">now_sec</span>() - t0
+    last_sieve.<span class="tok-fn">print_results</span>(duration, passes)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/primes.gg">primes.gg</a><a href="benchmarks/src/primes.cpp">primes.cpp</a><a href="benchmarks/src/primes.rs">primes.rs</a></div>
+        </article>
+        <article class="workload reveal" id="vector">
+          <div class="workload-head"><h3><a href="#vector">Vector</a></h3><span class="badge faster">3% faster</span></div>
+          <p class="workload-desc">Push the integers 0 through 19,999,999 onto a list, then sum them. All three programs printed <code>20000000</code> and <code>199999990000000</code>. Peak memory is about 261 MB because the list holds twenty million <code>i64</code> values.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.7%"></span></span><span class="bar-val">83.23 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">84.29 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:95.3%"></span></span><span class="bar-val">80.36 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>83.23 ms</td><td>89.01 ms</td><td>261.11 MB</td><td>0.43 s</td><td>61.5 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>84.29 ms</td><td>90.54 ms</td><td>260.71 MB</td><td>0.20 s</td><td>128.5 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>80.36 ms</td><td>83.24 ms</td><td>260.65 MB</td><td>0.35 s</td><td>59.6 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">vector.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-kw">overflow</span>: wrap
+    v <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">i64</span>]()
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">20000000</span>:
+        v.<span class="tok-fn">push</span>(<span class="tok-type">i64</span>(i))
+    total: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> x <span class="tok-kw">in</span> v:
+        total <span class="tok-op">+=</span> x
+    <span class="tok-fn">print</span>(v.len)
+    <span class="tok-fn">print</span>(total)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/vector.gg">vector.gg</a><a href="benchmarks/src/vector.cpp">vector.cpp</a><a href="benchmarks/src/vector.rs">vector.rs</a></div>
+        </article>
+        <article class="workload reveal" id="trees">
+          <div class="workload-head"><h3><a href="#trees">Trees</a></h3><span class="badge within">within 1.9%</span></div>
+          <p class="workload-desc">A full binary tree of depth 16, built and counted eighty times, then freed. Greengold stores children in <code>Box</code> and walks the tree by borrow. Each program printed <code>5242880</code>. Greengold is about the same as Rust and C++.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.9%"></span></span><span class="bar-val">487.6 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.2%"></span></span><span class="bar-val">484.0 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">493.2 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>487.6 ms</td><td>525.6 ms</td><td>8.23 MB</td><td>1.13 s</td><td>110.6 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>484.0 ms</td><td>515.9 ms</td><td>7.76 MB</td><td>0.18 s</td><td>129.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>493.2 ms</td><td>512.3 ms</td><td>7.70 MB</td><td>0.37 s</td><td>60.6 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">trees.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Build and walk a full binary tree. Depth 16 is 65536 leaves of value 1.</span>
+<span class="tok-comment"># Eighty trees. The tree is freed when the iteration ends.</span>
+
+<span class="tok-kw">enum</span> <span class="tok-type">Tree</span>:
+    <span class="tok-type">Leaf</span>(<span class="tok-type">i32</span>)
+    <span class="tok-type">Node</span>(<span class="tok-type">Box</span>[<span class="tok-type">Tree</span>], <span class="tok-type">Box</span>[<span class="tok-type">Tree</span>])
+
+<span class="tok-kw">fn</span> <span class="tok-fn">build</span>(d: <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">Tree</span>:
+    <span class="tok-kw">if</span> d <span class="tok-op">==</span> <span class="tok-num">0</span>:
+        <span class="tok-kw">return</span> <span class="tok-type">Tree</span>.<span class="tok-type">Leaf</span>(<span class="tok-num">1</span>)
+    <span class="tok-kw">return</span> <span class="tok-type">Tree</span>.<span class="tok-type">Node</span>(<span class="tok-type">Box</span>[<span class="tok-type">Tree</span>](<span class="tok-fn">build</span>(d - <span class="tok-num">1</span>)), <span class="tok-type">Box</span>[<span class="tok-type">Tree</span>](<span class="tok-fn">build</span>(d - <span class="tok-num">1</span>)))
+
+<span class="tok-kw">fn</span> <span class="tok-fn">count</span>(t: <span class="tok-type">Tree</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>:
+    <span class="tok-kw">match</span> t:
+        <span class="tok-type">Leaf</span>(v):
+            <span class="tok-kw">return</span> v
+        <span class="tok-type">Node</span>(left, right):
+            <span class="tok-kw">return</span> <span class="tok-fn">count</span>(left.value) + <span class="tok-fn">count</span>(right.value)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    total: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">80</span>:
+        t <span class="tok-op">=</span> <span class="tok-fn">build</span>(<span class="tok-num">16</span>)
+        total <span class="tok-op">+=</span> <span class="tok-fn">count</span>(t)
+    <span class="tok-fn">print</span>(total)</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/trees.gg">trees.gg</a><a href="benchmarks/src/trees.cpp">trees.cpp</a><a href="benchmarks/src/trees.rs">trees.rs</a></div>
+        </article>
+        <article class="workload reveal" id="particle">
+          <div class="workload-head"><h3><a href="#particle">Particle</a></h3><span class="badge faster">38% faster</span></div>
+          <p class="workload-desc">20,000 particles, 2,000 steps, then the sum of <code>x</code>. Greengold uses <code>soa Array</code> and indexes it with <code>trust</code> inside <code>hot fn</code>. C++ and Rust store an array of structs. Printed sums: C++ <code>5.99982e+07</code>, Rust <code>59998190</code>, Greengold <code>5.9999e+07</code>. Rust’s mean, 66.71 ms, sits well above its median, 19.81 ms.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:99.1%"></span></span><span class="bar-val">19.64 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">19.81 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:61.8%"></span></span><span class="bar-val">12.25 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>19.64 ms</td><td>25.86 ms</td><td>4.97 MB</td><td>0.45 s</td><td>60.5 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>19.81 ms</td><td>66.71 ms</td><td>4.46 MB</td><td>0.19 s</td><td>150.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>12.25 ms</td><td>16.66 ms</td><td>4.41 MB</td><td>2.11 s</td><td>58.9 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">particle.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">struct</span> <span class="tok-type">Particle</span>:
+    x: <span class="tok-type">f32</span>
+    y: <span class="tok-type">f32</span>
+    vx: <span class="tok-type">f32</span>
+    vy: <span class="tok-type">f32</span>
+
+<span class="tok-kw">hot</span> <span class="tok-kw">fn</span> <span class="tok-fn">update</span>(steps: <span class="tok-type">usize</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">f32</span>:
+    ps <span class="tok-op">=</span> <span class="tok-kw">soa</span> <span class="tok-type">Array</span>[<span class="tok-type">Particle</span>, <span class="tok-num">20000</span>]
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">20000</span>:
+        (<span class="tok-kw">trust</span> ps[i]).x <span class="tok-op">=</span> <span class="tok-type">f32</span>(i) * <span class="tok-num">0.1</span>
+        (<span class="tok-kw">trust</span> ps[i]).y <span class="tok-op">=</span> <span class="tok-type">f32</span>(i) * <span class="tok-num">0.2</span>
+        (<span class="tok-kw">trust</span> ps[i]).vx <span class="tok-op">=</span> <span class="tok-num">1.0</span>
+        (<span class="tok-kw">trust</span> ps[i]).vy <span class="tok-op">=</span> <span class="tok-num">2.0</span>
+
+    <span class="tok-kw">for</span> <span class="tok-kw">step</span> <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>steps:
+        <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">20000</span>:
+            (<span class="tok-kw">trust</span> ps[i]).x <span class="tok-op">=</span> (<span class="tok-kw">trust</span> ps[i]).x + (<span class="tok-kw">trust</span> ps[i]).vx
+            (<span class="tok-kw">trust</span> ps[i]).y <span class="tok-op">=</span> (<span class="tok-kw">trust</span> ps[i]).y + (<span class="tok-kw">trust</span> ps[i]).vy
+
+    total: <span class="tok-type">f32</span> <span class="tok-op">=</span> <span class="tok-num">0.0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span><span class="tok-num">20000</span>:
+        total <span class="tok-op">+=</span> (<span class="tok-kw">trust</span> ps[i]).x
+    <span class="tok-kw">return</span> total
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-fn">print</span>(<span class="tok-fn">update</span>(<span class="tok-num">2000</span>))</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/particle.gg">particle.gg</a><a href="benchmarks/src/particle.cpp">particle.cpp</a><a href="benchmarks/src/particle.rs">particle.rs</a></div>
+        </article>
+        <article class="workload reveal" id="gpumatmul">
+          <div class="workload-head"><h3><a href="#gpumatmul">GPU matmul</a></h3><span class="badge within">within 2.4%</span></div>
+          <p class="workload-desc">Inference-style dense layers on the GPU through OpenCL: 4096 token vectors of width 2048 go through 8 layers of f32 weights, each followed by ReLU and requantization to 0..127 as in an int8 model. The OpenCL kernel is the same in all three languages, so this measures the host side (generating 33 million weights, uploading them, driving the queue) more than the language's own code generation. Each program printed <code>294743112 4035566 127</code>.</p>
+          <div class="workload-body">
+            <div><div class="legend" style="margin-bottom:12px"><span>Median of five runs. Shorter is faster.</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:99.8%"></span></span><span class="bar-val">473.3 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:97.7%"></span></span><span class="bar-val">463.1 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">474.1 ms</span></div></div></div>
+            <div class="table-scroll"><table class="mtable"><thead><tr><th>Build</th><th>Median</th><th>Mean</th><th>Memory</th><th>Compile</th><th>Binary</th></tr></thead><tbody><tr class="cpp"><td>C++ <span style="color:var(--muted);font-size:.8rem">g++ -O3</span></td><td>473.3 ms</td><td>486.3 ms</td><td>214.74 MB</td><td>1.31 s</td><td>97.8 KB</td></tr><tr class="rust"><td>Rust <span style="color:var(--muted);font-size:.8rem">rustc opt-level=3</span></td><td>463.1 ms</td><td>464.7 ms</td><td>214.49 MB</td><td>0.23 s</td><td>136.0 KB</td></tr><tr class="gg"><td>Greengold <span style="color:var(--muted);font-size:.8rem">gg build --release</span></td><td>474.1 ms</td><td>473.8 ms</td><td>214.33 MB</td><td>0.71 s</td><td>62.8 KB</td></tr></tbody></table></div>
+          </div>
+          <details class="src"><summary><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg> Greengold source</summary><figure class="code scroll"><figcaption class="code-head"><span class="code-file">gpumatmul.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-comment"># Inference-style matrix products on the GPU through OpenCL: 4096 token vectors of width 2048 go through 8</span>
+<span class="tok-comment"># dense layers (f32 weights, ReLU, then requantized to integers 0..127 as an int8 model does).</span>
+<span class="tok-comment"># OpenCL is loaded at run time (OpenCL.dll, libOpenCL.so.1, or the macOS framework), so nothing extra is</span>
+<span class="tok-comment"># linked. Every product is an integer below 2^24, so f32 is exact and the printed numbers are the same on</span>
+<span class="tok-comment"># every GPU.</span>
+
+<span class="tok-kw">extern</span> <span class="tok-str">"windows.h"</span> <span class="tok-kw">fn</span> <span class="tok-type">LoadLibraryA</span>(name: <span class="tok-type">str</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>
+<span class="tok-kw">extern</span> <span class="tok-str">"windows.h"</span> <span class="tok-kw">fn</span> <span class="tok-type">GetProcAddress</span>(lib: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, name: <span class="tok-type">str</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>
+weak <span class="tok-kw">extern</span> <span class="tok-str">"dlfcn.h"</span> <span class="tok-kw">fn</span> <span class="tok-fn">dlopen</span>(name: <span class="tok-type">str</span>, flags: <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>
+weak <span class="tok-kw">extern</span> <span class="tok-str">"dlfcn.h"</span> <span class="tok-kw">fn</span> <span class="tok-fn">dlsym</span>(lib: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, name: <span class="tok-type">str</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>
+
+<span class="tok-kw">const</span> TOKENS: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">4096</span>
+<span class="tok-kw">const</span> WIDTH: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">2048</span>
+<span class="tok-kw">const</span> LAYERS: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">8</span>
+<span class="tok-kw">const</span> TILE: <span class="tok-type">usize</span> <span class="tok-op">=</span> <span class="tok-num">16</span>
+
+<span class="tok-kw">const</span> KERNEL <span class="tok-op">=</span> <span class="tok-str">""</span><span class="tok-str">"#define TILE 16</span>
+__kernel <span class="tok-type">void</span> <span class="tok-fn">layer</span>(__global <span class="tok-kw">const</span> <span class="tok-type">float</span>* x, __global <span class="tok-kw">const</span> <span class="tok-type">float</span>* w, __global <span class="tok-type">float</span>* y, <span class="tok-type">int</span> k, <span class="tok-type">int</span> n) {
+    __local <span class="tok-type">float</span> xs[TILE][TILE];
+    __local <span class="tok-type">float</span> ws[TILE][TILE];
+    <span class="tok-type">int</span> col <span class="tok-op">=</span> <span class="tok-fn">get_global_id</span>(<span class="tok-num">0</span>);
+    <span class="tok-type">int</span> row <span class="tok-op">=</span> <span class="tok-fn">get_global_id</span>(<span class="tok-num">1</span>);
+    <span class="tok-type">int</span> lc <span class="tok-op">=</span> <span class="tok-fn">get_local_id</span>(<span class="tok-num">0</span>);
+    <span class="tok-type">int</span> lr <span class="tok-op">=</span> <span class="tok-fn">get_local_id</span>(<span class="tok-num">1</span>);
+    <span class="tok-type">float</span> acc <span class="tok-op">=</span> <span class="tok-num">0</span>.0f;
+    <span class="tok-kw">for</span> (<span class="tok-type">int</span> t <span class="tok-op">=</span> <span class="tok-num">0</span>; t &lt; k; t <span class="tok-op">+=</span> TILE) {
+        xs[lr][lc] <span class="tok-op">=</span> x[row * k + t + lc];
+        ws[lr][lc] <span class="tok-op">=</span> w[(t + lr) * n + col];
+        <span class="tok-fn">barrier</span>(CLK_LOCAL_MEM_FENCE);
+        <span class="tok-kw">for</span> (<span class="tok-type">int</span> i <span class="tok-op">=</span> <span class="tok-num">0</span>; i &lt; TILE; i++)
+            acc <span class="tok-op">+=</span> xs[lr][i] * ws[i][lc];
+        <span class="tok-fn">barrier</span>(CLK_LOCAL_MEM_FENCE);
+    }
+    y[row * n + col] <span class="tok-op">=</span> <span class="tok-fn">fmin</span>(<span class="tok-fn">floor</span>(<span class="tok-fn">fmax</span>(acc, <span class="tok-num">0</span>.0f) / <span class="tok-num">32</span>.0f), <span class="tok-num">127</span>.0f);
+}
+<span class="tok-str">""</span><span class="tok-str">"</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">open_opencl</span>() <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>:
+    <span class="tok-kw">unsafe</span>:
+        <span class="tok-kw">if</span> <span class="tok-fn">target_os</span>() <span class="tok-op">==</span> <span class="tok-str">"windows"</span>:
+            <span class="tok-kw">return</span> <span class="tok-type">LoadLibraryA</span>(<span class="tok-str">"OpenCL.dll"</span>)
+        <span class="tok-kw">elif</span> <span class="tok-fn">target_os</span>() <span class="tok-op">==</span> <span class="tok-str">"macos"</span>:
+            <span class="tok-kw">return</span> <span class="tok-fn">dlopen</span>(<span class="tok-str">"/System/Library/Frameworks/OpenCL.framework/OpenCL"</span>, <span class="tok-num">2</span>)
+        <span class="tok-kw">else</span>:
+            <span class="tok-kw">return</span> <span class="tok-fn">dlopen</span>(<span class="tok-str">"libOpenCL.so.1"</span>, <span class="tok-num">2</span>)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">sym</span>(lib: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, name: <span class="tok-type">str</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>:
+    <span class="tok-kw">unsafe</span>:
+        p: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span> <span class="tok-op">=</span> <span class="tok-num">null</span>
+        <span class="tok-kw">if</span> <span class="tok-fn">target_os</span>() <span class="tok-op">==</span> <span class="tok-str">"windows"</span>:
+            p <span class="tok-op">=</span> <span class="tok-type">GetProcAddress</span>(lib, name)
+        <span class="tok-kw">else</span>:
+            p <span class="tok-op">=</span> <span class="tok-fn">dlsym</span>(lib, name)
+        <span class="tok-kw">if</span> p <span class="tok-op">==</span> <span class="tok-num">null</span>:
+            <span class="tok-fn">panic</span>(<span class="tok-str">"OpenCL function missing"</span>)
+        <span class="tok-kw">return</span> p
+
+<span class="tok-comment"># Reads a symbol address as a function value of type F.</span>
+<span class="tok-kw">fn</span> <span class="tok-fn">as_fn</span>[<span class="tok-type">F</span>](p: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">F</span>:
+    <span class="tok-kw">unsafe</span>:
+        <span class="tok-kw">return</span> <span class="tok-fn">ptr_read</span>[<span class="tok-type">F</span>](<span class="tok-fn">addr</span>(p))
+
+<span class="tok-kw">fn</span> <span class="tok-fn">check</span>(code: <span class="tok-type">i32</span>, what: <span class="tok-type">str</span>):
+    <span class="tok-kw">if</span> code <span class="tok-op">!=</span> <span class="tok-num">0</span>:
+        <span class="tok-fn">print</span>(what, code)
+        <span class="tok-fn">panic</span>(<span class="tok-str">"OpenCL call failed"</span>)
+
+<span class="tok-comment"># The same linear congruential generator as the C++ and Rust versions; no product overflows 64 bits.</span>
+<span class="tok-kw">fn</span> <span class="tok-fn">next</span>(state: <span class="tok-kw">lend</span> <span class="tok-type">u64</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">u64</span>:
+    state <span class="tok-op">=</span> (state * <span class="tok-num">1103515245</span> + <span class="tok-num">12345</span>) % <span class="tok-num">2147483648</span>
+    <span class="tok-kw">return</span> state &gt;&gt; <span class="tok-num">16</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    lib <span class="tok-op">=</span> <span class="tok-fn">open_opencl</span>()
+    <span class="tok-kw">if</span> lib <span class="tok-op">==</span> <span class="tok-num">null</span>:
+        <span class="tok-fn">panic</span>(<span class="tok-str">"OpenCL is not installed"</span>)
+    <span class="tok-kw">unsafe</span>:
+        get_platforms <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(<span class="tok-type">u32</span>, *<span class="tok-kw">mut</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">u32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clGetPlatformIDs"</span>))
+        get_devices <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u64</span>, <span class="tok-type">u32</span>, *<span class="tok-kw">mut</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">u32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clGetDeviceIDs"</span>))
+        create_context <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-type">u8</span>, <span class="tok-type">u32</span>, **<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-type">u8</span>, *<span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clCreateContext"</span>))
+        create_queue <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u64</span>, *<span class="tok-kw">mut</span> <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clCreateCommandQueue"</span>))
+        create_program <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u32</span>, **<span class="tok-type">u8</span>, *<span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clCreateProgramWithSource"</span>))
+        build_program <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u32</span>, **<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-type">u8</span>, *<span class="tok-type">u8</span>, *<span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clBuildProgram"</span>))
+        create_kernel <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clCreateKernel"</span>))
+        create_buffer <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u64</span>, <span class="tok-type">usize</span>, *<span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clCreateBuffer"</span>))
+        set_arg <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u32</span>, <span class="tok-type">usize</span>, *<span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clSetKernelArg"</span>))
+        enqueue_kernel <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u32</span>, *<span class="tok-type">usize</span>, *<span class="tok-type">usize</span>, *<span class="tok-type">usize</span>, <span class="tok-type">u32</span>, *<span class="tok-type">u8</span>, *<span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clEnqueueNDRangeKernel"</span>))
+        read_buffer <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u32</span>, <span class="tok-type">usize</span>, <span class="tok-type">usize</span>, *<span class="tok-kw">mut</span> <span class="tok-type">u8</span>, <span class="tok-type">u32</span>, *<span class="tok-type">u8</span>, *<span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clEnqueueReadBuffer"</span>))
+        finish <span class="tok-op">=</span> as_fn[<span class="tok-kw">fn</span>(*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>](<span class="tok-fn">sym</span>(lib, <span class="tok-str">"clFinish"</span>))
+
+        platform: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span> <span class="tok-op">=</span> <span class="tok-num">null</span>
+        device: *<span class="tok-kw">mut</span> <span class="tok-type">u8</span> <span class="tok-op">=</span> <span class="tok-num">null</span>
+        count: <span class="tok-type">u32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        err: <span class="tok-type">i32</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        <span class="tok-fn">check</span>(<span class="tok-fn">get_platforms</span>(<span class="tok-num">1</span>, <span class="tok-fn">addr_mut</span>(platform), <span class="tok-fn">addr_mut</span>(count)), <span class="tok-str">"clGetPlatformIDs"</span>)
+        <span class="tok-fn">check</span>(<span class="tok-fn">get_devices</span>(platform, <span class="tok-num">4</span>, <span class="tok-num">1</span>, <span class="tok-fn">addr_mut</span>(device), <span class="tok-fn">addr_mut</span>(count)), <span class="tok-str">"clGetDeviceIDs (GPU)"</span>)
+        context <span class="tok-op">=</span> <span class="tok-fn">create_context</span>(<span class="tok-num">null</span>, <span class="tok-num">1</span>, <span class="tok-fn">addr</span>(device), <span class="tok-num">null</span>, <span class="tok-num">null</span>, <span class="tok-fn">addr_mut</span>(err))
+        <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateContext"</span>)
+        queue <span class="tok-op">=</span> <span class="tok-fn">create_queue</span>(context, device, <span class="tok-num">0</span>, <span class="tok-fn">addr_mut</span>(err))
+        <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateCommandQueue"</span>)
+
+        source <span class="tok-op">=</span> <span class="tok-fn">string_to_cstr</span>(KERNEL)
+        program <span class="tok-op">=</span> <span class="tok-fn">create_program</span>(context, <span class="tok-num">1</span>, <span class="tok-fn">addr</span>(source), <span class="tok-num">null</span>, <span class="tok-fn">addr_mut</span>(err))
+        <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateProgramWithSource"</span>)
+        <span class="tok-fn">check</span>(<span class="tok-fn">build_program</span>(program, <span class="tok-num">1</span>, <span class="tok-fn">addr</span>(device), <span class="tok-num">null</span>, <span class="tok-num">null</span>, <span class="tok-num">null</span>), <span class="tok-str">"clBuildProgram"</span>)
+        kernel <span class="tok-op">=</span> <span class="tok-fn">create_kernel</span>(program, <span class="tok-fn">string_to_cstr</span>(<span class="tok-str">"layer"</span>), <span class="tok-fn">addr_mut</span>(err))
+        <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateKernel"</span>)
+
+        state: <span class="tok-type">u64</span> <span class="tok-op">=</span> <span class="tok-num">1</span>
+        x <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f32</span>]()
+        x.<span class="tok-fn">reserve</span>(TOKENS * WIDTH)
+        <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>TOKENS * WIDTH:
+            x.<span class="tok-fn">push</span>(<span class="tok-type">f32</span>(<span class="tok-fn">next</span>(state) % <span class="tok-num">128</span>))
+        bytes <span class="tok-op">=</span> TOKENS * WIDTH * <span class="tok-num">4</span>
+        <span class="tok-comment"># CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR</span>
+        xs <span class="tok-op">=</span> x[<span class="tok-op">..</span>]
+        cur <span class="tok-op">=</span> <span class="tok-fn">create_buffer</span>(context, <span class="tok-num">33</span>, bytes, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(xs)), <span class="tok-fn">addr_mut</span>(err))
+        <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateBuffer"</span>)
+        out <span class="tok-op">=</span> <span class="tok-fn">create_buffer</span>(context, <span class="tok-num">1</span>, bytes, <span class="tok-num">null</span>, <span class="tok-fn">addr_mut</span>(err))
+        <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateBuffer"</span>)
+
+        global: [<span class="tok-num">2</span>]<span class="tok-type">usize</span> <span class="tok-op">=</span> [WIDTH, TOKENS]
+        local: [<span class="tok-num">2</span>]<span class="tok-type">usize</span> <span class="tok-op">=</span> [TILE, TILE]
+        k <span class="tok-op">=</span> <span class="tok-type">i32</span>(WIDTH)
+        n <span class="tok-op">=</span> <span class="tok-type">i32</span>(WIDTH)
+        <span class="tok-kw">for</span> l <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>LAYERS:
+            w <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f32</span>]()
+            w.<span class="tok-fn">reserve</span>(WIDTH * WIDTH)
+            <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>WIDTH * WIDTH:
+                w.<span class="tok-fn">push</span>(<span class="tok-type">f32</span>(<span class="tok-type">i64</span>(<span class="tok-fn">next</span>(state) % <span class="tok-num">5</span>) - <span class="tok-num">2</span>))
+            <span class="tok-comment"># CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR</span>
+            ws <span class="tok-op">=</span> w[<span class="tok-op">..</span>]
+            weights <span class="tok-op">=</span> <span class="tok-fn">create_buffer</span>(context, <span class="tok-num">36</span>, WIDTH * WIDTH * <span class="tok-num">4</span>, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(ws)), <span class="tok-fn">addr_mut</span>(err))
+            <span class="tok-fn">check</span>(err, <span class="tok-str">"clCreateBuffer"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">set_arg</span>(kernel, <span class="tok-num">0</span>, <span class="tok-num">8</span>, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(cur))), <span class="tok-str">"clSetKernelArg"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">set_arg</span>(kernel, <span class="tok-num">1</span>, <span class="tok-num">8</span>, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(weights))), <span class="tok-str">"clSetKernelArg"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">set_arg</span>(kernel, <span class="tok-num">2</span>, <span class="tok-num">8</span>, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(out))), <span class="tok-str">"clSetKernelArg"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">set_arg</span>(kernel, <span class="tok-num">3</span>, <span class="tok-num">4</span>, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(k))), <span class="tok-str">"clSetKernelArg"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">set_arg</span>(kernel, <span class="tok-num">4</span>, <span class="tok-num">4</span>, ptr_cast[*<span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(n))), <span class="tok-str">"clSetKernelArg"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">enqueue_kernel</span>(queue, kernel, <span class="tok-num">2</span>, <span class="tok-num">null</span>, <span class="tok-fn">addr</span>(global), <span class="tok-fn">addr</span>(local), <span class="tok-num">0</span>, <span class="tok-num">null</span>, <span class="tok-num">null</span>), <span class="tok-str">"clEnqueueNDRangeKernel"</span>)
+            <span class="tok-fn">check</span>(<span class="tok-fn">finish</span>(queue), <span class="tok-str">"clFinish"</span>)
+            swap <span class="tok-op">=</span> cur
+            cur <span class="tok-op">=</span> out
+            out <span class="tok-op">=</span> swap
+
+        y <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">f32</span>]()
+        y.<span class="tok-fn">reserve</span>(TOKENS * WIDTH)
+        <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>TOKENS * WIDTH:
+            y.<span class="tok-fn">push</span>(<span class="tok-num">0.0</span>)
+        ys <span class="tok-op">=</span> y[<span class="tok-op">..</span>]
+        <span class="tok-fn">check</span>(<span class="tok-fn">read_buffer</span>(queue, cur, <span class="tok-num">1</span>, <span class="tok-num">0</span>, bytes, ptr_cast[*<span class="tok-kw">mut</span> <span class="tok-type">u8</span>](<span class="tok-fn">addr</span>(ys)), <span class="tok-num">0</span>, <span class="tok-num">null</span>, <span class="tok-num">null</span>), <span class="tok-str">"clEnqueueReadBuffer"</span>)
+
+        sum: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        active: <span class="tok-type">i64</span> <span class="tok-op">=</span> <span class="tok-num">0</span>
+        <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>TOKENS * WIDTH:
+            v <span class="tok-op">=</span> <span class="tok-type">i64</span>(y[i])
+            sum <span class="tok-op">+=</span> v
+            <span class="tok-kw">if</span> v <span class="tok-op">!=</span> <span class="tok-num">0</span>:
+                active <span class="tok-op">+=</span> <span class="tok-num">1</span>
+        <span class="tok-fn">print</span>(sum)
+        <span class="tok-fn">print</span>(active)
+        <span class="tok-fn">print</span>(<span class="tok-type">i64</span>(y[TOKENS * WIDTH / <span class="tok-num">2</span> + <span class="tok-num">7</span>]))</code></pre></figure></details>
+          <div class="workload-foot">Sources: <a href="benchmarks/src/gpumatmul.gg">gpumatmul.gg</a><a href="benchmarks/src/gpumatmul.cpp">gpumatmul.cpp</a><a href="benchmarks/src/gpumatmul.rs">gpumatmul.rs</a></div>
+        </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="section-head reveal"><h2>Method</h2></div>
+        <div class="method">
+          <div class="panel reveal"><h3><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9V3"/><path d="M7 15h10"/></svg> How it was measured</h3><ul class="list">
+            <li>Timed programs report the median of five runs. The primes drag race is one run of about 20 seconds, scored by completed passes.</li>
+            <li>Memory is peak working set. Compile time and binary size are from the same build.</li>
+            <li>Raw numbers, including every printed output, are in <a href="benchmarks/data.json">benchmarks/data.json</a>.</li>
+          </ul></div>
+          <div class="panel reveal"><h3><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg> Builds and machine</h3><ul class="list">
+            <li><code>g++ -O3</code> (15.2.0), <code>rustc -C opt-level=3</code> (1.99.0-nightly, 2026-08-10), <code>gg build --release</code> with Python 3.11.5 and llvmlite 0.42.0.</li>
+            <li>AMD Ryzen 5 5600X, 6 cores and 12 threads, 32 GB DDR4-3600, Windows 11 Pro build 26200.</li>
+            <li>Greengold sources use <code>hot fn</code>, <code>trust</code>, and <code>overflow: wrap</code> where the workload notes say so.</li>
+          </ul></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="brand"><img src="assets/greengold_logo.png" alt="" width="30" height="30"><span>Greengold</span></a>
+          <p>A statically typed systems language. Native code through LLVM, ownership in three words.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Language</h4>
+          <ul>
+            <li><a href="why.html">Why Greengold</a></li>
+            <li><a href="spec.html">Specification</a></li>
+            <li><a href="spec.md">spec.md</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Evidence</h4>
+          <ul>
+            <li><a href="benchmarks.html">Benchmarks</a></li>
+            <li><a href="benchmarks/data.json">Benchmark data</a></li>
+            <li><a href="diagnostics.html">Diagnostics</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="roadmap.html">Roadmap</a></li>
+            <li><a href="about.html">About</a></li>
+            <li><a href="llms.txt">llms.txt</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Umut Faruk Dilli. Greengold is released under the MIT License.</span>
+        <span>Version 0.3.3 · not yet released</span>
+      </div>
+    </div>
+  </footer>
+  <script src="app.js?v=4fb0d72f15"></script>
+</body>
+</html>

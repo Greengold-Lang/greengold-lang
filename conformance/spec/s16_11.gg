@@ -1,0 +1,17 @@
+# conformance: SPEC section 16 (Imports and the library), example 11
+# expect-output:
+#   {"x":1,"y":2}
+#   3
+#   Err("missing field `y` at byte 8")
+
+struct Point:
+    x: i32
+    y: i32
+
+fn main():
+    text = to_json(Point{ x: 1, y: 2 })
+    print(text)
+    match from_json[Point](text.as_str()):
+        Ok(p): print(p.x + p.y)
+        Err(e): print(e)
+    print(from_json[Point]("{\"x\": 1}"))

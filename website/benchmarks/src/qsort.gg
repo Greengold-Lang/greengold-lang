@@ -1,0 +1,95 @@
+# Quicksort eight million i32 values from a numerical-recipes LCG, low 31 bits.
+# Ranges shorter than 16 use insertion sort. Prints ends, the middle, the sum, and 0 when sorted.
+
+fn lcg(s: u32) -> u32:
+    overflow: wrap
+    return s * 1664525 + 1013904223
+
+hot fn swap(a: lend List[i32], i: usize, j: usize):
+    tmp = trust a[i]
+    trust a[i] = trust a[j]
+    trust a[j] = tmp
+
+hot fn insertion(a: lend List[i32], lo: usize, hi: usize):
+    overflow: wrap
+    if hi < lo + 2:
+        return
+    i: usize = lo + 1
+    while i < hi:
+        j: usize = i
+        while j > lo:
+            if trust a[j] < trust a[j - 1]:
+                swap(a, j, j - 1)
+                j -= 1
+            else:
+                break
+        i += 1
+
+hot fn partition(a: lend List[i32], lo: usize, hi: usize) -> usize:
+    overflow: wrap
+    mid = lo + (hi - lo) / 2
+    swap(a, mid, hi - 1)
+    pivot = trust a[hi - 1]
+    store: usize = lo
+    j: usize = lo
+    while j < hi - 1:
+        if trust a[j] < pivot:
+            swap(a, store, j)
+            store += 1
+        j += 1
+    swap(a, store, hi - 1)
+    return store
+
+fn qsort(a: lend List[i32]):
+    n = a.len
+    if n < 2:
+        return
+    slo = List[usize]()
+    shi = List[usize]()
+    slo.push(0)
+    shi.push(n)
+    while slo.len > 0:
+        lo: usize = 0
+        hi: usize = 0
+        match slo.pop():
+            Valid(v):
+                lo = v
+            None:
+                return
+        match shi.pop():
+            Valid(v):
+                hi = v
+            None:
+                return
+        if hi - lo < 16:
+            insertion(a, lo, hi)
+        else:
+            p = partition(a, lo, hi)
+            if p > lo:
+                slo.push(lo)
+                shi.push(p)
+            if p + 1 < hi:
+                slo.push(p + 1)
+                shi.push(hi)
+
+fn main():
+    a = List[i32]()
+    state: u32 = 1
+    for i in 0..8000000:
+        state = lcg(state)
+        a.push(i32(state & 2147483647))
+    qsort(a)
+    sum: i64 = 0
+    bad: i32 = 0
+    i: usize = 0
+    while i < a.len:
+        sum += i64(a[i])
+        if i > 0:
+            if a[i] < a[i - 1]:
+                bad = 1
+        i += 1
+    print(a[0])
+    print(a[4000000])
+    print(a[7999999])
+    print(sum)
+    print(bad)

@@ -1,0 +1,11 @@
+# conformance: SPEC section 14 (Constants and compile-time functions), example 2
+# expect-output:
+#   4
+
+const STEP = 2
+
+comptime fn sq(n: i32) -> i32:
+    return n * n
+
+fn main():
+    print(sq(STEP))

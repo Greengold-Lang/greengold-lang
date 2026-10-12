@@ -1,0 +1,27 @@
+struct Ring:
+    data: List[i32]
+    cap: usize
+    head: usize
+    len: usize
+
+fn ring_new(cap: usize) -> Ring:
+    data = List[i32]()
+    for i in 0..cap:
+        data.push(0)
+    return Ring{ data: data, cap: cap, head: 0, len: 0 }
+
+fn ring_push(r: lend Ring, value: i32) -> bool:
+    if r.len == r.cap:
+        return false
+    idx = (r.head + r.len) % r.cap
+    r.data[idx] = value
+    r.len += 1
+    return true
+
+fn ring_pop(r: lend Ring) -> Optional[i32]:
+    if r.len == 0:
+        return None
+    v = r.data[r.head]
+    r.head = (r.head + 1) % r.cap
+    r.len -= 1
+    return Valid(v)

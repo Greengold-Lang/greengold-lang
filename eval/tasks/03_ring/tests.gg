@@ -1,0 +1,14 @@
+fn test_ring_order():
+    r = ring_new(2)
+    require ring_push(r, 10)
+    require ring_push(r, 20)
+    require not ring_push(r, 30)
+    require ring_pop(r).value_or(-1) == 10
+    require ring_push(r, 30)
+    require ring_pop(r).value_or(-1) == 20
+    require ring_pop(r).value_or(-1) == 30
+    require ring_pop(r).is_none()
+
+fn test_ring_empty():
+    r = ring_new(1)
+    require ring_pop(r).is_none()

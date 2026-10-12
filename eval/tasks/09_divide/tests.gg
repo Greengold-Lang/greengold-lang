@@ -1,0 +1,6 @@
+fn test_divide_quotients():
+    require divide(8, 2).value_or_panic() == 4
+    require divide(7, 2).value_or_panic() == 3
+
+fn test_divide_zero():
+    require divide(1, 0).is_err()

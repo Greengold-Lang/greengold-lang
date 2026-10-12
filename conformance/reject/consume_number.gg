@@ -1,0 +1,8 @@
+# conformance: SPEC section 17, rejected form: `consume` of a number
+# expect-error: GG0304 at line 4
+
+fn f(x: consume i32):
+    pass
+
+fn main():
+    f(1)

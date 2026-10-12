@@ -1,0 +1,9 @@
+# conformance: SPEC section 8 (Generics and features), example 1
+# expect-output:
+#   7
+
+fn id[T](x: T) -> T:
+    return x
+
+fn main():
+    print(id[i32](7))

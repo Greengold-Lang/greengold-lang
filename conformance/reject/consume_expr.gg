@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: `consume x` as an expression
+# expect-error: GG0120 at line 9
+
+fn take(xs: consume List[i32]):
+    pass
+
+fn main():
+    xs = List[i32]()
+    take(consume xs)

@@ -1,0 +1,18 @@
+# conformance: SPEC section 10 (Heap, text, arrays, slices), example 1
+# expect-output:
+#   1 4
+#   9
+#   hi
+#   2 go
+
+fn main():
+    xs = List[i32]()
+    xs.push(4)
+    print(xs.len, xs[0])
+    b = Box[i32](9)
+    print(b.value)
+    owned = string.from("hi")
+    print(owned)
+    buf = string.new()
+    buf.append_str("go")
+    print(buf.len(), buf.as_str())

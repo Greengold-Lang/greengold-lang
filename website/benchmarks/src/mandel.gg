@@ -1,0 +1,29 @@
+# Count pixels that stay inside the Mandelbrot set.
+# 2048 by 2048, at most 80 iterations. The plane is [-1.5, 0.5] x [-1, 1].
+
+hot fn mandel(cx: f64, cy: f64) -> i32:
+    overflow: wrap
+    x: f64 = 0.0
+    y: f64 = 0.0
+    n: i32 = 0
+    while n < 80:
+        xx = x * x
+        yy = y * y
+        if xx + yy > 4.0:
+            return n
+        y = 2.0 * x * y + cy
+        x = xx - yy + cx
+        n += 1
+    return 80
+
+fn main():
+    width: usize = 2048
+    height: usize = 2048
+    inside: i32 = 0
+    for row in 0..height:
+        cy = -1.0 + 2.0 * f64(row) / f64(height)
+        for col in 0..width:
+            cx = -1.5 + 2.0 * f64(col) / f64(width)
+            if mandel(cx, cy) == 80:
+                inside += 1
+    print(inside)

@@ -1,0 +1,17 @@
+struct P:
+    x: i32
+
+fn main():
+    pi = 3.14159265
+    print(f"[{pi:.2}] [{pi:.0}] [{pi:8.3}] [{pi:<8.1}|] [{-pi:.3}] [{pi:+.1}]")
+    n = 255
+    print(f"[{n:x}] [{n:X}] [{n:#x}] [{n:b}] [{n:o}] [{n:08b}] [{n:#06x}]")
+    print(f"[{n:5}] [{n:<5}] [{n:^7}] [{n:*>6}] [{n:+}] [{-n:06}] [{-n:x}]")
+    name = "ab"
+    print(f"[{name:6}] [{name:>6}] [{name:^6}] [{name:-^7}] [{"şğ":>4}]")
+    print(f"[{12345.678:e}] [{0.000123:.2e}] [{1.0:E}] [{0.0:.1e}] [{9.999:.2e}]")
+    owned = string.from("xyz")
+    print(f"[{owned:>5}] [{P{ x: 1 }:>12}] [{true:>6}] [{0.1 + 0.2:.3}]")
+    rows = [("apple", 1.5), ("kiwi", 12.25)]
+    for r in rows:
+        print(f"{r.0:<8}{r.1:>8.2}")

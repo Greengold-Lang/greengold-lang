@@ -1,0 +1,15 @@
+import std.fs
+import std.string
+
+fn main():
+    ok = fs.write_string_to_file("gg_fs_test.tmp", "line1\nline2\n")
+    print(ok, fs.file_exists("gg_fs_test.tmp"), fs.file_exists("no_such_file.zzz"))
+    match fs.read_file_to_string("gg_fs_test.tmp"):
+        Valid(s):
+            lines = string.str_lines(s.as_str())
+            print(lines.len, lines[1])
+        None:
+            print("read failed")
+    removed = fs.remove_file("gg_fs_test.tmp")
+    gone = not fs.file_exists("gg_fs_test.tmp")
+    print(removed, gone)

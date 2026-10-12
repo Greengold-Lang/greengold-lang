@@ -1,0 +1,216 @@
+# std.time: wall clock, a monotonic clock for measuring, sleeping, and UTC calendar dates.
+#
+#     t = time.Instant.now()
+#     ...
+#     print(t.elapsed_millis())
+#     print(time.now_utc().to_iso())                      # 2026-10-11T08:30:00.123Z
+#     d = time.parse_iso("2024-02-29T12:00:00Z")          # Result[DateTime, string]
+private
+extern "time.h" fn time(out: *mut i64) -> i64
+extern "time.h" fn clock() -> i64
+weak extern "time.h" fn clock_gettime(clock: i32, out: *mut i64) -> i32
+weak extern "time.h" fn nanosleep(req: *i64, rem: *mut i64) -> i32
+weak extern "windows.h" fn QueryPerformanceCounter(out: *mut i64) -> i32
+weak extern "windows.h" fn QueryPerformanceFrequency(out: *mut i64) -> i32
+weak extern "windows.h" fn GetSystemTimePreciseAsFileTime(out: *mut u64)
+weak extern "windows.h" fn Sleep(ms: u32)
+
+public
+fn current_time() -> i64:
+    t: i64 = 0
+    unsafe:
+        return time(addr_mut(t))
+
+# CPU time in clock ticks (CLOCKS_PER_SEC is 1000 on Windows, 1000000 on POSIX).
+fn clock_ticks() -> i64:
+    unsafe:
+        return clock()
+
+fn current_time_millis() -> i64:
+    return unix_millis()
+
+# Milliseconds since 1970-01-01 00:00:00 UTC.
+fn unix_millis() -> i64:
+    unsafe:
+        if target_os() == "windows":
+            ft: u64 = 0
+            GetSystemTimePreciseAsFileTime(addr_mut(ft))  # 100 ns steps since 1601
+            return i64(ft / 10000) - 11644473600000
+        else:
+            ts: [2]i64 = [0, 0]
+            clock_gettime(0, ptr_cast[*mut i64](addr_mut(ts)))  # CLOCK_REALTIME
+            return ts[0] * 1000 + ts[1] / 1000000
+
+# Nanoseconds on a clock that never goes back; only differences between two readings mean anything.
+fn monotonic_nanos() -> i64:
+    unsafe:
+        if target_os() == "windows":
+            c: i64 = 0
+            f: i64 = 0
+            QueryPerformanceCounter(addr_mut(c))
+            QueryPerformanceFrequency(addr_mut(f))
+            return c / f * 1000000000 + c % f * 1000000000 / f
+        else:
+            ts: [2]i64 = [0, 0]
+            id: i32 = if target_os() == "macos" then 6 else 1  # CLOCK_MONOTONIC
+            clock_gettime(id, ptr_cast[*mut i64](addr_mut(ts)))
+            return ts[0] * 1000000000 + ts[1]
+
+fn sleep_millis(ms: i64):
+    if ms <= 0:
+        return
+    unsafe:
+        if target_os() == "windows":
+            Sleep(u32(ms))
+        else:
+            req: [2]i64 = [ms / 1000, ms % 1000 * 1000000]
+            rem: [2]i64 = [0, 0]
+            nanosleep(ptr_cast[*i64](addr(req)), ptr_cast[*mut i64](addr_mut(rem)))
+
+# A reading of the monotonic clock, for measuring how long something takes.
+struct Instant:
+    nanos: i64
+
+impl Instant:
+    fn now() -> Instant:
+        return Instant{ nanos: monotonic_nanos() }
+
+    fn elapsed_nanos(self: read Self) -> i64:
+        return monotonic_nanos() - self.nanos
+
+    fn elapsed_millis(self: read Self) -> i64:
+        return self.elapsed_nanos() / 1000000
+
+    fn elapsed_secs(self: read Self) -> f64:
+        return f64(self.elapsed_nanos()) / 1000000000.0
+
+# -- calendar dates (UTC, proleptic Gregorian) ----------------------------------------------------
+
+struct DateTime:
+    year: i64
+    month: i64   # 1..12
+    day: i64     # 1..31
+    hour: i64
+    minute: i64
+    second: i64
+    millis: i64
+
+fn is_leap_year(y: i64) -> bool:
+    return (y % 4 == 0 and y % 100 != 0) or y % 400 == 0
+
+fn days_in_month(y: i64, m: i64) -> i64:
+    if m == 2:
+        return if is_leap_year(y) then 29 else 28
+    if m == 4 or m == 6 or m == 9 or m == 11:
+        return 30
+    return 31
+
+# Days since 1970-01-01 for a date (Howard Hinnant's days_from_civil).
+fn days_from_civil(y0: i64, m: i64, d: i64) -> i64:
+    y = if m <= 2 then y0 - 1 else y0
+    era = (if y >= 0 then y else y - 399) / 400
+    yoe = y - era * 400
+    mp = if m > 2 then m - 3 else m + 9
+    doy = (153 * mp + 2) / 5 + d - 1
+    doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    return era * 146097 + doe - 719468
+
+fn _floor_div(a: i64, b: i64) -> i64:
+    q = a / b
+    return if a % b < 0 then q - 1 else q
+
+fn datetime_from_unix_millis(ms: i64) -> DateTime:
+    days = _floor_div(ms, 86400000)
+    rest = ms - days * 86400000
+    z = days + 719468
+    era = (if z >= 0 then z else z - 146096) / 146097
+    doe = z - era * 146097
+    yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    mp = (5 * doy + 2) / 153
+    d = doy - (153 * mp + 2) / 5 + 1
+    m = if mp < 10 then mp + 3 else mp - 9
+    y = yoe + era * 400 + (if m <= 2 then 1 else 0)
+    return DateTime{ year: y, month: m, day: d, hour: rest / 3600000, minute: rest / 60000 % 60,
+        second: rest / 1000 % 60, millis: rest % 1000 }
+
+fn now_utc() -> DateTime:
+    return datetime_from_unix_millis(unix_millis())
+
+impl DateTime:
+    fn to_unix_millis(self: read Self) -> i64:
+        days = days_from_civil(self.year, self.month, self.day)
+        return ((days * 24 + self.hour) * 60 + self.minute) * 60000 + self.second * 1000 + self.millis
+
+    # 0 is Monday, 6 is Sunday.
+    fn weekday(self: read Self) -> i64:
+        days = days_from_civil(self.year, self.month, self.day)
+        return ((days % 7) + 10) % 7  # 1970-01-01 was a Thursday
+
+    # `2026-10-11T08:30:00Z`, with `.123` before the `Z` when there are milliseconds.
+    fn to_iso(self: read Self) -> string:
+        out = f"{self.year:04}-{self.month:02}-{self.day:02}T{self.hour:02}:{self.minute:02}:{self.second:02}"
+        if self.millis != 0:
+            out.append(f".{self.millis:03}")
+        out.append_str("Z")
+        return out
+
+    fn add_millis(self: read Self, ms: i64) -> DateTime:
+        return datetime_from_unix_millis(self.to_unix_millis() + ms)
+
+fn _digits(text: str, at: usize, n: usize) -> i64:
+    if at + n > text.len:
+        return -1
+    v: i64 = 0
+    for i in at..at + n:
+        c = text[i]
+        if c < '0' or c > '9':
+            return -1
+        v = v * 10 + i64(c - '0')
+    return v
+
+# Reads `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, optional `.fff` fraction, and an optional `Z` or `+HH:MM` /
+# `-HH:MM` offset (the result is in UTC).
+fn parse_iso(text: str) -> Result[DateTime, string]:
+    y = _digits(text, 0, 4)
+    mo = _digits(text, 5, 2)
+    d = _digits(text, 8, 2)
+    if y < 0 or mo < 0 or d < 0 or text[4] != '-' or text[7] != '-':
+        return Err(string.from("expected a date as YYYY-MM-DD"))
+    if mo < 1 or mo > 12 or d < 1 or d > days_in_month(y, mo):
+        return Err(string.from("no such date"))
+    dt = DateTime{ year: y, month: mo, day: d, hour: 0, minute: 0, second: 0, millis: 0 }
+    if text.len == 10:
+        return Ok(dt)
+    if text[10] != 'T' and text[10] != ' ':
+        return Err(string.from("expected `T` after the date"))
+    h = _digits(text, 11, 2)
+    mi = _digits(text, 14, 2)
+    s = _digits(text, 17, 2)
+    if h < 0 or mi < 0 or s < 0 or text[13] != ':' or text[16] != ':':
+        return Err(string.from("expected a time as HH:MM:SS"))
+    if h > 23 or mi > 59 or s > 59:
+        return Err(string.from("no such time"))
+    dt.hour = h
+    dt.minute = mi
+    dt.second = s
+    i: usize = 19
+    if i < text.len and text[i] == '.':
+        i += 1
+        scale: i64 = 100
+        while i < text.len and text[i] >= '0' and text[i] <= '9':
+            dt.millis += i64(text[i] - '0') * scale
+            scale /= 10
+            i += 1
+    if i == text.len:
+        return Ok(dt)
+    if text[i] == 'Z' and i + 1 == text.len:
+        return Ok(dt)
+    if (text[i] == '+' or text[i] == '-') and i + 6 == text.len and text[i + 3] == ':':
+        oh = _digits(text, i + 1, 2)
+        om = _digits(text, i + 4, 2)
+        if oh < 0 or om < 0:
+            return Err(string.from("bad UTC offset"))
+        off = (oh * 60 + om) * 60000
+        return Ok(dt.add_millis(if text[i] == '+' then -off else off))
+    return Err(string.from("unexpected text after the time"))

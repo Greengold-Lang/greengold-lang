@@ -1,0 +1,32 @@
+# Jacobi stencil on a 1024x1024 grid. Three hundred twenty steps, as one hundred sixty pairs, so the result stays in the first grid.
+# Interior points are the average of the four neighbours. Prints the scaled cell sum.
+
+hot fn jacobi(cur: exclusive lend List[f64], nxt: exclusive lend List[f64], n: usize):
+    overflow: wrap
+    unsafe:
+        last = n - 1
+        for i in 1..last:
+            for j in 1..last:
+                idx = i * n + j
+                up = (i - 1) * n + j
+                down = (i + 1) * n + j
+                left = i * n + (j - 1)
+                right = i * n + (j + 1)
+                trust nxt[idx] = 0.25 * (trust cur[up] + trust cur[down] + trust cur[left] + trust cur[right])
+
+fn main():
+    n: usize = 1024
+    cells = n * n
+    a = List[f64]()
+    b = List[f64]()
+    for i in 0..n:
+        for j in 0..n:
+            a.push(f64((i * 13 + j * 7) % 19))
+            b.push(0.0)
+    for step in 0..160:
+        jacobi(a, b, n)
+        jacobi(b, a, n)
+    sum: f64 = 0.0
+    for i in 0..cells:
+        sum += a[i]
+    print(i64(sum * 1000.0))

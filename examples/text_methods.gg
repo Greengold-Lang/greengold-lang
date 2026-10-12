@@ -1,0 +1,7 @@
+fn main():
+    s = "  a,b,,c  "
+    t = s.trim()
+    print(t, t.split(","), t.starts_with("a,"), t.ends_with("c"), t.find(",,"), t.rfind(","), t.contains("b"))
+    print("x y\t z".split_whitespace(), "l1\r\nl2\n".lines(), "abc".to_upper(), "ABC".to_lower(), "ab".repeat(3))
+    print("a-b-c".replace("-", "::"), " -42 ".parse_int(), "3.5e2".parse_float(), "x".parse_int(), "aXa".count("a"))
+    print("Hello".eq_ignore_case("hELLO"), "prefix.gg".strip_suffix(".gg"), "".is_empty())

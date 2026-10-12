@@ -1,0 +1,7 @@
+# conformance: SPEC section 1 (A program), example 1
+# expect-output:
+#   Hello, Greengold
+
+# The entry point. print writes its arguments and a newline.
+fn main():
+    print("Hello, Greengold")

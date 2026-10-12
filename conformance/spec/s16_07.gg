@@ -1,0 +1,21 @@
+# conformance: SPEC section 16 (Imports and the library), example 7
+# expect-output:
+#   1
+#   2
+#   1
+
+struct Pair:
+    a: i32
+    b: i32
+
+fn see(p: Pair):
+    print(p.a)
+
+fn peek(p: read Pair):
+    print(p.b)
+
+fn main():
+    p = Pair{ a: 1, b: 2 }
+    see(p)
+    peek(p)
+    print(p.a)

@@ -1,0 +1,88 @@
+# std.rand: xorshift64* pseudo random generator (deterministic, not cryptographic), and random bytes from
+# the operating system for keys, tokens, and seeds (`secure_bytes`, `secure_u64`, `rng_from_entropy`).
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+weak extern "sys/random.h" fn getrandom(buf: *mut u8, len: usize, flags: u32) -> isize
+weak extern "stdlib.h" fn arc4random_buf(buf: *mut u8, len: usize)
+weak extern "windows.h" fn SystemFunction036(buf: *mut u8, len: u32) -> u8
+
+public
+struct Rng:
+    private
+    state: u64
+
+public
+fn rng_new(seed: u64) -> Rng:
+    s = seed
+    if s == 0:
+        s = 88172645463325252
+    return Rng{ state: s }
+
+impl Rng:
+    fn next_u64(self: lend Rng) -> u64:
+        overflow: wrap
+        x = self.state
+        x = x ^ (x >> 12)
+        x = x ^ (x << 25)
+        x = x ^ (x >> 27)
+        self.state = x
+        return x * 2685821657736338717
+
+    fn below(self: lend Rng, bound: u64) -> u64:
+        if bound == 0:
+            panic("Rng.below: bound must be > 0")
+        return self.next_u64() % bound
+
+    fn range(self: lend Rng, lo: i64, hi: i64) -> i64:
+        if lo >= hi:
+            panic("Rng.range: empty range")
+        return lo + i64(self.below(u64(hi - lo)))
+
+    fn next_f64(self: lend Rng) -> f64:
+        return f64(self.next_u64() >> 11) / 9007199254740992.0
+
+    fn next_bool(self: lend Rng) -> bool:
+        return (self.next_u64() >> 63) == 1
+
+public
+# `n` bytes from the operating system's cryptographic random source (RtlGenRandom, getrandom, or
+# arc4random_buf). Stops the program when the source fails.
+fn secure_bytes(n: usize) -> List[u8]:
+    out = List[u8]()
+    if n == 0:
+        return out
+    unsafe:
+        buf = malloc(n)
+        _fill(buf, n)
+        for i in 0..n:
+            out.push(buf[i])
+        free(buf)
+    return out
+
+fn secure_u64() -> u64:
+    b = secure_bytes(8)
+    v: u64 = 0
+    for i in 0..8:
+        v = (v << 8) | u64(b[i])
+    return v
+
+# A generator seeded from `secure_u64`: different on every run.
+fn rng_from_entropy() -> Rng:
+    return rng_new(secure_u64())
+
+private
+fn _fill(p: *mut u8, n: usize):
+    unsafe:
+        if target_os() == "windows":
+            if SystemFunction036(p, u32(n)) == 0:
+                panic("secure_bytes: the random source failed")
+        elif target_os() == "macos":
+            arc4random_buf(p, n)
+        else:
+            got: usize = 0
+            while got < n:
+                r = getrandom(ptr_offset(p, i64(got)), n - got, 0)
+                if r <= 0:
+                    panic("secure_bytes: the random source failed")
+                got += usize(r)

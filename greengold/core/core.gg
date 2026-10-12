@@ -1,0 +1,1303 @@
+# Greengold Core: OS-independent primitive types (Optional, Result).
+# The compiler prepends this to every program; uses only stack and registers, not dependent on libc.
+# Can also be used directly in programs compiled with `--no-std` / `--target bare-metal`
+# (`panic` becomes `llvm.trap` in these modes). Users cannot redefine these names
+# (Optional, Result, Valid, None, Ok, Err).
+#
+# `value_or` / `value_or_panic` take the payload out with `match consume self`. For a copyable payload
+# `self` is a copy and the caller keeps its value; for a heap payload (`Optional[List[i32]]`) the mode of
+# `self` is inferred as `consume`, so the call moves the Optional and hands over the payload.
+
+enum Optional[T]:
+    Valid(T)
+    None
+
+enum Result[T, E]:
+    Ok(T)
+    Err(E)
+
+impl Optional[T]:
+    fn has_value(self: Optional[T]) -> bool:
+        match self:
+            Valid(_):
+                return true
+            None:
+                return false
+
+    fn is_none(self: Optional[T]) -> bool:
+        match self:
+            Valid(_):
+                return false
+            None:
+                return true
+
+    fn value_or(self: Optional[T], fallback: T) -> T:
+        match consume self:
+            Valid(v):
+                return v
+            None:
+                return fallback
+
+    fn value_or_panic(self: Optional[T]) -> T:
+        match consume self:
+            Valid(v):
+                return v
+            None:
+                panic("value_or_panic: no value (None)")
+
+impl Result[T, E]:
+    fn is_ok(self: Result[T, E]) -> bool:
+        match self:
+            Ok(_):
+                return true
+            Err(_):
+                return false
+
+    fn is_err(self: Result[T, E]) -> bool:
+        match self:
+            Ok(_):
+                return false
+            Err(_):
+                return true
+
+    fn value_or(self: Result[T, E], fallback: T) -> T:
+        match consume self:
+            Ok(v):
+                return v
+            Err(_):
+                return fallback
+
+    fn value_or_panic(self: Result[T, E]) -> T:
+        match consume self:
+            Ok(v):
+                return v
+            Err(_):
+                panic("value_or_panic: Err value present")
+
+# ---------------------------------------------------------------------------
+# string: heap-growable, owned UTF-8 text (`str` is a read-only slice on the stack).
+# `string` is a `consume` value: automatically freed at the end of scope, not copied, only moved.
+# To read, obtain a `str` view with `s.as_str()`; to print: `print(s.as_str())`.
+# ---------------------------------------------------------------------------
+
+struct string:
+    bytes: List[u8]
+
+impl string:
+    fn new() -> string:
+        return string{ bytes: List[u8]() }
+
+    fn from(text: str) -> string:
+        s = string{ bytes: List[u8]() }
+        s.bytes.push_str(text)
+        return s
+
+    fn append_str(self: lend string, text: str):
+        self.bytes.push_str(text)
+
+    # Appends the UTF-8 bytes of code point `cp` (U+FFFD when `cp` is not a character).
+    fn push_char(self: lend string, cp: u32):
+        c = if cp > 0x10FFFF or (cp >= 0xD800 and cp < 0xE000) then u32(0xFFFD) else cp
+        _JsonReader.utf8(self, c)
+
+    fn append_byte(self: lend string, b: u8):
+        self.bytes.push(b)
+
+    fn clear(self: lend string):
+        self.bytes.clear()
+
+    fn len(self: read string) -> usize:
+        return self.bytes.len
+
+    fn as_str(self: read string) -> str:
+        return self.bytes.as_str()
+
+    fn append_u64(self: lend string, n: u64):
+        if n == 0:
+            self.append_byte('0')
+            return
+        digits: [20]u8 = [0; 20]
+        cnt: usize = 0
+        r_val = n
+        while r_val > 0:
+            digits[cnt] = u8(r_val % 10)
+            r_val = r_val / 10
+            cnt += 1
+        while cnt > 0:
+            cnt -= 1
+            self.append_byte('0' + digits[cnt])
+
+    fn append_i64(self: lend string, n: i64):
+        if n < 0:
+            self.append_byte('-')
+            if n == min_value[i64]():
+                self.append_u64(9223372036854775808)
+                return
+            self.append_u64(u64(0 - n))
+            return
+        self.append_u64(u64(n))
+
+    fn append_bool(self: lend string, b: bool):
+        if b:
+            self.append_str("true")
+        else:
+            self.append_str("false")
+
+    fn append(self: lend string, other: read string):
+        self.append_str(other.as_str())
+
+    fn add(self: read string, other: str) -> string:
+        out = string.from(self.as_str())
+        out.append_str(other)
+        return out
+
+    fn eq(self: read string, other: read string) -> bool:
+        return self.as_str() == other.as_str()
+
+fn to_string(text: str) -> string:
+    return string.from(text)
+
+# Hashing: `hash(x)` is resolved by the compiler per type (integers, bool, str, string, or a type's own
+# `fn hash(self: Self) -> u64`). These are the building blocks it calls.
+
+fn hash_mix64(x: u64) -> u64:
+    overflow: wrap
+    h = x
+    h = h ^ (h >> 33)
+    h = h * 0xFF51AFD7ED558CCD
+    h = h ^ (h >> 33)
+    h = h * 0xC4CEB9FE1A85EC53
+    h = h ^ (h >> 33)
+    return h
+
+fn hash_flag(b: bool) -> u64:
+    if b:
+        return hash_mix64(1)
+    return hash_mix64(0)
+
+# Tuples: (a, b) literals and (A, B) types are sugar for these generic structs (fields .0 .. .5 == f0 .. f5).
+
+struct Tuple2[A, B]:
+    f0: A
+    f1: B
+
+struct Tuple3[A, B, C]:
+    f0: A
+    f1: B
+    f2: C
+
+struct Tuple4[A, B, C, D]:
+    f0: A
+    f1: B
+    f2: C
+    f3: D
+
+struct Tuple5[A, B, C, D, E]:
+    f0: A
+    f1: B
+    f2: C
+    f3: D
+    f4: E
+
+struct Tuple6[A, B, C, D, E, F]:
+    f0: A
+    f1: B
+    f2: C
+    f3: D
+    f4: E
+    f5: F
+
+
+# ---------------------------------------------------------------------------
+# Integer arithmetic variants. Plain `+`, `-`, and `*` trap on overflow.
+# `wrapping_*` wraps, `checked_*` returns Optional, `saturating_*` clamps.
+# ---------------------------------------------------------------------------
+
+fn wrapping_add[T: Int](a: T, b: T) -> T:
+    overflow: wrap
+    return a + b
+
+fn wrapping_sub[T: Int](a: T, b: T) -> T:
+    overflow: wrap
+    return a - b
+
+fn wrapping_mul[T: Int](a: T, b: T) -> T:
+    overflow: wrap
+    return a * b
+
+fn checked_add[T: Int](a: T, b: T) -> Optional[T]:
+    if add_overflows(a, b):
+        return None
+    return Valid(a + b)
+
+fn checked_sub[T: Int](a: T, b: T) -> Optional[T]:
+    if sub_overflows(a, b):
+        return None
+    return Valid(a - b)
+
+fn checked_mul[T: Int](a: T, b: T) -> Optional[T]:
+    if mul_overflows(a, b):
+        return None
+    return Valid(a * b)
+
+fn saturating_add[T: Int](a: T, b: T) -> T:
+    if add_overflows(a, b):
+        if b < T(0):
+            return min_value[T]()
+        return max_value[T]()
+    return a + b
+
+fn saturating_sub[T: Int](a: T, b: T) -> T:
+    if sub_overflows(a, b):
+        if b > T(0):
+            return min_value[T]()
+        return max_value[T]()
+    return a - b
+
+fn saturating_mul[T: Int](a: T, b: T) -> T:
+    if mul_overflows(a, b):
+        a_neg = a < T(0)
+        b_neg = b < T(0)
+        if a_neg != b_neg:
+            return min_value[T]()
+        return max_value[T]()
+    return a * b
+
+
+# ---------------------------------------------------------------------------
+# List helpers: `xs.map(f)`, `xs.sort()`, ... are rewritten by the compiler into calls of these
+# (TypeChecker._vec_method). The callbacks take an element by value, so they need copied elements.
+# ---------------------------------------------------------------------------
+
+fn _list_map[T, R](v: List[T], f: fn(T) -> R) -> List[R]:
+    out = List[R]()
+    for i in 0..v.len:
+        out.push(f(v[i]))
+    return out
+
+fn _list_filter[T](v: List[T], keep: fn(T) -> bool) -> List[T]:
+    out = List[T]()
+    for i in 0..v.len:
+        if keep(v[i]):
+            out.push(v[i])
+    return out
+
+fn _list_fold[T, A](v: List[T], init: A, f: fn(A, T) -> A) -> A:
+    acc = init
+    for i in 0..v.len:
+        acc = f(acc, v[i])
+    return acc
+
+fn _list_any[T](v: List[T], test: fn(T) -> bool) -> bool:
+    for i in 0..v.len:
+        if test(v[i]):
+            return true
+    return false
+
+fn _list_all[T](v: List[T], test: fn(T) -> bool) -> bool:
+    for i in 0..v.len:
+        if not test(v[i]):
+            return false
+    return true
+
+fn _list_count[T](v: List[T], test: fn(T) -> bool) -> usize:
+    n: usize = 0
+    for i in 0..v.len:
+        if test(v[i]):
+            n += 1
+    return n
+
+fn _list_find[T](v: List[T], test: fn(T) -> bool) -> Optional[T]:
+    for i in 0..v.len:
+        if test(v[i]):
+            return Valid(v[i])
+    return None
+
+fn _list_position[T](v: List[T], test: fn(T) -> bool) -> Optional[usize]:
+    for i in 0..v.len:
+        if test(v[i]):
+            return Valid(i)
+    return None
+
+fn _list_index_of[T: Eq](v: List[T], x: T) -> Optional[usize]:
+    for i in 0..v.len:
+        if v[i] == x:
+            return Valid(i)
+    return None
+
+fn _list_contains[T: Eq](v: List[T], x: T) -> bool:
+    for i in 0..v.len:
+        if v[i] == x:
+            return true
+    return false
+
+fn _list_sum[T: Num](v: List[T]) -> T:
+    s = T(0)
+    for i in 0..v.len:
+        s += v[i]
+    return s
+
+fn _list_min[T: Ord](v: List[T]) -> Optional[T]:
+    if v.len == 0:
+        return None
+    best = v[0]
+    for i in 1..v.len:
+        if v[i] < best:
+            best = v[i]
+    return Valid(best)
+
+fn _list_max[T: Ord](v: List[T]) -> Optional[T]:
+    if v.len == 0:
+        return None
+    best = v[0]
+    for i in 1..v.len:
+        if best < v[i]:
+            best = v[i]
+    return Valid(best)
+
+fn _list_first[T](v: List[T]) -> Optional[T]:
+    if v.len == 0:
+        return None
+    return Valid(v[0])
+
+fn _list_last[T](v: List[T]) -> Optional[T]:
+    if v.len == 0:
+        return None
+    return Valid(v[v.len - 1])
+
+fn _list_is_empty[T](v: List[T]) -> bool:
+    return v.len == 0
+
+fn _list_reverse[T](v: List[T]):
+    if v.len < 2:
+        return
+    i: usize = 0
+    j = v.len - 1
+    while i < j:
+        v.swap(i, j)
+        i += 1
+        j -= 1
+
+fn _list_extend[T](v: List[T], other: List[T]):
+    for i in 0..other.len:
+        v.push(other[i])
+
+fn _list_sort_by[T](v: List[T], before: fn(T, T) -> bool):
+    # Insertion sort for short lists, heap sort above (not stable, no extra memory).
+    n = v.len
+    if n < 2:
+        return
+    if n <= 16:
+        for i in 1..n:
+            j = i
+            while j > 0 and before(v[j], v[j - 1]):
+                v.swap(j, j - 1)
+                j -= 1
+        return
+    start = n / 2
+    while start > 0:
+        start -= 1
+        _list_sift_by(v, start, n, before)
+    end = n
+    while end > 1:
+        end -= 1
+        v.swap(0, end)
+        _list_sift_by(v, 0, end, before)
+
+fn _list_sift_by[T](v: List[T], start: usize, end: usize, before: fn(T, T) -> bool):
+    root = start
+    while true:
+        child = root * 2 + 1
+        if child >= end:
+            return
+        if child + 1 < end and before(v[child], v[child + 1]):
+            child += 1
+        if before(v[root], v[child]):
+            v.swap(root, child)
+            root = child
+        else:
+            return
+
+fn _list_sort[T: Ord](v: List[T]):
+    n = v.len
+    if n < 2:
+        return
+    if n <= 16:
+        for i in 1..n:
+            j = i
+            while j > 0 and v[j] < v[j - 1]:
+                v.swap(j, j - 1)
+                j -= 1
+        return
+    start = n / 2
+    while start > 0:
+        start -= 1
+        _list_sift(v, start, n)
+    end = n
+    while end > 1:
+        end -= 1
+        v.swap(0, end)
+        _list_sift(v, 0, end)
+
+fn _list_sift[T: Ord](v: List[T], start: usize, end: usize):
+    root = start
+    while true:
+        child = root * 2 + 1
+        if child >= end:
+            return
+        if child + 1 < end and v[child] < v[child + 1]:
+            child += 1
+        if v[root] < v[child]:
+            v.swap(root, child)
+            root = child
+        else:
+            return
+
+
+# ---------------------------------------------------------------------------
+# Text methods on `str`. A `string` has them too: `s.trim()` on a `string` calls them on `s.as_str()`.
+# Results that are parts of the text (`trim`, `split`, ...) are views into it; `to_upper`, `replace`, and
+# the other builders return a new `string`.
+# ---------------------------------------------------------------------------
+
+impl str:
+    fn is_empty(self: str) -> bool:
+        return self.len == 0
+
+    fn starts_with(self: str, prefix: str) -> bool:
+        if prefix.len > self.len:
+            return false
+        for i in 0..prefix.len:
+            if self[i] != prefix[i]:
+                return false
+        return true
+
+    fn ends_with(self: str, suffix: str) -> bool:
+        if suffix.len > self.len:
+            return false
+        off = self.len - suffix.len
+        for i in 0..suffix.len:
+            if self[off + i] != suffix[i]:
+                return false
+        return true
+
+    fn find(self: str, needle: str) -> Optional[usize]:
+        if needle.len > self.len:
+            return None
+        last = self.len - needle.len
+        i: usize = 0
+        while i <= last:
+            j: usize = 0
+            while j < needle.len and self[i + j] == needle[j]:
+                j += 1
+            if j == needle.len:
+                return Valid(i)
+            i += 1
+        return None
+
+    fn rfind(self: str, needle: str) -> Optional[usize]:
+        if needle.len > self.len:
+            return None
+        i = self.len - needle.len + 1
+        while i > 0:
+            i -= 1
+            j: usize = 0
+            while j < needle.len and self[i + j] == needle[j]:
+                j += 1
+            if j == needle.len:
+                return Valid(i)
+        return None
+
+    fn contains(self: str, needle: str) -> bool:
+        match self.find(needle):  # not `has_value()`: that would instantiate Optional[usize] in every program
+            Valid(_):
+                return true
+            None:
+                return false
+
+    fn count(self: str, needle: str) -> usize:
+        if needle.len == 0:
+            return 0
+        n: usize = 0
+        i: usize = 0
+        while i + needle.len <= self.len:
+            if self[i..i + needle.len] == needle:
+                n += 1
+                i += needle.len
+            else:
+                i += 1
+        return n
+
+    fn trim(self: str) -> str:
+        return self.trim_start().trim_end()
+
+    fn trim_start(self: str) -> str:
+        lo: usize = 0
+        while lo < self.len and _is_space(self[lo]):
+            lo += 1
+        return self[lo..]
+
+    fn trim_end(self: str) -> str:
+        hi = self.len
+        while hi > 0 and _is_space(self[hi - 1]):
+            hi -= 1
+        return self[..hi]
+
+    fn strip_prefix(self: str, prefix: str) -> str:
+        if self.starts_with(prefix):
+            return self[prefix.len..]
+        return self
+
+    fn strip_suffix(self: str, suffix: str) -> str:
+        if self.ends_with(suffix):
+            return self[..self.len - suffix.len]
+        return self
+
+    fn split(self: str, sep: str) -> List[str]:
+        out = List[str]()
+        if sep.len == 0:
+            out.push(self)
+            return out
+        start: usize = 0
+        i: usize = 0
+        while i + sep.len <= self.len:
+            if self[i..i + sep.len] == sep:
+                out.push(self[start..i])
+                i += sep.len
+                start = i
+            else:
+                i += 1
+        out.push(self[start..])
+        return out
+
+    fn split_whitespace(self: str) -> List[str]:
+        out = List[str]()
+        i: usize = 0
+        while i < self.len:
+            while i < self.len and _is_space(self[i]):
+                i += 1
+            start = i
+            while i < self.len and not _is_space(self[i]):
+                i += 1
+            if i > start:
+                out.push(self[start..i])
+        return out
+
+    fn lines(self: str) -> List[str]:
+        out = List[str]()
+        start: usize = 0
+        for i in 0..self.len:
+            if self[i] == '\n':
+                end = i
+                if end > start and self[end - 1] == '\r':
+                    end -= 1
+                out.push(self[start..end])
+                start = i + 1
+        if start < self.len:
+            end = self.len
+            if self[end - 1] == '\r':
+                end -= 1
+            out.push(self[start..end])
+        return out
+
+    fn eq_ignore_case(self: str, other: str) -> bool:
+        if self.len != other.len:
+            return false
+        for i in 0..self.len:
+            if _lower_byte(self[i]) != _lower_byte(other[i]):
+                return false
+        return true
+
+    fn to_upper(self: str) -> string:
+        s = string.new()
+        for i in 0..self.len:
+            c = self[i]
+            if c >= 'a' and c <= 'z':
+                c -= 32
+            s.append_byte(c)
+        return s
+
+    fn to_lower(self: str) -> string:
+        s = string.new()
+        for i in 0..self.len:
+            s.append_byte(_lower_byte(self[i]))
+        return s
+
+    fn repeat(self: str, times: usize) -> string:
+        s = string.new()
+        for _i in 0..times:
+            s.append_str(self)
+        return s
+
+    fn replace(self: str, from: str, to: str) -> string:
+        s = string.new()
+        if from.len == 0:
+            s.append_str(self)
+            return s
+        i: usize = 0
+        while i < self.len:
+            if i + from.len <= self.len and self[i..i + from.len] == from:
+                s.append_str(to)
+                i += from.len
+            else:
+                s.append_byte(self[i])
+                i += 1
+        return s
+
+    fn parse_int(self: str) -> Optional[i64]:
+        t = self.trim()
+        if t.len == 0:
+            return None
+        neg = t[0] == '-'
+        i: usize = 0
+        if t[0] == '-' or t[0] == '+':
+            i = 1
+        if i == t.len:
+            return None
+        n: u64 = 0
+        while i < t.len:
+            c = t[i]
+            if c < '0' or c > '9':
+                return None
+            if mul_overflows(n, u64(10)):
+                return None
+            n = n * 10
+            if add_overflows(n, u64(c - '0')):
+                return None
+            n = n + u64(c - '0')
+            i += 1
+        if neg:
+            if n > 9223372036854775808:
+                return None
+            if n == 9223372036854775808:
+                return Valid(min_value[i64]())
+            return Valid(0 - i64(n))
+        if n > 9223372036854775807:
+            return None
+        return Valid(i64(n))
+
+    # -- UTF-8 ------------------------------------------------------------------------------------
+    # Text is bytes; these read it as UTF-8 code points. A byte that does not start a valid sequence
+    # counts as one character and decodes to U+FFFD.
+
+    # How many bytes the character starting at byte `i` takes (1 for an invalid byte).
+    fn char_len_at(self: str, i: usize) -> usize:
+        b = self[i]
+        if b < 0x80:
+            return 1
+        n: usize = 0
+        lo: u8 = 0x80
+        hi: u8 = 0xBF
+        if b >= 0xC2 and b <= 0xDF:
+            n = 2
+        elif b >= 0xE0 and b <= 0xEF:
+            n = 3
+            if b == 0xE0:
+                lo = 0xA0
+            elif b == 0xED:
+                hi = 0x9F
+        elif b >= 0xF0 and b <= 0xF4:
+            n = 4
+            if b == 0xF0:
+                lo = 0x90
+            elif b == 0xF4:
+                hi = 0x8F
+        else:
+            return 1
+        if i + n > self.len:
+            return 1
+        if self[i + 1] < lo or self[i + 1] > hi:
+            return 1
+        for k in 2..n:
+            if self[i + k] < 0x80 or self[i + k] > 0xBF:
+                return 1
+        return n
+
+    # The code point that starts at byte `i`.
+    fn char_at(self: str, i: usize) -> u32:
+        n = self.char_len_at(i)
+        b = u32(self[i])
+        if n == 1:
+            return if b < 0x80 then b else 0xFFFD
+        cp: u32 = if n == 2 then b & 0x1F elif n == 3 then b & 0x0F else b & 0x07
+        for k in 1..n:
+            cp = (cp << 6) | (u32(self[i + k]) & 0x3F)
+        return cp
+
+    fn char_count(self: str) -> usize:
+        n: usize = 0
+        i: usize = 0
+        while i < self.len:
+            i += self.char_len_at(i)
+            n += 1
+        return n
+
+    fn chars(self: str) -> List[u32]:
+        out = List[u32]()
+        i: usize = 0
+        while i < self.len:
+            out.push(self.char_at(i))
+            i += self.char_len_at(i)
+        return out
+
+    # True when every byte is part of a valid UTF-8 sequence.
+    fn is_utf8(self: str) -> bool:
+        i: usize = 0
+        while i < self.len:
+            n = self.char_len_at(i)
+            if n == 1 and self[i] >= 0x80:
+                return false
+            i += n
+        return true
+
+    fn parse_float(self: str) -> Optional[f64]:
+        t = self.trim()
+        if t.len == 0:
+            return None
+        i: usize = 0
+        neg = false
+        if t[0] == '-' or t[0] == '+':
+            neg = t[0] == '-'
+            i = 1
+        value: f64 = 0.0
+        digits: usize = 0
+        while i < t.len and t[i] >= '0' and t[i] <= '9':
+            value = value * 10.0 + f64(t[i] - '0')
+            digits += 1
+            i += 1
+        if i < t.len and t[i] == '.':
+            i += 1
+            scale: f64 = 0.1
+            while i < t.len and t[i] >= '0' and t[i] <= '9':
+                value = value + f64(t[i] - '0') * scale
+                scale = scale * 0.1
+                digits += 1
+                i += 1
+        if digits > 0 and i < t.len and (t[i] == 'e' or t[i] == 'E'):
+            i += 1
+            eneg = false
+            if i < t.len and (t[i] == '-' or t[i] == '+'):
+                eneg = t[i] == '-'
+                i += 1
+            if i == t.len:
+                return None
+            ex: i32 = 0
+            while i < t.len and t[i] >= '0' and t[i] <= '9' and ex < 400:
+                ex = ex * 10 + i32(t[i] - '0')
+                i += 1
+            for _k in 0..ex:
+                if eneg:
+                    value = value / 10.0
+                else:
+                    value = value * 10.0
+        if digits == 0 or i != t.len:
+            return None
+        if neg:
+            return Valid(0.0 - value)
+        return Valid(value)
+
+fn _is_space(c: u8) -> bool:
+    return c == ' ' or c == '\t' or c == '\n' or c == '\r'
+
+fn _lower_byte(c: u8) -> u8:
+    if c >= 'A' and c <= 'Z':
+        return c + 32
+    return c
+
+fn _list_join[T](v: List[T], sep: str) -> string:
+    s = string.new()
+    for i in 0..v.len:
+        if i > 0:
+            s.append_str(sep)
+        s.append(f"{v[i]}")
+    return s
+
+
+# ---------------------------------------------------------------------------
+# Format specs in f-strings: `{x:.2}`, `{n:>6}`, `{n:08x}`. The compiler turns a spec into calls of these.
+# ---------------------------------------------------------------------------
+
+fn _fmt_digits(out: lend string, v: u64, base: u64, upper: bool):
+    if v == 0:
+        out.append_byte('0')
+        return
+    buf: [64]u8 = [0; 64]
+    n: usize = 0
+    r = v
+    while r > 0:
+        d = u8(r % base)
+        if d < 10:
+            buf[n] = '0' + d
+        elif upper:
+            buf[n] = 'A' + d - 10
+        else:
+            buf[n] = 'a' + d - 10
+        r = r / base
+        n += 1
+    while n > 0:
+        n -= 1
+        out.append_byte(buf[n])
+
+fn _fmt_prefix(out: lend string, base: u64, upper: bool):
+    out.append_byte('0')
+    if base == 16:
+        if upper:
+            out.append_byte('X')
+        else:
+            out.append_byte('x')
+    elif base == 2:
+        out.append_byte('b')
+    else:
+        out.append_byte('o')
+
+fn _fmt_radix_u(v: u64, base: u64, upper: bool, alt: bool) -> string:
+    out = string.new()
+    if alt:
+        _fmt_prefix(out, base, upper)
+    _fmt_digits(out, v, base, upper)
+    return out
+
+fn _fmt_radix_i(v: i64, base: u64, upper: bool, alt: bool) -> string:
+    out = string.new()
+    mag = u64(0)
+    if v < 0:
+        out.append_byte('-')
+        if v == min_value[i64]():
+            mag = 9223372036854775808
+        else:
+            mag = u64(0 - v)
+    else:
+        mag = u64(v)
+    if alt:
+        _fmt_prefix(out, base, upper)
+    _fmt_digits(out, mag, base, upper)
+    return out
+
+fn _fmt_special(out: lend string, x: f64) -> bool:
+    if x != x:
+        out.append_str("nan")
+        return true
+    if x > 1.7976931348623157e308:
+        out.append_str("inf")
+        return true
+    if x < -1.7976931348623157e308:
+        out.append_str("-inf")
+        return true
+    return false
+
+fn _fmt_fraction(out: lend string, frac: u64, prec: usize):
+    # `frac` holds `prec` decimal digits; leading zeros are written too.
+    if prec == 0:
+        return
+    out.append_byte('.')
+    buf: [20]u8 = [0; 20]
+    r = frac
+    for i in 0..prec:
+        buf[prec - 1 - i] = '0' + u8(r % 10)
+        r = r / 10
+    for i in 0..prec:
+        out.append_byte(buf[i])
+
+fn _fmt_fixed(x: f64, prec: usize) -> string:
+    out = string.new()
+    if _fmt_special(out, x):
+        return out
+    p = prec
+    if p > 17:
+        p = 17
+    v = x
+    if v < 0.0:
+        v = 0.0 - v
+    if v >= 1.0e18:
+        out.append(f"{x}")  # too large for the integer path: shortest form
+        return out
+    scale: f64 = 1.0
+    for _i in 0..p:
+        scale = scale * 10.0
+    whole = u64(v)
+    frac = u64((v - f64(whole)) * scale + 0.5)
+    if f64(frac) >= scale:
+        whole += 1
+        frac = 0
+    if x < 0.0 and (whole != 0 or frac != 0):
+        out.append_byte('-')
+    out.append_u64(whole)
+    _fmt_fraction(out, frac, p)
+    for _i in p..prec:
+        out.append_byte('0')
+    return out
+
+fn _fmt_exp(x: f64, prec: usize, upper: bool) -> string:
+    out = string.new()
+    if _fmt_special(out, x):
+        return out
+    v = x
+    if v < 0.0:
+        out.append_byte('-')
+        v = 0.0 - v
+    e: i32 = 0
+    if v != 0.0:
+        while v >= 10.0:
+            v = v / 10.0
+            e += 1
+        while v < 1.0:
+            v = v * 10.0
+            e -= 1
+    digits = _fmt_fixed(v, prec)
+    if digits.as_str().starts_with("10"):  # rounding carried into a new digit: 9.99 -> 10.0
+        digits = _fmt_fixed(v / 10.0, prec)
+        e += 1
+    out.append(digits)
+    if upper:
+        out.append_byte('E')
+    else:
+        out.append_byte('e')
+    if e < 0:
+        out.append_byte('-')
+        e = 0 - e
+    else:
+        out.append_byte('+')
+    if e < 10:
+        out.append_byte('0')
+    out.append_i64(i64(e))
+    return out
+
+fn _fmt_plus(s: string) -> string:
+    if s.bytes.len > 0 and s.bytes[0] == '-':
+        return s
+    out = string.new()
+    out.append_byte('+')
+    out.append(s)
+    return out
+
+fn _fmt_chars(s: str) -> usize:
+    # Characters, not bytes: a UTF-8 continuation byte starts with the bits 10.
+    n: usize = 0
+    for i in 0..s.len:
+        if (s[i] & 0xC0) != 0x80:
+            n += 1
+    return n
+
+fn _fmt_pad(s: string, width: usize, fill: str, align: u8, zero: bool) -> string:
+    have = _fmt_chars(s.as_str())
+    if have >= width:
+        return s
+    gap = width - have
+    out = string.new()
+    if zero:
+        # numbers: zeros go after the sign and a `0x` prefix
+        t = s.as_str()
+        i: usize = 0
+        if t.len > 0 and (t[0] == '-' or t[0] == '+'):
+            out.append_byte(t[0])
+            i = 1
+        if t.len >= i + 2 and t[i] == '0' and (t[i + 1] == 'x' or t[i + 1] == 'X' or t[i + 1] == 'b' or t[i + 1] == 'o'):
+            out.append_str(t[i..i + 2])
+            i += 2
+        for _k in 0..gap:
+            out.append_byte('0')
+        out.append_str(t[i..])
+        return out
+    left: usize = 0
+    if align == '>':
+        left = gap
+    elif align == '^':
+        left = gap / 2
+    for _k in 0..left:
+        out.append_str(fill)
+    out.append(s)
+    for _k in left..gap:
+        out.append_str(fill)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# JSON: `to_json(x)` and `from_json[T](text)` are generated by the compiler per type (codegen json_fn,
+# json_dec_fn); these are the pieces they call.
+# ---------------------------------------------------------------------------
+
+fn _json_escape(out: lend string, s: str):
+    out.append_byte('"')
+    hex = "0123456789abcdef"
+    for i in 0..s.len:
+        c = s[i]
+        if c == '"':
+            out.append_str("\\\"")
+        elif c == '\\':
+            out.append_str("\\\\")
+        elif c == '\n':
+            out.append_str("\\n")
+        elif c == '\r':
+            out.append_str("\\r")
+        elif c == '\t':
+            out.append_str("\\t")
+        elif c < 32:
+            out.append_str("\\u00")
+            out.append_byte(hex[usize(c >> 4)])
+            out.append_byte(hex[usize(c & 15)])
+        else:
+            out.append_byte(c)
+    out.append_byte('"')
+
+fn _json_number(out: lend string, x: f64):
+    if x != x or x > 1.7976931348623157e308 or x < -1.7976931348623157e308:
+        out.append_str("null")  # JSON has no NaN or infinity
+    else:
+        out.append(f"{x}")
+
+struct _JsonReader:
+    text: str
+    pos: usize
+    error: string
+    key: string
+
+impl _JsonReader:
+    fn new(text: str) -> _JsonReader:
+        return _JsonReader{ text: text, pos: 0, error: string.new(), key: string.new() }
+
+    fn failed(self: read Self) -> bool:
+        return self.error.len() > 0
+
+    fn fail(self: lend Self, msg: str) -> bool:
+        if self.error.len() == 0:
+            self.error.append_str(msg)
+            self.error.append_str(" at byte ")
+            self.error.append_u64(u64(self.pos))
+        return false
+
+    fn ws(self: lend Self):
+        while self.pos < self.text.len:
+            c = self.text[self.pos]
+            if c == ' ' or c == '\n' or c == '\r' or c == '\t':
+                self.pos += 1
+            else:
+                return
+
+    fn peek(self: lend Self) -> u8:
+        self.ws()
+        if self.pos < self.text.len:
+            return self.text[self.pos]
+        return 0
+
+    fn eat(self: lend Self, c: u8) -> bool:
+        if self.peek() == c:
+            self.pos += 1
+            return true
+        return false
+
+    fn word(self: lend Self, w: str) -> bool:
+        self.ws()
+        if self.pos + w.len <= self.text.len and self.text[self.pos..self.pos + w.len] == w:
+            self.pos += w.len
+            return true
+        return false
+
+    fn finish(self: lend Self) -> bool:
+        if self.failed():
+            return false
+        self.ws()
+        if self.pos != self.text.len:
+            return self.fail("unexpected text after the value")
+        return true
+
+    fn read_null(self: lend Self) -> bool:
+        return self.word("null")
+
+    fn read_bool(self: lend Self) -> bool:
+        if self.word("true"):
+            return true
+        if not self.word("false"):
+            self.fail("expected true or false")
+        return false
+
+    fn number_text(self: lend Self) -> str:
+        self.ws()
+        start = self.pos
+        while self.pos < self.text.len:
+            c = self.text[self.pos]
+            if (c >= '0' and c <= '9') or c == '-' or c == '+' or c == '.' or c == 'e' or c == 'E':
+                self.pos += 1
+            else:
+                break
+        if self.pos == start:
+            self.fail("expected a number")
+        return self.text[start..self.pos]
+
+    fn read_f64(self: lend Self) -> f64:
+        t = self.number_text()
+        match t.parse_float():
+            Valid(v): return v
+            None:
+                if t.len > 0:
+                    self.fail("malformed number")
+                return 0.0
+
+    fn read_int(self: lend Self, lo: i64, hi: i64) -> i64:
+        t = self.number_text()
+        match t.parse_int():
+            Valid(v):
+                if v < lo or v > hi:
+                    self.fail("integer out of range")
+                return v
+            None:
+                if t.len > 0:
+                    self.fail("expected an integer")
+                return 0
+
+    fn read_uint(self: lend Self, hi: u64) -> u64:
+        t = self.number_text()
+        n: u64 = 0
+        if t.len == 0:
+            return 0
+        for i in 0..t.len:
+            c = t[i]
+            if c < '0' or c > '9':
+                self.fail("expected a non-negative integer")
+                return 0
+            if mul_overflows(n, u64(10)) or add_overflows(n * 10, u64(c - '0')):
+                self.fail("integer out of range")
+                return 0
+            n = n * 10 + u64(c - '0')
+        if n > hi:
+            self.fail("integer out of range")
+        return n
+
+    fn hex4(self: lend Self) -> u32:
+        v: u32 = 0
+        for _k in 0..4:
+            if self.pos >= self.text.len:
+                self.fail("short \\u escape")
+                return 0
+            c = self.text[self.pos]
+            self.pos += 1
+            d: u32 = 0
+            if c >= '0' and c <= '9':
+                d = u32(c - '0')
+            elif c >= 'a' and c <= 'f':
+                d = u32(c - 'a') + 10
+            elif c >= 'A' and c <= 'F':
+                d = u32(c - 'A') + 10
+            else:
+                self.fail("bad \\u escape")
+                return 0
+            v = v * 16 + d
+        return v
+
+    fn utf8(out: lend string, cp: u32):
+        if cp < 0x80:
+            out.append_byte(u8(cp))
+        elif cp < 0x800:
+            out.append_byte(u8(0xC0 | (cp >> 6)))
+            out.append_byte(u8(0x80 | (cp & 0x3F)))
+        elif cp < 0x10000:
+            out.append_byte(u8(0xE0 | (cp >> 12)))
+            out.append_byte(u8(0x80 | ((cp >> 6) & 0x3F)))
+            out.append_byte(u8(0x80 | (cp & 0x3F)))
+        else:
+            out.append_byte(u8(0xF0 | (cp >> 18)))
+            out.append_byte(u8(0x80 | ((cp >> 12) & 0x3F)))
+            out.append_byte(u8(0x80 | ((cp >> 6) & 0x3F)))
+            out.append_byte(u8(0x80 | (cp & 0x3F)))
+
+    fn read_string_into(self: lend Self, out: lend string) -> bool:
+        if not self.eat('"'):
+            return self.fail("expected a string")
+        while self.pos < self.text.len:
+            c = self.text[self.pos]
+            self.pos += 1
+            if c == '"':
+                return true
+            if c != '\\':
+                out.append_byte(c)
+                continue
+            if self.pos >= self.text.len:
+                break
+            e = self.text[self.pos]
+            self.pos += 1
+            if e == 'n':
+                out.append_byte('\n')
+            elif e == 't':
+                out.append_byte('\t')
+            elif e == 'r':
+                out.append_byte('\r')
+            elif e == 'b':
+                out.append_byte(8)
+            elif e == 'f':
+                out.append_byte(12)
+            elif e == 'u':
+                cp = self.hex4()
+                if cp >= 0xD800 and cp < 0xDC00 and self.word("\\u"):
+                    low = self.hex4()
+                    cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00)
+                _JsonReader.utf8(out, cp)
+            else:
+                out.append_byte(e)
+        return self.fail("unterminated string")
+
+    fn read_string(self: lend Self) -> string:
+        s = string.new()
+        self.read_string_into(s)
+        return s
+
+    fn begin_object(self: lend Self) -> bool:
+        if not self.eat('{'):
+            return self.fail("expected an object")
+        return true
+
+    # Reads the next `"key":` of an object into `key`; false at the closing `}` (or on an error).
+    fn next_key(self: lend Self, first: bool) -> bool:
+        if self.failed():
+            return false
+        if self.eat('}'):
+            return false
+        if not first and not self.eat(','):
+            return self.fail("expected `,` or `}`")
+        k = string.new()
+        if not self.read_string_into(k):
+            return false
+        self.key = k
+        if not self.eat(':'):
+            return self.fail("expected `:`")
+        return true
+
+    fn key_is(self: read Self, name: str) -> bool:
+        return self.key.as_str() == name
+
+    fn begin_array(self: lend Self) -> bool:
+        if not self.eat('['):
+            return self.fail("expected an array")
+        return true
+
+    fn next_item(self: lend Self, first: bool) -> bool:
+        if self.failed():
+            return false
+        if self.eat(']'):
+            return false
+        if not first and not self.eat(','):
+            return self.fail("expected `,` or `]`")
+        return true
+
+    fn skip_value(self: lend Self) -> bool:
+        c = self.peek()
+        if c == '{':
+            self.pos += 1
+            first = true
+            while self.next_key(first):
+                first = false
+                self.skip_value()
+        elif c == '[':
+            self.pos += 1
+            first = true
+            while self.next_item(first):
+                first = false
+                self.skip_value()
+        elif c == '"':
+            s = self.read_string()
+        elif c == 't' or c == 'f':
+            b = self.read_bool()
+        elif c == 'n':
+            if not self.read_null():
+                self.fail("expected a value")
+        else:
+            x = self.read_f64()
+        return not self.failed()

@@ -1,0 +1,7 @@
+struct Point:
+    x: i32
+    y: i32
+
+fn translate(p: lend Point, dx: i32, dy: i32):
+    p.x += dx
+    p.y += dy

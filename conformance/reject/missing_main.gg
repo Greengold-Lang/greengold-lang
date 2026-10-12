@@ -1,0 +1,5 @@
+# conformance: SPEC section 17, rejected form: a missing `fn main():`
+# expect-error: GG0204 at line 1
+
+fn f():
+    pass

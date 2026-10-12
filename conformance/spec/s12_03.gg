@@ -1,0 +1,12 @@
+# conformance: SPEC section 12 (Numbers), example 3
+# expect-output:
+#   13 6 3
+
+fn twice(n: i64) -> i64:
+    return n * 2
+
+fn main():
+    big: i64 = 10
+    small: i32 = 3
+    ratio: f64 = small
+    print(big + small, twice(small), ratio)

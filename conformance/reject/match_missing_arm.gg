@@ -1,0 +1,12 @@
+# conformance: SPEC section 17, rejected form: a `match` that skips a variant
+# expect-error: GG0222 at line 10
+
+enum E:
+    A
+    B
+
+fn main():
+    e = E.A
+    match e:
+        A:
+            pass

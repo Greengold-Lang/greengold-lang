@@ -1,0 +1,8 @@
+# conformance: SPEC section 17, rejected form: moving a heap element out of a `List`
+# expect-error: GG0313 at line 7
+
+fn main():
+    xs = List[string]()
+    xs.push("a")
+    s = xs[0]
+    print(s)

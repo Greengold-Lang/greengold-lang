@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: `string` where a `str` is expected
+# expect-error: GG0201 at line 9
+
+fn f(s: str):
+    pass
+
+fn main():
+    s = string.from("a")
+    f(s)

@@ -1,0 +1,18 @@
+fn test_reverse_order():
+    xs = List[i32]()
+    xs.push(1)
+    xs.push(2)
+    xs.push(3)
+    reverse(xs)
+    require xs[0] == 3
+    require xs[1] == 2
+    require xs[2] == 1
+
+fn test_reverse_short():
+    empty = List[i32]()
+    reverse(empty)
+    require empty.len == 0
+    one = List[i32]()
+    one.push(9)
+    reverse(one)
+    require one[0] == 9

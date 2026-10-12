@@ -1,0 +1,16 @@
+# conformance: SPEC section 12 (Numbers), example 4
+# expect-output:
+#   [2, 4, 6, 8] 20
+
+fn scale(xs: lend []f32, k: f32):
+    kv = f32x4.splat(k)
+    i: usize = 0
+    while i + 4 <= xs.len:
+        (f32x4.load(xs, i) * kv).store(xs, i)
+        i += 4
+
+fn main():
+    xs: [4]f32 = [1.0, 2.0, 3.0, 4.0]
+    scale(xs, 2.0)
+    v = f32x4(1.0, 2.0, 3.0, 4.0)
+    print(xs, (v + v).sum())

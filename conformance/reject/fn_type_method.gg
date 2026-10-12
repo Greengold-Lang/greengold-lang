@@ -1,0 +1,11 @@
+# conformance: SPEC section 17, rejected form: `fn Type.method`
+# expect-error: GG0131 at line 7
+
+struct P:
+    x: i32
+
+fn P.get(self) -> i32:
+    return self.x
+
+fn main():
+    pass

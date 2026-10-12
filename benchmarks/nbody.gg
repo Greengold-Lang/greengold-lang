@@ -1,0 +1,68 @@
+# Gravitational step of 768 bodies, 160 times.
+# Parallel arrays, softening 0.05, dt 0.01. Prints the position sums, scaled by 1000.
+
+import std.math
+
+fn zeros(n: usize) -> List[f64]:
+    xs = List[f64]()
+    for i in 0..n:
+        xs.push(0.0)
+    return xs
+
+hot fn advance(x: exclusive lend List[f64], y: exclusive lend List[f64], z: exclusive lend List[f64], vx: exclusive lend List[f64], vy: exclusive lend List[f64], vz: exclusive lend List[f64], mass: exclusive lend List[f64], n: usize):
+    overflow: wrap
+    unsafe:
+        i: usize = 0
+        while i < n:
+            j: usize = i + 1
+            while j < n:
+                dx = trust x[i] - trust x[j]
+                dy = trust y[i] - trust y[j]
+                dz = trust z[i] - trust z[j]
+                dist2 = dx * dx + dy * dy + dz * dz + 0.05
+                inv = 1.0 / math.sqrt(dist2)
+                scale = inv * inv * inv * 0.01
+                mi = trust mass[i]
+                mj = trust mass[j]
+                trust vx[i] = trust vx[i] - dx * mj * scale
+                trust vy[i] = trust vy[i] - dy * mj * scale
+                trust vz[i] = trust vz[i] - dz * mj * scale
+                trust vx[j] = trust vx[j] + dx * mi * scale
+                trust vy[j] = trust vy[j] + dy * mi * scale
+                trust vz[j] = trust vz[j] + dz * mi * scale
+                j += 1
+            i += 1
+        for k in 0..n:
+            trust x[k] = trust x[k] + trust vx[k] * 0.01
+            trust y[k] = trust y[k] + trust vy[k] * 0.01
+            trust z[k] = trust z[k] + trust vz[k] * 0.01
+
+fn main():
+    n: usize = 768
+    x = zeros(n)
+    y = zeros(n)
+    z = zeros(n)
+    vx = zeros(n)
+    vy = zeros(n)
+    vz = zeros(n)
+    mass = zeros(n)
+    for i in 0..n:
+        ang = f64(i) * 0.17
+        x[i] = math.cos(ang) * (1.0 + f64(i % 9) * 0.03)
+        y[i] = math.sin(ang) * (1.0 + f64(i % 5) * 0.02)
+        z[i] = f64(i % 7) * 0.02
+        vx[i] = math.sin(ang) * 0.01
+        vy[i] = math.cos(ang) * 0.01
+        mass[i] = 0.2 + f64(i % 5) * 0.15
+    for step in 0..160:
+        advance(x, y, z, vx, vy, vz, mass, n)
+    sx: f64 = 0.0
+    sy: f64 = 0.0
+    sz: f64 = 0.0
+    for i in 0..n:
+        sx += x[i]
+        sy += y[i]
+        sz += z[i]
+    print(i64(sx * 1000.0))
+    print(i64(sy * 1000.0))
+    print(i64(sz * 1000.0))

@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "gg",
+    "version": "0.3.3"
+  },
+  "command": "check",
+  "ok": false,
+  "summary": {
+    "errors": 1,
+    "warnings": 0,
+    "notes": 0,
+    "suppressed": 0
+  },
+  "diagnostics": [
+    {
+      "id": "d1",
+      "code": "GG0301",
+      "rule": "use-after-consume",
+      "severity": "error",
+      "category": "ownership",
+      "message": "`c` variable was moved (`consume`), can no longer be used.",
+      "explanation": "A value passed to a `consume` parameter moves into the callee. The caller no longer owns it.",
+      "span": {
+        "file": "website\\diagnostics\\use-after-consume.gg",
+        "start": {
+          "line": 10,
+          "column": 11,
+          "offset": 147
+        },
+        "end": {
+          "line": 10,
+          "column": 18,
+          "offset": 154
+        }
+      },
+      "caused_by": null,
+      "doc": "gg explain GG0301",
+      "labels": [
+        {
+          "role": "cause",
+          "message": "`c` is consumed here",
+          "span": {
+            "file": "website\\diagnostics\\use-after-consume.gg",
+            "start": {
+              "line": 9,
+              "column": 12,
+              "offset": 134
+            },
+            "end": {
+              "line": 9,
+              "column": 13,
+              "offset": 135
+            }
+          }
+        },
+        {
+          "role": "definition",
+          "message": "`c` is declared here",
+          "span": {
+            "file": "website\\diagnostics\\use-after-consume.gg",
+            "start": {
+              "line": 8,
+              "column": 5,
+              "offset": 98
+            },
+            "end": {
+              "line": 8,
+              "column": 29,
+              "offset": 122
+            }
+          }
+        },
+        {
+          "role": "expected",
+          "message": "`finish` takes `c` as `consume`",
+          "span": {
+            "file": "website\\diagnostics\\use-after-consume.gg",
+            "start": {
+              "line": 4,
+              "column": 14,
+              "offset": 45
+            },
+            "end": {
+              "line": 4,
+              "column": 22,
+              "offset": 53
+            }
+          }
+        }
+      ],
+      "details": {
+        "value": "c",
+        "state": "consumed",
+        "consumed_at": {
+          "line": 9,
+          "column": 12
+        },
+        "used_at": {
+          "line": 10,
+          "column": 11
+        },
+        "callee": "finish",
+        "parameter": "c"
+      },
+      "fixes": [
+        {
+          "id": "f1",
+          "description": "Remove `consume` from `c` so the caller keeps ownership",
+          "applicability": "likely",
+          "verified": true,
+          "edits": [
+            {
+              "file": "website\\diagnostics\\use-after-consume.gg",
+              "start": {
+                "line": 4,
+                "column": 14,
+                "offset": 45
+              },
+              "end": {
+                "line": 4,
+                "column": 22,
+                "offset": 53
+              },
+              "replacement": ""
+            }
+          ]
+        },
+        {
+          "id": "f2",
+          "description": "Move a copy instead: `c.clone()`",
+          "applicability": "likely",
+          "verified": true,
+          "edits": [
+            {
+              "file": "website\\diagnostics\\use-after-consume.gg",
+              "start": {
+                "line": 9,
+                "column": 13,
+                "offset": 135
+              },
+              "end": {
+                "line": 9,
+                "column": 13,
+                "offset": 135
+              },
+              "replacement": ".clone()"
+            }
+          ]
+        },
+        {
+          "id": "f3",
+          "description": "Use `c` before it is consumed, or do not use it afterwards",
+          "applicability": "manual",
+          "verified": false,
+          "edits": []
+        }
+      ]
+    }
+  ]
+}

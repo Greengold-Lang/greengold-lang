@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnostics — Greengold</title>
+  <meta name="description" content="A real Greengold use-after-consume diagnostic from gg check, in text and JSON, with verified fixes.">
+  <meta name="theme-color" content="#090d0b">
+  <link rel="canonical" href="https://greengoldlang.com/diagnostics.html">
+  <meta property="og:title" content="Diagnostics — Greengold">
+  <meta property="og:description" content="A real Greengold use-after-consume diagnostic from gg check, in text and JSON, with verified fixes.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://greengoldlang.com/diagnostics.html">
+  <meta property="og:image" content="https://greengoldlang.com/assets/greengold_logo.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/png" href="assets/greengold_logo.png">
+  <link rel="apple-touch-icon" href="assets/greengold_logo.png">
+  <script>(function(){try{var t=localStorage.getItem('gg-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4fb0d72f15">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="brand" aria-label="Greengold home">
+        <img src="assets/greengold_logo.png" alt="" width="30" height="30">
+        <span>Greengold</span>
+        <span class="brand-version">v0.3.3</span>
+      </a>
+      <nav id="site-nav" class="site-nav" aria-label="Main">
+        <a href="why.html">Why</a>
+        <a href="spec.html">Spec</a>
+        <a href="benchmarks.html">Benchmarks</a>
+        <a href="diagnostics.html" aria-current="page">Diagnostics</a>
+        <a href="roadmap.html">Roadmap</a>
+        <a href="about.html">About</a>
+      </nav>
+      <div class="header-tools">
+        <button type="button" class="icon-btn theme-toggle" aria-label="Switch colour theme"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="moon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <button type="button" class="icon-btn menu-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        
+        <h1>Diagnostics</h1>
+        <p class="lede"><code>gg check</code> reports a use-after-consume error, in text for people and in JSON for tools. Both come from the same diagnostic.</p>
+        <p>Files: <a href="diagnostics/use-after-consume.gg">use-after-consume.gg</a> · <a href="diagnostics/use-after-consume.txt">.txt</a> · <a href="diagnostics/use-after-consume.json">.json</a></p>
+      </div>
+    </section>
+    <section class="section tight" style="padding-top:24px">
+      <div class="wrap">
+        <div class="diag-grid">
+          <div class="reveal">
+            <h2 style="font-size:1.4rem;margin-bottom:14px">The program</h2>
+            <figure class="code"><figcaption class="code-head"><span class="code-file">use-after-consume.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="lines"><span class="ln"><span class="tok-kw">struct</span> <span class="tok-type">Counter</span>:</span><span class="ln">    value: <span class="tok-type">i32</span></span><span class="ln"> </span><span class="ln hl2"><span class="tok-kw">fn</span> <span class="tok-fn">finish</span>(c: <span class="tok-kw">consume</span> <span class="tok-type">Counter</span>):</span><span class="ln">    <span class="tok-fn">print</span>(c.value)</span><span class="ln"> </span><span class="ln"><span class="tok-kw">fn</span> <span class="tok-fn">main</span>():</span><span class="ln">    c <span class="tok-op">=</span> <span class="tok-type">Counter</span>{ value: <span class="tok-num">1</span> }</span><span class="ln hl2">    <span class="tok-fn">finish</span>(c)</span><span class="ln hl">    <span class="tok-fn">print</span>(c.value)</span></span></code></pre><p class="code-note"><code>finish</code> takes <code>c</code> as <code>consume</code> on line 9, so reading <code>c.value</code> on line 10 is an error.</p></figure>
+          </div>
+          <div class="reveal">
+            <h2 style="font-size:1.4rem;margin-bottom:14px">What a person sees</h2>
+            <figure class="code term"><figcaption class="code-head"><span class="code-file">gg check use-after-consume.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="t-prompt">$ </span>gg check use-after-consume.gg
+<span class="t-err">error:</span> `c` variable was moved (`consume`), can no longer be used.
+  <span class="t-gutter">--&gt;</span> <span class="t-loc">website\diagnostics\use-after-consume.gg:10:11</span>  <span class="t-label">GG0301</span><span class="t-dim"> use-after-consume</span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter">10 |</span>     <span class="tok-fn">print</span>(c.value)
+<span class="t-gutter">   |</span>           <span class="t-caret">^^^^^^^</span><span class="t-label"></span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter"> 9 |</span>     <span class="tok-fn">finish</span>(c)
+<span class="t-gutter">   |</span>            <span class="t-caret">^</span><span class="t-label"> `c` is consumed here</span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter"> 8 |</span>     c <span class="tok-op">=</span> <span class="tok-type">Counter</span>{ value: <span class="tok-num">1</span> }
+<span class="t-gutter">   |</span>     <span class="t-caret">^^^^^^^^^^^^^^^^^^^^^^^^</span><span class="t-label"> `c` is declared here</span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter"> 4 |</span> <span class="tok-kw">fn</span> <span class="tok-fn">finish</span>(c: <span class="tok-kw">consume</span> <span class="tok-type">Counter</span>):
+<span class="t-gutter">   |</span>              <span class="t-caret">^^^^^^^^</span><span class="t-label"> `finish` takes `c` as `consume`</span>
+   <span class="t-help">= help:</span> Move a copy with `c.clone()` to keep using `c`, use it before the move, or reassign it after the move.
+   <span class="t-ok">= fix (verified):</span> Remove `consume` from `c` so the caller keeps ownership
+   <span class="t-ok">= fix (verified):</span> Move a copy instead: `c.clone()`
+   <span class="t-dim">= fix (manual):</span> Use `c` before it is consumed, or do not use it afterwards
+
+<span class="t-err">1 error found.</span></code></pre></figure>
+          </div>
+          <div class="full reveal">
+            <h2 style="font-size:1.4rem;margin:18px 0 14px">What a tool sees</h2>
+            <figure class="code scroll"><figcaption class="code-head"><span class="code-file">gg check use-after-consume.gg --json</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code>{
+  <span class="tok-key">"schema_version"</span>: <span class="tok-num">1</span>,
+  <span class="tok-key">"tool"</span>: {
+    <span class="tok-key">"name"</span>: <span class="tok-str">"gg"</span>,
+    <span class="tok-key">"version"</span>: <span class="tok-str">"0.3.3"</span>
+  },
+  <span class="tok-key">"command"</span>: <span class="tok-str">"check"</span>,
+  <span class="tok-key">"ok"</span>: <span class="tok-kw">false</span>,
+  <span class="tok-key">"summary"</span>: {
+    <span class="tok-key">"errors"</span>: <span class="tok-num">1</span>,
+    <span class="tok-key">"warnings"</span>: <span class="tok-num">0</span>,
+    <span class="tok-key">"notes"</span>: <span class="tok-num">0</span>,
+    <span class="tok-key">"suppressed"</span>: <span class="tok-num">0</span>
+  },
+  <span class="tok-key">"diagnostics"</span>: [
+    {
+      <span class="tok-key">"id"</span>: <span class="tok-str">"d1"</span>,
+      <span class="tok-key">"code"</span>: <span class="tok-str">"GG0301"</span>,
+      <span class="tok-key">"rule"</span>: <span class="tok-str">"use-after-consume"</span>,
+      <span class="tok-key">"severity"</span>: <span class="tok-str">"error"</span>,
+      <span class="tok-key">"category"</span>: <span class="tok-str">"ownership"</span>,
+      <span class="tok-key">"message"</span>: <span class="tok-str">"`c` variable was moved (`consume`), can no longer be used."</span>,
+      <span class="tok-key">"explanation"</span>: <span class="tok-str">"A value passed to a `consume` parameter moves into the callee. The caller no longer owns it."</span>,
+      <span class="tok-key">"span"</span>: {
+        <span class="tok-key">"file"</span>: <span class="tok-str">"website\\diagnostics\\use-after-consume.gg"</span>,
+        <span class="tok-key">"start"</span>: {
+          <span class="tok-key">"line"</span>: <span class="tok-num">10</span>,
+          <span class="tok-key">"column"</span>: <span class="tok-num">11</span>,
+          <span class="tok-key">"offset"</span>: <span class="tok-num">147</span>
+        },
+        <span class="tok-key">"end"</span>: {
+          <span class="tok-key">"line"</span>: <span class="tok-num">10</span>,
+          <span class="tok-key">"column"</span>: <span class="tok-num">18</span>,
+          <span class="tok-key">"offset"</span>: <span class="tok-num">154</span>
+        }
+      },
+      <span class="tok-key">"caused_by"</span>: <span class="tok-kw">null</span>,
+      <span class="tok-key">"doc"</span>: <span class="tok-str">"gg explain GG0301"</span>,
+      <span class="tok-key">"labels"</span>: [
+        {
+          <span class="tok-key">"role"</span>: <span class="tok-str">"cause"</span>,
+          <span class="tok-key">"message"</span>: <span class="tok-str">"`c` is consumed here"</span>,
+          <span class="tok-key">"span"</span>: {
+            <span class="tok-key">"file"</span>: <span class="tok-str">"website\\diagnostics\\use-after-consume.gg"</span>,
+            <span class="tok-key">"start"</span>: {
+              <span class="tok-key">"line"</span>: <span class="tok-num">9</span>,
+              <span class="tok-key">"column"</span>: <span class="tok-num">12</span>,
+              <span class="tok-key">"offset"</span>: <span class="tok-num">134</span>
+            },
+            <span class="tok-key">"end"</span>: {
+              <span class="tok-key">"line"</span>: <span class="tok-num">9</span>,
+              <span class="tok-key">"column"</span>: <span class="tok-num">13</span>,
+              <span class="tok-key">"offset"</span>: <span class="tok-num">135</span>
+            }
+          }
+        },
+        {
+          <span class="tok-key">"role"</span>: <span class="tok-str">"definition"</span>,
+          <span class="tok-key">"message"</span>: <span class="tok-str">"`c` is declared here"</span>,
+          <span class="tok-key">"span"</span>: {
+            <span class="tok-key">"file"</span>: <span class="tok-str">"website\\diagnostics\\use-after-consume.gg"</span>,
+            <span class="tok-key">"start"</span>: {
+              <span class="tok-key">"line"</span>: <span class="tok-num">8</span>,
+              <span class="tok-key">"column"</span>: <span class="tok-num">5</span>,
+              <span class="tok-key">"offset"</span>: <span class="tok-num">98</span>
+            },
+            <span class="tok-key">"end"</span>: {
+              <span class="tok-key">"line"</span>: <span class="tok-num">8</span>,
+              <span class="tok-key">"column"</span>: <span class="tok-num">29</span>,
+              <span class="tok-key">"offset"</span>: <span class="tok-num">122</span>
+            }
+          }
+        },
+        {
+          <span class="tok-key">"role"</span>: <span class="tok-str">"expected"</span>,
+          <span class="tok-key">"message"</span>: <span class="tok-str">"`finish` takes `c` as `consume`"</span>,
+          <span class="tok-key">"span"</span>: {
+            <span class="tok-key">"file"</span>: <span class="tok-str">"website\\diagnostics\\use-after-consume.gg"</span>,
+            <span class="tok-key">"start"</span>: {
+              <span class="tok-key">"line"</span>: <span class="tok-num">4</span>,
+              <span class="tok-key">"column"</span>: <span class="tok-num">14</span>,
+              <span class="tok-key">"offset"</span>: <span class="tok-num">45</span>
+            },
+            <span class="tok-key">"end"</span>: {
+              <span class="tok-key">"line"</span>: <span class="tok-num">4</span>,
+              <span class="tok-key">"column"</span>: <span class="tok-num">22</span>,
+              <span class="tok-key">"offset"</span>: <span class="tok-num">53</span>
+            }
+          }
+        }
+      ],
+      <span class="tok-key">"details"</span>: {
+        <span class="tok-key">"value"</span>: <span class="tok-str">"c"</span>,
+        <span class="tok-key">"state"</span>: <span class="tok-str">"consumed"</span>,
+        <span class="tok-key">"consumed_at"</span>: {
+          <span class="tok-key">"line"</span>: <span class="tok-num">9</span>,
+          <span class="tok-key">"column"</span>: <span class="tok-num">12</span>
+        },
+        <span class="tok-key">"used_at"</span>: {
+          <span class="tok-key">"line"</span>: <span class="tok-num">10</span>,
+          <span class="tok-key">"column"</span>: <span class="tok-num">11</span>
+        },
+        <span class="tok-key">"callee"</span>: <span class="tok-str">"finish"</span>,
+        <span class="tok-key">"parameter"</span>: <span class="tok-str">"c"</span>
+      },
+      <span class="tok-key">"fixes"</span>: [
+        {
+          <span class="tok-key">"id"</span>: <span class="tok-str">"f1"</span>,
+          <span class="tok-key">"description"</span>: <span class="tok-str">"Remove `consume` from `c` so the caller keeps ownership"</span>,
+          <span class="tok-key">"applicability"</span>: <span class="tok-str">"likely"</span>,
+          <span class="tok-key">"verified"</span>: <span class="tok-kw">true</span>,
+          <span class="tok-key">"edits"</span>: [
+            {
+              <span class="tok-key">"file"</span>: <span class="tok-str">"website\\diagnostics\\use-after-consume.gg"</span>,
+              <span class="tok-key">"start"</span>: {
+                <span class="tok-key">"line"</span>: <span class="tok-num">4</span>,
+                <span class="tok-key">"column"</span>: <span class="tok-num">14</span>,
+                <span class="tok-key">"offset"</span>: <span class="tok-num">45</span>
+              },
+              <span class="tok-key">"end"</span>: {
+                <span class="tok-key">"line"</span>: <span class="tok-num">4</span>,
+                <span class="tok-key">"column"</span>: <span class="tok-num">22</span>,
+                <span class="tok-key">"offset"</span>: <span class="tok-num">53</span>
+              },
+              <span class="tok-key">"replacement"</span>: <span class="tok-str">""</span>
+            }
+          ]
+        },
+        {
+          <span class="tok-key">"id"</span>: <span class="tok-str">"f2"</span>,
+          <span class="tok-key">"description"</span>: <span class="tok-str">"Move a copy instead: `c.clone()`"</span>,
+          <span class="tok-key">"applicability"</span>: <span class="tok-str">"likely"</span>,
+          <span class="tok-key">"verified"</span>: <span class="tok-kw">true</span>,
+          <span class="tok-key">"edits"</span>: [
+            {
+              <span class="tok-key">"file"</span>: <span class="tok-str">"website\\diagnostics\\use-after-consume.gg"</span>,
+              <span class="tok-key">"start"</span>: {
+                <span class="tok-key">"line"</span>: <span class="tok-num">9</span>,
+                <span class="tok-key">"column"</span>: <span class="tok-num">13</span>,
+                <span class="tok-key">"offset"</span>: <span class="tok-num">135</span>
+              },
+              <span class="tok-key">"end"</span>: {
+                <span class="tok-key">"line"</span>: <span class="tok-num">9</span>,
+                <span class="tok-key">"column"</span>: <span class="tok-num">13</span>,
+                <span class="tok-key">"offset"</span>: <span class="tok-num">135</span>
+              },
+              <span class="tok-key">"replacement"</span>: <span class="tok-str">".clone()"</span>
+            }
+          ]
+        },
+        {
+          <span class="tok-key">"id"</span>: <span class="tok-str">"f3"</span>,
+          <span class="tok-key">"description"</span>: <span class="tok-str">"Use `c` before it is consumed, or do not use it afterwards"</span>,
+          <span class="tok-key">"applicability"</span>: <span class="tok-str">"manual"</span>,
+          <span class="tok-key">"verified"</span>: <span class="tok-kw">false</span>,
+          <span class="tok-key">"edits"</span>: []
+        }
+      ]
+    }
+  ]
+}</code></pre></figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Reading the document</h2>
+          <p>The rule for tools is short: apply a fix only when its <code>applicability</code> is <code>safe</code> or <code>likely</code> and <code>verified</code> is true. Here, two fixes meet that bar and one is <code>manual</code>.</p>
+        </div>
+        <div class="fields"><div class="field reveal"><code>code · rule</code><p>A stable code (<code>GG0301</code>) and a rule name. <code>gg explain GG0301</code> prints the long form.</p></div><div class="field reveal"><code>span · labels</code><p>Where the error is, plus labels for the definition, the move, and the parameter that caused it.</p></div><div class="field reveal"><code>details</code><p><code>callee</code> and <code>parameter</code> name the signature that moved the value.</p></div><div class="field reveal"><code>fixes</code><p>Each fix has edits, an <code>applicability</code> (<code>safe</code>, <code>likely</code>, <code>manual</code>), and <code>verified</code>.</p></div><div class="field reveal"><code>verified</code><p>The compiler applied the edit to a copy, re-checked it, and the diagnostic went away.</p></div><div class="field reveal"><code>manual</code><p>A hint, not an edit. A person or a model has to decide what the program should do.</p></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="brand"><img src="assets/greengold_logo.png" alt="" width="30" height="30"><span>Greengold</span></a>
+          <p>A statically typed systems language. Native code through LLVM, ownership in three words.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Language</h4>
+          <ul>
+            <li><a href="why.html">Why Greengold</a></li>
+            <li><a href="spec.html">Specification</a></li>
+            <li><a href="spec.md">spec.md</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Evidence</h4>
+          <ul>
+            <li><a href="benchmarks.html">Benchmarks</a></li>
+            <li><a href="benchmarks/data.json">Benchmark data</a></li>
+            <li><a href="diagnostics.html">Diagnostics</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="roadmap.html">Roadmap</a></li>
+            <li><a href="about.html">About</a></li>
+            <li><a href="llms.txt">llms.txt</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Umut Faruk Dilli. Greengold is released under the MIT License.</span>
+        <span>Version 0.3.3 · not yet released</span>
+      </div>
+    </div>
+  </footer>
+  <script src="app.js?v=4fb0d72f15"></script>
+</body>
+</html>

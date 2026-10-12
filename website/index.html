@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Greengold — Systems speed, readable ownership</title>
+  <meta name="description" content="Greengold is a statically typed systems language that compiles to native code through LLVM. Ownership is three words on a parameter, mutability is inferred, and diagnostics carry checked fixes.">
+  <meta name="theme-color" content="#090d0b">
+  <link rel="canonical" href="https://greengoldlang.com/">
+  <meta property="og:title" content="Greengold — Systems speed, readable ownership">
+  <meta property="og:description" content="Greengold is a statically typed systems language that compiles to native code through LLVM. Ownership is three words on a parameter, mutability is inferred, and diagnostics carry checked fixes.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://greengoldlang.com/">
+  <meta property="og:image" content="https://greengoldlang.com/assets/greengold_logo.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/png" href="assets/greengold_logo.png">
+  <link rel="apple-touch-icon" href="assets/greengold_logo.png">
+  <script>(function(){try{var t=localStorage.getItem('gg-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4fb0d72f15">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="brand" aria-label="Greengold home">
+        <img src="assets/greengold_logo.png" alt="" width="30" height="30">
+        <span>Greengold</span>
+        <span class="brand-version">v0.3.3</span>
+      </a>
+      <nav id="site-nav" class="site-nav" aria-label="Main">
+        <a href="why.html">Why</a>
+        <a href="spec.html">Spec</a>
+        <a href="benchmarks.html">Benchmarks</a>
+        <a href="diagnostics.html">Diagnostics</a>
+        <a href="roadmap.html">Roadmap</a>
+        <a href="about.html">About</a>
+      </nav>
+      <div class="header-tools">
+        <button type="button" class="icon-btn theme-toggle" aria-label="Switch colour theme"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="moon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <button type="button" class="icon-btn menu-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow">Version 0.3.3. New in this version: <code>var</code> is gone and mutability is inferred. <a href="roadmap.html">What changed</a></p>
+          <h1>Systems speed.<br><span class="accent">Readable ownership.</span></h1>
+          <p class="lede">Greengold is a statically typed systems language that compiles to native code through LLVM. Ownership is three words on a parameter, mutability is inferred, and every diagnostic can carry a checked fix.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="spec.html"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 21.5A2.5 2.5 0 0 1 6.5 19H20v3H6.5"/></svg> Read the spec</a>
+            <a class="btn btn-ghost" href="benchmarks.html"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg> See benchmarks</a>
+          </div>
+          <div class="hero-cmd"><span><span class="prompt">$ </span>gg run hello.gg</span></div>
+        </div>
+        <figure class="code hero-code" data-tabs><figcaption class="code-head"><span class="code-file">account.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><div class="code-tabs" role="tablist" aria-label="Examples"><button type="button" class="code-tab" role="tab" id="tab-own" aria-controls="panel-own" aria-selected="true" tabindex="0" data-file="account.gg">Ownership</button><button type="button" class="code-tab" role="tab" id="tab-err" aria-controls="panel-err" aria-selected="false" tabindex="-1" data-file="digits.gg">Result and ?</button><button type="button" class="code-tab" role="tab" id="tab-clo" aria-controls="panel-clo" aria-selected="false" tabindex="-1" data-file="adders.gg">Closures</button><button type="button" class="code-tab" role="tab" id="tab-match" aria-controls="panel-match" aria-selected="false" tabindex="-1" data-file="shapes.gg">match</button><button type="button" class="code-tab" role="tab" id="tab-test" aria-controls="panel-test" aria-selected="false" tabindex="-1" data-file="clamp.gg">Tests</button></div><div class="code-panel" role="tabpanel" id="panel-own" aria-labelledby="tab-own"><pre><code><span class="tok-kw">struct</span> <span class="tok-type">Account</span>:
+    owner: <span class="tok-type">string</span>
+    balance: <span class="tok-type">i64</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">show</span>(a: <span class="tok-kw">read</span> <span class="tok-type">Account</span>):
+    <span class="tok-fn">print</span>(a.owner, a.balance)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">deposit</span>(a: <span class="tok-kw">lend</span> <span class="tok-type">Account</span>, amount: <span class="tok-type">i64</span>):
+    a.balance <span class="tok-op">+=</span> amount
+
+<span class="tok-kw">fn</span> <span class="tok-fn">close</span>(a: <span class="tok-kw">consume</span> <span class="tok-type">Account</span>):
+    <span class="tok-fn">print</span>(<span class="tok-str">"closed"</span>, a.owner)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    acct <span class="tok-op">=</span> <span class="tok-type">Account</span>{ owner: <span class="tok-type">string</span>.<span class="tok-fn">from</span>(<span class="tok-str">"Ada"</span>), balance: <span class="tok-num">100</span> }
+    <span class="tok-fn">deposit</span>(acct, <span class="tok-num">50</span>)
+    <span class="tok-fn">show</span>(acct)
+    <span class="tok-fn">close</span>(acct)</code></pre><p class="code-note">The mode is written once, on the parameter. The call stays <code>f(x)</code>. After <code>close</code>, <code>acct</code> is gone.</p></div><div class="code-panel" role="tabpanel" id="panel-err" aria-labelledby="tab-err" hidden><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">parse_digit</span>(c: <span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">Result</span>[<span class="tok-type">i32</span>, <span class="tok-type">str</span>]:
+    <span class="tok-kw">if</span> c &lt; <span class="tok-str">'0'</span> <span class="tok-kw">or</span> c &gt; <span class="tok-str">'9'</span>:
+        <span class="tok-kw">return</span> <span class="tok-type">Err</span>(<span class="tok-str">"not a digit"</span>)
+    <span class="tok-kw">return</span> <span class="tok-type">Ok</span>(<span class="tok-type">i32</span>(c - <span class="tok-str">'0'</span>))
+
+<span class="tok-kw">fn</span> <span class="tok-fn">add_digits</span>(a: <span class="tok-type">u8</span>, b: <span class="tok-type">u8</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">Result</span>[<span class="tok-type">i32</span>, <span class="tok-type">str</span>]:
+    x <span class="tok-op">=</span> <span class="tok-fn">parse_digit</span>(a)?
+    y <span class="tok-op">=</span> <span class="tok-fn">parse_digit</span>(b)?
+    <span class="tok-kw">return</span> <span class="tok-type">Ok</span>(x + y)
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-kw">match</span> <span class="tok-fn">add_digits</span>(<span class="tok-str">'3'</span>, <span class="tok-str">'4'</span>):
+        <span class="tok-type">Ok</span>(v):
+            <span class="tok-fn">print</span>(v)
+        <span class="tok-type">Err</span>(e):
+            <span class="tok-fn">print</span>(e)</code></pre><p class="code-note"><code>Optional</code> and <code>Result</code> are prelude enums. <code>?</code> returns early on <code>Err</code> and stands on its own line.</p></div><div class="code-panel" role="tabpanel" id="panel-clo" aria-labelledby="tab-clo" hidden><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">make_adder</span>(k: <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">Fn</span>(<span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>:
+    <span class="tok-kw">return</span> <span class="tok-kw">fn</span>(x: <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span> <span class="tok-op">=&gt;</span> x + k
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    steps <span class="tok-op">=</span> <span class="tok-type">List</span>[<span class="tok-type">Fn</span>(<span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>]()
+    steps.<span class="tok-fn">push</span>(<span class="tok-fn">make_adder</span>(<span class="tok-num">1</span>))
+    steps.<span class="tok-fn">push</span>(<span class="tok-fn">make_adder</span>(<span class="tok-num">10</span>))
+    v <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> f <span class="tok-kw">in</span> steps:
+        v <span class="tok-op">=</span> <span class="tok-fn">f</span>(v)
+    <span class="tok-fn">print</span>(v, <span class="tok-fn">make_adder</span>(<span class="tok-num">5</span>)(<span class="tok-num">1</span>))</code></pre><p class="code-note"><code>Fn</code> is an owned closure: it can be returned and stored in a list. A plain <code>fn</code> argument is compiled for the closure, so the call is direct.</p></div><div class="code-panel" role="tabpanel" id="panel-match" aria-labelledby="tab-match" hidden><pre><code><span class="tok-kw">enum</span> <span class="tok-type">Shape</span>:
+    <span class="tok-type">Circle</span>(<span class="tok-type">f64</span>)
+    <span class="tok-type">Rect</span>(<span class="tok-type">f64</span>, <span class="tok-type">f64</span>)
+    <span class="tok-type">Empty</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">area</span>(s: <span class="tok-type">Shape</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">f64</span>:
+    <span class="tok-kw">return</span> <span class="tok-kw">match</span> s:
+        <span class="tok-type">Circle</span>(r) <span class="tok-op">=&gt;</span> <span class="tok-num">3.14159</span> * r * r
+        <span class="tok-type">Rect</span>(w, h) <span class="tok-op">=&gt;</span> w * h
+        <span class="tok-type">Empty</span> <span class="tok-op">=&gt;</span> <span class="tok-num">0.0</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-fn">print</span>(<span class="tok-fn">area</span>(<span class="tok-type">Shape</span>.<span class="tok-type">Rect</span>(<span class="tok-num">2.0</span>, <span class="tok-num">3.0</span>)))</code></pre><p class="code-note">A <code>match</code> must cover every variant. In a pattern a bare name is a variant, so a typo is an error, not a catch-all.</p></div><div class="code-panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" hidden><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">clamp</span>(n: <span class="tok-type">i32</span>, lo: <span class="tok-type">i32</span>, hi: <span class="tok-type">i32</span>) <span class="tok-op">-&gt;</span> <span class="tok-type">i32</span>:
+    <span class="tok-kw">if</span> n &lt; lo:
+        <span class="tok-kw">return</span> lo
+    <span class="tok-kw">elif</span> n &gt; hi:
+        <span class="tok-kw">return</span> hi
+    <span class="tok-kw">return</span> n
+
+<span class="tok-kw">test</span>:
+    <span class="tok-kw">require</span> <span class="tok-fn">clamp</span>(<span class="tok-num">5</span>, <span class="tok-num">0</span>, <span class="tok-num">10</span>) <span class="tok-op">==</span> <span class="tok-num">5</span>
+
+<span class="tok-kw">test</span> edges:
+    <span class="tok-kw">require</span> <span class="tok-fn">clamp</span>(-<span class="tok-num">3</span>, <span class="tok-num">0</span>, <span class="tok-num">10</span>) <span class="tok-op">==</span> <span class="tok-num">0</span>
+    <span class="tok-kw">require</span> <span class="tok-fn">clamp</span>(<span class="tok-num">99</span>, <span class="tok-num">0</span>, <span class="tok-num">10</span>) <span class="tok-op">==</span> <span class="tok-num">10</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-fn">print</span>(<span class="tok-fn">clamp</span>(<span class="tok-num">42</span>, <span class="tok-num">0</span>, <span class="tok-num">10</span>))</code></pre><p class="code-note">A <code>test</code> block belongs to the function above it. <code>gg test</code> runs them; <code>gg test --json</code> reports each one.</p></div></figure>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="stats reveal">
+          <div class="stat"><div class="stat-value">7<small> / 18</small></div><div class="stat-label">workloads where Greengold beat both C++ and Rust</div></div>
+          <div class="stat"><div class="stat-value">15<small> / 18</small></div><div class="stat-label">ahead, or within 5% of the faster of the two</div></div>
+          <div class="stat"><div class="stat-value">3</div><div class="stat-label">ownership words: <code>read</code>, <code>lend</code>, <code>consume</code></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>What the language does</h2>
+          <p>Native code, value types, and no garbage collector. Six choices define how Greengold reads and fails.</p>
+        </div>
+        <div class="cards"><article class="card reveal"><h3><a href="spec.html#parameter-modes">Ownership without lifetimes</a></h3><p>Parameters say <code>read</code>, <code>lend</code>, or <code>consume</code>. A stored reference is <code>tied to</code> the place it came from. There is no lifetime syntax.</p></article><article class="card reveal"><h3><a href="benchmarks.html">Native speed through LLVM</a></h3><p>Release builds keep bounds and overflow checks and still finish within 5% of C++ and Rust, or ahead of both, on 15 of 18 workloads.</p></article><article class="card reveal"><h3><a href="spec.html#3-bindings">Mutability is inferred</a></h3><p>Variables can change by default. One that never changes is treated as <code>fixed</code>, and the editor shows it as an inlay hint.</p></article><article class="card reveal"><h3><a href="spec.html#12-numbers">Failures are loud</a></h3><p>Integer overflow, division by zero, bad shifts, and out-of-bounds indexes trap, in debug and in <code>--release</code>.</p></article><article class="card reveal"><h3><a href="diagnostics.html">Diagnostics with checked fixes</a></h3><p><code>gg check --json</code> returns stable codes and fixes. A fix marked <code>verified</code> was applied to a copy and made the error go away.</p></article><article class="card reveal"><h3><a href="why.html">One way to write it</a></h3><p>One spelling for each construct, one specification, and a list of rejected forms. People and language models read the same language.</p></article></div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Ownership is three words</h2>
+          <p>The mode is written on the parameter, never at the call.</p>
+        </div>
+        <div class="modes"><div class="mode reveal"><div class="mode-top"><span class="mode-word">read</span><p>A shared borrow. The function may read, not assign. The caller keeps the value.</p></div><figure class="code"><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">show</span>(a: <span class="tok-kw">read</span> <span class="tok-type">Account</span>):
+    <span class="tok-fn">print</span>(a.balance)</code></pre></figure></div><div class="mode reveal"><div class="mode-top"><span class="mode-word">lend</span><p>An exclusive borrow. The function may change the value in place; nothing else may touch it during the call.</p></div><figure class="code"><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">deposit</span>(a: <span class="tok-kw">lend</span> <span class="tok-type">Account</span>, n: <span class="tok-type">i64</span>):
+    a.balance <span class="tok-op">+=</span> n</code></pre></figure></div><div class="mode reveal"><div class="mode-top"><span class="mode-word">consume</span><p>Takes ownership. After the call the argument is gone, and using it again is a compile error.</p></div><figure class="code"><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">close</span>(a: <span class="tok-kw">consume</span> <span class="tok-type">Account</span>):
+    <span class="tok-fn">print</span>(<span class="tok-str">"closed"</span>)</code></pre></figure></div></div>
+        <div class="callout reveal"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><p>A bare parameter of a heap type gets its mode from the body: <code>read</code> when the body only reads it, <code>lend</code> when it changes it, <code>consume</code> when it moves it. Write the mode only when you want to pin it in the signature.</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="split reveal">
+          <div>
+            <span class="kicker">Bindings</span>
+            <h3>Variables can change. The ones that don't are marked for you.</h3>
+            <p>There is no <code>var</code> and no <code>mut</code> on locals. Every variable can change. A variable that nothing changes is treated as <code>fixed</code>, and your editor shows the inferred word as an inlay hint.</p>
+            <ul class="checks">
+              <li>Write <code>fixed</code> to turn the inference into a guarantee.</li>
+              <li>Assigning, lending, or mutating a <code>fixed</code> value is a compile error.</li>
+              <li>Writing <code>var</code> is an error that tells you to delete it.</li>
+            </ul>
+          </div>
+          <figure class="code"><figcaption class="code-head"><span class="code-file">main.gg — inlay hints on</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    <span class="tok-kw">fixed</span> limit <span class="tok-op">=</span> <span class="tok-num">3</span>
+    total <span class="tok-op">=</span> <span class="tok-num">0</span>
+    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> <span class="tok-num">0</span><span class="tok-op">..</span>limit:
+        total <span class="tok-op">+=</span> i
+    <span class="inlay">fixed</span>name <span class="tok-op">=</span> <span class="tok-str">"gg"</span>
+    <span class="tok-fn">print</span>(name, total)</code></pre></figure>
+        </div>
+
+        <div class="split flip reveal">
+          <div>
+            <span class="kicker">Diagnostics</span>
+            <h3>Diagnostics with fixes the compiler has tried</h3>
+            <p>Every diagnostic has a stable <code>GGxxxx</code> code, labels for the definition, the move, and the later use, and a list of fixes.</p>
+            <ol class="diag-steps">
+              <li><span><code>gg check --json</code> returns the same diagnostic as structured data.</span></li>
+              <li><span>The compiler applies each candidate fix to a copy and re-checks it.</span></li>
+              <li><span>Only fixes that made the error disappear are marked <code>verified</code>.</span></li>
+            </ol>
+            <a class="spec-link" href="diagnostics.html">See the full GG0301 output <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          </div>
+          <figure class="code term"><figcaption class="code-head"><span class="code-file">gg check counter.gg</span><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button></figcaption><pre><code><span class="t-prompt">$ </span>gg check counter.gg
+<span class="t-err">error:</span> `c` variable was moved (`consume`), can no longer be used.
+  <span class="t-gutter">--&gt;</span> <span class="t-loc">use-after-consume.gg:10:11</span>  <span class="t-label">GG0301</span><span class="t-dim"> use-after-consume</span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter">10 |</span>     <span class="tok-fn">print</span>(c.value)
+<span class="t-gutter">   |</span>           <span class="t-caret">^^^^^^^</span><span class="t-label"></span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter"> 9 |</span>     <span class="tok-fn">finish</span>(c)
+<span class="t-gutter">   |</span>            <span class="t-caret">^</span><span class="t-label"> `c` is consumed here</span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter"> 8 |</span>     c <span class="tok-op">=</span> <span class="tok-type">Counter</span>{ value: <span class="tok-num">1</span> }
+<span class="t-gutter">   |</span>     <span class="t-caret">^^^^^^^^^^^^^^^^^^^^^^^^</span><span class="t-label"> `c` is declared here</span>
+<span class="t-gutter">   |</span>
+<span class="t-gutter"> 4 |</span> <span class="tok-kw">fn</span> <span class="tok-fn">finish</span>(c: <span class="tok-kw">consume</span> <span class="tok-type">Counter</span>):
+<span class="t-gutter">   |</span>              <span class="t-caret">^^^^^^^^</span><span class="t-label"> `finish` takes `c` as `consume`</span>
+   <span class="t-help">= help:</span> Move a copy with `c.clone()` to keep using `c`, use it before the move, or reassign it after the move.
+   <span class="t-ok">= fix (verified):</span> Remove `consume` from `c` so the caller keeps ownership
+   <span class="t-ok">= fix (verified):</span> Move a copy instead: `c.clone()`
+   <span class="t-dim">= fix (manual):</span> Use `c` before it is consumed, or do not use it afterwards
+
+<span class="t-err">1 error found.</span></code></pre></figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="wrap">
+        <div class="split reveal">
+          <div>
+            <span class="kicker">Performance</span>
+            <h3>Checks stay on in release builds</h3>
+            <p>18 workloads against <code>g++ -O3</code> and <code>rustc -C opt-level=3</code>, measured on 9 October 2026. Greengold's <code>--release</code> keeps bounds checks and integer overflow traps on.</p>
+            <ul class="checks">
+              <li>Median of five runs; peak memory, compile time, and binary size too.</li>
+              <li>Every program prints a checked result, so the work is not optimized away.</li>
+              <li>Sources for all three languages are published next to the numbers.</li>
+            </ul>
+            <a class="spec-link" href="benchmarks.html">All 18 workloads <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          </div>
+          <div class="bench-panel">
+            <div class="legend"><span><i class="lg-cpp"></i>C++</span><span><i class="lg-rust"></i>Rust</span><span><i class="lg-gg"></i>Greengold</span><span style="margin-left:auto">shorter is faster</span></div>
+            <div class="brow"><div class="brow-head"><a href="benchmarks.html#mandel">Mandelbrot <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 3.2%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:96.9%"></span></span><span class="bar-val">322.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.0%"></span></span><span class="bar-val">326.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">332.7 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#matmul">Matmul <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">18% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">427.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:96.4%"></span></span><span class="bar-val">411.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:79.2%"></span></span><span class="bar-val">338.0 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#qsort">Quicksort <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">12% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">563.9 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:90.9%"></span></span><span class="bar-val">512.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:80.3%"></span></span><span class="bar-val">452.8 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#trees">Trees <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 1.9%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.9%"></span></span><span class="bar-val">487.6 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.2%"></span></span><span class="bar-val">484.0 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">493.2 ms</span></div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Status</h2>
+          <p>What exists today, and what is outside the safety guarantee.</p>
+        </div>
+        <div class="status-grid">
+          <div class="panel reveal">
+            <h3><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg> The toolchain</h3>
+            <dl class="kv">
+              <dt>Version</dt><dd>0.3.3, not yet released as a package.</dd>
+              <dt>Compiler</dt><dd>Written in Python. Emits LLVM IR through <code>llvmlite</code> and links with clang or gcc. LLVM is the only backend.</dd>
+              <dt>Tools</dt><dd><code>gg check</code>, <code>run</code>, <code>build</code>, <code>test</code>, <code>fmt</code>, <code>doc</code>, <code>api</code>, <code>bindgen</code>, and a language server with inlay hints.</dd>
+              <dt>Self-hosting</dt><dd>Paused. The lexer is written in Greengold; language work happens in the Python compiler for now.</dd>
+            </dl>
+          </div>
+          <div class="panel warn reveal">
+            <h3><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> Outside the guarantee</h3>
+            <ul class="list">
+              <li><code>unsafe:</code> blocks — pointers are not checked for liveness, alignment, or bounds.</li>
+              <li><code>trust</code>, which skips one bounds check, in <code>unsafe:</code> or a <code>hot fn</code>.</li>
+              <li>The <code>--unchecked</code> build flag, which removes bounds checks.</li>
+              <li><code>std.thread</code>, a pthread wrapper with no <code>Send</code> or <code>Share</code> bound.</li>
+              <li>Not supported: dynamic dispatch, lifetime names, storing or returning a slice <code>[]T</code>.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="cta reveal">
+          <h2>The language is one document</h2>
+          <p>Eighteen sections, one example per feature, and the list of forms the compiler rejects. Also available as plain Markdown for tools and models.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="spec.html"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 21.5A2.5 2.5 0 0 1 6.5 19H20v3H6.5"/></svg> Read the spec</a>
+            <a class="btn btn-ghost" href="spec.md"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> spec.md</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="brand"><img src="assets/greengold_logo.png" alt="" width="30" height="30"><span>Greengold</span></a>
+          <p>A statically typed systems language. Native code through LLVM, ownership in three words.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Language</h4>
+          <ul>
+            <li><a href="why.html">Why Greengold</a></li>
+            <li><a href="spec.html">Specification</a></li>
+            <li><a href="spec.md">spec.md</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Evidence</h4>
+          <ul>
+            <li><a href="benchmarks.html">Benchmarks</a></li>
+            <li><a href="benchmarks/data.json">Benchmark data</a></li>
+            <li><a href="diagnostics.html">Diagnostics</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="roadmap.html">Roadmap</a></li>
+            <li><a href="about.html">About</a></li>
+            <li><a href="llms.txt">llms.txt</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Umut Faruk Dilli. Greengold is released under the MIT License.</span>
+        <span>Version 0.3.3 · not yet released</span>
+      </div>
+    </div>
+  </footer>
+  <script src="app.js?v=4fb0d72f15"></script>
+</body>
+</html>

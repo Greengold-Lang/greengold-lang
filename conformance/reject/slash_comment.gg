@@ -1,0 +1,6 @@
+# conformance: SPEC section 17, rejected form: `//` as a comment
+# expect-error: GG0102 at line 5
+
+fn main():
+    // hello
+    pass

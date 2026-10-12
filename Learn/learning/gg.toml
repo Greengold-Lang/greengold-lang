@@ -1,0 +1,7 @@
+[package]
+name = "learning"
+version = "0.1.0"
+main = "src/main.gg"
+
+[dependencies]
+# mylib = { path = "../mylib" }   # then: import mylib.module

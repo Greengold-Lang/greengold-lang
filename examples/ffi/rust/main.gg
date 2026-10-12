@@ -1,0 +1,28 @@
+# Using a Rust library. Compilation (for Windows / mingw `gnu` target required, see README):
+#   cargo build --release --target x86_64-pc-windows-gnu
+#   python -m greengold run main.gg --link-file target/x86_64-pc-windows-gnu/release/libgg_rustlib.a \
+#       --link ws2_32 --link userenv --link ntdll --link bcrypt
+# Linux/macOS:
+#   cargo build --release
+#   python -m greengold run main.gg --link-file target/release/libgg_rustlib.a --link dl --link pthread
+# List of required system libraries: `cargo rustc --release -- --print native-static-libs`
+
+extern struct Vec2:
+    x: f64
+    y: f64
+
+extern fn rs_add(a: i32, b: i32) -> i32
+extern fn rs_square_all(data: *mut i32, n: usize)
+extern fn rs_vec2_len(v: *Vec2) -> f64
+
+fn main():
+    print("2 + 3 =", rs_add(2, 3))
+
+    nums = [1, 2, 3, 4]
+    unsafe:
+        rs_square_all(addr_mut(nums), 4)
+    print("squares:", nums[0], nums[1], nums[2], nums[3])
+
+    v = Vec2{ x: 3.0, y: 4.0 }
+    unsafe:
+        print("length:", rs_vec2_len(addr(v)))

@@ -1,0 +1,8 @@
+# conformance: SPEC section 17, rejected form: a generic body using more than its bounds
+# expect-error: GG0219 at line 5
+
+fn big[T](a: T, b: T) -> bool:
+    return a > b
+
+fn main():
+    pass

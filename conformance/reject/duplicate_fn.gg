@@ -1,0 +1,11 @@
+# conformance: SPEC section 17, rejected form: a second function with the same name
+# expect-error: GG0209 at line 7
+
+fn f():
+    pass
+
+fn f():
+    pass
+
+fn main():
+    pass

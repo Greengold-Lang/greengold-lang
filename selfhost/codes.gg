@@ -1,0 +1,351 @@
+# First-match diagnostic codes. Same order as greengold/codes.py _PATTERNS.
+import std.string
+
+public
+
+fn classify(msg: str) -> string:
+    s = string.new()
+    if string.str_contains(msg, "`consume` can only be used in a parameter"):
+        s.append_str("GG0120")
+        return s
+    if string.str_contains(msg, "cannot be used: field `"):
+        s.append_str("GG0302")
+        return s
+    if string.str_contains(msg, "was moved (`"):
+        s.append_str("GG0301")
+        return s
+    if string.str_contains(msg, "each iteration of the loop"):
+        s.append_str("GG0303")
+        return s
+    if string.str_contains(msg, "is copied, `consume` is not needed"):
+        s.append_str("GG0304")
+        return s
+    if string.str_contains(msg, "cannot be borrowed as `lend` multiple times"):
+        s.append_str("GG0305")
+        return s
+    if string.str_contains(msg, "cannot be borrowed as `lend` in the same call"):
+        s.append_str("GG0305")
+        return s
+    if string.str_contains(msg, "while being moved (`consume`)"):
+        s.append_str("GG0306")
+        return s
+    if string.str_contains(msg, "both `read` and `lend`"):
+        s.append_str("GG0307")
+        return s
+    if string.str_contains(msg, "aliasing risk"):
+        s.append_str("GG0308")
+        return s
+    if string.str_contains(msg, "you do not own it"):
+        s.append_str("GG0312")
+        return s
+    if string.str_contains(msg, "no partial moves"):
+        s.append_str("GG0314")
+        return s
+    if string.str_contains(msg, "cannot be moved"):
+        s.append_str("GG0313")
+        return s
+    if string.str_contains(msg, "is a view (`ref`)"):
+        s.append_str("GG0313")
+        return s
+    if string.str_contains(msg, "does not live long enough"):
+        s.append_str("GG0315")
+        return s
+    if string.str_contains(msg, "cannot be returned"):
+        s.append_str("GG0315")
+        return s
+    if string.str_contains(msg, "still tied to it"):
+        s.append_str("GG0316")
+        return s
+    if string.str_contains(msg, "no other access is permitted"):
+        s.append_str("GG0316")
+        return s
+    if string.str_contains(msg, "cannot be tied to itself"):
+        s.append_str("GG0317")
+        return s
+    if string.str_contains(msg, "no parameter named"):
+        s.append_str("GG0317")
+        return s
+    if string.str_contains(msg, "can only be tied to `self`"):
+        s.append_str("GG0317")
+        return s
+    if string.str_contains(msg, "cannot be tied to a value parameter"):
+        s.append_str("GG0317")
+        return s
+    if string.str_contains(msg, "`consume self` is not yet supported"):
+        s.append_str("GG0318")
+        return s
+    if string.str_contains(msg, "Cannot assign"):
+        s.append_str("GG0309")
+        return s
+    if string.str_contains(msg, "Cannot rebind"):
+        s.append_str("GG0309")
+        return s
+    if string.str_contains(msg, "cannot be `lend`ed"):
+        s.append_str("GG0310")
+        return s
+    if string.str_contains(msg, "is a mutating method"):
+        s.append_str("GG0311")
+        return s
+    if string.str_contains(msg, "is immutable"):
+        s.append_str("GG0319")
+        return s
+    if string.str_contains(msg, "Tab characters are not allowed"):
+        s.append_str("GG0101")
+        return s
+    if string.str_contains(msg, "// is not a comment"):
+        s.append_str("GG0102")
+        return s
+    if string.str_contains(msg, "Indentation must be a multiple"):
+        s.append_str("GG0103")
+        return s
+    if string.str_contains(msg, "Indentation must increase"):
+        s.append_str("GG0104")
+        return s
+    if string.str_contains(msg, "Indentation does not match"):
+        s.append_str("GG0105")
+        return s
+    if string.str_contains(msg, "Unexpected indentation"):
+        s.append_str("GG0106")
+        return s
+    if string.str_contains(msg, "opened but never closed"):
+        s.append_str("GG0107")
+        return s
+    if string.str_contains(msg, "no matching open bracket"):
+        s.append_str("GG0108")
+        return s
+    if string.str_contains(msg, "closes wrong bracket"):
+        s.append_str("GG0109")
+        return s
+    if string.str_contains(msg, "Unterminated"):
+        s.append_str("GG0110")
+        return s
+    if string.str_contains(msg, "Unclosed `{`"):
+        s.append_str("GG0110")
+        return s
+    if string.str_contains(msg, "Empty expression in formatted string"):
+        s.append_str("GG0123")
+        return s
+    if string.str_contains(msg, "Empty char literal"):
+        s.append_str("GG0112")
+        return s
+    if string.str_contains(msg, "multi-byte UTF-8"):
+        s.append_str("GG0113")
+        return s
+    if string.str_contains(msg, "single character"):
+        s.append_str("GG0114")
+        return s
+    if string.str_contains(msg, "Unknown escape"):
+        s.append_str("GG0115")
+        return s
+    if string.str_contains(msg, "escape sequence can only be used in char"):
+        s.append_str("GG0115")
+        return s
+    if string.str_contains(msg, "Invalid hexadecimal") or string.str_contains(msg, "Invalid binary") or string.str_contains(msg, "Invalid number"):
+        s.append_str("GG0116")
+        return s
+    if string.str_contains(msg, "Unrecognized character"):
+        s.append_str("GG0117")
+        return s
+    if string.str_contains(msg, "`else if` does not exist"):
+        s.append_str("GG0119")
+        return s
+    if string.str_contains(msg, "Chained comparison"):
+        s.append_str("GG0121")
+        return s
+    if string.str_contains(msg, "can be declared at top-level") or string.str_contains(msg, "Only `struct`"):
+        s.append_str("GG0122")
+        return s
+    if string.str_contains(msg, "Type mismatch:"):
+        s.append_str("GG0201")
+        return s
+    if string.str_contains(msg, "Unknown type `"):
+        s.append_str("GG0202")
+        return s
+    if string.str_contains(msg, "is not defined") or string.str_contains(msg, "No function named") or string.str_contains(msg, "No struct named") or string.str_contains(msg, "has no `"):
+        s.append_str("GG0203")
+        return s
+    if string.str_contains(msg, "is private"):
+        s.append_str("GG0213")
+        return s
+    if string.str_contains(msg, "Import name `") or string.str_contains(msg, "cannot import itself"):
+        s.append_str("GG0209")
+        return s
+    if string.str_contains(msg, "`fn main` is only allowed"):
+        s.append_str("GG0239")
+        return s
+    if string.str_contains(msg, "`fn main():` not found"):
+        s.append_str("GG0204")
+        return s
+    if string.str_contains(msg, "not all paths have a `return`") or string.str_contains(msg, "must return `"):
+        s.append_str("GG0205")
+        return s
+    if string.str_contains(msg, "expects ") and string.str_contains(msg, " argument") and not string.str_contains(msg, "type argument"):
+        s.append_str("GG0206")
+        return s
+    if string.str_contains(msg, "has no field named"):
+        s.append_str("GG0207")
+        return s
+    if string.str_contains(msg, "has no method named"):
+        s.append_str("GG0208")
+        return s
+    if string.str_contains(msg, "has no variant named") or string.str_contains(msg, "is not a variant"):
+        s.append_str("GG0218")
+        return s
+    if string.str_contains(msg, "already defined") or string.str_contains(msg, "defined twice") or string.str_contains(msg, "must be unique") or string.str_contains(msg, "conflicts with a function"):
+        s.append_str("GG0209")
+        return s
+    if string.str_contains(msg, "reserved name") or string.str_contains(msg, "is a reserved"):
+        s.append_str("GG0210")
+        return s
+    if string.str_contains(msg, "Condition must be `bool`"):
+        s.append_str("GG0211")
+        return s
+    if string.str_contains(msg, "Slice (`[]T`) cannot") or string.str_contains(msg, "Slice cannot be stored") or string.str_contains(msg, "cannot be an arm value"):
+        s.append_str("GG0212")
+        return s
+    if string.str_contains(msg, "body is empty"):
+        s.append_str("GG0124")
+        return s
+    if string.str_contains(msg, "must be indented"):
+        s.append_str("GG0125")
+        return s
+    if string.str_contains(msg, "pattern has") or string.str_contains(msg, "value must be provided") or string.str_contains(msg, "Pattern specifies"):
+        s.append_str("GG0224")
+        return s
+    if string.str_contains(msg, "empty payload parentheses") or string.str_contains(msg, "do not write parentheses"):
+        s.append_str("GG0126")
+        return s
+    if string.str_contains(msg, "`?` can only be used on the whole expression"):
+        s.append_str("GG0127")
+        return s
+    if string.str_contains(msg, "`defer` defers"):
+        s.append_str("GG0128")
+        return s
+    if string.str_contains(msg, "does not perform any action"):
+        s.append_str("GG0129")
+        return s
+    if string.str_contains(msg, "`break` can only be used inside"):
+        s.append_str("GG0130")
+        return s
+    if string.str_contains(msg, "heap-owning"):
+        s.append_str("GG0236")
+        return s
+    if string.str_contains(msg, "not supported") or string.str_contains(msg, "cannot have their own type parameters") or string.str_contains(msg, "cannot be an enum payload"):
+        s.append_str("GG0131")
+        return s
+    if string.str_contains(msg, "Both sides of") or string.str_contains(msg, "can only be used with") or string.str_contains(msg, "only compares numbers") or string.str_contains(msg, "right operand") or string.str_contains(msg, "does not support operator") or string.str_contains(msg, "Unary `"):
+        s.append_str("GG0219")
+        return s
+    if string.str_contains(msg, "Tuples must have"):
+        s.append_str("GG0217")
+        return s
+    if string.str_contains(msg, "too small for") or string.str_contains(msg, "too large for") or string.str_contains(msg, "cannot be negative") or string.str_contains(msg, "bounded integer range"):
+        s.append_str("GG0216")
+        return s
+    if string.str_contains(msg, "`step` cannot be zero") or string.str_contains(msg, "Negative `step`") or string.str_contains(msg, "`max_value` requires"):
+        s.append_str("GG0220")
+        return s
+    if string.str_contains(msg, "Cannot iterate over"):
+        s.append_str("GG0221")
+        return s
+    if string.str_contains(msg, "does not cover all cases"):
+        s.append_str("GG0222")
+        return s
+    if string.str_contains(msg, "unreachable ") or string.str_contains(msg, "redundant `_`") or string.str_contains(msg, "duplicate arm"):
+        s.append_str("GG0223")
+        return s
+    if string.str_contains(msg, "Literal/range patterns") or string.str_contains(msg, "`match` can only be used") or string.str_contains(msg, "`match lend`"):
+        s.append_str("GG0225")
+        return s
+    if string.str_contains(msg, "Function using `?`") or string.str_contains(msg, "`?` can only be applied") or string.str_contains(msg, "`?` cannot mix") or string.str_contains(msg, "`?`: error types"):
+        s.append_str("GG0226")
+        return s
+    if string.str_contains(msg, "contains itself") or string.str_contains(msg, "cannot contain itself") or string.str_contains(msg, "infinite recursive"):
+        s.append_str("GG0227")
+        return s
+    if string.str_contains(msg, "Conflicting default") or string.str_contains(msg, "refers to itself") or string.str_contains(msg, "written twice") or string.str_contains(msg, "conflicts with an existing type"):
+        s.append_str("GG0228")
+        return s
+    if string.str_contains(msg, "could not be inferred") or string.str_contains(msg, "inferred as both"):
+        s.append_str("GG0229")
+        return s
+    if string.str_contains(msg, "does not satisfy"):
+        s.append_str("GG0230")
+        return s
+    if string.str_contains(msg, "cannot be compared"):
+        s.append_str("GG0231")
+        return s
+    if string.str_contains(msg, "cannot be printed"):
+        s.append_str("GG0232")
+        return s
+    if string.str_contains(msg, "cannot be converted") or string.str_contains(msg, "conversion cannot"):
+        s.append_str("GG0233")
+        return s
+    if string.str_contains(msg, "Missing field"):
+        s.append_str("GG0234")
+        return s
+    if string.str_contains(msg, "has no variants"):
+        s.append_str("GG0235")
+        return s
+    if string.str_contains(msg, "Slice expression can only") or string.str_contains(msg, "cannot be sliced"):
+        s.append_str("GG0237")
+        return s
+    if string.str_contains(msg, "cannot produce a value without `else`"):
+        s.append_str("GG0238")
+        return s
+    if string.str_contains(msg, "is a enum name") or string.str_contains(msg, "cannot be generic") or string.str_contains(msg, "qualifier is required") or string.str_contains(msg, "`main` takes no parameters"):
+        s.append_str("GG0239")
+        return s
+    if string.str_contains(msg, "`panic` ") or string.str_contains(msg, "`input` takes"):
+        s.append_str("GG0240")
+        return s
+    if string.str_contains(msg, "`ref` return") or string.str_contains(msg, "`-> ref T`") or string.str_contains(msg, "Reference return"):
+        s.append_str("GG0320")
+        return s
+    if string.str_contains(msg, "requires a `tied to`"):
+        s.append_str("GG0321")
+        return s
+    if string.str_contains(msg, "cannot be used as a function value"):
+        s.append_str("GG0322")
+        return s
+    if string.str_contains(msg, "does not return a value"):
+        s.append_str("GG0217")
+        return s
+    if string.str_contains(msg, "Unknown feature"):
+        s.append_str("GG0241")
+        return s
+    if string.str_contains(msg, "pointer type for") or string.str_contains(msg, "can only point to") or string.str_contains(msg, "cannot be dereferenced"):
+        s.append_str("GG0242")
+        return s
+    if string.str_contains(msg, "unsafe"):
+        s.append_str("GG0406")
+        return s
+    if string.str_contains(msg, "extern"):
+        s.append_str("GG0405")
+        return s
+    if string.str_contains(msg, "is a generic type") or string.str_contains(msg, "is not a generic") or string.str_contains(msg, "type argument") or string.str_contains(msg, "must be written explicitly"):
+        s.append_str("GG0214")
+        return s
+    if string.str_contains(msg, "constant") or string.str_contains(msg, "Cannot use `"):
+        s.append_str("GG0215")
+        return s
+    if string.str_contains(msg, "out of range") or string.str_contains(msg, "out of bounds") or string.str_contains(msg, "does not fit"):
+        s.append_str("GG0216")
+        return s
+    if string.str_contains(msg, "Imported file not found"):
+        s.append_str("GG0402")
+        return s
+    if string.str_contains(msg, "Failed to read"):
+        s.append_str("GG0403")
+        return s
+    if string.str_contains(msg, "Compiler internal error") or string.str_contains(msg, "LSP loop error") or string.str_contains(msg, "Handler error"):
+        s.append_str("GG0404")
+        return s
+    if string.str_contains(msg, "comptime evaluation"):
+        s.append_str("GG0401")
+        return s
+    if string.str_contains(msg, "Expected ") or string.str_contains(msg, "expected "):
+        s.append_str("GG0118")
+        return s
+    s.append_str("GG0499")
+    return s

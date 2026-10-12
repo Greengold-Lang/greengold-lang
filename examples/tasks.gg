@@ -1,0 +1,38 @@
+# Tasks: `async fn` starts a task, `await` waits for its result. The three sleeps below overlap.
+import std.tasks
+import std.time
+
+async fn twice(n: i32) -> i32:
+    tasks.sleep(50)
+    return n * 2
+
+async fn greet(name: string, times: i32) -> string:
+    out = string.new()
+    for i in 0..times:
+        out.append(f"{name}{i} ")
+        tasks.yield_now()
+    return out
+
+async fn log(msg: string):
+    print("log:", msg)
+
+async fn sum_children(n: i32) -> i32:
+    total = 0
+    for i in 0..n:
+        total += await twice(i)
+    return total
+
+fn main():
+    t = time.Instant.now()
+    a = twice(1)
+    b = twice(2)
+    c = twice(3)
+    print(await a + await b + await c)
+    print(t.elapsed_millis() < 140)
+    g1 = greet(string.from("x"), 3)
+    g2 = greet(string.from("y"), 3)
+    print(await g1, await g2)
+    await log(string.from("done"))
+    print(await sum_children(4))
+    h = tasks.spawn(fn() -> string => string.from("spawned"))
+    print(h.is_done(), await h)

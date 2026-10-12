@@ -1,0 +1,40 @@
+# conformance: SPEC section 8 (Generics and features), example 6
+# expect-output:
+#   9
+#   1
+
+feature Shape:
+    fn area(self: Self) -> f64
+    fn grow(self: lend Self, by: f64)
+
+struct Square:
+    side: f64
+
+impl Square:
+    fn area(self) -> f64:
+        return self.side * self.side
+
+    fn grow(self: lend Self, by: f64):
+        self.side += by
+
+struct Ring:
+    sizes: List[f64]
+
+impl Ring:
+    fn area(self) -> f64:
+        total = 0.0
+        for s in self.sizes:
+            total += s
+        return total
+
+    fn grow(self: lend Self, by: f64):
+        self.sizes.push(by)
+
+fn main():
+    shapes = List[dyn Shape]()
+    shapes.push(Square{ side: 2.0 })
+    shapes.push(Ring{ sizes: List[f64]() })
+    for s in shapes:
+        s.grow(1.0)
+    for s in shapes:
+        print(s.area())

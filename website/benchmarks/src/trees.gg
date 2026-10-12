@@ -1,0 +1,25 @@
+# Build and walk a full binary tree. Depth 16 is 65536 leaves of value 1.
+# Eighty trees. The tree is freed when the iteration ends.
+
+enum Tree:
+    Leaf(i32)
+    Node(Box[Tree], Box[Tree])
+
+fn build(d: i32) -> Tree:
+    if d == 0:
+        return Tree.Leaf(1)
+    return Tree.Node(Box[Tree](build(d - 1)), Box[Tree](build(d - 1)))
+
+fn count(t: Tree) -> i32:
+    match t:
+        Leaf(v):
+            return v
+        Node(left, right):
+            return count(left.value) + count(right.value)
+
+fn main():
+    total: i32 = 0
+    for i in 0..80:
+        t = build(16)
+        total += count(t)
+    print(total)

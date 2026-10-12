@@ -1,0 +1,295 @@
+# std.net: TCP connections and UDP datagrams over IPv4.
+#
+# A server binds a TcpListener and accepts TcpStreams; a client connects a TcpStream. Each stream is
+# closed when it goes away (`drop`). Calls block; serve many clients with one thread per connection
+# (`Thread.spawn(fn() => handle(stream))`). Hosts are IPv4 addresses ("127.0.0.1", "0.0.0.0") or
+# "localhost".
+#
+# Inside std.tasks tasks, the `_async` methods wait for the socket without blocking the other tasks.
+import std.tasks
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+extern "sys/socket.h" fn socket(family: i32, kind: i32, protocol: i32) -> i32
+extern "sys/socket.h" fn bind(s: i64, addr: *u8, len: i32) -> i32
+extern "sys/socket.h" fn listen(s: i64, backlog: i32) -> i32
+extern "sys/socket.h" fn accept(s: i64, addr: *mut u8, len: *mut i32) -> i32
+extern "sys/socket.h" fn connect(s: i64, addr: *u8, len: i32) -> i32
+extern "sys/socket.h" fn recv(s: i64, buf: *mut u8, len: i64, flags: i32) -> i32
+extern "sys/socket.h" fn send(s: i64, buf: *u8, len: i64, flags: i32) -> i32
+extern "sys/socket.h" fn setsockopt(s: i64, level: i32, name: i32, value: *u8, len: i32) -> i32
+extern "sys/socket.h" fn sendto(s: i64, buf: *u8, len: i64, flags: i32, to: *u8, tolen: i32) -> i32
+extern "sys/socket.h" fn recvfrom(s: i64, buf: *mut u8, len: i64, flags: i32, from: *mut u8, fromlen: *mut i32) -> i32
+extern "sys/socket.h" fn getsockname(s: i64, addr: *mut u8, len: *mut i32) -> i32
+extern "unistd.h" fn close(fd: i32) -> i32
+weak extern "winsock2.h" fn closesocket(s: i64) -> i32
+weak extern "winsock2.h" fn WSAStartup(version: u16, data: *mut u8) -> i32
+
+static NET_READY: bool = false
+static WSA_DATA: [512]u8 = [0; 512]
+
+# Windows needs its socket library started once.
+fn _start():
+    unsafe:
+        if NET_READY:
+            return
+        NET_READY = true
+        if target_os() == "windows":
+            WSAStartup(u16(514), ptr_cast[*mut u8](addr_mut(WSA_DATA)))
+
+fn _close(fd: i64):
+    unsafe:
+        if target_os() == "windows":
+            closesocket(fd)
+        else:
+            close(i32(fd))
+
+# `a.b.c.d` (or "localhost") as four bytes, or None.
+fn _ipv4(host: str) -> Optional[[4]u8]:
+    if host == "localhost":
+        return Valid([127, 0, 0, 1])
+    parts: [4]u8 = [0; 4]
+    part = 0
+    value: u32 = 0
+    digits = 0
+    for c in host:
+        if c == '.':
+            if digits == 0 or part == 3:
+                return None
+            parts[part] = u8(value)
+            part += 1
+            value = 0
+            digits = 0
+        elif c >= '0' and c <= '9':
+            value = value * 10 + u32(c - '0')
+            digits += 1
+            if value > 255 or digits > 3:
+                return None
+        else:
+            return None
+    if part != 3 or digits == 0:
+        return None
+    parts[3] = u8(value)
+    return Valid(parts)
+
+# The 16 bytes of a `sockaddr_in` for `ip:port`.
+fn _sockaddr(ip: [4]u8, port: u16) -> [16]u8:
+    a: [16]u8 = [0; 16]
+    if target_os() == "macos":
+        a[0] = 16
+        a[1] = 2
+    else:
+        a[0] = 2
+    a[2] = u8(port >> 8)
+    a[3] = u8(port & 255)
+    for i in 0..4:
+        a[4 + i] = ip[i]
+    return a
+
+public
+# A TCP socket listening for connections.
+struct TcpListener:
+    private
+    fd: i64
+
+public
+# One TCP connection.
+struct TcpStream:
+    private
+    fd: i64
+
+public
+
+impl TcpListener:
+    # Listens on `host:port`. Port 0 lets the system choose one; `port()` says which.
+    public
+    fn bind(host: str, port: u16) -> Result[TcpListener, string]:
+        _start()
+        fixed ip = match _ipv4(host):
+            Valid(v) => v
+            None => [0, 0, 0, 0]
+        if _ipv4(host).is_none():
+            return Err(f"not an IPv4 address: {host}")
+        unsafe:
+            fd = i64(socket(2, 1, 6))
+            if fd < 0:
+                return Err("socket() failed")
+            one: i32 = 1
+            if target_os() == "windows":
+                setsockopt(fd, 65535, 4, ptr_cast[*u8](addr(one)), 4)
+            else:
+                setsockopt(fd, 1, 2, ptr_cast[*u8](addr(one)), 4)
+            sa = _sockaddr(ip, port)
+            if bind(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+                _close(fd)
+                return Err(f"cannot bind {host}:{port}")
+            if listen(fd, 128) != 0:
+                _close(fd)
+                return Err(f"cannot listen on {host}:{port}")
+            return Ok(TcpListener{ fd: fd })
+
+    # The port the listener is bound to.
+    fn port(self: read Self) -> u16:
+        sa: [16]u8 = [0; 16]
+        len: i32 = 16
+        unsafe:
+            getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
+        return u16(sa[2]) * 256 + u16(sa[3])
+
+    # Like `accept`, but other tasks run while it waits (std.tasks).
+    fn accept_async(self: read Self) -> Result[TcpStream, string]:
+        tasks.wait_readable(self.fd)
+        return self.accept()
+
+    # Waits for the next connection.
+    fn accept(self: read Self) -> Result[TcpStream, string]:
+        unsafe:
+            fd = i64(accept(self.fd, null, null))
+            if fd < 0:
+                return Err("accept() failed")
+            return Ok(TcpStream{ fd: fd })
+
+    fn drop(self: lend Self):
+        _close(self.fd)
+
+impl TcpStream:
+    # Connects to `host:port`.
+    public
+    fn connect(host: str, port: u16) -> Result[TcpStream, string]:
+        _start()
+        if _ipv4(host).is_none():
+            return Err(f"not an IPv4 address: {host}")
+        fixed ip = match _ipv4(host):
+            Valid(v) => v
+            None => [0, 0, 0, 0]
+        unsafe:
+            fd = i64(socket(2, 1, 6))
+            if fd < 0:
+                return Err("socket() failed")
+            sa = _sockaddr(ip, port)
+            if connect(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+                _close(fd)
+                return Err(f"cannot connect to {host}:{port}")
+            return Ok(TcpStream{ fd: fd })
+
+    # Sends every byte of `data`.
+    fn send(self: read Self, data: str) -> Result[usize, string]:
+        sent: usize = 0
+        while sent < data.len:
+            unsafe:
+                part = data[sent..]
+                n = send(self.fd, addr(part), i64(part.len), 0)
+                if n <= 0:
+                    return Err("send() failed")
+                sent += usize(n)
+        return Ok(sent)
+
+    # Like `receive`, but other tasks run while it waits (std.tasks).
+    fn receive_async(self: read Self, max: usize) -> Result[string, string]:
+        tasks.wait_readable(self.fd)
+        return self.receive(max)
+
+    # Receives up to `max` bytes; an empty string means the other side closed the connection.
+    fn receive(self: read Self, max: usize) -> Result[string, string]:
+        out = string.new()
+        unsafe:
+            buf = malloc(max)
+            n = recv(self.fd, buf, i64(max), 0)
+            if n < 0:
+                free(buf)
+                return Err("recv() failed")
+            out.append_str(str_from_raw(buf, usize(n)))
+            free(buf)
+        return Ok(out)
+
+    # Receives until the other side closes the connection.
+    fn receive_all(self: read Self) -> Result[string, string]:
+        out = string.new()
+        while true:
+            chunk = self.receive(4096)?
+            if chunk.len == 0:
+                return Ok(out)
+            out.append_str(chunk.as_str())
+        return Ok(out)
+
+    fn drop(self: lend Self):
+        _close(self.fd)
+
+public
+# A UDP socket: sends and receives single datagrams, without a connection.
+struct UdpSocket:
+    private
+    fd: i64
+
+public
+# One datagram received, and who sent it.
+struct Datagram:
+    data: string
+    host: string
+    port: u16
+
+impl UdpSocket:
+    # Binds `host:port` (port 0 lets the system choose; `port()` says which).
+    public
+    fn bind(host: str, port: u16) -> Result[UdpSocket, string]:
+        _start()
+        if _ipv4(host).is_none():
+            return Err(f"not an IPv4 address: {host}")
+        fixed ip = match _ipv4(host):
+            Valid(v) => v
+            None => [0, 0, 0, 0]
+        unsafe:
+            fd = i64(socket(2, 2, 17))
+            if fd < 0:
+                return Err("socket() failed")
+            sa = _sockaddr(ip, port)
+            if bind(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+                _close(fd)
+                return Err(f"cannot bind {host}:{port}")
+            return Ok(UdpSocket{ fd: fd })
+
+    fn port(self: read Self) -> u16:
+        sa: [16]u8 = [0; 16]
+        len: i32 = 16
+        unsafe:
+            getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
+        return u16(sa[2]) * 256 + u16(sa[3])
+
+    # Sends `data` as one datagram to `host:port`.
+    fn send_to(self: read Self, data: str, host: str, port: u16) -> Result[usize, string]:
+        if _ipv4(host).is_none():
+            return Err(f"not an IPv4 address: {host}")
+        fixed ip = match _ipv4(host):
+            Valid(v) => v
+            None => [0, 0, 0, 0]
+        sa = _sockaddr(ip, port)
+        unsafe:
+            n = sendto(self.fd, addr(data), i64(data.len), 0, ptr_cast[*u8](addr(sa)), 16)
+            if n < 0:
+                return Err("sendto() failed")
+            return Ok(usize(n))
+
+    # Like `receive_from`, but other tasks run while it waits (std.tasks).
+    fn receive_from_async(self: read Self, max: usize) -> Result[Datagram, string]:
+        tasks.wait_readable(self.fd)
+        return self.receive_from(max)
+
+    # Waits for one datagram of at most `max` bytes (a longer one is cut).
+    fn receive_from(self: read Self, max: usize) -> Result[Datagram, string]:
+        sa: [16]u8 = [0; 16]
+        len: i32 = 16
+        out = string.new()
+        unsafe:
+            buf = malloc(max + 1)
+            n = recvfrom(self.fd, buf, i64(max), 0, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
+            if n < 0:
+                free(buf)
+                return Err("recvfrom() failed")
+            out.append_str(str_from_raw(buf, usize(n)))
+            free(buf)
+        host = f"{sa[4]}.{sa[5]}.{sa[6]}.{sa[7]}"
+        return Ok(Datagram{ data: out, host: host, port: u16(sa[2]) * 256 + u16(sa[3]) })
+
+    fn drop(self: lend Self):
+        _close(self.fd)

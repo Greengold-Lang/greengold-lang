@@ -1,0 +1,25 @@
+# Points of an xorshift64* stream that land in the unit circle.
+# The generator matches std.rand. The printed value is the hit count.
+# One hot function, so the multiply wraps and the generator stays in the loop.
+
+hot fn count_hits() -> i64:
+    overflow: wrap
+    x: u64 = 88172645463325252
+    hits: i64 = 0
+    i: i32 = 0
+    while i < 120000000:
+        x = x ^ (x >> 12)
+        x = x ^ (x << 25)
+        x = x ^ (x >> 27)
+        fx = f64((x * 2685821657736338717) >> 11) / 9007199254740992.0 * 2.0 - 1.0
+        x = x ^ (x >> 12)
+        x = x ^ (x << 25)
+        x = x ^ (x >> 27)
+        fy = f64((x * 2685821657736338717) >> 11) / 9007199254740992.0 * 2.0 - 1.0
+        if fx * fx + fy * fy <= 1.0:
+            hits += 1
+        i += 1
+    return hits
+
+fn main():
+    print(count_hits())

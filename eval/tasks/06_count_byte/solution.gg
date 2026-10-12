@@ -1,0 +1,6 @@
+fn count_byte(text: str, needle: u8) -> usize:
+    n: usize = 0
+    for i in 0..text.len:
+        if text[i] == needle:
+            n += 1
+    return n

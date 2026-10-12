@@ -1,0 +1,8 @@
+# conformance: SPEC section 17, rejected form: `Send` written as a bound
+# expect-error: GG0241 at line 4
+
+fn f[T: Send](x: T):
+    pass
+
+fn main():
+    pass

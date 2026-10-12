@@ -1,0 +1,238 @@
+# std.json: JSON as a tree of values, for documents whose shape is not known ahead.
+#
+# For data with a known shape, `from_json[T](text)` and `to_json(x)` (built in) read and write a struct
+# directly. This module is for the rest:
+#     doc = json.parse(text)?
+#     name = doc.get("user").get("name").as_str_or("")
+#     out = json.object()
+#     out.set("ok", Json.Bool(true))
+#     print(out.to_text())                                # {"ok":true}
+
+public
+enum Json:
+    Null
+    Bool(bool)
+    Num(f64)
+    Str(string)
+    Arr(List[Json])
+    Obj(List[Member])
+
+# One `"key": value` pair of an object, in the order of the text.
+struct Member:
+    key: string
+    value: Json
+
+fn object() -> Json:
+    return Json.Obj(List[Member]())
+
+fn array() -> Json:
+    return Json.Arr(List[Json]())
+
+fn text(s: str) -> Json:
+    return Json.Str(string.from(s))
+
+# Reads one JSON value; an error says what is wrong and at which byte.
+fn parse(input: str) -> Result[Json, string]:
+    r = _JsonReader.new(input)
+    v = _read(r, 0)
+    if not r.finish():
+        return Err(r.error.clone())
+    return Ok(v)
+
+impl Json:
+    # The member `key` of an object (a copy), or `Null` when this is not an object or has no such key.
+    fn get(self: read Self, key: str) -> Json:
+        match self:
+            Obj(members):
+                for m in members:
+                    if m.key.as_str() == key:
+                        return m.value.clone()
+            _: pass
+        return Json.Null
+
+    fn has(self: read Self, key: str) -> bool:
+        match self:
+            Obj(members):
+                for m in members:
+                    if m.key.as_str() == key:
+                        return true
+            _: pass
+        return false
+
+    # The element `i` of an array (a copy), or `Null`.
+    fn at(self: read Self, i: usize) -> Json:
+        match self:
+            Arr(items):
+                if i < items.len:
+                    return items[i].clone()
+            _: pass
+        return Json.Null
+
+    # Elements of an array or members of an object; 0 for anything else.
+    fn len(self: read Self) -> usize:
+        match self:
+            Arr(items): return items.len
+            Obj(members): return members.len
+            _: return 0
+
+    # The keys of an object, in order.
+    fn keys(self: read Self) -> List[string]:
+        out = List[string]()
+        match self:
+            Obj(members):
+                for m in members:
+                    out.push(m.key.clone())
+            _: pass
+        return out
+
+    fn is_null(self: read Self) -> bool:
+        match self:
+            Null: return true
+            _: return false
+
+    fn as_f64(self: read Self) -> Optional[f64]:
+        match self:
+            Num(x): return Valid(x)
+            _: return None
+
+    # The number when it is a whole number that fits in `i64`.
+    fn as_i64(self: read Self) -> Optional[i64]:
+        match self:
+            Num(x):
+                if x == f64(i64(x)) and x >= -9.2e18 and x <= 9.2e18:
+                    return Valid(i64(x))
+            _: pass
+        return None
+
+    fn as_bool(self: read Self) -> Optional[bool]:
+        match self:
+            Bool(b): return Valid(b)
+            _: return None
+
+    fn as_string(self: read Self) -> Optional[string]:
+        match self:
+            Str(s): return Valid(s.clone())
+            _: return None
+
+    fn as_f64_or(self: read Self, fallback: f64) -> f64:
+        match self:
+            Num(x): return x
+            _: return fallback
+
+    fn as_str_or(self: read Self, fallback: str) -> string:
+        match self:
+            Str(s): return s.clone()
+            _: return string.from(fallback)
+
+    # Sets the member `key` of an object, replacing an old one (a value that is not an object first
+    # becomes an empty object).
+    fn set(self: lend Self, key: str, value: Json):
+        match lend self:
+            Obj(members):
+                for i in 0..members.len:
+                    if members[i].key.as_str() == key:
+                        members[i].value = value
+                        return
+                members.push(Member{ key: string.from(key), value: value })
+                return
+            _: pass
+        fresh = List[Member]()
+        fresh.push(Member{ key: string.from(key), value: value })
+        self = Json.Obj(fresh)
+
+    # Appends to an array (a value that is not an array first becomes an empty array).
+    fn push(self: lend Self, value: Json):
+        match lend self:
+            Arr(items):
+                items.push(value)
+                return
+            _: pass
+        fresh = List[Json]()
+        fresh.push(value)
+        self = Json.Arr(fresh)
+
+    # Compact JSON text: no spaces, keys in their order.
+    fn to_text(self: read Self) -> string:
+        out = string.new()
+        _write(self, out, false, 0)
+        return out
+
+    # JSON text with two-space indentation, one member or element per line.
+    fn to_pretty(self: read Self) -> string:
+        out = string.new()
+        _write(self, out, true, 0)
+        return out
+
+    # `to_json(x)` of a struct with a `Json` field writes the value as it is.
+    fn to_json(self: read Self) -> string:
+        return self.to_text()
+
+private
+fn _read(r: lend _JsonReader, depth: i32) -> Json:
+    if depth > 512:
+        r.fail("nested too deeply")
+        return Json.Null
+    c = r.peek()
+    if c == '{':
+        members = List[Member]()
+        r.begin_object()
+        first = true
+        while r.next_key(first):
+            first = false
+            members.push(Member{ key: r.key.clone(), value: _read(r, depth + 1) })
+        return Json.Obj(members)
+    if c == '[':
+        items = List[Json]()
+        r.begin_array()
+        first = true
+        while r.next_item(first):
+            first = false
+            items.push(_read(r, depth + 1))
+        return Json.Arr(items)
+    if c == '"':
+        return Json.Str(r.read_string())
+    if c == 't' or c == 'f':
+        return Json.Bool(r.read_bool())
+    if c == 'n':
+        if not r.read_null():
+            r.fail("expected a value")
+        return Json.Null
+    if c == '-' or (c >= '0' and c <= '9'):
+        return Json.Num(r.read_f64())
+    r.fail("expected a value")
+    return Json.Null
+
+fn _indent(out: lend string, pretty: bool, depth: i32):
+    if pretty:
+        out.append_byte('\n')
+        for _i in 0..depth:
+            out.append_str("  ")
+
+fn _write(j: read Json, out: lend string, pretty: bool, depth: i32):
+    match j:
+        Null: out.append_str("null")
+        Bool(b): out.append_str(if b then "true" else "false")
+        Num(x): _json_number(out, x)
+        Str(s): _json_escape(out, s.as_str())
+        Arr(items):
+            out.append_byte('[')
+            for i in 0..items.len:
+                if i > 0:
+                    out.append_byte(',')
+                _indent(out, pretty, depth + 1)
+                _write(items[i], out, pretty, depth + 1)
+            if items.len > 0:
+                _indent(out, pretty, depth)
+            out.append_byte(']')
+        Obj(members):
+            out.append_byte('{')
+            for i in 0..members.len:
+                if i > 0:
+                    out.append_byte(',')
+                _indent(out, pretty, depth + 1)
+                _json_escape(out, members[i].key.as_str())
+                out.append_str(if pretty then ": " else ":")
+                _write(members[i].value, out, pretty, depth + 1)
+            if members.len > 0:
+                _indent(out, pretty, depth)
+            out.append_byte('}')

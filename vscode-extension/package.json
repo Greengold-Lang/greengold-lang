@@ -1,0 +1,397 @@
+{
+  "name": "greengold-vscode",
+  "displayName": "Greengold Language Support",
+  "description": "Full IDE experience for Greengold (.gg): LSP, Test Explorer, CodeLens, native debugging, syntax highlighting, diagnostics, hover, inlay hints, definition, references, rename, completion, formatting, snippets, and tasks.",
+  "version": "0.19.0",
+  "publisher": "greengold",
+  "icon": "icons/greengold_logo.png",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets",
+    "Formatters",
+    "Testing",
+    "Debuggers"
+  ],
+  "keywords": [
+    "greengold",
+    "gg",
+    "systems programming",
+    "llvm",
+    "lsp",
+    "compiler"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:gg",
+    "onCommand:greengold.newPackage",
+    "onCommand:greengold.bindgen",
+    "onCommand:greengold.bindgenCpp",
+    "onCommand:greengold.debugFile"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UmutFarukDilli/Greengold-lang"
+  },
+  "license": "MIT",
+  "contributes": {
+    "languages": [
+      {
+        "id": "gg",
+        "aliases": [
+          "Greengold",
+          "greengold",
+          "gg"
+        ],
+        "extensions": [
+          ".gg"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/greengold_logo.png",
+          "dark": "./icons/greengold_logo.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gg",
+        "scopeName": "source.gg",
+        "path": "./syntaxes/gg.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "gg",
+        "path": "./snippets/snippets.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "greengold.runFile",
+        "title": "Greengold: Run Current File (Debug)",
+        "icon": "$(play)"
+      },
+      {
+        "command": "greengold.runRelease",
+        "title": "Greengold: Run Current File (Release)",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "greengold.debugFile",
+        "title": "Greengold: Debug Current File",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "greengold.buildFile",
+        "title": "Greengold: Build Binary (Debug)",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "greengold.buildRelease",
+        "title": "Greengold: Build Binary (Release)",
+        "icon": "$(package)"
+      },
+      {
+        "command": "greengold.emitLLVM",
+        "title": "Greengold: Emit LLVM IR",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "greengold.emitBC",
+        "title": "Greengold: Emit LLVM Bitcode",
+        "icon": "$(file-binary)"
+      },
+      {
+        "command": "greengold.checkFile",
+        "title": "Greengold: Check Current File",
+        "icon": "$(search)"
+      },
+      {
+        "command": "greengold.fixFile",
+        "title": "Greengold: Apply Safe Fixes",
+        "icon": "$(wrench)"
+      },
+      {
+        "command": "greengold.explain",
+        "title": "Greengold: Explain Diagnostic Code",
+        "icon": "$(question)"
+      },
+      {
+        "command": "greengold.targets",
+        "title": "Greengold: List Targets",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "greengold.apiLock",
+        "title": "Greengold: Write API Lock",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "greengold.apiCheck",
+        "title": "Greengold: Check API Lock",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "greengold.showAst",
+        "title": "Greengold: View AST",
+        "icon": "$(symbol-structure)"
+      },
+      {
+        "command": "greengold.formatFile",
+        "title": "Greengold: Format File (gg fmt)",
+        "icon": "$(paintcan)"
+      },
+      {
+        "command": "greengold.runTests",
+        "title": "Greengold: Run Tests (gg test)",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "greengold.runSingleTest",
+        "title": "Greengold: Run Single Test at Cursor",
+        "icon": "$(play)"
+      },
+      {
+        "command": "greengold.newPackage",
+        "title": "Greengold: Create New Project (gg new)",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "greengold.bindgen",
+        "title": "Greengold: Generate C Bindings (gg bindgen)",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "greengold.bindgenCpp",
+        "title": "Greengold: Generate C++ Bindings (gg bindgen --cpp)",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "greengold.generateDoc",
+        "title": "Greengold: Generate Documentation (gg doc)",
+        "icon": "$(book)"
+      },
+      {
+        "command": "greengold.restartServer",
+        "title": "Greengold: Restart Language Server",
+        "icon": "$(sync)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "greengold.runFile",
+          "when": "resourceLangId == gg",
+          "group": "navigation@1"
+        },
+        {
+          "command": "greengold.runRelease",
+          "when": "resourceLangId == gg",
+          "group": "navigation@2"
+        },
+        {
+          "command": "greengold.debugFile",
+          "when": "resourceLangId == gg",
+          "group": "navigation@3"
+        },
+        {
+          "command": "greengold.buildRelease",
+          "when": "resourceLangId == gg",
+          "group": "navigation@4"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "greengold.runFile",
+          "when": "resourceLangId == gg",
+          "group": "greengold@1"
+        },
+        {
+          "command": "greengold.runRelease",
+          "when": "resourceLangId == gg",
+          "group": "greengold@2"
+        },
+        {
+          "command": "greengold.debugFile",
+          "when": "resourceLangId == gg",
+          "group": "greengold@3"
+        },
+        {
+          "command": "greengold.buildFile",
+          "when": "resourceLangId == gg",
+          "group": "greengold@4"
+        },
+        {
+          "command": "greengold.buildRelease",
+          "when": "resourceLangId == gg",
+          "group": "greengold@5"
+        },
+        {
+          "command": "greengold.formatFile",
+          "when": "resourceLangId == gg",
+          "group": "greengold@6"
+        },
+        {
+          "command": "greengold.runTests",
+          "when": "resourceLangId == gg",
+          "group": "greengold@7"
+        },
+        {
+          "command": "greengold.generateDoc",
+          "when": "resourceLangId == gg",
+          "group": "greengold@8"
+        },
+        {
+          "command": "greengold.checkFile",
+          "when": "resourceLangId == gg",
+          "group": "greengold@9"
+        },
+        {
+          "command": "greengold.fixFile",
+          "when": "resourceLangId == gg",
+          "group": "greengold@10"
+        },
+        {
+          "command": "greengold.emitLLVM",
+          "when": "resourceLangId == gg",
+          "group": "greengold@11"
+        },
+        {
+          "command": "greengold.showAst",
+          "when": "resourceLangId == gg",
+          "group": "greengold@12"
+        },
+        {
+          "command": "greengold.newPackage",
+          "group": "greengold@13"
+        },
+        {
+          "command": "greengold.explain",
+          "when": "resourceLangId == gg",
+          "group": "greengold@14"
+        },
+        {
+          "command": "greengold.restartServer",
+          "when": "resourceLangId == gg",
+          "group": "greengold@15"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "greengold.bindgen",
+          "when": "resourceExtname == .h",
+          "group": "greengold"
+        },
+        {
+          "command": "greengold.bindgenCpp",
+          "when": "resourceExtname == .h || resourceExtname == .hpp || resourceExtname == .hh || resourceExtname == .hxx",
+          "group": "greengold"
+        }
+      ]
+    },
+    "problemMatchers": [
+      {
+        "name": "greengold",
+        "owner": "greengold",
+        "source": "greengold",
+        "fileLocation": "autoDetect",
+        "pattern": [
+          {
+            "regexp": "^(Error|Warning):\\s+(.*)$",
+            "severity": 1,
+            "message": 2
+          },
+          {
+            "regexp": "^\\s*-->\\s+(.+):(\\d+):(\\d+)(?:\\s+(GG\\d+))?",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "code": 4
+          }
+        ]
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "greengold",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The Greengold command to execute (build, run, check, test, fix, fmt)."
+          },
+          "file": {
+            "type": "string",
+            "description": "Source file to compile or run."
+          },
+          "release": {
+            "type": "boolean",
+            "description": "Enable release mode (LLVM -O3)."
+          }
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[gg]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false,
+        "editor.inlayHints.enabled": "on",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.greengold": "explicit"
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Greengold",
+      "properties": {
+        "greengold.languageServer.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Greengold Language Server (LSP) support."
+        },
+        "greengold.languageServer.command": {
+          "type": "string",
+          "default": "",
+          "description": "Custom command to start the LSP server (defaults to 'python -m greengold lsp' if left blank)."
+        },
+        "greengold.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python interpreter path to run the Greengold compiler and LSP server."
+        },
+        "greengold.debug.debugger": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "lldb",
+            "cppvsdbg",
+            "cppdbg"
+          ],
+          "default": "auto",
+          "description": "Debugger backend to use for Greengold debug sessions (auto selects CodeLLDB or C/C++ tools)."
+        },
+        "greengold.codeLens.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeLens annotations above main and test functions."
+        },
+        "greengold.testing.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable native VS Code Test Explorer integration for Greengold."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.2"
+  }
+}

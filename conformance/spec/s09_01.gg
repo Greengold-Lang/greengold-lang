@@ -1,0 +1,15 @@
+# conformance: SPEC section 9 (Optional, Result, and `?`), example 1
+# expect-output:
+#   8
+
+fn half(n: i32) -> Optional[i32]:
+    if n < 0:
+        return None
+    return Valid(n)
+
+fn twice(n: Optional[i32]) -> Optional[i32]:
+    v = n?
+    return Valid(v + v)
+
+fn main():
+    print(twice(half(4)).value_or(0))

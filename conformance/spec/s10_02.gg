@@ -1,0 +1,12 @@
+# conformance: SPEC section 10 (Heap, text, arrays, slices), example 2
+# expect-output:
+#   6
+
+fn sum(xs: []i32) -> i32:
+    total = 0
+    for x in xs:
+        total += x
+    return total
+
+fn main():
+    print(sum([1, 2, 3]))

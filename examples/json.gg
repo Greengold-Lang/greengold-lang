@@ -1,0 +1,44 @@
+enum Shape:
+    Circle(f64)
+    Rect(f64, f64)
+    Empty
+
+enum Color:
+    Red
+    Green
+
+struct Point:
+    x: i32
+    y: i32
+
+struct Doc:
+    title: string
+    tags: List[string]
+    at: Point
+    shapes: List[Shape]
+    color: Color
+    note: Optional[string]
+    pair: (i32, bool)
+    grid: [2]u8
+
+fn main():
+    tags = List[string]()
+    tags.push("a\"b")
+    tags.push("é")
+    shapes = List[Shape]()
+    shapes.push(Shape.Circle(1.5))
+    shapes.push(Shape.Rect(2.0, 3.0))
+    shapes.push(Shape.Empty)
+    d = Doc{ title: "Hi\n", tags: tags, at: Point{ x: 1, y: -2 }, shapes: shapes, color: Color.Green, note: None, pair: (7, true), grid: [3, 4] }
+    text = to_json(d)
+    print(text)
+    back = from_json[Doc](text.as_str())
+    match back:
+        Ok(v):
+            print(v == d, v.tags, v.at)
+        Err(e):
+            print("error", e)
+    print(from_json[Point]("{\"y\": 5, \"x\": 4, \"extra\": [1, {\"z\": null}]}"))
+    print(from_json[Point]("{\"x\": 4}"))
+    print(from_json[List[i32]]("[1, 2, 300]"), from_json[List[u8]]("[1, 2, 300]"))
+    print(from_json[Color]("\"Red\""), from_json[Shape]("{\"Rect\": [1, 2]}"), from_json[Optional[i32]]("null"))

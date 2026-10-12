@@ -1,0 +1,68 @@
+import std.thread
+
+fn bump(p: *u8) -> *u8:
+    unsafe:
+        a = ptr_cast[*mut thread.AtomicI64](p)
+        for _i in 0..1000:
+            a[0].fetch_and_add(1)
+    return p
+
+struct Guarded:
+    lock: thread.Mutex
+    value: [1]i64
+
+fn locked_bump(p: *u8) -> *u8:
+    unsafe:
+        g = ptr_cast[*mut Guarded](p)
+        for _i in 0..2000:
+            g[0].lock.lock()
+            g[0].value[0] = g[0].value[0] + 1
+            g[0].lock.unlock()
+    return p
+
+fn producer(p: *u8) -> *u8:
+    unsafe:
+        c = ptr_cast[*mut thread.Channel](p)
+        for i in 1..101:
+            c[0].send(i64(i))
+        c[0].close()
+    return p
+
+fn main():
+    counter = thread.AtomicI64.new(0)
+    threads = List[thread.Thread]()
+    for _i in 0..4:
+        unsafe:
+            threads.push(thread.Thread.spawn_raw(bump, ptr_cast[*u8](addr_mut(counter))))
+    for i in 0..threads.len:
+        threads[i].join()
+    print("counter =", counter.load())
+    swapped = counter.compare_and_swap(4000, 7)
+    after = counter.load()
+    print("cas:", swapped, after)
+
+    zero: [1]i64 = [0]
+    guarded = Guarded{ lock: thread.Mutex.new(), value: zero }
+    workers = List[thread.Thread]()
+    for _i in 0..4:
+        unsafe:
+            workers.push(thread.Thread.spawn_raw(locked_bump, ptr_cast[*u8](addr_mut(guarded))))
+    for i in 0..workers.len:
+        workers[i].join()
+    print("guarded =", guarded.value[0])
+
+    ch = thread.Channel.new()
+    sum: i64 = 0
+    n: i64 = 0
+    unsafe:
+        t = thread.Thread.spawn_raw(producer, ptr_cast[*u8](addr_mut(ch)))
+        while true:
+            got = ch.recv()
+            match got:
+                Valid(v):
+                    sum += v
+                    n += 1
+                None:
+                    break
+        t.join()
+    print("received", n, "sum", sum)

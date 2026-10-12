@@ -1,0 +1,18 @@
+# conformance: SPEC section 8 (Generics and features), example 5
+# expect-output:
+#   6
+
+feature Sized:
+    fn size(self: Self) -> i32
+    fn twice(self: Self) -> i32:
+        return self.size() + self.size()
+
+struct Gem:
+    n: i32
+
+impl Gem:
+    fn size(self) -> i32:
+        return self.n
+
+fn main():
+    print(Gem{ n: 3 }.twice())

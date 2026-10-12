@@ -1,0 +1,6 @@
+fn median3(a: i32, b: i32, c: i32) -> i32:
+    if (a <= b and b <= c) or (c <= b and b <= a):
+        return b
+    if (b <= a and a <= c) or (c <= a and a <= b):
+        return a
+    return c

@@ -1,0 +1,15 @@
+# conformance: SPEC section 13 (Expressions), example 4
+# expect-output:
+#   11 6
+
+fn make_adder(k: i32) -> Fn(i32) -> i32:
+    return fn(x: i32) -> i32 => x + k
+
+fn main():
+    steps = List[Fn(i32) -> i32]()
+    steps.push(make_adder(1))
+    steps.push(make_adder(10))
+    v = 0
+    for i in 0..steps.len:
+        v = steps[i](v)
+    print(v, make_adder(5)(1))

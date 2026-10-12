@@ -1,0 +1,13 @@
+fn bsearch(xs: []i32, target: i32) -> Optional[usize]:
+    lo: usize = 0
+    hi: usize = xs.len
+    while lo < hi:
+        mid = lo + (hi - lo) / 2
+        v = xs[mid]
+        if v == target:
+            return Valid(mid)
+        if v < target:
+            lo = mid + 1
+        else:
+            hi = mid
+    return None

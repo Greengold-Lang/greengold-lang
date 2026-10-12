@@ -1,0 +1,17 @@
+const MASK: u32 = 0xFF
+
+fn pack(r: u8, g: u8, b: u8, a: u8) -> u32:
+    return (u32(r) << 24) | (u32(g) << 16) | (u32(b) << 8) | u32(a)
+
+fn red(c: u32) -> u8:
+    return u8((c >> 24) & MASK)
+
+fn main():
+    c = pack(255, 128, 64, 32)
+    print(c)
+    print(red(c))
+    print(c & 0xFF)
+    print(i64(c) * 2)
+    x: f32 = 7.5
+    print(i32(x))
+    print(f64(3) / 2.0)

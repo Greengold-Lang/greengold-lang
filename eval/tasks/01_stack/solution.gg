@@ -1,0 +1,17 @@
+struct Stack:
+    items: List[i32]
+
+fn stack_new() -> Stack:
+    return Stack{ items: List[i32]() }
+
+fn stack_push(s: lend Stack, value: i32):
+    s.items.push(value)
+
+fn stack_pop(s: lend Stack) -> Optional[i32]:
+    return s.items.pop()
+
+fn stack_len(s: read Stack) -> usize:
+    return s.items.len
+
+fn stack_into_len(s: consume Stack) -> usize:
+    return s.items.len

@@ -1,0 +1,13 @@
+# conformance: SPEC section 17, rejected form: calling `drop` by hand
+# expect-error: GG0325 at line 13
+
+struct Fd:
+    n: i32
+
+impl Fd:
+    fn drop(self: lend Self):
+        pass
+
+fn main():
+    f = Fd{ n: 1 }
+    f.drop()

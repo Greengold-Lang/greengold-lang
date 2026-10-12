@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gg-grad" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0d1315" />
+  <rect width="64" height="64" rx="14" stroke="#1f2d30" stroke-width="2" />
+  <!-- Stylized leaf & lightning / G glyph -->
+  <path d="M32 10C20 18 14 30 16 42C17 48 21 52 27 53C24 45 25 37 30 30C35 23 44 18 48 14C51 22 49 32 44 40C40 46 34 50 28 52C36 53 45 49 50 41C55 33 55 20 48 13C43 8 37 9 32 10Z" fill="url(#gg-grad)" filter="url(#glow)" />
+  <circle cx="48" cy="14" r="3" fill="#fef08a" />
+</svg>

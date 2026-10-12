@@ -1,0 +1,524 @@
+# Parser cursor: tokens, diagnostics, and the node arena.
+import std.string
+import lex
+import ast
+import codes
+
+public
+
+struct Span:
+    lo: usize
+    hi: usize
+
+struct Mark:
+    pos: usize
+    diags: usize
+    nodes: usize
+    ids: usize
+    strs: usize
+    bkeys: usize
+
+struct Parser:
+    lx: lex.Lexer
+    pos: usize
+    bad: bool
+    nodes: List[ast.Node]
+    ids: List[usize]
+    strs: List[usize]
+    bkeys: List[usize]
+    bvlo: List[usize]
+    bvhi: List[usize]
+    ak: List[usize]
+    av: List[usize]
+    lk: List[usize]
+    ln: List[i32]
+    lifted: List[usize]
+    export: bool
+    pat_only: bool
+    test_target: usize
+    test_serial: i32
+    tmp_counter: i32
+    lambda_counter: i32
+    z: usize
+    busy: List[usize]
+    prelude: usize
+    pre_nodes: usize
+
+fn empty_span() -> Span:
+    return Span{ lo: 0, hi: 0 }
+
+fn parser_new(lx: consume lex.Lexer) -> Parser:
+    p = Parser{
+        lx: lx,
+        pos: 0,
+        bad: false,
+        nodes: List[ast.Node](),
+        ids: List[usize](),
+        strs: List[usize](),
+        bkeys: List[usize](),
+        bvlo: List[usize](),
+        bvhi: List[usize](),
+        ak: List[usize](),
+        av: List[usize](),
+        lk: List[usize](),
+        ln: List[i32](),
+        lifted: List[usize](),
+        export: false,
+        pat_only: false,
+        test_target: 0,
+        test_serial: 0,
+        tmp_counter: 0,
+        lambda_counter: 0,
+        z: 0,
+        busy: List[usize](),
+        prelude: 0,
+        pre_nodes: 0,
+    }
+    p.nodes.push(ast.blank())
+    p.z = p.lx.names.put("") + 1
+    p.test_target = p.z
+    return p
+
+fn kind_is(p: read Parser, t: lex.Token, k: str) -> bool:
+    return string.str_eq(p.lx.names.text(t.kind), k)
+
+fn text_is(p: read Parser, t: lex.Token, s: str) -> bool:
+    return string.str_eq(p.lx.names.text(t.text), s)
+
+fn cur(p: read Parser) -> lex.Token:
+    return p.lx.tokens[p.pos]
+
+fn at(p: read Parser, k: str) -> bool:
+    return kind_is(p, p.lx.tokens[p.pos], k)
+
+fn at2(p: read Parser, a: str, b: str) -> bool:
+    t = p.lx.tokens[p.pos]
+    if kind_is(p, t, a):
+        return true
+    return kind_is(p, t, b)
+
+fn at3(p: read Parser, a: str, b: str, c: str) -> bool:
+    if at2(p, a, b):
+        return true
+    return at(p, c)
+
+fn peek_at(p: read Parser, n: usize) -> lex.Token:
+    i = p.pos + n
+    last = p.lx.tokens.len - 1
+    if i > last:
+        i = last
+    return p.lx.tokens[i]
+
+fn advance(p: lend Parser) -> lex.Token:
+    t = p.lx.tokens[p.pos]
+    if not kind_is(p, t, "EOF"):
+        p.pos += 1
+    return t
+
+fn eat(p: lend Parser, k: str) -> bool:
+    if at(p, k):
+        advance(p)
+        return true
+    return false
+
+fn named(p: read Parser, t: lex.Token, s: str) -> bool:
+    if not kind_is(p, t, "NAME"):
+        return false
+    return text_is(p, t, s)
+
+fn cur_named(p: read Parser, s: str) -> bool:
+    return named(p, p.lx.tokens[p.pos], s)
+
+fn sid(p: lend Parser, text: str) -> usize:
+    return p.lx.names.put(text) + 1
+
+fn raw(packed: usize) -> usize:
+    return packed - 1
+
+fn packed_text(p: read Parser, packed: usize) -> str:
+    return p.lx.names.text(packed - 1)
+
+fn push_node(p: lend Parser, n: ast.Node) -> usize:
+    id = p.nodes.len
+    p.nodes.push(n)
+    return id
+
+fn set_node(p: lend Parser, id: usize, n: ast.Node):
+    p.nodes[id] = n
+
+fn get_node(p: read Parser, id: usize) -> ast.Node:
+    return p.nodes[id]
+
+fn flush(p: lend Parser, tmp: read List[usize]) -> Span:
+    lo = p.ids.len
+    i: usize = 0
+    while i < tmp.len:
+        p.ids.push(tmp[i])
+        i += 1
+    return Span{ lo: lo, hi: p.ids.len }
+
+fn flush_str(p: lend Parser, tmp: read List[usize]) -> Span:
+    lo = p.strs.len
+    i: usize = 0
+    while i < tmp.len:
+        p.strs.push(tmp[i])
+        i += 1
+    return Span{ lo: lo, hi: p.strs.len }
+
+fn trim_us(xs: lend List[usize], n: usize):
+    while xs.len > n:
+        match xs.pop():
+            None:
+                return
+            Valid(_):
+                pass
+
+fn trim_nodes(xs: lend List[ast.Node], n: usize):
+    while xs.len > n:
+        match xs.pop():
+            None:
+                return
+            Valid(_):
+                pass
+
+fn trim_diags(xs: lend List[lex.Diag], n: usize):
+    while xs.len > n:
+        match xs.pop():
+            None:
+                return
+            Valid(_):
+                pass
+
+fn here(p: read Parser) -> Mark:
+    return Mark{
+        pos: p.pos,
+        diags: p.lx.diags.len,
+        nodes: p.nodes.len,
+        ids: p.ids.len,
+        strs: p.strs.len,
+        bkeys: p.bkeys.len,
+    }
+
+fn rewind(p: lend Parser, m: Mark):
+    p.pos = m.pos
+    p.bad = false
+    trim_diags(p.lx.diags, m.diags)
+    trim_nodes(p.nodes, m.nodes)
+    trim_us(p.ids, m.ids)
+    trim_us(p.strs, m.strs)
+    trim_us(p.bkeys, m.bkeys)
+    trim_us(p.bvlo, m.bkeys)
+    trim_us(p.bvhi, m.bkeys)
+
+fn describe(p: read Parser, t: lex.Token, out: lend string):
+    if kind_is(p, t, "NEWLINE"):
+        out.append_str("newline")
+        return
+    if kind_is(p, t, "INDENT"):
+        out.append_str("indent")
+        return
+    if kind_is(p, t, "DEDENT"):
+        out.append_str("dedent")
+        return
+    if kind_is(p, t, "EOF"):
+        out.append_str("end of file")
+        return
+    out.append_byte(96)
+    out.append_str(p.lx.names.text(t.text))
+    out.append_byte(96)
+
+fn push_diag(p: lend Parser, line: i32, col: i32, length: i32, msg: str, hint: str, has_hint: bool, has_fix: bool, desc: str, sl: i32, sc: i32, el: i32, ec: i32, repl: str):
+    ln = length
+    if ln < 1:
+        ln = 1
+    code = codes.classify(msg)
+    p.lx.diags.push(lex.Diag{
+        code: p.lx.names.put(code.as_str()),
+        msg: p.lx.names.put(msg),
+        hint: p.lx.names.put(hint),
+        has_hint: has_hint,
+        line: line,
+        col: col,
+        length: ln,
+        has_fix: has_fix,
+        fix_desc: p.lx.names.put(desc),
+        esl: sl,
+        esc: sc,
+        eel: el,
+        eec: ec,
+        repl: p.lx.names.put(repl),
+        app: 0,
+    })
+
+fn fail(p: lend Parser, line: i32, col: i32, length: i32, msg: str, hint: str, has_hint: bool):
+    if p.bad:
+        return
+    p.bad = true
+    push_diag(p, line, col, length, msg, hint, has_hint, false, "", 0, 0, 0, 0, "")
+
+fn fail_fix(p: lend Parser, line: i32, col: i32, length: i32, msg: str, hint: str, has_hint: bool, desc: str, sl: i32, sc: i32, el: i32, ec: i32, repl: str):
+    if p.bad:
+        return
+    p.bad = true
+    push_diag(p, line, col, length, msg, hint, has_hint, true, desc, sl, sc, el, ec, repl)
+
+fn soft(p: lend Parser, line: i32, col: i32, length: i32, msg: str, hint: str, has_hint: bool):
+    push_diag(p, line, col, length, msg, hint, has_hint, false, "", 0, 0, 0, 0, "")
+
+fn line_start_col(p: read Parser, index: usize) -> i32:
+    if index >= p.lx.tokens.len:
+        return -1
+    line = p.lx.tokens[index].line
+    i = index
+    while true:
+        if p.lx.tokens[i].line != line:
+            i += 1
+            break
+        if i == 0:
+            break
+        i -= 1
+        if p.lx.tokens[i].line != line:
+            i += 1
+            break
+    while i < p.lx.tokens.len:
+        k = p.lx.tokens[i]
+        if kind_is(p, k, "INDENT") or kind_is(p, k, "DEDENT") or kind_is(p, k, "NEWLINE"):
+            i += 1
+        else:
+            break
+    if i >= p.lx.tokens.len:
+        return -1
+    if p.lx.tokens[i].line != line:
+        return -1
+    return p.lx.tokens[i].col
+
+fn indent_fix(p: read Parser) -> bool:
+    if at(p, "NEWLINE") or at(p, "DEDENT") or at(p, "EOF") or at(p, "INDENT"):
+        return false
+    if p.pos == 0:
+        return false
+    opener = p.pos - 1
+    while true:
+        if not kind_is(p, p.lx.tokens[opener], "NEWLINE"):
+            break
+        if opener == 0:
+            return false
+        opener -= 1
+    origin = line_start_col(p, opener)
+    if origin < 0:
+        return false
+    return true
+
+fn indent_spaces(p: read Parser) -> i32:
+    opener = p.pos - 1
+    while kind_is(p, p.lx.tokens[opener], "NEWLINE"):
+        if opener == 0:
+            break
+        opener -= 1
+    origin = line_start_col(p, opener)
+    return origin - 1 + 4
+
+fn expect_kind(p: lend Parser, k: str, msg: str, hint: str, has_hint: bool) -> bool:
+    if p.bad:
+        return false
+    if at(p, k):
+        advance(p)
+        return true
+    t = cur(p)
+    full = string.new()
+    full.append_str(msg)
+    full.append_str(" (found ")
+    describe(p, t, full)
+    full.append_str(")")
+    if string.str_eq(k, "INDENT") and indent_fix(p):
+        spaces = indent_spaces(p)
+        desc = string.new()
+        desc.append_str("Indent with ")
+        desc.append_i64(i64(spaces))
+        desc.append_str(" spaces")
+        repl = string.new()
+        n: i32 = 0
+        while n < spaces:
+            repl.append_byte(32)
+            n += 1
+        fail_fix(p, t.line, t.col, t.length, full.as_str(), hint, has_hint, desc.as_str(), t.line, 1, t.line, t.col, repl.as_str())
+        return false
+    fail(p, t.line, t.col, t.length, full.as_str(), hint, has_hint)
+    return false
+
+fn fail_here(p: lend Parser, msg: str, hint: str, has_hint: bool):
+    t = cur(p)
+    fail(p, t.line, t.col, t.length, msg, hint, has_hint)
+
+fn soft_here(p: lend Parser, msg: str, hint: str, has_hint: bool):
+    t = cur(p)
+    soft(p, t.line, t.col, t.length, msg, hint, has_hint)
+
+fn anchor(p: lend Parser, id: usize, start: lex.Token):
+    n = p.nodes[id]
+    n.line = start.line
+    n.col = start.col
+    if p.pos == 0:
+        ln = start.length
+        if ln < 1:
+            ln = 1
+        n.length = ln
+        p.nodes[id] = n
+        return
+    prev = p.lx.tokens[p.pos - 1]
+    if prev.line == start.line:
+        ln2 = prev.col + prev.length - start.col
+        if ln2 < 1:
+            ln2 = 1
+        n.length = ln2
+    else:
+        ln3 = start.length
+        if ln3 < 1:
+            ln3 = 1
+        n.length = ln3
+    p.nodes[id] = n
+
+fn header(p: lend Parser, id: usize, start: lex.Token):
+    n = p.nodes[id]
+    n.line = start.line
+    n.col = start.col
+    n.length = start.length
+    p.nodes[id] = n
+
+fn end_stmt(p: lend Parser):
+    if p.bad:
+        return
+    if at(p, "NEWLINE"):
+        advance(p)
+        return
+    if p.pos > 0 and kind_is(p, p.lx.tokens[p.pos - 1], "DEDENT"):
+        return
+    if not at(p, "EOF"):
+        t = cur(p)
+        full = string.new()
+        full.append_str("Expected end of line (found ")
+        describe(p, t, full)
+        full.append_str(").")
+        fail(p, t.line, t.col, t.length, full.as_str(), "Only one statement per line.", true)
+
+fn skip_block(p: lend Parser):
+    depth: i32 = 0
+    while not at(p, "EOF"):
+        if at(p, "INDENT"):
+            depth += 1
+        elif at(p, "DEDENT"):
+            depth -= 1
+            if depth == 0:
+                advance(p)
+                return
+        advance(p)
+
+fn sync_stmt(p: lend Parser):
+    if at(p, "INDENT"):
+        skip_block(p)
+        return
+    while not at3(p, "NEWLINE", "DEDENT", "EOF"):
+        advance(p)
+    if eat(p, "NEWLINE") and at(p, "INDENT"):
+        skip_block(p)
+
+fn is_top_start(p: read Parser) -> bool:
+    if at(p, "fn") or at(p, "struct") or at(p, "enum") or at(p, "feature") or at(p, "const") or at(p, "extern") or at(p, "import") or at(p, "comptime") or at(p, "public") or at(p, "private") or at(p, "hot"):
+        return true
+    if cur_named(p, "test"):
+        nx = peek_at(p, 1)
+        if kind_is(p, nx, ":") or kind_is(p, nx, "NAME"):
+            return true
+    return false
+
+fn sync_top(p: lend Parser, start: usize):
+    if p.pos == start:
+        advance(p)
+    depth: i32 = 0
+    while not at(p, "EOF"):
+        if at(p, "INDENT"):
+            depth += 1
+        elif at(p, "DEDENT"):
+            if depth > 0:
+                depth -= 1
+        elif depth == 0 and p.pos > 0:
+            prev = p.lx.tokens[p.pos - 1]
+            if kind_is(p, prev, "NEWLINE") or kind_is(p, prev, "DEDENT"):
+                if is_top_start(p):
+                    return
+        advance(p)
+
+fn unexpected_fix(p: read Parser) -> bool:
+    content = p.pos + 1
+    while content < p.lx.tokens.len:
+        k = p.lx.tokens[content]
+        if kind_is(p, k, "NEWLINE") or kind_is(p, k, "INDENT") or kind_is(p, k, "DEDENT"):
+            content += 1
+        else:
+            break
+    if content >= p.lx.tokens.len:
+        return false
+    if p.pos == 0:
+        return false
+    prev = p.pos - 1
+    while true:
+        k2 = p.lx.tokens[prev]
+        if not (kind_is(p, k2, "NEWLINE") or kind_is(p, k2, "INDENT") or kind_is(p, k2, "DEDENT")):
+            break
+        if prev == 0:
+            return false
+        prev -= 1
+    origin = line_start_col(p, prev)
+    if origin < 0:
+        return false
+    spaces = origin - 1
+    token = p.lx.tokens[content]
+    if token.col - 1 == spaces:
+        return false
+    return true
+
+fn unexpected_spaces(p: read Parser) -> i32:
+    prev = p.pos - 1
+    while true:
+        k2 = p.lx.tokens[prev]
+        if not (kind_is(p, k2, "NEWLINE") or kind_is(p, k2, "INDENT") or kind_is(p, k2, "DEDENT")):
+            break
+        if prev == 0:
+            break
+        prev -= 1
+    origin = line_start_col(p, prev)
+    return origin - 1
+
+fn unexpected_token(p: read Parser) -> lex.Token:
+    content = p.pos + 1
+    while content < p.lx.tokens.len:
+        k = p.lx.tokens[content]
+        if kind_is(p, k, "NEWLINE") or kind_is(p, k, "INDENT") or kind_is(p, k, "DEDENT"):
+            content += 1
+        else:
+            break
+    return p.lx.tokens[content]
+
+fn put_alias(p: lend Parser, name: usize, node: usize):
+    p.ak.push(name)
+    p.av.push(node)
+
+fn find_alias(p: read Parser, name: usize) -> usize:
+    i: usize = 0
+    while i < p.ak.len:
+        if p.ak[i] == name:
+            return p.av[i]
+        i += 1
+    return 0
+
+fn label_bump(p: lend Parser, base: usize) -> i32:
+    i: usize = 0
+    while i < p.lk.len:
+        if p.lk[i] == base:
+            n = p.ln[i] + 1
+            p.ln[i] = n
+            return n
+        i += 1
+    p.lk.push(base)
+    p.ln.push(1)
+    return 1

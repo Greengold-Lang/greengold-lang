@@ -1,0 +1,197 @@
+# std.fs: whole-file read/write over C stdio.
+# Dynamic paths are copied and NUL-terminated before they are passed to C.
+import std.string
+import std.process
+import std.sort
+private
+extern "stdio.h" fn fopen(path: *u8, mode: *u8) -> *u8
+extern "stdio.h" fn fclose(f: *u8) -> i32
+extern "stdio.h" fn fgetc(f: *u8) -> i32
+extern "stdio.h" fn fputc(c: i32, f: *u8) -> i32
+
+private
+fn _nul_path(path: str) -> string:
+    s = string.from(path)
+    s.append_byte(0)
+    return s
+
+public
+fn read_file_to_string(path: str) -> Optional[string]:
+    owned = _nul_path(path)
+    unsafe:
+        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr("rb"))
+        if ptr_to_int(f) == 0:
+            return None
+        s = string.new()
+        c: i32 = fgetc(f)
+        while c >= 0:
+            s.append_byte(u8(c))
+            c = fgetc(f)
+        fclose(f)
+        return Valid(s)
+
+fn write_string_to_file(path: str, data: str) -> bool:
+    owned = _nul_path(path)
+    unsafe:
+        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr("wb"))
+        if ptr_to_int(f) == 0:
+            return false
+        for i in 0..data.len:
+            fputc(i32(data[i]), f)
+        fclose(f)
+        return true
+
+fn file_exists(path: str) -> bool:
+    owned = _nul_path(path)
+    unsafe:
+        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr("rb"))
+        if ptr_to_int(f) == 0:
+            return false
+        fclose(f)
+        return true
+
+private
+extern "stdio.h" fn remove(path: *u8) -> i32
+
+public
+fn remove_file(path: str) -> bool:
+    owned = _nul_path(path)
+    unsafe:
+        return remove(string_to_cstr(owned.as_str())) == 0
+
+private
+fn _is_sep(c: u8) -> bool:
+    return c == '/' or c == '\\'
+
+fn _is_abs(path: str) -> bool:
+    if path.len == 0:
+        return false
+    if _is_sep(path[0]):
+        return true
+    return path.len > 1 and path[1] == ':'
+
+# Drop trailing separators, but keep a single root slash.
+fn _trimmed_len(path: str) -> usize:
+    hi = path.len
+    while hi > 1 and _is_sep(path[hi - 1]):
+        hi -= 1
+    return hi
+
+public
+# Join `dir` and `name` with `/`. An absolute `name`, or an empty `dir`, yields `name` alone.
+fn path_join(dir: str, name: str) -> string:
+    if _is_abs(name) or dir.len == 0:
+        return string.from(name)
+    out = string.from(dir)
+    if not _is_sep(dir[dir.len - 1]):
+        out.append_byte('/')
+    out.append_str(name)
+    return out
+
+# Directory containing `path`. A root path stays the root. A bare name yields an empty string.
+fn path_parent(path: str) -> string:
+    body = string.substr(path, 0, _trimmed_len(path))
+    i = body.len
+    while i > 0 and not _is_sep(body[i - 1]):
+        i -= 1
+    if i == 0:
+        return string.new()
+    if i == 1:
+        return string.from(string.substr(body, 0, 1))
+    return string.from(string.substr(body, 0, i - 1))
+
+# Final component of `path`, after a trailing separator is removed.
+fn path_name(path: str) -> string:
+    body = string.substr(path, 0, _trimmed_len(path))
+    i = body.len
+    while i > 0 and not _is_sep(body[i - 1]):
+        i -= 1
+    return string.from(string.substr(body, i, body.len))
+
+# Extension including the dot, taken from the last dot of the file name. A leading dot is not an extension.
+fn path_ext(path: str) -> string:
+    name = path_name(path)
+    text = name.as_str()
+    dot: usize = 0
+    found = false
+    i: usize = 0
+    while i < text.len:
+        if text[i] == '.':
+            dot = i
+            found = true
+        i += 1
+    if not found or dot == 0:
+        return string.new()
+    return string.from(string.substr(text, dot, text.len))
+
+private
+extern "stdio.h" fn rename(old_path: *u8, new_path: *u8) -> i32
+
+fn _str_less(a: str, b: str) -> bool:
+    n = a.len
+    if b.len < n:
+        n = b.len
+    for i in 0..n:
+        if a[i] < b[i]:
+            return true
+        if b[i] < a[i]:
+            return false
+    return a.len < b.len
+
+public
+# True when `path` is an existing directory.
+fn is_dir(path: str) -> bool:
+    argv = List[str]()
+    argv.push("cd")
+    if process.host_is_windows():
+        argv.push("/d")
+    argv.push(path)
+    match consume process.process_run(argv):
+        Valid(r):
+            return r.code == 0
+        None:
+            return false
+
+# Create one directory. The parent must already exist.
+fn make_dir(path: str) -> bool:
+    argv = List[str]()
+    argv.push("mkdir")
+    argv.push(path)
+    match consume process.process_run(argv):
+        Valid(r):
+            return r.code == 0
+        None:
+            return false
+
+# Names in `path`, one per line, sorted by bytes. `None` when `path` is not a directory.
+fn list_dir(path: str) -> Optional[string]:
+    if not is_dir(path):
+        return None
+    argv = List[str]()
+    if process.host_is_windows():
+        argv.push("dir")
+        argv.push("/b")
+    else:
+        argv.push("ls")
+        argv.push("-1")
+    argv.push(path)
+    match consume process.process_run(argv):
+        Valid(r):
+            if r.code != 0 and r.out.len() == 0:
+                return None
+            kept = List[str]()
+            lines = string.str_lines(r.out.as_str())
+            for i in 0..lines.len:
+                if lines[i].len > 0:
+                    kept.push(lines[i])
+            sort.sort_by[str](kept, _str_less)
+            return Valid(string.str_join(kept, "\n"))
+        None:
+            return None
+
+# Rename `old_path` to `new_path`. Fails when the destination already exists.
+fn rename_file(old_path: str, new_path: str) -> bool:
+    src = _nul_path(old_path)
+    dst = _nul_path(new_path)
+    unsafe:
+        return rename(string_to_cstr(src.as_str()), string_to_cstr(dst.as_str())) == 0

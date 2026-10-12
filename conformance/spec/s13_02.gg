@@ -1,0 +1,10 @@
+# conformance: SPEC section 13 (Expressions), example 2
+# expect-output:
+#   2
+
+fn main():
+    n = Valid(2)
+    x = match n:
+        Valid(v) => v
+        None => 0
+    print(x)

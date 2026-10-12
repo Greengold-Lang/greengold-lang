@@ -1,0 +1,10 @@
+struct Counter:
+    value: i32
+
+fn finish(c: consume Counter):
+    print(c.value)
+
+fn main():
+    c = Counter{ value: 1 }
+    finish(c)
+    print(c.value)

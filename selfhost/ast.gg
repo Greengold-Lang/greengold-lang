@@ -1,0 +1,215 @@
+# AST arena record. One copyable node for every Python dataclass.
+# Child nodes are usize ids (0 = none). Lists are spans into the parser's id tables.
+# Optional strings use intern id + 1 (0 = none).
+import std.string
+
+public
+
+# 1 Program 2 Import 3 Const 4 Struct 5 Field 6 Enum 7 Variant 8 Feature
+# 9 Func 10 Extern 11 Param 12 Type 13 Var 14 Assign 15 If 16 Branch
+# 17 While 18 For 19 ForIn 20 Return 21 Break 22 Continue 23 Match 24 Arm
+# 25 Binding 26 Range 27 Pass 28 ExprStmt 29 Defer 30 Yield 31 Require
+# 32 Wrapping 33 Overflow 34 BlockExpr 35 Int 36 Float 37 Str 38 Format
+# 39 Bool 40 Char 41 Name 42 Field 43 Unary 44 Binary 45 Cast 46 Soa
+# 47 Copy 48 Borrow 49 Call 50 Method 51 Init 52 StructLit 53 Index
+# 54 TypeApp 55 Try 56 Slice 57 Array 58 Repeat
+struct Node:
+    kind: u8
+    line: i32
+    col: i32
+    length: i32
+    s0: usize
+    s1: usize
+    s2: usize
+    s3: usize
+    s4: usize
+    c0: usize
+    c1: usize
+    c2: usize
+    c3: usize
+    lo: usize
+    hi: usize
+    lo2: usize
+    hi2: usize
+    lo3: usize
+    hi3: usize
+    slo: usize
+    shi: usize
+    slo2: usize
+    shi2: usize
+    bk0: usize
+    bk1: usize
+    f0: bool
+    f1: bool
+    f2: bool
+    f3: bool
+    f4: bool
+    f5: bool
+    f6: bool
+    f7: bool
+    i0: i64
+    j0: i64
+    i1: i32
+    i2: i32
+    i3: i32
+
+fn blank() -> Node:
+    return Node{
+        kind: 0,
+        line: 0,
+        col: 0,
+        length: 1,
+        s0: 0,
+        s1: 0,
+        s2: 0,
+        s3: 0,
+        s4: 0,
+        c0: 0,
+        c1: 0,
+        c2: 0,
+        c3: 0,
+        lo: 0,
+        hi: 0,
+        lo2: 0,
+        hi2: 0,
+        lo3: 0,
+        hi3: 0,
+        slo: 0,
+        shi: 0,
+        slo2: 0,
+        shi2: 0,
+        bk0: 0,
+        bk1: 0,
+        f0: false,
+        f1: false,
+        f2: false,
+        f3: false,
+        f4: false,
+        f5: false,
+        f6: false,
+        f7: false,
+        i0: 0,
+        j0: 0,
+        i1: 0,
+        i2: 0,
+        i3: 0,
+    }
+
+fn kind_name(k: u8) -> str:
+    if k == 1:
+        return "Program"
+    if k == 2:
+        return "ImportDecl"
+    if k == 3:
+        return "ConstDecl"
+    if k == 4:
+        return "StructDecl"
+    if k == 5:
+        return "FieldDecl"
+    if k == 6:
+        return "EnumDecl"
+    if k == 7:
+        return "VariantDecl"
+    if k == 8:
+        return "FeatureDecl"
+    if k == 9:
+        return "FuncDecl"
+    if k == 10:
+        return "ExternFuncDecl"
+    if k == 11:
+        return "Param"
+    if k == 12:
+        return "TypeRef"
+    if k == 13:
+        return "VarDecl"
+    if k == 14:
+        return "Assign"
+    if k == 15:
+        return "If"
+    if k == 16:
+        return "Branch"
+    if k == 17:
+        return "While"
+    if k == 18:
+        return "For"
+    if k == 19:
+        return "ForIn"
+    if k == 20:
+        return "Return"
+    if k == 21:
+        return "Break"
+    if k == 22:
+        return "Continue"
+    if k == 23:
+        return "Match"
+    if k == 24:
+        return "MatchArm"
+    if k == 25:
+        return "Binding"
+    if k == 26:
+        return "RangePat"
+    if k == 27:
+        return "Pass"
+    if k == 28:
+        return "ExprStmt"
+    if k == 29:
+        return "Defer"
+    if k == 30:
+        return "Yield"
+    if k == 31:
+        return "Require"
+    if k == 32:
+        return "Wrapping"
+    if k == 33:
+        return "OverflowMode"
+    if k == 34:
+        return "BlockExpr"
+    if k == 35:
+        return "IntLit"
+    if k == 36:
+        return "FloatLit"
+    if k == 37:
+        return "StrLit"
+    if k == 38:
+        return "FormatStr"
+    if k == 39:
+        return "BoolLit"
+    if k == 40:
+        return "CharLit"
+    if k == 41:
+        return "Name"
+    if k == 42:
+        return "FieldAccess"
+    if k == 43:
+        return "Unary"
+    if k == 44:
+        return "Binary"
+    if k == 45:
+        return "Cast"
+    if k == 46:
+        return "SoaExpr"
+    if k == 47:
+        return "CopyExpr"
+    if k == 48:
+        return "BorrowExpr"
+    if k == 49:
+        return "Call"
+    if k == 50:
+        return "MethodCall"
+    if k == 51:
+        return "FieldInit"
+    if k == 52:
+        return "StructLit"
+    if k == 53:
+        return "IndexAccess"
+    if k == 54:
+        return "TypeApp"
+    if k == 55:
+        return "Try"
+    if k == 56:
+        return "SliceExpr"
+    if k == 57:
+        return "ArrayLit"
+    if k == 58:
+        return "ArrayRepeatLit"
+    return "Node"

@@ -1,0 +1,11 @@
+# conformance: SPEC section 5 (Copy and move), example 2
+# expect-output:
+#   1
+
+fn take(xs: consume List[i32]):
+    print(xs.len)
+
+fn main():
+    xs = List[i32]()
+    xs.push(1)
+    take(xs)

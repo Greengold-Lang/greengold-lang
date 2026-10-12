@@ -1,0 +1,7 @@
+fn test_median_distinct():
+    require median3(3, 1, 2) == 2
+    require median3(9, 8, 7) == 8
+
+fn test_median_ties():
+    require median3(5, 5, 1) == 5
+    require median3(4, 4, 4) == 4

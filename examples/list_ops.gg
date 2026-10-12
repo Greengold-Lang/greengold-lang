@@ -1,0 +1,30 @@
+fn show(xs: List[i32]):
+    s = string.new()
+    for x in xs:
+        s.append_i64(i64(x))
+        s.append_str(" ")
+    print(s)
+
+fn main():
+    xs = List[i32]()
+    for i in 0..6:
+        xs.push(i)
+    xs.swap(0, 5)
+    show(xs)
+    a = xs.swap_remove(1)
+    show(xs)
+    b = xs.remove(0)
+    show(xs)
+    xs.insert(0, 42)
+    xs.insert(2, 7)
+    xs.insert(xs.len, 99)
+    show(xs)
+    print(a, b)
+    names = List[string]()
+    names.push(string.from("a"))
+    names.push(string.from("b"))
+    names.push(string.from("c"))
+    gone = names.remove(0)
+    names.insert(1, string.from("z"))
+    last = names.swap_remove(0)
+    print(gone, last, names.len, names[0], names[1])

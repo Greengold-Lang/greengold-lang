@@ -1,0 +1,456 @@
+# std.thread: OS threads, mutexes, condition variables, atomics and channels.
+#
+# Provides canonical struct-based concurrency primitives (Thread, Mutex, Cond, AtomicI64, Channel).
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+
+extern "pthread.h" fn pthread_create(t: *mut u64, attr: *u8, f: fn(*u8) -> *u8, arg: *u8) -> i32
+extern "pthread.h" fn pthread_join(t: u64, ret: *mut u8) -> i32
+extern "pthread.h" fn pthread_mutex_init(m: *mut u8, attr: *u8) -> i32
+extern "pthread.h" fn pthread_mutex_lock(m: *mut u8) -> i32
+extern "pthread.h" fn pthread_mutex_unlock(m: *mut u8) -> i32
+extern "pthread.h" fn pthread_cond_init(c: *mut u8, attr: *u8) -> i32
+extern "pthread.h" fn pthread_cond_wait(c: *mut u8, m: *mut u8) -> i32
+extern "pthread.h" fn pthread_cond_broadcast(c: *mut u8) -> i32
+extern "sched.h" fn sched_yield() -> i32
+
+struct _ThreadJobNoArg:
+    f: fn()
+
+fn _thread_trampoline_noarg(arg: *u8) -> *u8:
+    unsafe:
+        p = ptr_cast[*mut _ThreadJobNoArg](arg)
+        job = p[0]
+        free(arg)
+        f = job.f
+        f()
+    return null
+
+fn _thread_trampoline_fn(arg: *u8) -> *u8:
+    unsafe:
+        f = ptr_read[Fn()](arg)
+        free(arg)
+        f()
+    return null
+
+struct _ThreadJobI64:
+    f: fn(i64)
+    arg: i64
+
+fn _thread_trampoline_i64(arg: *u8) -> *u8:
+    unsafe:
+        p = ptr_cast[*mut _ThreadJobI64](arg)
+        job = p[0]
+        free(arg)
+        f = job.f
+        val = job.arg
+        f(val)
+    return null
+
+public
+# Thread, Mutex, Cond, AtomicI64 and Channel are OS handles: they are moved, never copied or cloned
+# (GG0323). Share one by passing it as `read`/`lend`.
+struct Thread:
+    private
+    handle: u64
+    joined: bool
+
+impl Thread:
+    # Starts `f()` on a new OS thread. `f` may be a lambda that captures values: they move into the
+    # thread. The compiler checks that each one can go to another thread (no `str` view, slice,
+    # reference, raw pointer, `Shared`, or stored `Fn`); share read-only data with `Arc`.
+    public
+    fn spawn(f: send Fn()) -> Thread:
+        h: u64 = 0
+        unsafe:
+            raw = malloc(size_of[Fn()]())
+            ptr_write[Fn()](raw, f)
+            rc = pthread_create(addr_mut(h), null, _thread_trampoline_fn, raw)
+            if rc != 0:
+                free(raw)
+                panic("Thread.spawn: pthread_create failed")
+        return Thread{ handle: h, joined: false }
+
+    # Starts `f(arg)` on a new OS thread with an i64 parameter. Safe: no `unsafe:` needed.
+    fn spawn_with_param(f: fn(i64), arg: i64) -> Thread:
+        h: u64 = 0
+        unsafe:
+            raw = malloc(usize(16))
+            p = ptr_cast[*mut _ThreadJobI64](raw)
+            p[0] = _ThreadJobI64{ f: f, arg: arg }
+            rc = pthread_create(addr_mut(h), null, _thread_trampoline_i64, raw)
+            if rc != 0:
+                free(raw)
+                panic("Thread.spawn_with_param: pthread_create failed")
+        return Thread{ handle: h, joined: false }
+
+    # Raw OS thread spawn receiving `*u8` payload (for C FFI).
+    fn spawn_raw(f: fn(*u8) -> *u8, arg: *u8) -> Thread:
+        h: u64 = 0
+        unsafe:
+            rc = pthread_create(addr_mut(h), null, f, arg)
+            if rc != 0:
+                panic("Thread.spawn_raw: pthread_create failed")
+        return Thread{ handle: h, joined: false }
+
+    # Waits for the thread to complete. A thread is joined once; a second `join` panics.
+    fn join(self: lend Thread):
+        if self.joined:
+            panic("Thread.join: thread was already joined")
+        self.joined = true
+        unsafe:
+            pthread_join(self.handle, null)
+
+    # Yields execution to another thread.
+    fn yield_now():
+        unsafe:
+            sched_yield()
+
+# -- Mutex / Cond (64 bytes of opaque storage each) -------------------------------------------
+
+struct Mutex:
+    private
+    storage: [8]u64
+
+public
+struct Cond:
+    private
+    storage: [8]u64
+
+impl Mutex:
+    # Creates a new initialized Mutex.
+    public
+    fn new() -> Mutex:
+        s: [8]u64 = [0; 8]
+        m = Mutex{ storage: s }
+        unsafe:
+            pthread_mutex_init(ptr_cast[*mut u8](addr(m)), null)
+        return m
+
+    # Acquires the mutex lock. Caller needs no `unsafe:`.
+    fn lock(self: read Mutex):
+        unsafe:
+            pthread_mutex_lock(ptr_cast[*mut u8](addr(self)))
+
+    # Releases the mutex lock. Caller needs no `unsafe:`.
+    fn unlock(self: read Mutex):
+        unsafe:
+            pthread_mutex_unlock(ptr_cast[*mut u8](addr(self)))
+
+impl Cond:
+    # Creates a new condition variable.
+    fn new() -> Cond:
+        s: [8]u64 = [0; 8]
+        c = Cond{ storage: s }
+        unsafe:
+            pthread_cond_init(ptr_cast[*mut u8](addr_mut(c)), null)
+        return c
+
+    # Waits on condition variable until broadcast/signaled. Caller needs no `unsafe:`.
+    fn wait(self: read Cond, m: read Mutex):
+        unsafe:
+            pthread_cond_wait(ptr_cast[*mut u8](addr(self)), ptr_cast[*mut u8](addr(m)))
+
+    # Wakes all threads waiting on this condition variable. Caller needs no `unsafe:`.
+    fn broadcast(self: read Cond):
+        unsafe:
+            pthread_cond_broadcast(ptr_cast[*mut u8](addr(self)))
+
+# -- Atomic[T] and AtomicI64: lock-free integers (hardware atomics, sequentially consistent) ------
+
+# An integer that several threads read and change at once. Every method is one indivisible hardware
+# operation in sequentially consistent order. Share it through `Arc[Atomic[T]]` or pass it as `read`.
+# For weaker orderings use the `atomic_*` intrinsics inside `unsafe:`.
+struct Atomic[T: Int]:
+    private
+    value: T
+
+impl Atomic[T]:
+    # A new atomic holding `initial`.
+    public
+    fn new(initial: T) -> Atomic[T]:
+        return Atomic[T]{ value: initial }
+
+    # The current value.
+    fn load(self: read Self) -> T:
+        unsafe:
+            return atomic_load[T](ptr_cast[*T](addr(self)), "seq_cst")
+
+    # Replaces the value.
+    fn store(self: read Self, value: T):
+        unsafe:
+            atomic_store[T](ptr_cast[*mut T](addr(self)), value, "seq_cst")
+
+    # Adds `delta` and returns the value before.
+    fn fetch_add(self: read Self, delta: T) -> T:
+        unsafe:
+            return atomic_add[T](ptr_cast[*mut T](addr(self)), delta, "seq_cst")
+
+    # Subtracts `delta` and returns the value before.
+    fn fetch_sub(self: read Self, delta: T) -> T:
+        unsafe:
+            return atomic_sub[T](ptr_cast[*mut T](addr(self)), delta, "seq_cst")
+
+    # Stores `value` and returns the value before.
+    fn swap(self: read Self, value: T) -> T:
+        unsafe:
+            return atomic_swap[T](ptr_cast[*mut T](addr(self)), value, "seq_cst")
+
+    # Stores `new` if the value is `expected`; true when it did.
+    fn compare_exchange(self: read Self, expected: T, new: T) -> bool:
+        unsafe:
+            return atomic_cas[T](ptr_cast[*mut T](addr(self)), expected, new, "seq_cst") == expected
+
+struct AtomicI64:
+    private
+    value: i64
+
+impl AtomicI64:
+    # Creates an atomic 64-bit integer initialized to `initial`.
+    public
+    fn new(initial: i64) -> AtomicI64:
+        return AtomicI64{ value: initial }
+
+    # Atomically adds `delta` and returns the previous value. Safe: no `unsafe:` in caller.
+    fn fetch_and_add(self: read AtomicI64, delta: i64) -> i64:
+        unsafe:
+            return atomic_add[i64](ptr_cast[*mut i64](addr(self)), delta, "seq_cst")
+
+    # Atomically loads current value. Safe: no `unsafe:` in caller.
+    fn load(self: read AtomicI64) -> i64:
+        unsafe:
+            return atomic_load[i64](ptr_cast[*i64](addr(self)), "seq_cst")
+
+    # Atomically stores a new value. Safe: no `unsafe:` in caller.
+    fn store(self: read AtomicI64, value: i64):
+        unsafe:
+            atomic_store[i64](ptr_cast[*mut i64](addr(self)), value, "seq_cst")
+
+    # Sets value to `new` if equal to `expected`. Returns true if swap occurred.
+    fn compare_and_swap(self: read AtomicI64, expected: i64, new: i64) -> bool:
+        unsafe:
+            return atomic_cas[i64](ptr_cast[*mut i64](addr(self)), expected, new, "seq_cst") == expected
+
+# -- Channel: bounded blocking MPMC queue of i64 -----------------------------------------------
+
+# words: [0..8) mutex, [8..16) cond, 16 head, 17 tail, 18 count, 19 closed, [20..276) ring buffer
+struct Channel:
+    private
+    words: [276]i64
+
+impl Channel:
+    # Creates a new bounded Channel (256 slots).
+    public
+    fn new() -> Channel:
+        w: [276]i64 = [0; 276]
+        c = Channel{ words: w }
+        unsafe:
+            base = ptr_cast[*mut u8](addr_mut(c))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut i64](base), 8)), null)
+        return c
+
+    # Blocks while buffer is full. Safe: caller needs no `unsafe:`.
+    fn send(self: read Channel, value: i64):
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            while base[18] == 256:
+                pthread_cond_wait(cnd, mtx)
+            if base[19] != 0:
+                pthread_mutex_unlock(mtx)
+                panic("Channel.send: channel is closed")
+            base[20 + base[17]] = value
+            base[17] = (base[17] + 1) % 256
+            base[18] = base[18] + 1
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+    # Blocks while empty; returns None when channel is closed and drained. Safe: caller needs no `unsafe:`.
+    fn recv(self: read Channel) -> Optional[i64]:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            while base[18] == 0 and base[19] == 0:
+                pthread_cond_wait(cnd, mtx)
+            if base[18] == 0:
+                pthread_mutex_unlock(mtx)
+                return None
+            v = base[20 + base[16]]
+            base[16] = (base[16] + 1) % 256
+            base[18] = base[18] - 1
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+            return Valid(v)
+
+    # Closes the channel. Safe: caller needs no `unsafe:`.
+    fn close(self: read Channel):
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            base[19] = 1
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+# -- Queue[T]: blocking MPMC queue of owned values ----------------------------------------------
+
+# A queue of any `T` that can go to another thread. `send` moves the value in, `recv` moves it out.
+# Share one queue between threads with `Arc[Queue[T]]`.
+struct Queue[T]:
+    private
+    sync: [16]u64   # [0..8) mutex, [8..16) condition variable
+    cell: *mut u8   # List[T] and the closed flag, on the C heap so a shared `read` queue can change them
+
+struct _QueueCell[T]:
+    items: List[T]
+    closed: bool
+
+impl Queue[T]:
+    # Creates an empty, open queue.
+    public
+    fn new() -> Queue[T]:
+        s: [16]u64 = [0; 16]
+        q = Queue[T]{ sync: s, cell: null }
+        unsafe:
+            raw = malloc(size_of[_QueueCell[T]]())
+            ptr_write[_QueueCell[T]](raw, _QueueCell[T]{ items: List[T](), closed: false })
+            q.cell = raw
+            base = ptr_cast[*mut u8](addr_mut(q))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](base), 8)), null)
+        return q
+
+    # Adds `value` at the back and wakes a waiting `recv`. Panics when the queue is closed.
+    fn send(self: read Self, value: send T):
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            c = ptr_read[_QueueCell[T]](self.cell)
+            if c.closed:
+                ptr_write[_QueueCell[T]](self.cell, c)
+                pthread_mutex_unlock(mtx)
+                panic("Queue.send: queue is closed")
+            c.items.push(value)
+            ptr_write[_QueueCell[T]](self.cell, c)
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+    # Takes the value at the front, waiting while the queue is empty. None once it is closed and empty.
+    fn recv(self: read Self) -> Optional[T]:
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            while true:
+                c = ptr_read[_QueueCell[T]](self.cell)
+                if c.items.len > 0 or c.closed:
+                    out: Optional[T] = None
+                    if c.items.len > 0:
+                        out = Valid(c.items.remove(0))
+                    ptr_write[_QueueCell[T]](self.cell, c)
+                    pthread_mutex_unlock(mtx)
+                    return out
+                ptr_write[_QueueCell[T]](self.cell, c)
+                pthread_cond_wait(cnd, mtx)
+        return None
+
+    # Closes the queue: `recv` drains what is left, then returns None; `send` panics.
+    fn close(self: read Self):
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            c = ptr_read[_QueueCell[T]](self.cell)
+            c.closed = true
+            ptr_write[_QueueCell[T]](self.cell, c)
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+    fn drop(self: lend Self):
+        unsafe:
+            if self.cell != null:
+                c = ptr_read[_QueueCell[T]](self.cell)
+                free(self.cell)
+
+# -- Locked[T]: a value that one thread at a time may change -------------------------------------
+
+# `Locked[T]` keeps a value behind its own mutex. `lock()` waits for the mutex and returns a `Guard`;
+# `guard.value()` is the value itself (`lend T`), and the mutex opens again when the guard goes away.
+# Share one `Locked[T]` between threads with `Arc[Locked[T]]`.
+#     counter = Arc[Locked[i64]](Locked[i64].new(0))
+#     g = counter.value.lock()
+#     g.value() += 1
+public
+struct Locked[T]:
+    private
+    sync: [8]u64    # the mutex
+    cell: *mut u8   # the value, on the C heap so a shared `read` Locked can change it
+
+# The open lock of a `Locked[T]`: the value can be read and changed through `value()` while it lives.
+public
+struct Guard[T]:
+    private
+    owner: read Locked[T] tied to self
+
+impl Locked[T]:
+    # A new lock around `value`.
+    public
+    fn new(value: send T) -> Locked[T]:
+        s: [8]u64 = [0; 8]
+        m = Locked[T]{ sync: s, cell: null }
+        unsafe:
+            raw = malloc(size_of[T]())
+            ptr_write[T](raw, value)
+            m.cell = raw
+            pthread_mutex_init(ptr_cast[*mut u8](addr_mut(m)), null)
+        return m
+
+    # Waits until no other thread holds the lock, then holds it until the guard goes away.
+    fn lock(self: read Self) -> Guard[T]:
+        unsafe:
+            pthread_mutex_lock(ptr_cast[*mut u8](addr(self)))
+        return Guard[T]{ owner: self }
+
+    # A copy of the value (`clone`), taken under the lock.
+    fn get(self: read Self) -> T:
+        g = self.lock()
+        unsafe:
+            return ptr_cast[*mut T](self.cell)[0].clone()
+
+    # Replaces the value, under the lock.
+    fn set(self: read Self, value: send T):
+        old = self.replace(value)
+
+    # Replaces the value and returns the one before, under the lock.
+    fn replace(self: read Self, value: send T) -> T:
+        g = self.lock()
+        unsafe:
+            old = ptr_read[T](self.cell)
+            ptr_write[T](self.cell, value)
+            return old
+
+    fn drop(self: lend Self):
+        unsafe:
+            if self.cell != null:
+                old = ptr_read[T](self.cell)
+                free(self.cell)
+
+impl Guard[T]:
+    # The locked value. It can be read and changed while the guard lives.
+    public
+    fn value(self: lend Self) -> lend T:
+        unsafe:
+            return ptr_cast[*mut T](self.owner.cell)[0]
+
+    fn drop(self: lend Self):
+        unsafe:
+            pthread_mutex_unlock(ptr_cast[*mut u8](addr(self.owner)))

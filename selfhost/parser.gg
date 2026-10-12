@@ -1,0 +1,23 @@
+# AST dump driver. Grammar lives in decl, stmt, expr, ty, and cursor.
+import std.fs
+import std.process
+import lex
+import cursor
+import decl
+import dump
+
+fn main():
+    text = fs.read_file_to_string("gg_selfhost_in.txt")
+    match text:
+        None:
+            print("cannot read gg_selfhost_in.txt")
+            process.process_exit(2)
+        Valid(s):
+            lx = lex.lexer_new(s.as_str())
+            lx.run()
+            p = cursor.parser_new(lx)
+            root = decl.parse_program(p)
+            dump.print_ast(p, root)
+            if p.lx.diags.len > 0:
+                dump.print_diags(p)
+                process.process_exit(1)

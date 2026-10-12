@@ -1,0 +1,14 @@
+# conformance: SPEC section 13 (Expressions), example 5
+# expect-output:
+#   3 5
+#   11 15 30
+
+fn apply(f: fn(i32) -> i32, n: i32) -> i32:
+    return f(n)
+
+fn main():
+    f = fn(x: i32) -> i32 => x + 1
+    print(f(2), apply(f, 4))
+    k = 10
+    add_k = fn(x: i32) -> i32 => x + k
+    print(add_k(1), apply(add_k, 5), apply(fn(x: i32) -> i32 => x * k, 3))

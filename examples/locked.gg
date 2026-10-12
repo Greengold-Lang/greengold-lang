@@ -1,0 +1,23 @@
+import std.thread
+
+fn main():
+    counter = Arc[thread.Locked[i64]](thread.Locked[i64].new(0))
+    names = Arc[thread.Locked[List[string]]](thread.Locked[List[string]].new(List[string]()))
+    workers = List[thread.Thread]()
+    for w in 0..4:
+        c = counter.clone()
+        n = names.clone()
+        workers.push(thread.Thread.spawn(fn() =>
+            work(c, n, w)))
+    for i in 0..workers.len:
+        workers[i].join()
+    print(counter.value.get(), names.value.get().len)
+    old = counter.value.replace(99)
+    print(old, counter.value.get())
+
+fn work(c: Arc[thread.Locked[i64]], n: Arc[thread.Locked[List[string]]], w: i32):
+    for _i in 0..1000:
+        g = c.value.lock()
+        g.value() += 1
+    h = n.value.lock()
+    h.value().push(f"worker {w}")

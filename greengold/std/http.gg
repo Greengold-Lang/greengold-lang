@@ -1,0 +1,292 @@
+# std.http: HTTP/1.1 over std.net: read requests, write responses, a simple server loop, and a client
+# for plain `http://` URLs (no TLS; hosts are IPv4 addresses or "localhost", as in std.net).
+#
+#     struct Hello:
+#         greeting: string
+#
+#     impl Hello:
+#         fn handle(self: read Self, req: read http.Request) -> http.Response:
+#             return http.response(200, f"{self.greeting} {req.path}".as_str())
+#
+#     fn main():
+#         l = net.TcpListener.bind("127.0.0.1", 8080)?
+#         http.serve(l, Hello{ greeting: string.from("hello") }, -1)   # one request at a time, forever
+import std.net
+
+public
+struct Header:
+    name: string
+    value: string
+
+struct Request:
+    method: string
+    path: string       # without the query
+    query: string      # the text after `?`, or empty
+    version: string
+    headers: List[Header]
+    body: string
+
+struct Response:
+    status: i32
+    headers: List[Header]
+    body: string
+
+# A response with `Content-Type: text/plain; charset=utf-8`.
+fn response(status: i32, body: str) -> Response:
+    r = Response{ status: status, headers: List[Header](), body: string.from(body) }
+    r.set_header("Content-Type", "text/plain; charset=utf-8")
+    return r
+
+fn status_text(status: i32) -> str:
+    match status:
+        200: return "OK"
+        201: return "Created"
+        204: return "No Content"
+        301: return "Moved Permanently"
+        302: return "Found"
+        304: return "Not Modified"
+        400: return "Bad Request"
+        401: return "Unauthorized"
+        403: return "Forbidden"
+        404: return "Not Found"
+        405: return "Method Not Allowed"
+        413: return "Payload Too Large"
+        500: return "Internal Server Error"
+        503: return "Service Unavailable"
+        _: return "Unknown"
+
+impl Request:
+    # The value of the first header called `name` (any case), or None.
+    fn header(self: read Self, name: str) -> Optional[string]:
+        return _find_header(self.headers, name)
+
+    # The value of `key` in the query (`?a=1&b=2`), percent-decoded, or None.
+    fn query_param(self: read Self, key: str) -> Optional[string]:
+        for part in self.query.as_str().split("&"):
+            eq = part.find("=")
+            match eq:
+                Valid(i):
+                    if part[..i] == key:
+                        return Valid(url_decode(part[i + 1..]))
+                None:
+                    if part == key:
+                        return Valid(string.new())
+        return None
+
+impl Response:
+    fn header(self: read Self, name: str) -> Optional[string]:
+        return _find_header(self.headers, name)
+
+    # Sets a header, replacing one with the same name.
+    fn set_header(self: lend Self, name: str, value: str):
+        for i in 0..self.headers.len:
+            if self.headers[i].name.as_str().eq_ignore_case(name):
+                self.headers[i].value = string.from(value)
+                return
+        self.headers.push(Header{ name: string.from(name), value: string.from(value) })
+
+    # The response as HTTP/1.1 text, with `Content-Length` and `Connection: close`.
+    fn to_text(self: read Self) -> string:
+        out = f"HTTP/1.1 {self.status} {status_text(self.status)}\r\n"
+        for h in self.headers:
+            n = h.name.as_str()
+            if not n.eq_ignore_case("Content-Length") and not n.eq_ignore_case("Connection"):
+                out.append(f"{h.name}: {h.value}\r\n")
+        out.append(f"Content-Length: {self.body.len()}\r\nConnection: close\r\n\r\n")
+        out.append(self.body)
+        return out
+
+# Reads `METHOD /path?query HTTP/1.1`, the headers, and the body (by `Content-Length`).
+fn parse_request(raw: str) -> Result[Request, string]:
+    end = match raw.find("\r\n\r\n"):
+        Valid(e) => e
+        None => raw.len
+    if end == raw.len:
+        return Err(string.from("the request has no blank line after its headers"))
+    lines = raw[..end].split("\r\n")
+    first = lines[0].split(" ")
+    if first.len != 3:
+        return Err(string.from("bad request line"))
+    target = first[1]
+    path = target
+    query = ""
+    match target.find("?"):
+        Valid(q):
+            path = target[..q]
+            query = target[q + 1..]
+        None: pass
+    req = Request{ method: string.from(first[0]), path: url_decode(path), query: string.from(query),
+        version: string.from(first[2]), headers: List[Header](), body: string.new() }
+    for i in 1..lines.len:
+        match lines[i].find(":"):
+            Valid(c):
+                req.headers.push(Header{ name: string.from(lines[i][..c].trim()), value: string.from(lines[i][c + 1..].trim()) })
+            None: return Err(string.from("bad header line"))
+    body = raw[end + 4..]
+    match req.header("Content-Length"):
+        Valid(n):
+            match n.as_str().parse_int():
+                Valid(len):
+                    if len < 0 or usize(len) > body.len:
+                        return Err(string.from("the body is shorter than Content-Length"))
+                    req.body = string.from(body[..usize(len)])
+                None: return Err(string.from("bad Content-Length"))
+        None: pass
+    return Ok(req)
+
+# Reads one request from a connection: up to the blank line, then `Content-Length` bytes of body.
+fn read_request(stream: read net.TcpStream, max_bytes: usize) -> Result[Request, string]:
+    raw = string.new()
+    while true:
+        text = raw.as_str()
+        match text.find("\r\n\r\n"):
+            Valid(e):
+                need = e + 4 + _content_length(text[..e])
+                if raw.len() >= need:
+                    return parse_request(text)
+            None: pass
+        if raw.len() > max_bytes:
+            return Err(string.from("the request is too large"))
+        chunk = stream.receive(8192)?
+        if chunk.len() == 0:
+            return Err(string.from("the connection closed in the middle of a request"))
+        raw.append(chunk)
+    return Err(string.from("unreachable"))
+
+# What `serve` calls for each request: any type with this method.
+feature Handler:
+    fn handle(self: read Self, req: read Request) -> Response
+
+# Answers requests on `listener` one at a time with `app.handle`, closing each connection after its
+# response. Stops after `limit` requests (a negative limit never stops). A request that cannot be read
+# gets a 400.
+fn serve[H: Handler](listener: read net.TcpListener, app: read H, limit: i64):
+    served: i64 = 0
+    while limit < 0 or served < limit:
+        match listener.accept():
+            Ok(stream):
+                answer = match read_request(stream, 1048576):
+                    Ok(req) => app.handle(req)
+                    Err(e) => response(400, e.as_str())
+                sent = stream.send(answer.to_text().as_str())
+                served += 1
+            Err(_e): pass
+
+# Sends a GET to an `http://host:port/path` URL and reads the whole response.
+fn get(url: str) -> Result[Response, string]:
+    return request("GET", url, "")
+
+# Sends a request with a body (empty for none) and reads the whole response.
+fn request(method: str, url: str, body: str) -> Result[Response, string]:
+    if not url.starts_with("http://"):
+        return Err(string.from("only http:// URLs are supported"))
+    rest = url[7..]
+    slash = rest.find("/")
+    host_port = rest
+    path = "/"
+    match slash:
+        Valid(i):
+            host_port = rest[..i]
+            path = rest[i..]
+        None: pass
+    host = host_port
+    port: u16 = 80
+    match host_port.find(":"):
+        Valid(c):
+            host = host_port[..c]
+            match host_port[c + 1..].parse_int():
+                Valid(p):
+                    if p < 1 or p > 65535:
+                        return Err(string.from("bad port"))
+                    port = u16(p)
+                None: return Err(string.from("bad port"))
+        None: pass
+    stream = net.TcpStream.connect(host, port)?
+    text = f"{method} {path} HTTP/1.1\r\nHost: {host_port}\r\nConnection: close\r\n"
+    if body.len > 0 or method == "POST" or method == "PUT":
+        text.append(f"Content-Length: {body.len}\r\n")
+    text.append_str("\r\n")
+    text.append_str(body)
+    sent = stream.send(text.as_str())?
+    raw = stream.receive_all()?
+    return parse_response(raw.as_str())
+
+# Reads `HTTP/1.1 200 OK`, the headers, and the body after them.
+fn parse_response(raw: str) -> Result[Response, string]:
+    match raw.find("\r\n\r\n"):
+        Valid(end):
+            lines = raw[..end].split("\r\n")
+            first = lines[0].split(" ")
+            if first.len < 2 or not first[0].starts_with("HTTP/"):
+                return Err(string.from("bad status line"))
+            status = match first[1].parse_int():
+                Valid(s) => s
+                None => -1
+            if status < 100 or status > 999:
+                return Err(string.from("bad status code"))
+            r = Response{ status: i32(status), headers: List[Header](), body: string.from(raw[end + 4..]) }
+            for i in 1..lines.len:
+                match lines[i].find(":"):
+                    Valid(c): r.headers.push(Header{ name: string.from(lines[i][..c].trim()), value: string.from(lines[i][c + 1..].trim()) })
+                    None: pass
+            return Ok(r)
+        None: return Err(string.from("the response has no blank line after its headers"))
+
+# `%41` becomes `A` and `+` a space.
+fn url_decode(s: str) -> string:
+    out = string.new()
+    i: usize = 0
+    while i < s.len:
+        c = s[i]
+        if c == '+':
+            out.append_byte(' ')
+            i += 1
+        elif c == '%' and i + 2 < s.len and _hex(s[i + 1]) >= 0 and _hex(s[i + 2]) >= 0:
+            out.append_byte(u8(_hex(s[i + 1]) * 16 + _hex(s[i + 2])))
+            i += 3
+        else:
+            out.append_byte(c)
+            i += 1
+    return out
+
+# Percent-encodes everything but letters, digits, and `-_.~`.
+fn url_encode(s: str) -> string:
+    out = string.new()
+    hex = "0123456789ABCDEF"
+    for c in s:
+        if (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '-' or c == '_' or c == '.' or c == '~':
+            out.append_byte(c)
+        else:
+            out.append_byte('%')
+            out.append_byte(hex[usize(c >> 4)])
+            out.append_byte(hex[usize(c & 15)])
+    return out
+
+private
+fn _hex(c: u8) -> i32:
+    if c >= '0' and c <= '9':
+        return i32(c - '0')
+    if c >= 'a' and c <= 'f':
+        return i32(c - 'a') + 10
+    if c >= 'A' and c <= 'F':
+        return i32(c - 'A') + 10
+    return -1
+
+fn _find_header(headers: read List[Header], name: str) -> Optional[string]:
+    for h in headers:
+        if h.name.as_str().eq_ignore_case(name):
+            return Valid(h.value.clone())
+    return None
+
+fn _content_length(head: str) -> usize:
+    for line in head.split("\r\n"):
+        match line.find(":"):
+            Valid(c):
+                if line[..c].trim().eq_ignore_case("Content-Length"):
+                    match line[c + 1..].trim().parse_int():
+                        Valid(n):
+                            if n > 0:
+                                return usize(n)
+                        None: pass
+            None: pass
+    return 0

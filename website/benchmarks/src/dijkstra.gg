@@ -1,0 +1,51 @@
+# Dense Dijkstra on an implicit graph. Edge i->j weighs (131*i + 17*j) mod 97, plus 1.
+# Eight searches from node 0. The printed value is the sum of distances.
+# The search is one hot function. The two lists do not alias.
+
+hot fn search(dist: exclusive lend List[i32], used: exclusive lend List[u8], n: usize) -> i64:
+    overflow: wrap
+    inf: i32 = 1000000000
+    for i in 0..n:
+        trust dist[i] = inf
+        trust used[i] = 0
+    trust dist[0] = 0
+    placed: usize = 0
+    while placed < n:
+        best: usize = 0
+        best_d: i32 = inf
+        found: bool = false
+        for i in 0..n:
+            if trust used[i] == 0:
+                d = trust dist[i]
+                if d < best_d:
+                    best_d = d
+                    best = i
+                    found = true
+        if not found:
+            placed = n
+        else:
+            trust used[best] = 1
+            placed += 1
+            for j in 0..n:
+                if trust used[j] == 0:
+                    if best != j:
+                        w = i32((best * 131 + j * 17) % 97 + 1)
+                        alt = trust dist[best] + w
+                        if alt < trust dist[j]:
+                            trust dist[j] = alt
+    sum: i64 = 0
+    for i in 0..n:
+        sum += i64(trust dist[i])
+    return sum
+
+fn main():
+    n: usize = 4000
+    dist = List[i32]()
+    used = List[u8]()
+    for i in 0..n:
+        dist.push(0)
+        used.push(0)
+    total: i64 = 0
+    for round in 0..8:
+        total += search(dist, used, n)
+    print(total)

@@ -1,0 +1,199 @@
+# std.string: searching, slicing, splitting, parsing and formatting for `str` / `string`.
+#
+# Most of these are also methods of `str` and `string` (`s.trim()`, `s.split(",")`); the functions
+# below that only call a method are kept for older code.
+#
+# `str` is a read-only view; the slicing helpers return views into the original bytes (no copy). Views
+# produced by `substr` are not NUL-terminated, so do not pass them to C functions expecting C strings.
+
+private
+extern "stdio.h" fn snprintf(buf: *mut u8, n: usize, fmt: *u8, ...) -> i32
+
+public
+fn substr(s: str, lo: usize, hi: usize) -> str:
+    if lo > hi or hi > s.len:
+        panic("substr: range out of bounds")
+    out = s
+    unsafe:
+        out = str_from_raw(ptr_offset(string_to_cstr(s), isize(lo)), hi - lo)
+    return out
+
+fn str_starts_with(s: str, prefix: str) -> bool:
+    return s.starts_with(prefix)
+
+fn str_ends_with(s: str, suffix: str) -> bool:
+    return s.ends_with(suffix)
+
+fn str_find(s: str, needle: str) -> Optional[usize]:
+    return s.find(needle)
+
+fn str_contains(s: str, needle: str) -> bool:
+    return s.contains(needle)
+
+fn str_trim(s: str) -> str:
+    return s.trim()
+
+fn str_split(s: str, sep: u8) -> List[str]:
+    out = List[str]()
+    start: usize = 0
+    for i in 0..s.len:
+        if s[i] == sep:
+            out.push(substr(s, start, i))
+            start = i + 1
+    out.push(substr(s, start, s.len))
+    return out
+
+fn str_lines(s: str) -> List[str]:
+    out = str_split(s, '\n')
+    # drop a trailing '\r' on each line
+    trimmed = List[str]()
+    for i in 0..out.len:
+        line = out[i]
+        if line.len > 0 and line[line.len - 1] == '\r':
+            trimmed.push(substr(line, 0, line.len - 1))
+        else:
+            trimmed.push(line)
+    return trimmed
+
+fn str_eq_ignore_case(a: str, b: str) -> bool:
+    return a.eq_ignore_case(b)
+
+fn to_lower_u8(c: u8) -> u8:
+    if c >= 'A' and c <= 'Z':
+        return c + 32
+    return c
+
+fn is_digit(c: u8) -> bool:
+    return c >= '0' and c <= '9'
+
+fn is_alpha(c: u8) -> bool:
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z')
+
+# -- parsing ------------------------------------------------------------------------------------
+
+fn parse_u64(s: str) -> Optional[u64]:
+    if s.len == 0:
+        return None
+    n: u64 = 0
+    for i in 0..s.len:
+        c = s[i]
+        if not is_digit(c):
+            return None
+        d = u64(c - '0')
+        if mul_overflows(n, u64(10)):
+            return None
+        n = n * 10
+        if add_overflows(n, d):
+            return None
+        n = n + d
+    return Valid(n)
+
+fn parse_i64(s: str) -> Optional[i64]:
+    if s.len == 0:
+        return None
+    if s[0] == '-':
+        m = parse_u64(substr(s, 1, s.len))
+        match m:
+            Valid(v):
+                if v > 9223372036854775808:
+                    return None
+                if v == 9223372036854775808:
+                    return Valid(min_value[i64]())
+                return Valid(0 - i64(v))
+            None:
+                return None
+    start: usize = 0
+    if s[0] == '+':
+        start = 1
+    m = parse_u64(substr(s, start, s.len))
+    match m:
+        Valid(v):
+            if v > 9223372036854775807:
+                return None
+            return Valid(i64(v))
+        None:
+            return None
+
+fn parse_f64(s: str) -> Optional[f64]:
+    if s.len == 0:
+        return None
+    i: usize = 0
+    neg = false
+    if s[0] == '-' or s[0] == '+':
+        neg = s[0] == '-'
+        i = 1
+    value: f64 = 0.0
+    digits: usize = 0
+    while i < s.len and is_digit(s[i]):
+        value = value * 10.0 + f64(s[i] - '0')
+        digits += 1
+        i += 1
+    if i < s.len and s[i] == '.':
+        i += 1
+        scale: f64 = 0.1
+        while i < s.len and is_digit(s[i]):
+            value = value + f64(s[i] - '0') * scale
+            scale = scale * 0.1
+            digits += 1
+            i += 1
+    if digits == 0 or i != s.len:
+        return None
+    if neg:
+        return Valid(0.0 - value)
+    return Valid(value)
+
+# -- formatting (String builders) ---------------------------------------------------------------
+
+impl string:
+    fn append_f64(self: lend string, x: f64):
+        buf: [48]u8 = [0; 48]
+        written: i32 = 0
+        unsafe:
+            written = snprintf(addr_mut(buf), 48, string_to_cstr("%.15g"), x)
+        i: i32 = 0
+        while i < written and i < 47:
+            self.append_byte(buf[usize(i)])
+            i += 1
+
+fn to_string_i64(n: i64) -> string:
+    s = string.new()
+    s.append_i64(n)
+    return s
+
+fn to_string_u64(n: u64) -> string:
+    s = string.new()
+    s.append_u64(n)
+    return s
+
+fn to_string_f64(x: f64) -> string:
+    s = string.new()
+    s.append_f64(x)
+    return s
+
+fn to_upper(text: str) -> string:
+    return text.to_upper()
+
+fn to_lower(text: str) -> string:
+    return text.to_lower()
+
+fn str_repeat(text: str, times: usize) -> string:
+    return text.repeat(times)
+
+fn str_join(parts: read List[str], sep: str) -> string:
+    s = string.new()
+    for i in 0..parts.len:
+        if i > 0:
+            s.append_str(sep)
+        s.append_str(parts[i])
+    return s
+
+fn str_replace(text: str, from: str, to: str) -> string:
+    return text.replace(from, to)
+
+fn str_eq(a: str, b: str) -> bool:
+    if a.len != b.len:
+        return false
+    for i in 0..a.len:
+        if a[i] != b[i]:
+            return false
+    return true

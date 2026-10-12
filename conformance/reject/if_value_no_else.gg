@@ -1,0 +1,5 @@
+# conformance: SPEC section 17, rejected form: an `if` value with no `else`
+# expect-error: GG0238 at line 5
+
+fn main():
+    x = if true then 1

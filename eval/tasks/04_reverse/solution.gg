@@ -1,0 +1,11 @@
+fn reverse(xs: lend List[i32]):
+    if xs.len < 2:
+        return
+    i: usize = 0
+    j: usize = xs.len - 1
+    while i < j:
+        tmp = xs[i]
+        xs[i] = xs[j]
+        xs[j] = tmp
+        i += 1
+        j -= 1

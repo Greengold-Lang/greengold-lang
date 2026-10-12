@@ -1,0 +1,7 @@
+fn test_count_hits():
+    require count_byte("aab", 'a') == 2
+    require count_byte("aab", 'b') == 1
+
+fn test_count_absent():
+    require count_byte("", 'a') == 0
+    require count_byte("aab", 'z') == 0

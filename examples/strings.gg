@@ -1,0 +1,9 @@
+fn first(s: str) -> u8:
+    return s[0]
+
+fn main():
+    name = "Re"
+    print(name.len)
+    print(first(name))
+    print(name == "Re")
+    print('A')

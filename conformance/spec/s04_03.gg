@@ -1,0 +1,11 @@
+# conformance: SPEC section 4 (Functions), example 3
+# expect-output:
+#   1
+
+fn fill(n: exclusive lend i32):
+    n = 1
+
+fn main():
+    n = 0
+    fill(n)
+    print(n)

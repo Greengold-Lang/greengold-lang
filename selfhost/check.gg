@@ -1,0 +1,5210 @@
+# Core of the type checker: names, literals, arithmetic, functions, assignment,
+# struct fields, methods, range loops, enums, match, arrays, slices,
+# constants, if/match expressions, move analysis, and borrow checking.
+# Generic type applications, generic functions, and generic methods are instantiated here.
+import std.string
+import lex
+import ast
+import cursor
+import codes
+import typeinfo
+import dump
+
+public
+
+struct VarRec:
+    name: usize
+    ty: usize
+    mutable: bool
+    kind: u8
+    origin: usize
+    tie: usize
+
+struct Frame:
+    lo: usize
+    hi: usize
+
+struct FuncRec:
+    name: usize
+    owner: usize
+    ret: usize
+    decl: usize
+    inst: bool
+    blo: usize
+    bhi: usize
+
+struct Tmpl:
+    name: usize
+    owner: usize
+    decl: usize
+
+struct TyRec:
+    name: usize
+    decl: usize
+
+struct GenRec:
+    name: usize
+    decl: usize
+    kind: u8
+
+struct Bind:
+    name: usize
+    ty: usize
+
+struct VariantRec:
+    owner: usize
+    name: usize
+    lo: usize
+    hi: usize
+
+struct FieldRec:
+    owner: usize
+    name: usize
+    ty: usize
+    held: bool
+
+struct Moved:
+    path: usize
+    line: i32
+    col: i32
+    length: i32
+    param: usize
+    mline: i32
+    mcol: i32
+    mlen: i32
+
+struct Mv:
+    moved: List[Moved]
+    lnames: List[usize]
+    ltop: usize
+    lmarks: List[usize]
+    ctx_on: bool
+    ctx_method: bool
+    ctx_decl: usize
+    ctx_arg: usize
+    reassign: usize
+
+struct ConstRec:
+    name: usize
+    ty: usize
+    decl: usize
+    val: i64
+    has_i: bool
+
+struct YieldRec:
+    ty: usize
+    exp: usize
+
+struct Checker:
+    vars: List[VarRec]
+    frames: List[Frame]
+    funcs: List[FuncRec]
+    types: List[TyRec]
+    enums: List[TyRec]
+    variants: List[VariantRec]
+    payloads: List[usize]
+    fields: List[FieldRec]
+    consts: List[ConstRec]
+    yields: List[YieldRec]
+    rep_line: List[i32]
+    rep_col: List[i32]
+    rep_msg: List[usize]
+    cur_ret: usize
+    cur_name: usize
+    cur_decl: usize
+    loop_depth: i32
+    err_ty: usize
+    void_ty: usize
+    gens: List[GenRec]
+    binds: List[Bind]
+    tmpls: List[Tmpl]
+    ibinds: List[Bind]
+    depth: i32
+    pre_nodes: usize
+
+fn checker_new(p: lend cursor.Parser) -> Checker:
+    return Checker{
+        vars: List[VarRec](),
+        frames: List[Frame](),
+        funcs: List[FuncRec](),
+        types: List[TyRec](),
+        enums: List[TyRec](),
+        variants: List[VariantRec](),
+        payloads: List[usize](),
+        fields: List[FieldRec](),
+        consts: List[ConstRec](),
+        yields: List[YieldRec](),
+        rep_line: List[i32](),
+        rep_col: List[i32](),
+        rep_msg: List[usize](),
+        cur_ret: 0,
+        cur_name: 0,
+        cur_decl: 0,
+        loop_depth: 0,
+        err_ty: p.lx.names.put("<error>") + 1,
+        void_ty: p.lx.names.put("void") + 1,
+        gens: List[GenRec](),
+        binds: List[Bind](),
+        tmpls: List[Tmpl](),
+        ibinds: List[Bind](),
+        depth: 0,
+        pre_nodes: 0,
+    }
+
+fn text_of(p: read cursor.Parser, packed: usize) -> str:
+    return cursor.packed_text(p, packed)
+
+fn same(p: read cursor.Parser, a: usize, b: usize) -> bool:
+    return string.str_eq(text_of(p, a), text_of(p, b))
+
+fn pack(p: lend cursor.Parser, text: str) -> usize:
+    return p.lx.names.put(text) + 1
+
+fn raw_name(p: lend cursor.Parser, packed: usize) -> usize:
+    return p.lx.names.put(text_of(p, packed))
+
+fn node_at(p: read cursor.Parser, id: usize) -> ast.Node:
+    return p.nodes[id]
+
+fn seen(c: read Checker, line: i32, col: i32, msg: usize) -> bool:
+    i: usize = 0
+    while i < c.rep_line.len:
+        if c.rep_line[i] == line and c.rep_col[i] == col and c.rep_msg[i] == msg:
+            return true
+        i += 1
+    return false
+
+fn report(p: lend cursor.Parser, c: lend Checker, line: i32, col: i32, length: i32, msg: str, hint: str, has_hint: bool, has_fix: bool, desc: str, sl: i32, sc: i32, el: i32, ec: i32, repl: str, app: str):
+    ln = length
+    if ln < 1:
+        ln = 1
+    mid = p.lx.names.put(msg)
+    if seen(c, line, col, mid):
+        return
+    c.rep_line.push(line)
+    c.rep_col.push(col)
+    c.rep_msg.push(mid)
+    code = codes.classify(msg)
+    applicability: usize = 0
+    if app.len > 0:
+        applicability = p.lx.names.put(app) + 1
+    p.lx.diags.push(lex.Diag{
+        code: p.lx.names.put(code.as_str()),
+        msg: mid,
+        hint: p.lx.names.put(hint),
+        has_hint: has_hint,
+        line: line,
+        col: col,
+        length: ln,
+        has_fix: has_fix,
+        fix_desc: p.lx.names.put(desc),
+        esl: sl,
+        esc: sc,
+        eel: el,
+        eec: ec,
+        repl: p.lx.names.put(repl),
+        app: applicability,
+    })
+
+fn err_at(p: lend cursor.Parser, c: lend Checker, id: usize, msg: str, hint: str, has_hint: bool):
+    n = node_at(p, id)
+    report(p, c, n.line, n.col, n.length, msg, hint, has_hint, false, "", 0, 0, 0, 0, "", "")
+
+fn push_frame(c: lend Checker):
+    c.frames.push(Frame{ lo: c.vars.len, hi: c.vars.len })
+
+fn pop_frame(c: lend Checker):
+    gone = c.frames.pop()
+
+fn add_var(c: lend Checker, rec: VarRec):
+    c.vars.push(rec)
+    fr = c.frames[c.frames.len - 1]
+    fr.hi = c.vars.len
+    c.frames[c.frames.len - 1] = fr
+
+fn lookup(c: read Checker, name: usize) -> usize:
+    fi = c.frames.len
+    while fi > 0:
+        fi -= 1
+        fr = c.frames[fi]
+        i = fr.lo
+        while i < fr.hi:
+            if c.vars[i].name == name:
+                return i + 1
+            i += 1
+    return 0
+
+fn declared(c: read Checker, name: usize) -> bool:
+    fi: usize = 0
+    while fi < c.frames.len:
+        fr = c.frames[fi]
+        i = fr.lo
+        while i < fr.hi:
+            if c.vars[i].name == name:
+                return true
+            i += 1
+        fi += 1
+    return false
+
+fn find_func(c: read Checker, name: usize) -> usize:
+    i: usize = 0
+    while i < c.funcs.len:
+        if c.funcs[i].owner == 0 and c.funcs[i].name == name:
+            return i + 1
+        i += 1
+    return 0
+
+fn find_type(c: read Checker, name: usize) -> bool:
+    i: usize = 0
+    while i < c.types.len:
+        if c.types[i].name == name:
+            return true
+        i += 1
+    return false
+
+fn find_enum(c: read Checker, name: usize) -> bool:
+    i: usize = 0
+    while i < c.enums.len:
+        if c.enums[i].name == name:
+            return true
+        i += 1
+    return false
+
+fn find_variant(c: read Checker, owner: usize, name: usize) -> usize:
+    i: usize = 0
+    while i < c.variants.len:
+        if c.variants[i].owner == owner and c.variants[i].name == name:
+            return i + 1
+        i += 1
+    return 0
+
+fn is_const_expr(p: read cursor.Parser, id: usize) -> bool:
+    if id == 0:
+        return false
+    k = node_at(p, id).kind
+    if k == 35 or k == 36:
+        return true
+    if k == 43:
+        op = text_of(p, node_at(p, id).s0)
+        if string.str_eq(op, "-") or string.str_eq(op, "~"):
+            return is_const_expr(p, node_at(p, id).c0)
+        return false
+    if k == 44:
+        op2 = text_of(p, node_at(p, id).s0)
+        if string.str_eq(op2, "+") or string.str_eq(op2, "-") or string.str_eq(op2, "*") or string.str_eq(op2, "/") or string.str_eq(op2, "%"):
+            return is_const_expr(p, node_at(p, id).c0) and is_const_expr(p, node_at(p, id).c1)
+        if string.str_eq(op2, "&") or string.str_eq(op2, "|") or string.str_eq(op2, "^") or string.str_eq(op2, "<<") or string.str_eq(op2, ">>"):
+            return is_const_expr(p, node_at(p, id).c0) and is_const_expr(p, node_at(p, id).c1)
+        return false
+    if k == 45:
+        return is_const_expr(p, node_at(p, id).c0)
+    return false
+
+fn lit_i64(p: read cursor.Parser, id: usize) -> i64:
+    got = string.parse_i64(text_of(p, node_at(p, id).s0))
+    match got:
+        Valid(v):
+            return v
+        None:
+            return 0
+
+fn lookup_bind(p: lend cursor.Parser, c: read Checker, packed: usize) -> usize:
+    raw = raw_name(p, packed)
+    i: usize = 0
+    while i < c.binds.len:
+        if c.binds[i].name == raw:
+            return c.binds[i].ty
+        i += 1
+    return 0
+
+fn trim_binds(c: lend Checker, n: usize):
+    while c.binds.len > n:
+        match c.binds.pop():
+            None:
+                return
+            Valid(_):
+                pass
+
+fn type_shape(p: read cursor.Parser, decl: usize, base: str) -> string:
+    n = node_at(p, decl)
+    out = string.new()
+    out.append_str(base)
+    out.append_byte(91)
+    s = n.slo
+    first = true
+    while s < n.shi:
+        if not first:
+            out.append_str(", ")
+        first = false
+        out.append_str(p.lx.names.text(p.strs[s]))
+        s += 1
+    out.append_byte(93)
+    return out
+
+fn instantiate(p: lend cursor.Parser, c: lend Checker, decl: usize, base: str, args: read List[usize], node: usize) -> usize:
+    canon = string.new()
+    canon.append_str(base)
+    canon.append_byte(91)
+    ai: usize = 0
+    while ai < args.len:
+        if ai > 0:
+            canon.append_str(", ")
+        canon.append_str(text_of(p, args[ai]))
+        ai += 1
+    canon.append_byte(93)
+    raw = p.lx.names.put(canon.as_str())
+    if find_type(c, raw) or find_enum(c, raw):
+        return raw + 1
+    if c.depth >= 64:
+        err_at(p, c, node, "possible infinite recursive instantiation (instantiation depth exceeded 64).", "A generic definition may be instantiating itself with larger type parameters; break the cycle.", true)
+        return c.err_ty
+    c.depth += 1
+    saved = c.binds.len
+    dn = node_at(p, decl)
+    s = dn.slo
+    k: usize = 0
+    while s < dn.shi and k < args.len:
+        c.binds.push(Bind{ name: p.strs[s], ty: args[k] })
+        s += 1
+        k += 1
+    if dn.kind == 6:
+        c.enums.push(TyRec{ name: raw, decl: decl })
+        fill_enum(p, c, decl, raw)
+    else:
+        c.types.push(TyRec{ name: raw, decl: decl })
+        fill_struct(p, c, decl, raw)
+    trim_binds(c, saved)
+    c.depth -= 1
+    return raw + 1
+
+fn apply_heap(p: lend cursor.Parser, c: lend Checker, base: str, lo: usize, hi: usize, node: usize) -> usize:
+    count: i64 = i64(hi - lo)
+    if count != 1:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(base)
+        msg.append_str("` expects 1 type argument(s), found ")
+        msg.append_i64(count)
+        msg.append_str(".")
+        hint = string.new()
+        hint.append_str("Write as `")
+        hint.append_str(base)
+        hint.append_str("[T]`.")
+        err_at(p, c, node, msg.as_str(), hint.as_str(), true)
+        return c.err_ty
+    ty = resolve_type(p, c, p.ids[lo])
+    if ty != c.err_ty and typeinfo.is_slice_type(text_of(p, ty)):
+        err_at(p, c, p.ids[lo], "Slice (`[]T`) cannot be a type argument; slices can only be function parameters.", "Use array type `[N]T` instead of slice.", true)
+        return c.err_ty
+    if ty == c.err_ty:
+        return c.err_ty
+    shown = string.new()
+    shown.append_str(base)
+    shown.append_byte(91)
+    shown.append_str(text_of(p, ty))
+    shown.append_byte(93)
+    return pack(p, shown.as_str())
+
+fn apply_generic(p: lend cursor.Parser, c: lend Checker, decl: usize, base: str, lo: usize, hi: usize, node: usize) -> usize:
+    args = List[usize]()
+    i = lo
+    while i < hi:
+        args.push(resolve_type(p, c, p.ids[i]))
+        i += 1
+    n = node_at(p, decl)
+    need: i64 = i64(n.shi - n.slo)
+    got: i64 = i64(hi - lo)
+    if got != need:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(base)
+        msg.append_str("` expects ")
+        msg.append_i64(need)
+        msg.append_str(" type argument(s), found ")
+        msg.append_i64(got)
+        msg.append_str(".")
+        shape = type_shape(p, decl, base)
+        hint = string.new()
+        hint.append_str("Write as `")
+        hint.append_str(shape.as_str())
+        hint.append_str("` (no partial type arguments).")
+        err_at(p, c, node, msg.as_str(), hint.as_str(), true)
+        return c.err_ty
+    ok = true
+    a: usize = 0
+    id = lo
+    while a < args.len:
+        ty = args[a]
+        if ty != c.err_ty and typeinfo.is_slice_type(text_of(p, ty)):
+            err_at(p, c, p.ids[id], "Slice (`[]T`) cannot be a type argument; slices can only be function parameters.", "Use array type `[N]T` instead of slice.", true)
+            ok = false
+        elif ty == c.err_ty:
+            ok = false
+        a += 1
+        id += 1
+    if not ok:
+        return c.err_ty
+    return instantiate(p, c, decl, base, args, node)
+
+fn apply_named(p: lend cursor.Parser, c: lend Checker, base_packed: usize, lo: usize, hi: usize, node: usize) -> usize:
+    base = text_of(p, base_packed)
+    if string.str_eq(base, "List") or string.str_eq(base, "Box"):
+        return apply_heap(p, c, base, lo, hi, node)
+    raw = raw_name(p, base_packed)
+    slot = find_gen(c, raw)
+    if slot != 0:
+        return apply_generic(p, c, c.gens[slot - 1].decl, base, lo, hi, node)
+    if typeinfo.is_prim(base) or find_type(c, raw) or find_enum(c, raw):
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(base)
+        msg.append_str("` is not a generic type, cannot take type arguments.")
+        hint = string.new()
+        hint.append_str("Write only `")
+        hint.append_str(base)
+        hint.append_str("`.")
+        err_at(p, c, node, msg.as_str(), hint.as_str(), true)
+        return c.err_ty
+    umsg = string.new()
+    umsg.append_str("Unknown type `")
+    umsg.append_str(base)
+    umsg.append_str("`.")
+    err_at(p, c, node, umsg.as_str(), "", false)
+    return c.err_ty
+
+fn resolve_type(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    if id == 0:
+        return c.err_ty
+    n = node_at(p, id)
+    if n.kind == 12 and n.f0:
+        return resolve_slice(p, c, id)
+    if n.kind == 12 and n.f1:
+        return resolve_array(p, c, id)
+    if n.kind == 12 and n.lo != n.hi and n.s1 != 0:
+        return apply_named(p, c, n.s1, n.lo, n.hi, id)
+    hit = lookup_bind(p, c, n.s0)
+    if hit != 0:
+        return hit
+    name = text_of(p, n.s0)
+    if string.str_eq(name, "List") or string.str_eq(name, "Box"):
+        hmsg = string.new()
+        hmsg.append_str("`")
+        hmsg.append_str(name)
+        hmsg.append_str("` is a generic type; type argument required.")
+        hhint = string.new()
+        hhint.append_str("Write as `")
+        hhint.append_str(name)
+        hhint.append_str("[T]`.")
+        err_at(p, c, id, hmsg.as_str(), hhint.as_str(), true)
+        return c.err_ty
+    g = find_gen(c, raw_name(p, n.s0))
+    if g != 0:
+        shape = type_shape(p, c.gens[g - 1].decl, name)
+        gmsg = string.new()
+        gmsg.append_str("`")
+        gmsg.append_str(name)
+        gmsg.append_str("` is a generic type; type arguments required.")
+        ghint = string.new()
+        ghint.append_str("Write as `")
+        ghint.append_str(shape.as_str())
+        ghint.append_str("` (type arguments are always explicit).")
+        err_at(p, c, id, gmsg.as_str(), ghint.as_str(), true)
+        return c.err_ty
+    if typeinfo.is_prim(name) or find_type(c, raw_name(p, n.s0)) or find_enum(c, raw_name(p, n.s0)):
+        return n.s0
+    msg = string.new()
+    msg.append_str("Unknown type `")
+    msg.append_str(name)
+    msg.append_str("`.")
+    err_at(p, c, id, msg.as_str(), "Types: i32, i64, f32, f64, bool, string, or your own struct/enum.", true)
+    return c.err_ty
+
+fn simple_type(p: lend cursor.Parser, c: lend Checker, packed: usize, node: usize) -> usize:
+    hit = lookup_bind(p, c, packed)
+    if hit != 0:
+        return hit
+    name = text_of(p, packed)
+    if string.str_eq(name, "List") or string.str_eq(name, "Box"):
+        hmsg = string.new()
+        hmsg.append_str("`")
+        hmsg.append_str(name)
+        hmsg.append_str("` is a generic type; type argument required.")
+        hhint = string.new()
+        hhint.append_str("Write as `")
+        hhint.append_str(name)
+        hhint.append_str("[T]`.")
+        err_at(p, c, node, hmsg.as_str(), hhint.as_str(), true)
+        return c.err_ty
+    g = find_gen(c, raw_name(p, packed))
+    if g != 0:
+        shape = type_shape(p, c.gens[g - 1].decl, name)
+        gmsg = string.new()
+        gmsg.append_str("`")
+        gmsg.append_str(name)
+        gmsg.append_str("` is a generic type; type arguments required.")
+        ghint = string.new()
+        ghint.append_str("Write as `")
+        ghint.append_str(shape.as_str())
+        ghint.append_str("` (type arguments are always explicit).")
+        err_at(p, c, node, gmsg.as_str(), ghint.as_str(), true)
+        return c.err_ty
+    if typeinfo.is_prim(name) or find_type(c, raw_name(p, packed)) or find_enum(c, raw_name(p, packed)):
+        return packed
+    msg = string.new()
+    msg.append_str("Unknown type `")
+    msg.append_str(name)
+    msg.append_str("`.")
+    err_at(p, c, node, msg.as_str(), "Types: i32, i64, f32, f64, bool, string, or your own struct/enum.", true)
+    return c.err_ty
+
+fn expr_as_type(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    k = node_at(p, id).kind
+    if k == 41:
+        return simple_type(p, c, node_at(p, id).s0, id)
+    if k == 54:
+        app = node_at(p, id)
+        return apply_named(p, c, app.s0, app.lo, app.hi, id)
+    if k == 53:
+        return index_as_type(p, c, id)
+    return c.err_ty
+
+fn enum_index(p: lend cursor.Parser, c: read Checker, id: usize) -> bool:
+    n = node_at(p, id)
+    if n.kind != 53:
+        return false
+    base = node_at(p, n.c0)
+    if base.kind != 41:
+        return false
+    slot = find_gen(c, raw_name(p, base.s0))
+    if slot == 0:
+        return false
+    return c.gens[slot - 1].kind == 6
+
+fn index_as_type(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    base_n = node_at(p, n.c0)
+    if base_n.kind != 41:
+        return c.err_ty
+    arg = expr_as_type(p, c, n.c1)
+    if arg == c.err_ty:
+        return c.err_ty
+    if typeinfo.is_slice_type(text_of(p, arg)):
+        err_at(p, c, n.c1, "Slice (`[]T`) cannot be a type argument; slices can only be function parameters.", "Use array type `[N]T` instead of slice.", true)
+        return c.err_ty
+    base = text_of(p, base_n.s0)
+    if string.str_eq(base, "List") or string.str_eq(base, "Box"):
+        shown = string.new()
+        shown.append_str(base)
+        shown.append_byte(91)
+        shown.append_str(text_of(p, arg))
+        shown.append_byte(93)
+        return pack(p, shown.as_str())
+    slot = find_gen(c, raw_name(p, base_n.s0))
+    if slot == 0:
+        return c.err_ty
+    decl = c.gens[slot - 1].decl
+    dn = node_at(p, decl)
+    need: i64 = i64(dn.shi - dn.slo)
+    if need != 1:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(base)
+        msg.append_str("` expects ")
+        msg.append_i64(need)
+        msg.append_str(" type argument(s), found 1.")
+        shape = type_shape(p, decl, base)
+        hint = string.new()
+        hint.append_str("Write as `")
+        hint.append_str(shape.as_str())
+        hint.append_str("` (no partial type arguments).")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        return c.err_ty
+    args = List[usize]()
+    args.push(arg)
+    return instantiate(p, c, decl, base, args, id)
+
+fn owns_heap(p: read cursor.Parser, ty: usize) -> bool:
+    return string.str_eq(text_of(p, ty), "string")
+
+fn resolve_slice(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    elem = resolve_type(p, c, n.c1)
+    if elem == c.err_ty:
+        return c.err_ty
+    if owns_heap(p, elem):
+        msg = string.new()
+        msg.append_str("Slice with heap-owning elements (`[]")
+        msg.append_str(text_of(p, elem))
+        msg.append_str("`) is not supported.")
+        err_at(p, c, id, msg.as_str(), "Use `List[T]` for owned elements.", true)
+        return c.err_ty
+    shown = string.new()
+    shown.append_str("[]")
+    shown.append_str(text_of(p, elem))
+    return pack(p, shown.as_str())
+
+fn resolve_array(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    elem = resolve_type(p, c, n.c1)
+    if elem == c.err_ty:
+        return c.err_ty
+    count: i64 = -1
+    match eval_int(p, c, n.c0):
+        Valid(v):
+            count = v
+        None:
+            count = -1
+    if count <= 0:
+        err_at(p, c, n.c0, "Array size must be a positive constant integer.", "", false)
+        return c.err_ty
+    if owns_heap(p, elem):
+        msg = string.new()
+        msg.append_str("Array with heap-owning elements (`[")
+        msg.append_i64(count)
+        msg.append_str("]")
+        msg.append_str(text_of(p, elem))
+        msg.append_str("`) is not supported.")
+        err_at(p, c, id, msg.as_str(), "Use `List[T]` for owned elements.", true)
+        return c.err_ty
+    shown = string.new()
+    shown.append_byte(91)
+    shown.append_i64(count)
+    shown.append_byte(93)
+    shown.append_str(text_of(p, elem))
+    return pack(p, shown.as_str())
+
+fn eval_int(p: read cursor.Parser, c: read Checker, id: usize) -> Optional[i64]:
+    if id == 0:
+        return None
+    n = node_at(p, id)
+    if n.kind == 35:
+        return Valid(lit_i64(p, id))
+    if n.kind == 41:
+        slot = find_const(p, c, n.s0)
+        if slot == 0 or not c.consts[slot - 1].has_i:
+            return None
+        return Valid(c.consts[slot - 1].val)
+    if n.kind == 43 and string.str_eq(text_of(p, n.s0), "-"):
+        match eval_int(p, c, n.c0):
+            Valid(v):
+                return Valid(0 - v)
+            None:
+                return None
+    if n.kind == 44:
+        lv: i64 = 0
+        rv: i64 = 0
+        ok = false
+        match eval_int(p, c, n.c0):
+            Valid(l):
+                lv = l
+                match eval_int(p, c, n.c1):
+                    Valid(r):
+                        rv = r
+                        ok = true
+                    None:
+                        ok = false
+            None:
+                ok = false
+        if not ok:
+            return None
+        op = text_of(p, n.s0)
+        if string.str_eq(op, "+"):
+            return Valid(lv + rv)
+        if string.str_eq(op, "-"):
+            return Valid(lv - rv)
+        if string.str_eq(op, "*"):
+            return Valid(lv * rv)
+        return None
+    return None
+
+fn bind(p: lend cursor.Parser, c: lend Checker, name_packed: usize, ty: usize, mutable: bool, kind: u8, origin: usize):
+    nm = text_of(p, name_packed)
+    raw = raw_name(p, name_packed)
+    if declared(c, raw):
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(nm)
+        msg.append_str("` is already defined; cannot declare second variable with the same name in v0.")
+        hint = string.new()
+        hint.append_str("Choose another name or assign to `")
+        hint.append_str(nm)
+        hint.append_str("` if it is `var`.")
+        err_at(p, c, origin, msg.as_str(), hint.as_str(), true)
+    add_var(c, VarRec{ name: raw, ty: ty, mutable: mutable, kind: kind, origin: origin, tie: 0 })
+
+fn check_program(p: lend cursor.Parser, root: usize):
+    c = checker_new(p)
+    c.pre_nodes = p.pre_nodes
+    if p.prelude != 0:
+        pre = node_at(p, p.prelude)
+        collect_types(p, c, pre.lo, pre.hi)
+        collect_consts(p, c, pre.lo, pre.hi)
+        collect_funcs(p, c, pre.lo, pre.hi)
+    top = node_at(p, root)
+    collect_types(p, c, top.lo, top.hi)
+    collect_consts(p, c, top.lo, top.hi)
+    collect_funcs(p, c, top.lo, top.hi)
+    check_main(p, c)
+    i: usize = 0
+    while i < c.funcs.len:
+        check_func(p, c, i)
+        i += 1
+    if p.lx.diags.len == 0:
+        move_program(p, c)
+    if p.lx.diags.len == 0:
+        borrow_program(p, c, root)
+
+fn name_taken(c: read Checker, name: usize) -> bool:
+    if find_type(c, name) or find_enum(c, name):
+        return true
+    return find_gen(c, name) != 0
+
+fn find_gen(c: read Checker, name: usize) -> usize:
+    i: usize = 0
+    while i < c.gens.len:
+        if c.gens[i].name == name:
+            return i + 1
+        i += 1
+    return 0
+
+fn struct_home(c: read Checker, name: usize) -> usize:
+    i: usize = 0
+    while i < c.types.len:
+        if c.types[i].name == name:
+            return c.types[i].decl
+        i += 1
+    return 0
+
+fn enum_home(c: read Checker, name: usize) -> usize:
+    i: usize = 0
+    while i < c.enums.len:
+        if c.enums[i].name == name:
+            return c.enums[i].decl
+        i += 1
+    return 0
+
+fn already_defined(p: lend cursor.Parser, c: lend Checker, id: usize, shown: str, hint: str):
+    msg = string.new()
+    msg.append_str("`")
+    msg.append_str(shown)
+    msg.append_str("` is already defined.")
+    err_at(p, c, id, msg.as_str(), hint, true)
+
+fn register_generic(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    name = raw_name(p, n.s0)
+    if name_taken(c, name):
+        hint = "Type names must be unique."
+        if n.kind == 4:
+            hint = "Struct names must be unique."
+        already_defined(p, c, id, text_of(p, n.s0), hint)
+        return
+    c.gens.push(GenRec{ name: name, decl: id, kind: n.kind })
+
+fn register_struct(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    name = raw_name(p, n.s0)
+    if name_taken(c, name):
+        already_defined(p, c, id, text_of(p, n.s0), "Struct names must be unique.")
+        return
+    c.types.push(TyRec{ name: name, decl: id })
+
+fn register_enum(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    name = raw_name(p, n.s0)
+    if name_taken(c, name):
+        already_defined(p, c, id, text_of(p, n.s0), "Type names must be unique.")
+        return
+    c.enums.push(TyRec{ name: name, decl: id })
+
+fn fill_struct(p: lend cursor.Parser, c: lend Checker, id: usize, owner: usize):
+    n = node_at(p, id)
+    f = n.lo
+    while f < n.hi:
+        fid = p.ids[f]
+        field = node_at(p, fid)
+        fty = c.err_ty
+        if field.c0 != 0:
+            fty = resolve_type(p, c, field.c0)
+        fname = raw_name(p, field.s0)
+        if field_ty(c, owner, fname) != 0:
+            msg = string.new()
+            msg.append_str("Field `")
+            msg.append_str(text_of(p, field.s0))
+            msg.append_str("` defined twice in struct `")
+            msg.append_str(text_of(p, n.s0))
+            msg.append_str("`.")
+            err_at(p, c, fid, msg.as_str(), "", false)
+        else:
+            held = true
+            if field.s1 != 0:
+                fmode = text_of(p, field.s1)
+                if string.str_eq(fmode, "read") or string.str_eq(fmode, "lend"):
+                    held = false
+            c.fields.push(FieldRec{ owner: owner, name: fname, ty: fty, held: held })
+        f += 1
+
+fn fill_enum(p: lend cursor.Parser, c: lend Checker, id: usize, owner: usize):
+    n = node_at(p, id)
+    v = n.lo
+    while v < n.hi:
+        vid = p.ids[v]
+        variant = node_at(p, vid)
+        vname = raw_name(p, variant.s0)
+        if find_variant(c, owner, vname) != 0:
+            vmsg = string.new()
+            vmsg.append_str("Variant `")
+            vmsg.append_str(text_of(p, variant.s0))
+            vmsg.append_str("` defined twice in enum `")
+            vmsg.append_str(text_of(p, n.s0))
+            vmsg.append_str("`.")
+            err_at(p, c, vid, vmsg.as_str(), "Variant names must be unique within an enum.", true)
+        else:
+            plo = c.payloads.len
+            t = variant.lo
+            while t < variant.hi:
+                c.payloads.push(resolve_type(p, c, p.ids[t]))
+                t += 1
+            c.variants.push(VariantRec{ owner: owner, name: vname, lo: plo, hi: c.payloads.len })
+        v += 1
+
+fn collect_types(p: lend cursor.Parser, c: lend Checker, lo: usize, hi: usize):
+    i = lo
+    while i < hi:
+        id = p.ids[i]
+        n = node_at(p, id)
+        if n.kind == 4 or n.kind == 6:
+            if n.slo != n.shi:
+                register_generic(p, c, id)
+            elif n.kind == 4:
+                register_struct(p, c, id)
+            else:
+                register_enum(p, c, id)
+        i += 1
+    j = lo
+    while j < hi:
+        id2 = p.ids[j]
+        n2 = node_at(p, id2)
+        if n2.kind == 4 and n2.slo == n2.shi and struct_home(c, raw_name(p, n2.s0)) == id2:
+            fill_struct(p, c, id2, raw_name(p, n2.s0))
+        if n2.kind == 6 and n2.slo == n2.shi and enum_home(c, raw_name(p, n2.s0)) == id2:
+            fill_enum(p, c, id2, raw_name(p, n2.s0))
+        j += 1
+
+fn collect_funcs(p: lend cursor.Parser, c: lend Checker, lo: usize, hi: usize):
+    i = lo
+    while i < hi:
+        id = p.ids[i]
+        n = node_at(p, id)
+        if n.kind == 9 and (n.slo != n.shi or n.slo2 != n.shi2):
+            towner: usize = 0
+            if n.i0 != 0:
+                towner = raw_name(p, usize(n.i0))
+            c.tmpls.push(Tmpl{ name: raw_name(p, n.s0), owner: towner, decl: id })
+        if n.kind == 9 and n.slo == n.shi and n.slo2 == n.shi2:
+            ret: usize = 0
+            if n.c0 != 0:
+                ret = resolve_type(p, c, n.c0)
+            pi = n.lo
+            while pi < n.hi:
+                param = node_at(p, p.ids[pi])
+                pty = resolve_type(p, c, param.c0)
+                mode = text_of(p, param.s1)
+                ptname = text_of(p, pty)
+                if string.str_eq(mode, "consume") and typeinfo.is_slice_type(ptname):
+                    err_at(p, c, p.ids[pi], "Slice cannot be moved.", "Slices are not copied and cannot be moved.", true)
+                elif string.str_eq(mode, "consume") and typeinfo.is_prim(ptname):
+                    msg = string.new()
+                    msg.append_str(ptname)
+                    msg.append_str(" is copied, `consume` is not needed.")
+                    hint = string.new()
+                    hint.append_str("Write `")
+                    hint.append_str(text_of(p, param.s0))
+                    hint.append_str(": ")
+                    hint.append_str(ptname)
+                    hint.append_str("` (`lend` if you want to mutate).")
+                    err_at(p, c, p.ids[pi], msg.as_str(), hint.as_str(), true)
+                elif string.str_eq(mode, "consume") and typeinfo.is_array_type(ptname) and typeinfo.is_prim(typeinfo.array_elem(ptname)):
+                    msg = string.new()
+                    msg.append_str(ptname)
+                    msg.append_str(" is copied, `consume` is not needed.")
+                    hint = string.new()
+                    hint.append_str("Write `")
+                    hint.append_str(text_of(p, param.s0))
+                    hint.append_str(": ")
+                    hint.append_str(ptname)
+                    hint.append_str("`.")
+                    err_at(p, c, p.ids[pi], msg.as_str(), hint.as_str(), true)
+                pi += 1
+            owner: usize = 0
+            keep = true
+            if n.i0 != 0:
+                owner = raw_name(p, usize(n.i0))
+                if not find_type(c, owner) and not find_enum(c, owner):
+                    msg2 = string.new()
+                    msg2.append_str("No struct named `")
+                    msg2.append_str(text_of(p, usize(n.i0)))
+                    msg2.append_str("`; cannot define method.")
+                    hint2 = string.new()
+                    hint2.append_str("First define `struct ")
+                    hint2.append_str(text_of(p, usize(n.i0)))
+                    hint2.append_str(":` (or `enum ")
+                    hint2.append_str(text_of(p, usize(n.i0)))
+                    hint2.append_str(":`).")
+                    err_at(p, c, id, msg2.as_str(), hint2.as_str(), true)
+                    keep = false
+                elif n.lo != n.hi and string.str_eq(text_of(p, node_at(p, p.ids[n.lo]).s0), "self"):
+                    first = node_at(p, p.ids[n.lo])
+                    if string.str_eq(text_of(p, first.s1), "consume"):
+                        hintc = string.new()
+                        hintc.append_str("Use `self: ")
+                        hintc.append_str(text_of(p, usize(n.i0)))
+                        hintc.append_str("` (value), `self: read ")
+                        hintc.append_str(text_of(p, usize(n.i0)))
+                        hintc.append_str("` or `self: lend ")
+                        hintc.append_str(text_of(p, usize(n.i0)))
+                        hintc.append_str("`.")
+                        err_at(p, c, p.ids[n.lo], "`consume self` is not yet supported.", hintc.as_str(), true)
+                        keep = false
+                    elif first.c0 != 0:
+                        sty = resolve_type(p, c, first.c0)
+                        if sty != c.err_ty and not same(p, sty, usize(n.i0)):
+                            msg3 = string.new()
+                            msg3.append_str("`self` type must be `")
+                            msg3.append_str(text_of(p, usize(n.i0)))
+                            msg3.append_str("`, found `")
+                            msg3.append_str(text_of(p, sty))
+                            msg3.append_str("`.")
+                            err_at(p, c, p.ids[n.lo], msg3.as_str(), "", false)
+                            keep = false
+            if keep and owner == 0:
+                fname = raw_name(p, n.s0)
+                if reserved_const(text_of(p, n.s0)):
+                    rmsg = string.new()
+                    rmsg.append_str("`")
+                    rmsg.append_str(text_of(p, n.s0))
+                    rmsg.append_str("` is a reserved name.")
+                    err_at(p, c, id, rmsg.as_str(), "", false)
+                    keep = false
+                elif find_func(c, fname) != 0:
+                    dmsg = string.new()
+                    dmsg.append_str("`")
+                    dmsg.append_str(text_of(p, n.s0))
+                    dmsg.append_str("` is already defined.")
+                    err_at(p, c, id, dmsg.as_str(), "Function names must be unique (no overloading in v0).", true)
+                    keep = false
+            if keep:
+                c.funcs.push(FuncRec{ name: raw_name(p, n.s0), owner: owner, ret: ret, decl: id, inst: false, blo: 0, bhi: 0 })
+        i += 1
+
+fn check_main(p: lend cursor.Parser, c: lend Checker):
+    slot = find_func(c, p.lx.names.put("main"))
+    if slot == 0:
+        report(p, c, 1, 1, 1, "`fn main():` not found.", "Write `fn main():` as program entry point.", true, false, "", 0, 0, 0, 0, "", "")
+        return
+    info = c.funcs[slot - 1]
+    d = node_at(p, info.decl)
+    if d.lo != d.hi or info.ret != 0:
+        err_at(p, c, info.decl, "`main` takes no parameters and does not return a value.", "Write as `fn main():`.", true)
+
+fn check_func(p: lend cursor.Parser, c: lend Checker, index: usize):
+    if c.funcs[index].decl < c.pre_nodes and not c.funcs[index].inst:
+        return
+    saved_b = c.binds.len
+    if c.funcs[index].inst:
+        apply_saved(c, c.funcs[index].blo, c.funcs[index].bhi)
+    info = c.funcs[index]
+    d = node_at(p, info.decl)
+    c.cur_ret = info.ret
+    c.cur_name = info.name
+    c.cur_decl = info.decl
+    c.loop_depth = 0
+    push_frame(c)
+    pi = d.lo
+    while pi < d.hi:
+        param = node_at(p, p.ids[pi])
+        pty = resolve_type(p, c, param.c0)
+        mode = text_of(p, param.s1)
+        pkind: u8 = 2
+        if string.str_eq(mode, "consume"):
+            pkind = 5
+        elif string.str_eq(mode, "lend"):
+            pkind = 4
+        elif string.str_eq(mode, "read") or needs_drop(p, c, pty):
+            pkind = 3
+        mutable = pkind == 4 or pkind == 5
+        bind(p, c, param.s0, pty, mutable, pkind, p.ids[pi])
+        pi += 1
+    walk_block(p, c, d.lo2, d.hi2)
+    if info.ret != 0 and info.ret != c.err_ty and not always_returns(p, d.lo2, d.hi2):
+        msg = string.new()
+        msg.append_str("Function `")
+        msg.append_str(text_of(p, d.s0))
+        msg.append_str("` must return `")
+        msg.append_str(text_of(p, info.ret))
+        msg.append_str("`, but not all paths have a `return`.")
+        err_at(p, c, info.decl, msg.as_str(), "Add `return value` at the end of the function (and all if/else arms).", true)
+    pop_frame(c)
+    c.cur_ret = 0
+    c.cur_name = 0
+    c.cur_decl = 0
+    trim_binds(c, saved_b)
+
+fn always_returns(p: read cursor.Parser, lo: usize, hi: usize) -> bool:
+    i = lo
+    while i < hi:
+        id = p.ids[i]
+        n = node_at(p, id)
+        if n.kind == 20:
+            return true
+        if n.kind == 28 and node_at(p, n.c0).kind == 49 and string.str_eq(text_of(p, node_at(p, n.c0).s0), "panic"):
+            return true
+        if n.kind == 15 and n.f0:
+            all = true
+            b = n.lo
+            while b < n.hi:
+                body = node_at(p, p.ids[b])
+                if not always_returns(p, body.lo, body.hi):
+                    all = false
+                b += 1
+            if all and always_returns(p, n.lo2, n.hi2):
+                return true
+        if n.kind == 23 and n.lo != n.hi:
+            mall = true
+            a = n.lo
+            while a < n.hi:
+                arm = node_at(p, p.ids[a])
+                if not always_returns(p, arm.lo2, arm.hi2):
+                    mall = false
+                a += 1
+            if mall:
+                return true
+        i += 1
+    return false
+
+fn walk_block(p: lend cursor.Parser, c: lend Checker, lo: usize, hi: usize):
+    push_frame(c)
+    i = lo
+    while i < hi:
+        walk_stmt(p, c, p.ids[i])
+        i += 1
+    pop_frame(c)
+
+fn step_is_lit(p: read cursor.Parser, id: usize) -> bool:
+    n = node_at(p, id)
+    if n.kind == 35:
+        return true
+    return n.kind == 43 and string.str_eq(text_of(p, n.s0), "-") and node_at(p, n.c0).kind == 35
+
+fn step_number(p: read cursor.Parser, id: usize) -> i64:
+    n = node_at(p, id)
+    if n.kind == 43:
+        return 0 - lit_i64(p, n.c0)
+    return lit_i64(p, id)
+
+fn walk_for(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    st: usize = 0
+    et: usize = 0
+    if is_const_expr(p, n.c0) and not is_const_expr(p, n.c1):
+        et = expr_value(p, c, n.c1, 0)
+        exp: usize = 0
+        if et != c.err_ty and typeinfo.is_int(text_of(p, et)):
+            exp = et
+        st = expr_value(p, c, n.c0, exp)
+    else:
+        st = expr_value(p, c, n.c0, 0)
+        exp2: usize = 0
+        if st != c.err_ty and typeinfo.is_int(text_of(p, st)):
+            exp2 = st
+        et = expr_value(p, c, n.c1, exp2)
+    ty: usize = 0
+    if st != c.err_ty and et != c.err_ty:
+        if not typeinfo.is_int(text_of(p, st)):
+            msg = string.new()
+            msg.append_str("`for` range must be an integer, found `")
+            msg.append_str(text_of(p, st))
+            msg.append_str("`.")
+            err_at(p, c, n.c0, msg.as_str(), "", false)
+        elif not same(p, st, et):
+            msg2 = string.new()
+            msg2.append_str("Both ends of range must have the same type: `")
+            msg2.append_str(text_of(p, st))
+            msg2.append_str("` and `")
+            msg2.append_str(text_of(p, et))
+            msg2.append_str("`.")
+            err_at(p, c, n.c1, msg2.as_str(), "", false)
+        else:
+            ty = st
+    if n.c2 != 0:
+        if not step_is_lit(p, n.c2):
+            err_at(p, c, n.c2, "`step` must be an integer literal.", "Write e.g. `step 2` or `step -1`.", true)
+        else:
+            sv = step_number(p, n.c2)
+            if sv == 0:
+                err_at(p, c, n.c2, "`step` cannot be zero.", "Use a non-zero step.", true)
+            else:
+                exp3: usize = 0
+                if ty != 0 and typeinfo.is_int(text_of(p, ty)):
+                    exp3 = ty
+                expr_value(p, c, n.c2, exp3)
+                if sv < 0 and ty != 0 and typeinfo.is_unsigned(text_of(p, ty)):
+                    msg3 = string.new()
+                    msg3.append_str("Negative `step` cannot be used with unsigned type `")
+                    msg3.append_str(text_of(p, ty))
+                    msg3.append_str("`.")
+                    err_at(p, c, n.c2, msg3.as_str(), "Use a signed integer type for descending loops.", true)
+                elif ty != 0 and typeinfo.is_int(text_of(p, ty)):
+                    mag = sv
+                    if sv < 0:
+                        mag = 0 - sv
+                    if mag > typeinfo.int_max(text_of(p, ty)):
+                        msg4 = string.new()
+                        msg4.append_str("`step` ")
+                        msg4.append_i64(sv)
+                        msg4.append_str(" does not fit in `")
+                        msg4.append_str(text_of(p, ty))
+                        msg4.append_str("`.")
+                        err_at(p, c, n.c2, msg4.as_str(), "Use a smaller step.", true)
+    loop_ty = c.err_ty
+    if ty != 0:
+        loop_ty = ty
+    push_frame(c)
+    bind(p, c, n.s0, loop_ty, false, 1, id)
+    c.loop_depth += 1
+    walk_block(p, c, n.lo, n.hi)
+    c.loop_depth -= 1
+    pop_frame(c)
+
+fn walk_for_in(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    it = expr_value(p, c, n.c0, 0)
+    ty = c.err_ty
+    loop_mut = false
+    if it != c.err_ty and typeinfo.is_int(text_of(p, it)):
+        if n.f0 or n.s1 != 0:
+            err_at(p, c, id, "`for var` / index variable cannot be used when counting over an integer.", "Write `for i in n:`.", true)
+        else:
+            ty = it
+    elif it != c.err_ty and typeinfo.is_array_type(text_of(p, it)):
+        ty = pack(p, typeinfo.array_elem(text_of(p, it)))
+        if n.f0:
+            loop_mut = true
+            check_lend(p, c, n.c0)
+    elif it != c.err_ty and typeinfo.is_slice_type(text_of(p, it)):
+        ty = pack(p, typeinfo.slice_elem(text_of(p, it)))
+        if n.f0:
+            loop_mut = true
+            check_lend(p, c, n.c0)
+    elif it != c.err_ty and string.str_eq(text_of(p, it), "str"):
+        ty = pack(p, "u8")
+        if n.f0:
+            loop_mut = true
+            err_at(p, c, id, "Cannot iterate over a string with `for var`: string is immutable.", "", false)
+    elif it != c.err_ty:
+        msg = string.new()
+        msg.append_str("Cannot iterate over type `")
+        msg.append_str(text_of(p, it))
+        msg.append_str("` with `for .. in`.")
+        err_at(p, c, n.c0, msg.as_str(), "Can iterate over integers (`for i in n:`), arrays, slices, lists and strings.", true)
+    push_frame(c)
+    bind(p, c, n.s0, ty, loop_mut, 1, id)
+    if n.s1 != 0:
+        bind(p, c, n.s1, pack(p, "usize"), false, 1, id)
+    c.loop_depth += 1
+    walk_block(p, c, n.lo, n.hi)
+    c.loop_depth -= 1
+    pop_frame(c)
+
+fn walk_stmt(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    if n.kind == 13:
+        walk_var(p, c, id)
+        return
+    if n.kind == 14:
+        walk_assign(p, c, id)
+        return
+    if n.kind == 15:
+        b = n.lo
+        while b < n.hi:
+            br = node_at(p, p.ids[b])
+            cond(p, c, br.c0)
+            walk_block(p, c, br.lo, br.hi)
+            b += 1
+        if n.f0:
+            walk_block(p, c, n.lo2, n.hi2)
+        return
+    if n.kind == 17:
+        cond(p, c, n.c0)
+        c.loop_depth += 1
+        walk_block(p, c, n.lo, n.hi)
+        c.loop_depth -= 1
+        return
+    if n.kind == 18:
+        walk_for(p, c, id)
+        return
+    if n.kind == 19:
+        walk_for_in(p, c, id)
+        return
+    if n.kind == 23:
+        walk_match(p, c, id)
+        return
+    if n.kind == 20:
+        walk_return(p, c, id)
+        return
+    if n.kind == 21 or n.kind == 22:
+        if c.loop_depth == 0:
+            word = string.new()
+            if n.kind == 21:
+                word.append_str("break")
+            else:
+                word.append_str("continue")
+            msg = string.new()
+            msg.append_str("`")
+            msg.append_str(word.as_str())
+            msg.append_str("` can only be used inside a loop.")
+            err_at(p, c, id, msg.as_str(), "", false)
+        return
+    if n.kind == 27 or n.kind == 33:
+        return
+    if n.kind == 30:
+        walk_yield(p, c, id)
+        return
+    if n.kind == 28:
+        infer(p, c, n.c0, 0)
+        return
+
+fn cond(p: lend cursor.Parser, c: lend Checker, id: usize):
+    t = expr_value(p, c, id, pack(p, "bool"))
+    if t != c.err_ty and not same(p, t, pack(p, "bool")):
+        msg = string.new()
+        msg.append_str("Condition must be `bool`, found `")
+        msg.append_str(text_of(p, t))
+        msg.append_str("`.")
+        err_at(p, c, id, msg.as_str(), "Use a comparison, e.g. `x != 0`.", true)
+
+fn walk_var(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    declared_ty: usize = 0
+    if n.c0 != 0:
+        declared_ty = resolve_type(p, c, n.c0)
+    mode = text_of(p, n.s1)
+    ref = string.str_eq(mode, "read") or string.str_eq(mode, "lend")
+    vt = expr_value(p, c, n.c1, declared_ty)
+    ty = vt
+    if declared_ty != 0:
+        if declared_ty != c.err_ty:
+            expect_type(p, c, declared_ty, vt, n.c1)
+        ty = declared_ty
+    if ref:
+        if typeinfo.is_slice_type(text_of(p, ty)):
+            err_at(p, c, id, "Slice (`[]T`) cannot be stored in a variable; can only be a function parameter.", "Pass slices directly as function arguments instead of assigning them to variables.", true)
+            return
+        if ty != c.err_ty:
+            if not ref_place(p, n.c1):
+                err_at(p, c, n.c1, "A reference must be bound to a variable, field, index, or another reference.", "Assign the value to a variable first, then borrow that variable.", true)
+            elif string.str_eq(mode, "lend"):
+                lend_store(p, c, n.c1)
+        root = tie_root(p, c, n.c1)
+        edited = p.nodes[id]
+        edited.s2 = root
+        p.nodes[id] = edited
+        rkind: u8 = 6
+        if string.str_eq(mode, "lend"):
+            rkind = 7
+        bind(p, c, n.s0, ty, n.f0, rkind, id)
+        poke_tie(c, root)
+        return
+    note_copy(p, c, n.c1, ty)
+    bind(p, c, n.s0, ty, n.f0, 1, id)
+
+fn walk_assign(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    if string.str_eq(text_of(p, n.s0), "=") and node_at(p, n.c0).kind == 41:
+        slot = lookup(c, raw_name(p, node_at(p, n.c0).s0))
+        if slot != 0 and (c.vars[slot - 1].kind == 6 or c.vars[slot - 1].kind == 7):
+            rebind_ref(p, c, id, slot)
+            return
+    tt = infer(p, c, n.c0, 0)
+    check_mutable(p, c, n.c0, false, "")
+    vt = expr_value(p, c, n.c1, tt)
+    if tt == c.err_ty or vt == c.err_ty:
+        return
+    op = text_of(p, n.s0)
+    if string.str_eq(op, "="):
+        expect_type(p, c, tt, vt, n.c1)
+        note_copy(p, c, n.c1, tt)
+        return
+    if string.str_eq(op, "+=") or string.str_eq(op, "-=") or string.str_eq(op, "*=") or string.str_eq(op, "/="):
+        if not typeinfo.is_numeric(text_of(p, tt)):
+            msg = string.new()
+            msg.append_str("`")
+            msg.append_str(op)
+            msg.append_str("` can only be used with numbers, found `")
+            msg.append_str(text_of(p, tt))
+            msg.append_str("`.")
+            err_at(p, c, id, msg.as_str(), "", false)
+        else:
+            expect_type(p, c, tt, vt, n.c1)
+
+fn root_place(p: read cursor.Parser, id: usize) -> usize:
+    if id == 0:
+        return 0
+    k = node_at(p, id).kind
+    if k == 41:
+        return id
+    if k == 42:
+        return root_place(p, node_at(p, id).c0)
+    return 0
+
+fn check_mutable(p: lend cursor.Parser, c: lend Checker, id: usize, as_method: bool, method: str):
+    n = node_at(p, id)
+    root = root_place(p, id)
+    if root == 0:
+        return
+    slot = lookup(c, raw_name(p, node_at(p, root).s0))
+    if slot == 0:
+        if find_const(p, c, node_at(p, root).s0) != 0:
+            nm0 = text_of(p, node_at(p, root).s0)
+            shown0 = dump.unparse(p, id)
+            msg0 = string.new()
+            if n.kind == 41:
+                msg0.append_str("Cannot assign to variable `")
+                msg0.append_str(nm0)
+            else:
+                label0 = "variable"
+                if n.kind == 42:
+                    label0 = "field"
+                msg0.append_str("Cannot assign to ")
+                msg0.append_str(label0)
+                msg0.append_str(" of `")
+                msg0.append_str(shown0.as_str())
+            msg0.append_str("`: `")
+            msg0.append_str(nm0)
+            msg0.append_str("` is a constant (const).")
+            err_at(p, c, id, msg0.as_str(), "Constants are immutable; if a variable is needed, use a `var` local variable.", true)
+        return
+    rec = c.vars[slot - 1]
+    if rec.mutable:
+        return
+    nm = text_of(p, node_at(p, root).s0)
+    shown = dump.unparse(p, id)
+    msg = string.new()
+    if as_method:
+        msg.append_str("`")
+        msg.append_str(method)
+        msg.append_str("` is a mutating method, `")
+        msg.append_str(nm)
+        msg.append_str("` must be `var`: `")
+        msg.append_str(nm)
+        msg.append_str("` is immutable.")
+    else:
+        label = "variable"
+        if n.kind == 42:
+            label = "field"
+        msg.append_str("Cannot assign to ")
+        msg.append_str(label)
+        msg.append_str(" of `")
+        if n.kind == 41:
+            msg = string.new()
+            msg.append_str("Cannot assign to variable `")
+            msg.append_str(nm)
+        else:
+            msg.append_str(shown.as_str())
+        msg.append_str("`: `")
+        msg.append_str(nm)
+        msg.append_str("` is immutable.")
+    hint = string.new()
+    hint.append_str("Change `")
+    hint.append_str(nm)
+    hint.append_str("` declaration to `var ")
+    hint.append_str(nm)
+    hint.append_str(" = ...` (or `var ")
+    hint.append_str(nm)
+    hint.append_str(": type = ...`).")
+    origin = node_at(p, rec.origin)
+    desc = string.new()
+    desc.append_str("Declare `")
+    desc.append_str(nm)
+    desc.append_str("` with `var` so it can be changed")
+    report(p, c, n.line, n.col, n.length, msg.as_str(), hint.as_str(), true, true, desc.as_str(), origin.line, origin.col, origin.line, origin.col, "var ", "likely")
+
+fn walk_return(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    fname = p.lx.names.text(c.cur_name)
+    if n.c0 == 0:
+        if c.cur_ret != 0 and c.cur_ret != c.err_ty:
+            msg = string.new()
+            msg.append_str("Function `")
+            msg.append_str(fname)
+            msg.append_str("` must return `")
+            msg.append_str(text_of(p, c.cur_ret))
+            msg.append_str("`.")
+            err_at(p, c, id, msg.as_str(), "Write `return value`.", true)
+        return
+    if c.cur_ret == 0:
+        vt = infer(p, c, n.c0, 0)
+        shown = text_of(p, vt)
+        if vt == 0 or vt == c.err_ty or vt == c.void_ty:
+            shown = "type"
+        msg2 = string.new()
+        msg2.append_str("Function `")
+        msg2.append_str(fname)
+        msg2.append_str("` does not return a value, but `return` carries a value.")
+        hint = string.new()
+        hint.append_str("Add return type: `-> ")
+        hint.append_str(shown)
+        hint.append_str("`.")
+        err_at(p, c, id, msg2.as_str(), hint.as_str(), true)
+        return
+    vt2 = expr_value(p, c, n.c0, c.cur_ret)
+    expect_type(p, c, c.cur_ret, vt2, n.c0)
+    if needs_drop(p, c, c.cur_ret) and node_at(p, n.c0).kind == 41:
+        slot = lookup(c, raw_name(p, node_at(p, n.c0).s0))
+        if slot != 0 and (c.vars[slot - 1].kind == 1 or c.vars[slot - 1].kind == 5):
+            set_moved(p, n.c0)
+        else:
+            note_copy(p, c, n.c0, c.cur_ret)
+    else:
+        note_copy(p, c, n.c0, c.cur_ret)
+
+fn expect_type(p: lend cursor.Parser, c: lend Checker, exp: usize, got: usize, id: usize):
+    if exp == c.err_ty or got == c.err_ty or same(p, exp, got):
+        return
+    hint = string.new()
+    hint.append_str("No automatic type conversion in v0; types must be identical.")
+    n = node_at(p, id)
+    if n.kind == 35 and typeinfo.is_float(text_of(p, exp)):
+        hint = string.new()
+        hint.append_str("Write floating-point number: `")
+        hint.append_str(text_of(p, n.s0))
+        hint.append_str(".0`")
+    if n.kind == 36 and typeinfo.is_int(text_of(p, exp)):
+        hint = string.new()
+        hint.append_str("`")
+        hint.append_str(text_of(p, exp))
+        hint.append_str("` is an integer type; write a number without fractional part.")
+    msg = string.new()
+    msg.append_str("Type mismatch: expected `")
+    msg.append_str(text_of(p, exp))
+    msg.append_str("`, found `")
+    msg.append_str(text_of(p, got))
+    msg.append_str("`.")
+    err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+
+fn expr_value(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    t = infer(p, c, id, exp)
+    if t == c.void_ty:
+        err_at(p, c, id, "This call does not return a value, cannot be used as a value.", "", false)
+        return c.err_ty
+    return t
+
+fn infer(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    if id == 0:
+        return c.err_ty
+    k = node_at(p, id).kind
+    if k == 35:
+        return infer_int(p, c, id, exp)
+    if k == 36:
+        if exp != 0 and typeinfo.is_float(text_of(p, exp)):
+            return exp
+        return pack(p, "f64")
+    if k == 37:
+        return pack(p, "str")
+    if k == 39:
+        return pack(p, "bool")
+    if k == 40:
+        return pack(p, "u8")
+    if k == 41:
+        return infer_name(p, c, id)
+    if k == 43:
+        return infer_unary(p, c, id, exp)
+    if k == 44:
+        return infer_binary(p, c, id, exp)
+    if k == 45:
+        return infer_cast(p, c, id)
+    if k == 42:
+        return infer_field(p, c, id)
+    if k == 49:
+        return infer_call(p, c, id)
+    if k == 50:
+        return infer_method(p, c, id)
+    if k == 52:
+        return infer_struct(p, c, id)
+    if k == 53:
+        return infer_index(p, c, id)
+    if k == 56:
+        return infer_slice(p, c, id)
+    if k == 57:
+        return infer_array(p, c, id, exp)
+    if k == 58:
+        return infer_repeat(p, c, id, exp)
+    if k == 34:
+        return infer_block(p, c, id, exp)
+    if k == 54:
+        app = node_at(p, id)
+        return apply_named(p, c, app.s0, app.lo, app.hi, id)
+    return c.err_ty
+
+fn infer_int(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    ty = pack(p, "i32")
+    if exp != 0 and typeinfo.is_int(text_of(p, exp)):
+        ty = exp
+    value = lit_i64(p, id)
+    if value > typeinfo.int_max(text_of(p, ty)):
+        msg = string.new()
+        msg.append_i64(value)
+        msg.append_str(" is too large for `")
+        msg.append_str(text_of(p, ty))
+        msg.append_str("`.")
+        hint = ""
+        if string.str_eq(text_of(p, ty), "i32"):
+            hint = "Use `i64` or an appropriate type for larger numbers."
+        err_at(p, c, id, msg.as_str(), hint, string.str_eq(text_of(p, ty), "i32"))
+    return ty
+
+fn infer_name(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    slot = lookup(c, raw_name(p, n.s0))
+    if slot == 0:
+        cs = find_const(p, c, n.s0)
+        if cs != 0:
+            return c.consts[cs - 1].ty
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(text_of(p, n.s0))
+        msg.append_str("` is not defined.")
+        hint = string.new()
+        hint.append_str("Define with `")
+        hint.append_str(text_of(p, n.s0))
+        hint.append_str(" = ...` first.")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        return c.err_ty
+    return c.vars[slot - 1].ty
+
+fn infer_unary(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    n = node_at(p, id)
+    op = text_of(p, n.s0)
+    if string.str_eq(op, "not"):
+        t = expr_value(p, c, n.c0, pack(p, "bool"))
+        if t != c.err_ty and not same(p, t, pack(p, "bool")):
+            msg = string.new()
+            msg.append_str("`not` requires a `bool`, found `")
+            msg.append_str(text_of(p, t))
+            msg.append_str("`.")
+            err_at(p, c, n.c0, msg.as_str(), "", false)
+            return c.err_ty
+        if t == c.err_ty:
+            return c.err_ty
+        return pack(p, "bool")
+    if string.str_eq(op, "-"):
+        if exp != 0 and typeinfo.is_unsigned(text_of(p, exp)):
+            msg2 = string.new()
+            msg2.append_str("Unary `-` cannot be used with unsigned type (`")
+            msg2.append_str(text_of(p, exp))
+            msg2.append_str("`).")
+            err_at(p, c, id, msg2.as_str(), "", false)
+            return c.err_ty
+        if node_at(p, n.c0).kind == 35:
+            use = pack(p, "i32")
+            if exp != 0 and (typeinfo.is_signed(text_of(p, exp)) or typeinfo.is_float(text_of(p, exp))):
+                use = exp
+            val = 0 - lit_i64(p, n.c0)
+            if typeinfo.is_int(text_of(p, use)) and val > typeinfo.int_max(text_of(p, use)):
+                msg3 = string.new()
+                msg3.append_i64(val)
+                msg3.append_str(" is too small for `")
+                msg3.append_str(text_of(p, use))
+                msg3.append_str("`.")
+                err_at(p, c, id, msg3.as_str(), "", false)
+            return use
+        exp2: usize = 0
+        if exp != 0 and (typeinfo.is_signed(text_of(p, exp)) or typeinfo.is_float(text_of(p, exp))):
+            exp2 = exp
+        t2 = expr_value(p, c, n.c0, exp2)
+        if t2 != c.err_ty and typeinfo.is_unsigned(text_of(p, t2)):
+            msg4 = string.new()
+            msg4.append_str("Unary `-` cannot be used with unsigned type (`")
+            msg4.append_str(text_of(p, t2))
+            msg4.append_str("`).")
+            err_at(p, c, id, msg4.as_str(), "", false)
+            return c.err_ty
+        if t2 != c.err_ty and not typeinfo.is_signed(text_of(p, t2)) and not typeinfo.is_float(text_of(p, t2)):
+            msg5 = string.new()
+            msg5.append_str("Unary `-` requires a number, found `")
+            msg5.append_str(text_of(p, t2))
+            msg5.append_str("`.")
+            err_at(p, c, n.c0, msg5.as_str(), "", false)
+            return c.err_ty
+        return t2
+    if string.str_eq(op, "~"):
+        exp3: usize = 0
+        if exp != 0 and typeinfo.is_int(text_of(p, exp)):
+            exp3 = exp
+        t3 = expr_value(p, c, n.c0, exp3)
+        if t3 != c.err_ty and not typeinfo.is_int(text_of(p, t3)):
+            msg6 = string.new()
+            msg6.append_str("`~` can only be used with integers, found `")
+            msg6.append_str(text_of(p, t3))
+            msg6.append_str("`.")
+            err_at(p, c, n.c0, msg6.as_str(), "", false)
+            return c.err_ty
+        return t3
+    return c.err_ty
+
+fn infer_binary(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    n = node_at(p, id)
+    op = text_of(p, n.s0)
+    if string.str_eq(op, "and") or string.str_eq(op, "or"):
+        lt = expr_value(p, c, n.c0, pack(p, "bool"))
+        rt = expr_value(p, c, n.c1, pack(p, "bool"))
+        if lt != c.err_ty and not same(p, lt, pack(p, "bool")):
+            msg = string.new()
+            msg.append_str("`")
+            msg.append_str(op)
+            msg.append_str("` requires `bool` on both sides, found `")
+            msg.append_str(text_of(p, lt))
+            msg.append_str("`.")
+            err_at(p, c, n.c0, msg.as_str(), "", false)
+        if rt != c.err_ty and not same(p, rt, pack(p, "bool")):
+            msg2 = string.new()
+            msg2.append_str("`")
+            msg2.append_str(op)
+            msg2.append_str("` requires `bool` on both sides, found `")
+            msg2.append_str(text_of(p, rt))
+            msg2.append_str("`.")
+            err_at(p, c, n.c1, msg2.as_str(), "", false)
+        return pack(p, "bool")
+    arith = true
+    if string.str_eq(op, "==") or string.str_eq(op, "!=") or string.str_eq(op, "<") or string.str_eq(op, "<=") or string.str_eq(op, ">") or string.str_eq(op, ">="):
+        arith = false
+    lt2: usize = 0
+    rt2: usize = 0
+    if is_const_expr(p, n.c0) and not is_const_expr(p, n.c1):
+        rt2 = expr_value(p, c, n.c1, 0)
+        use: usize = 0
+        if typeinfo.is_numeric(text_of(p, rt2)):
+            use = rt2
+        lt2 = expr_value(p, c, n.c0, use)
+    else:
+        use2: usize = 0
+        if arith and exp != 0 and typeinfo.is_numeric(text_of(p, exp)):
+            use2 = exp
+        lt2 = expr_value(p, c, n.c0, use2)
+        use3: usize = 0
+        if typeinfo.is_numeric(text_of(p, lt2)):
+            use3 = lt2
+        rt2 = expr_value(p, c, n.c1, use3)
+    result = pack(p, "bool")
+    if arith:
+        result = c.err_ty
+    if lt2 == c.err_ty or rt2 == c.err_ty:
+        return result
+    if string.str_eq(op, "+") and (string.str_eq(text_of(p, lt2), "str") or string.str_eq(text_of(p, lt2), "string") or string.str_eq(text_of(p, rt2), "str") or string.str_eq(text_of(p, rt2), "string")):
+        return pack(p, "string")
+    if not same(p, lt2, rt2):
+        msg3 = string.new()
+        msg3.append_str("Both sides of `")
+        msg3.append_str(op)
+        msg3.append_str("` must have the same type: found `")
+        msg3.append_str(text_of(p, lt2))
+        msg3.append_str("` and `")
+        msg3.append_str(text_of(p, rt2))
+        msg3.append_str("`.")
+        err_at(p, c, id, msg3.as_str(), "No automatic type conversion in v0.", true)
+        return result
+    if arith:
+        if (string.str_eq(op, "%") or string.str_eq(op, "&") or string.str_eq(op, "|") or string.str_eq(op, "^")) and not typeinfo.is_int(text_of(p, lt2)):
+            msg4 = string.new()
+            msg4.append_str("`")
+            msg4.append_str(op)
+            msg4.append_str("` can only be used with integers, found `")
+            msg4.append_str(text_of(p, lt2))
+            msg4.append_str("`.")
+            err_at(p, c, id, msg4.as_str(), "", false)
+            return c.err_ty
+        if not typeinfo.is_numeric(text_of(p, lt2)):
+            msg5 = string.new()
+            msg5.append_str("`")
+            msg5.append_str(op)
+            msg5.append_str("` can only be used with numbers, found `")
+            msg5.append_str(text_of(p, lt2))
+            msg5.append_str("`.")
+            err_at(p, c, id, msg5.as_str(), "", false)
+            return c.err_ty
+        return lt2
+    if string.str_eq(op, "==") or string.str_eq(op, "!="):
+        ok = typeinfo.is_numeric(text_of(p, lt2)) or string.str_eq(text_of(p, lt2), "bool") or string.str_eq(text_of(p, lt2), "str")
+        if not ok:
+            msg6 = string.new()
+            msg6.append_str("Type `")
+            msg6.append_str(text_of(p, lt2))
+            msg6.append_str("` cannot be compared with `")
+            msg6.append_str(op)
+            msg6.append_str("`.")
+            err_at(p, c, id, msg6.as_str(), "", false)
+    elif not typeinfo.is_numeric(text_of(p, lt2)):
+        msg7 = string.new()
+        msg7.append_str("`")
+        msg7.append_str(op)
+        msg7.append_str("` only compares numbers, found `")
+        msg7.append_str(text_of(p, lt2))
+        msg7.append_str("`.")
+        err_at(p, c, id, msg7.as_str(), "", false)
+    return pack(p, "bool")
+
+fn infer_cast(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    target = text_of(p, n.s0)
+    if not typeinfo.is_numeric(target):
+        msg = string.new()
+        msg.append_str("Unknown cast target type `")
+        msg.append_str(target)
+        msg.append_str("`.")
+        err_at(p, c, id, msg.as_str(), "", false)
+        return c.err_ty
+    vt = expr_value(p, c, n.c0, 0)
+    if vt == c.err_ty:
+        return c.err_ty
+    if not typeinfo.is_numeric(text_of(p, vt)):
+        msg2 = string.new()
+        msg2.append_str("Type `")
+        msg2.append_str(text_of(p, vt))
+        msg2.append_str("` cannot be converted to type `")
+        msg2.append_str(target)
+        msg2.append_str("`.")
+        err_at(p, c, n.c0, msg2.as_str(), "Explicit cast can only be performed between numeric types.", true)
+        return c.err_ty
+    return n.s0
+
+fn apply_saved(c: lend Checker, blo: usize, bhi: usize) -> usize:
+    saved = c.binds.len
+    i = blo
+    while i < bhi:
+        c.binds.push(c.ibinds[i])
+        i += 1
+    return saved
+
+fn find_tmpl(c: read Checker, owner: usize, name: usize) -> usize:
+    i: usize = 0
+    while i < c.tmpls.len:
+        if c.tmpls[i].owner == owner and c.tmpls[i].name == name:
+            return i + 1
+        i += 1
+    return 0
+
+fn find_inst_fn(c: read Checker, key: usize) -> usize:
+    i: usize = 0
+    while i < c.funcs.len:
+        if c.funcs[i].inst and c.funcs[i].owner == 0 and c.funcs[i].name == key:
+            return i + 1
+        i += 1
+    return 0
+
+fn generic_shaped(ty: str) -> bool:
+    if ty.len < 3:
+        return false
+    if ty[0] == 91 or ty[0] == 42:
+        return false
+    if ty[0] == 102 and ty[1] == 110 and ty[2] == 40:
+        return false
+    if ty[ty.len - 1] != 93:
+        return false
+    i: usize = 0
+    while i < ty.len:
+        if ty[i] == 91:
+            return true
+        i += 1
+    return false
+
+fn base_text(ty: str) -> string:
+    out = string.new()
+    i: usize = 0
+    while i < ty.len and ty[i] != 91:
+        out.append_byte(ty[i])
+        i += 1
+    return out
+
+fn pack_span(p: lend cursor.Parser, ty: str, lo: usize, hi: usize) -> usize:
+    a = lo
+    b = hi
+    while a < b and ty[a] == 32:
+        a += 1
+    while b > a and ty[b - 1] == 32:
+        b -= 1
+    return pack(p, string.substr(ty, a, b))
+
+fn split_args(p: lend cursor.Parser, ty: str, args: lend List[usize]):
+    open: usize = 0
+    i: usize = 0
+    while i < ty.len:
+        if ty[i] == 91:
+            open = i
+            break
+        i += 1
+    depth: i32 = 0
+    start = open + 1
+    j = open + 1
+    end = ty.len - 1
+    while j < end:
+        ch = ty[j]
+        if ch == 91:
+            depth += 1
+        elif ch == 93:
+            depth -= 1
+        elif ch == 44 and depth == 0:
+            args.push(pack_span(p, ty, start, j))
+            start = j + 1
+        j += 1
+    args.push(pack_span(p, ty, start, end))
+
+fn bind_find(bs: read List[Bind], name: usize) -> usize:
+    i: usize = 0
+    while i < bs.len:
+        if bs[i].name == name:
+            return bs[i].ty
+        i += 1
+    return 0
+
+fn set_bind(bs: lend List[Bind], name: usize, ty: usize):
+    i: usize = 0
+    while i < bs.len:
+        if bs[i].name == name:
+            b = bs[i]
+            b.ty = ty
+            bs[i] = b
+            return
+        i += 1
+    bs.push(Bind{ name: name, ty: ty })
+
+fn is_tparam_span(p: read cursor.Parser, lo: usize, hi: usize, raw: usize) -> bool:
+    s = lo
+    while s < hi:
+        if p.strs[s] == raw:
+            return true
+        s += 1
+    return false
+
+fn mentions_param(p: lend cursor.Parser, id: usize, lo: usize, hi: usize) -> bool:
+    if id == 0:
+        return false
+    n = node_at(p, id)
+    if is_tparam_span(p, lo, hi, raw_name(p, n.s0)):
+        return true
+    if n.c1 != 0 and mentions_param(p, n.c1, lo, hi):
+        return true
+    i = n.lo
+    while i < n.hi:
+        if mentions_param(p, p.ids[i], lo, hi):
+            return true
+        i += 1
+    return false
+
+fn float_const(p: read cursor.Parser, id: usize) -> bool:
+    if id == 0:
+        return false
+    k = node_at(p, id).kind
+    if k == 36:
+        return true
+    if k == 35:
+        return false
+    if k == 43:
+        return float_const(p, node_at(p, id).c0)
+    if k == 44:
+        return float_const(p, node_at(p, id).c0) or float_const(p, node_at(p, id).c1)
+    if k == 45:
+        t = text_of(p, node_at(p, id).s0)
+        return string.str_eq(t, "f32") or string.str_eq(t, "f64")
+    return false
+
+fn unify_pat(p: lend cursor.Parser, c: lend Checker, pattern: usize, actual: usize, bs: lend List[Bind], plo: usize, phi: usize, node: usize) -> bool:
+    n = node_at(p, pattern)
+    if n.f0 or n.f1:
+        an = text_of(p, actual)
+        elem = ""
+        if typeinfo.is_slice_type(an):
+            elem = typeinfo.slice_elem(an)
+        elif typeinfo.is_array_type(an):
+            elem = typeinfo.array_elem(an)
+        else:
+            return true
+        return unify_pat(p, c, n.c1, pack(p, elem), bs, plo, phi, node)
+    if n.lo != n.hi and n.s1 != 0:
+        an2 = text_of(p, actual)
+        if not generic_shaped(an2):
+            return true
+        base = base_text(an2)
+        if not string.str_eq(base.as_str(), text_of(p, n.s1)):
+            return true
+        args = List[usize]()
+        split_args(p, an2, args)
+        if args.len != n.hi - n.lo:
+            return true
+        i: usize = 0
+        ok = true
+        while i < args.len:
+            if not unify_pat(p, c, p.ids[n.lo + i], args[i], bs, plo, phi, node):
+                ok = false
+            i += 1
+        return ok
+    raw = raw_name(p, n.s0)
+    if not is_tparam_span(p, plo, phi, raw):
+        return true
+    prev = bind_find(bs, raw)
+    if prev != 0 and not same(p, prev, actual):
+        msg = string.new()
+        msg.append_str(text_of(p, n.s0))
+        msg.append_str(" was inferred as both ")
+        msg.append_str(text_of(p, prev))
+        msg.append_str(" and ")
+        msg.append_str(text_of(p, actual))
+        msg.append_str(".")
+        hint = string.new()
+        hint.append_str("Argument types must be identical; or specify type argument explicitly: `f[")
+        hint.append_str(text_of(p, prev))
+        hint.append_str("](...)`.")
+        err_at(p, c, node, msg.as_str(), hint.as_str(), true)
+        return false
+    set_bind(bs, raw, actual)
+    return true
+
+fn param_list_text(p: read cursor.Parser, decl: usize) -> string:
+    d = node_at(p, decl)
+    out = string.new()
+    s = d.slo
+    first = true
+    while s < d.shi:
+        if not first:
+            out.append_str(", ")
+        first = false
+        out.append_str(p.lx.names.text(p.strs[s]))
+        s += 1
+    return out
+
+fn infer_binds(p: lend cursor.Parser, c: lend Checker, decl: usize, call: usize, bs: lend List[Bind]) -> bool:
+    d = node_at(p, decl)
+    n = node_at(p, call)
+    failed = false
+    dname = List[usize]()
+    darg = List[usize]()
+    ai = n.lo
+    pi = d.lo
+    while ai < n.hi and pi < d.hi:
+        param = node_at(p, p.ids[pi])
+        pat = param.c0
+        if mentions_param(p, pat, d.slo, d.shi):
+            simple = node_at(p, pat).lo == node_at(p, pat).hi and not node_at(p, pat).f0 and not node_at(p, pat).f1
+            if is_const_expr(p, p.ids[ai]) and simple and is_tparam_span(p, d.slo, d.shi, raw_name(p, node_at(p, pat).s0)):
+                dname.push(raw_name(p, node_at(p, pat).s0))
+                darg.push(p.ids[ai])
+            else:
+                mark_slice(p, p.ids[ai])
+                ty = expr_value(p, c, p.ids[ai], 0)
+                if ty == c.err_ty:
+                    failed = true
+                elif not unify_pat(p, c, pat, ty, bs, d.slo, d.shi, p.ids[ai]):
+                    failed = true
+        ai += 1
+        pi += 1
+    if failed:
+        return false
+    di: usize = 0
+    while di < dname.len:
+        if bind_find(bs, dname[di]) == 0:
+            def = pack(p, "i32")
+            if float_const(p, darg[di]):
+                def = pack(p, "f64")
+            set_bind(bs, dname[di], def)
+        di += 1
+    s = d.slo
+    while s < d.shi:
+        if bind_find(bs, p.strs[s]) == 0:
+            names = param_list_text(p, decl)
+            msg = string.new()
+            msg.append_str("type could not be inferred: `")
+            msg.append_str(p.lx.names.text(p.strs[s]))
+            msg.append_str("` cannot be determined from arguments.")
+            hint = string.new()
+            hint.append_str("Specify type argument explicitly: `")
+            hint.append_str(text_of(p, n.s0))
+            hint.append_str("[")
+            hint.append_str(names.as_str())
+            hint.append_str("](...)`.")
+            err_at(p, c, call, msg.as_str(), hint.as_str(), true)
+            return false
+        bound = bind_find(bs, p.strs[s])
+        if typeinfo.is_slice_type(text_of(p, bound)):
+            err_at(p, c, call, "Slice (`[]T`) cannot be a type argument; slices can only be function parameters.", "Pass array `[N]T` instead of slice.", true)
+            return false
+        s += 1
+    return true
+
+fn declare_instance(p: lend cursor.Parser, c: lend Checker, decl: usize, inst_name: usize, inst_owner: usize, binds: read List[Bind], node: usize) -> usize:
+    if c.depth >= 64:
+        err_at(p, c, node, "possible infinite recursive instantiation (instantiation depth exceeded 64).", "A generic definition may be instantiating itself with larger type parameters; break the cycle.", true)
+        return 0
+    blo = c.ibinds.len
+    i: usize = 0
+    while i < binds.len:
+        c.ibinds.push(binds[i])
+        i += 1
+    bhi = c.ibinds.len
+    saved = apply_saved(c, blo, bhi)
+    c.depth += 1
+    d = node_at(p, decl)
+    ret: usize = 0
+    if d.c0 != 0:
+        ret = resolve_type(p, c, d.c0)
+    c.depth -= 1
+    trim_binds(c, saved)
+    c.funcs.push(FuncRec{ name: inst_name, owner: inst_owner, ret: ret, decl: decl, inst: true, blo: blo, bhi: bhi })
+    return c.funcs.len
+
+fn apply_call(p: lend cursor.Parser, c: lend Checker, id: usize, slot: usize) -> usize:
+    info = c.funcs[slot - 1]
+    saved = c.binds.len
+    if info.inst:
+        apply_saved(c, info.blo, info.bhi)
+    d = node_at(p, info.decl)
+    n = node_at(p, id)
+    ai = n.lo
+    pi = d.lo
+    while ai < n.hi:
+        param2 = node_at(p, p.ids[pi])
+        pty = resolve_type(p, c, param2.c0)
+        mark_slice(p, p.ids[ai])
+        got = expr_value(p, c, p.ids[ai], pty)
+        expect_type(p, c, pty, got, p.ids[ai])
+        if string.str_eq(text_of(p, param2.s1), "consume"):
+            note_consume(p, c, p.ids[ai], pty)
+        ai += 1
+        pi += 1
+    alias_args(p, c, 0, info.decl, d.lo, id)
+    trim_binds(c, saved)
+    if info.ret == 0:
+        return c.void_ty
+    return info.ret
+
+fn generic_invoke(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    callee = text_of(p, n.s0)
+    tslot = find_tmpl(c, 0, raw_name(p, n.s0))
+    decl = c.tmpls[tslot - 1].decl
+    d = node_at(p, decl)
+    nargs: i64 = i64(n.hi - n.lo)
+    nparams: i64 = i64(d.hi - d.lo)
+    if nargs != nparams:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(callee)
+        msg.append_str("` expects ")
+        msg.append_i64(nparams)
+        msg.append_str(" argument(s), found ")
+        msg.append_i64(nargs)
+        msg.append_str(".")
+        names = param_list_text(p, decl)
+        hint = string.new()
+        hint.append_str("Signature: ")
+        hint.append_str(callee)
+        hint.append_str("[")
+        hint.append_str(names.as_str())
+        hint.append_str("](")
+        first = true
+        q = d.lo
+        while q < d.hi:
+            if not first:
+                hint.append_str(", ")
+            first = false
+            param = node_at(p, p.ids[q])
+            hint.append_str(text_of(p, param.s0))
+            hint.append_str(": ")
+            hint.append_str(text_of(p, node_at(p, param.c0).s0))
+            q += 1
+        hint.append_str(")")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        type_quiet(p, c, n.lo, n.hi)
+        return c.err_ty
+    binds = List[Bind]()
+    if n.lo2 != n.hi2:
+        gotn: i64 = i64(n.hi2 - n.lo2)
+        needn: i64 = i64(d.shi - d.slo)
+        if gotn != needn:
+            msg2 = string.new()
+            msg2.append_str("`")
+            msg2.append_str(callee)
+            msg2.append_str("` expects ")
+            msg2.append_i64(needn)
+            msg2.append_str(" type argument(s), found ")
+            msg2.append_i64(gotn)
+            msg2.append_str(" (partial type arguments not allowed).")
+            names2 = param_list_text(p, decl)
+            hint2 = string.new()
+            hint2.append_str("Provide all: `")
+            hint2.append_str(callee)
+            hint2.append_str("[")
+            hint2.append_str(names2.as_str())
+            hint2.append_str("](...)`, or none at all (inference).")
+            err_at(p, c, id, msg2.as_str(), hint2.as_str(), true)
+            type_quiet(p, c, n.lo, n.hi)
+            return c.err_ty
+        ti = n.lo2
+        ts = d.slo
+        ok = true
+        while ti < n.hi2:
+            ty = resolve_type(p, c, p.ids[ti])
+            if ty != c.err_ty and typeinfo.is_slice_type(text_of(p, ty)):
+                err_at(p, c, p.ids[ti], "Slice (`[]T`) cannot be a type argument; slices can only be function parameters.", "Use array type `[N]T` instead of slice.", true)
+                ok = false
+            elif ty == c.err_ty:
+                ok = false
+            else:
+                binds.push(Bind{ name: p.strs[ts], ty: ty })
+            ti += 1
+            ts += 1
+        if not ok:
+            type_quiet(p, c, n.lo, n.hi)
+            return c.err_ty
+    elif not infer_binds(p, c, decl, id, binds):
+        return c.err_ty
+    key = string.new()
+    key.append_str(callee)
+    key.append_byte(91)
+    ks = d.slo
+    kfirst = true
+    while ks < d.shi:
+        if not kfirst:
+            key.append_str(", ")
+        kfirst = false
+        bound = bind_find(binds, p.strs[ks])
+        key.append_str(text_of(p, bound))
+        ks += 1
+    key.append_byte(93)
+    kraw = p.lx.names.put(key.as_str())
+    existing = find_inst_fn(c, kraw)
+    slot: usize = 0
+    if existing != 0:
+        slot = existing
+    else:
+        slot = declare_instance(p, c, decl, kraw, 0, binds, id)
+    if slot == 0:
+        type_quiet(p, c, n.lo, n.hi)
+        return c.err_ty
+    return apply_call(p, c, id, slot)
+
+fn method_inst(p: lend cursor.Parser, c: lend Checker, ot: usize, method: usize, call: usize) -> usize:
+    ty = text_of(p, ot)
+    if not generic_shaped(ty):
+        return 0
+    base = base_text(ty)
+    braw = p.lx.names.put(base.as_str())
+    tslot = find_tmpl(c, braw, raw_name(p, method))
+    if tslot == 0:
+        return 0
+    oraw = raw_name(p, ot)
+    mraw = raw_name(p, method)
+    existing = find_method(c, oraw, mraw)
+    if existing != 0:
+        return existing
+    decl = c.tmpls[tslot - 1].decl
+    d = node_at(p, decl)
+    args = List[usize]()
+    split_args(p, ty, args)
+    binds = List[Bind]()
+    s = d.slo2
+    i: usize = 0
+    while s < d.shi2 and i < args.len:
+        binds.push(Bind{ name: p.strs[s], ty: args[i] })
+        s += 1
+        i += 1
+    return declare_instance(p, c, decl, mraw, oraw, binds, call)
+
+fn tmpl_methods(p: read cursor.Parser, c: read Checker, owner: usize) -> string:
+    out = string.new()
+    first = true
+    i: usize = 0
+    while i < c.tmpls.len:
+        if c.tmpls[i].owner == owner:
+            if not first:
+                out.append_str(", ")
+            first = false
+            out.append_str(p.lx.names.text(c.tmpls[i].name))
+        i += 1
+    return out
+
+fn infer_call(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    callee = text_of(p, n.s0)
+    if string.str_eq(callee, "print") or string.str_eq(callee, "eprint"):
+        i = n.lo
+        while i < n.hi:
+            t = expr_value(p, c, p.ids[i], 0)
+            if t != c.err_ty and not typeinfo.is_prim(text_of(p, t)) and not string.str_eq(text_of(p, t), "string"):
+                msg = string.new()
+                msg.append_str("Type `")
+                msg.append_str(text_of(p, t))
+                msg.append_str("` cannot be printed.")
+                hint = string.new()
+                hint.append_str("`")
+                hint.append_str(callee)
+                hint.append_str("` can only print primitive types (integers, floats, bool, str) and string; print field: `x.field`.")
+                err_at(p, c, p.ids[i], msg.as_str(), hint.as_str(), true)
+            i += 1
+        return c.void_ty
+    if string.str_eq(callee, "panic"):
+        j = n.lo
+        count: i64 = 0
+        while j < n.hi:
+            arg = node_at(p, p.ids[j])
+            if arg.kind != 37:
+                infer(p, c, p.ids[j], 0)
+                err_at(p, c, p.ids[j], "`panic` only accepts a string literal.", "Write the message directly inside quotes: `panic(\"message\")`.", true)
+            count += 1
+            j += 1
+        if count != 1:
+            msg2 = string.new()
+            msg2.append_str("`panic` expects exactly 1 argument, found ")
+            msg2.append_i64(count)
+            msg2.append_str(".")
+            err_at(p, c, id, msg2.as_str(), "Write as `panic(\"message\")`.", true)
+        return c.void_ty
+    if n.lo2 != n.hi2 and find_tmpl(c, 0, raw_name(p, n.s0)) != 0:
+        return generic_invoke(p, c, id)
+    slot = find_func(c, raw_name(p, n.s0))
+    if slot == 0 and find_tmpl(c, 0, raw_name(p, n.s0)) != 0:
+        return generic_invoke(p, c, id)
+    if slot == 0:
+        msg3 = string.new()
+        msg3.append_str("No function named `")
+        msg3.append_str(callee)
+        msg3.append_str("`.")
+        err_at(p, c, id, msg3.as_str(), "Define the function with `fn ...` first.", true)
+        k = n.lo
+        while k < n.hi:
+            infer(p, c, p.ids[k], 0)
+            k += 1
+        return c.err_ty
+    if n.lo2 != n.hi2:
+        gmsg = string.new()
+        gmsg.append_str("`")
+        gmsg.append_str(callee)
+        gmsg.append_str("` is not a generic function, cannot take type arguments.")
+        ghint = string.new()
+        ghint.append_str("Write `")
+        ghint.append_str(callee)
+        ghint.append_str("(...)`.")
+        err_at(p, c, id, gmsg.as_str(), ghint.as_str(), true)
+    info = c.funcs[slot - 1]
+    d = node_at(p, info.decl)
+    nargs: i64 = 0
+    a = n.lo
+    while a < n.hi:
+        nargs += 1
+        a += 1
+    nparams: i64 = 0
+    q = d.lo
+    while q < d.hi:
+        nparams += 1
+        q += 1
+    if nargs != nparams:
+        msg4 = string.new()
+        msg4.append_str("`")
+        msg4.append_str(callee)
+        msg4.append_str("` expects ")
+        msg4.append_i64(nparams)
+        msg4.append_str(" argument(s), found ")
+        msg4.append_i64(nargs)
+        msg4.append_str(".")
+        hint4 = string.new()
+        hint4.append_str("Signature: ")
+        hint4.append_str(callee)
+        hint4.append_str("(")
+        first = true
+        s = d.lo
+        while s < d.hi:
+            if not first:
+                hint4.append_str(", ")
+            first = false
+            param = node_at(p, p.ids[s])
+            hint4.append_str(text_of(p, param.s0))
+            hint4.append_str(": ")
+            hint4.append_str(text_of(p, resolve_type(p, c, param.c0)))
+            s += 1
+        hint4.append_str(")")
+        err_at(p, c, id, msg4.as_str(), hint4.as_str(), true)
+        b = n.lo
+        while b < n.hi:
+            infer(p, c, p.ids[b], 0)
+            b += 1
+        if info.ret == 0:
+            return c.void_ty
+        return info.ret
+    ai = n.lo
+    pi = d.lo
+    while ai < n.hi:
+        param2 = node_at(p, p.ids[pi])
+        pty = resolve_type(p, c, param2.c0)
+        mark_slice(p, p.ids[ai])
+        got = expr_value(p, c, p.ids[ai], pty)
+        expect_type(p, c, pty, got, p.ids[ai])
+        if string.str_eq(text_of(p, param2.s1), "consume"):
+            note_consume(p, c, p.ids[ai], pty)
+        ai += 1
+        pi += 1
+    alias_args(p, c, 0, info.decl, d.lo, id)
+    if info.ret == 0:
+        return c.void_ty
+    return info.ret
+
+fn field_ty(c: read Checker, owner: usize, name: usize) -> usize:
+    i: usize = 0
+    while i < c.fields.len:
+        if c.fields[i].owner == owner and c.fields[i].name == name:
+            return c.fields[i].ty
+        i += 1
+    return 0
+
+fn find_method(c: read Checker, owner: usize, name: usize) -> usize:
+    i: usize = 0
+    while i < c.funcs.len:
+        if c.funcs[i].owner == owner and c.funcs[i].name == name:
+            return i + 1
+        i += 1
+    return 0
+
+fn field_list(p: read cursor.Parser, c: read Checker, owner: usize) -> string:
+    out = string.new()
+    first = true
+    i: usize = 0
+    while i < c.fields.len:
+        if c.fields[i].owner == owner:
+            if not first:
+                out.append_str(", ")
+            first = false
+            out.append_str(p.lx.names.text(c.fields[i].name))
+        i += 1
+    return out
+
+fn method_list(p: read cursor.Parser, c: read Checker, owner: usize) -> string:
+    out = string.new()
+    first = true
+    i: usize = 0
+    while i < c.funcs.len:
+        if c.funcs[i].owner == owner:
+            if not first:
+                out.append_str(", ")
+            first = false
+            out.append_str(p.lx.names.text(c.funcs[i].name))
+        i += 1
+    return out
+
+fn infer_field(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    obj = node_at(p, n.c0)
+    if obj.kind == 41 and find_enum(c, raw_name(p, obj.s0)):
+        return variant_unit(p, c, id, raw_name(p, obj.s0), n.s0)
+    if obj.kind == 54:
+        got = infer(p, c, n.c0, 0)
+        if got == c.err_ty:
+            return c.err_ty
+        if find_enum(c, raw_name(p, got)):
+            return variant_unit(p, c, id, raw_name(p, got), n.s0)
+    if obj.kind == 53 and enum_index(p, c, n.c0):
+        got2 = index_as_type(p, c, n.c0)
+        if got2 == c.err_ty:
+            return c.err_ty
+        if find_enum(c, raw_name(p, got2)):
+            return variant_unit(p, c, id, raw_name(p, got2), n.s0)
+    ot = expr_value(p, c, n.c0, 0)
+    if ot == c.err_ty:
+        return c.err_ty
+    fname = text_of(p, n.s0)
+    if string.str_eq(fname, "len") and (string.str_eq(text_of(p, ot), "str") or typeinfo.is_array_type(text_of(p, ot)) or typeinfo.is_slice_type(text_of(p, ot))):
+        return pack(p, "usize")
+    owner = raw_name(p, ot)
+    if not find_type(c, owner):
+        msg = string.new()
+        msg.append_str("Type `")
+        msg.append_str(text_of(p, ot))
+        msg.append_str("` has no fields (cannot use `.")
+        msg.append_str(fname)
+        msg.append_str("`).")
+        err_at(p, c, id, msg.as_str(), "", false)
+        return c.err_ty
+    fty = field_ty(c, owner, raw_name(p, n.s0))
+    if fty == 0:
+        msg2 = string.new()
+        msg2.append_str("Struct `")
+        msg2.append_str(text_of(p, ot))
+        msg2.append_str("` has no field named `")
+        msg2.append_str(fname)
+        msg2.append_str("`.")
+        hint = string.new()
+        hint.append_str("`")
+        hint.append_str(text_of(p, ot))
+        hint.append_str("` fields: ")
+        names = field_list(p, c, owner)
+        hint.append_str(names.as_str())
+        hint.append_str(".")
+        err_at(p, c, id, msg2.as_str(), hint.as_str(), true)
+        return c.err_ty
+    return fty
+
+fn is_tuple_name(s: str) -> bool:
+    if s.len < 6:
+        return false
+    head = string.substr(s, 0, 5)
+    if not string.str_eq(head, "Tuple"):
+        return false
+    return s[5] >= 48 and s[5] <= 57
+
+fn infer_struct(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    canon = n.s0
+    if n.lo2 != n.hi2:
+        canon = apply_named(p, c, n.s0, n.lo2, n.hi2, id)
+        if canon == c.err_ty:
+            j0 = n.lo
+            while j0 < n.hi:
+                infer(p, c, node_at(p, p.ids[j0]).c0, 0)
+                j0 += 1
+            return c.err_ty
+    tname = text_of(p, canon)
+    owner = raw_name(p, canon)
+    if not find_type(c, owner):
+        if is_tuple_name(tname):
+            i = n.lo
+            while i < n.hi:
+                val = node_at(p, p.ids[i]).c0
+                got = expr_value(p, c, val, 0)
+                note_copy(p, c, val, got)
+                i += 1
+            return c.err_ty
+        msg = string.new()
+        msg.append_str("Unknown struct `")
+        msg.append_str(tname)
+        msg.append_str("`.")
+        err_at(p, c, id, msg.as_str(), "", false)
+        j = n.lo
+        while j < n.hi:
+            infer(p, c, node_at(p, p.ids[j]).c0, 0)
+            j += 1
+        return c.err_ty
+    seen = List[usize]()
+    k = n.lo
+    while k < n.hi:
+        fid = p.ids[k]
+        field = node_at(p, fid)
+        raw = raw_name(p, field.s0)
+        fty = field_ty(c, owner, raw)
+        if fty == 0:
+            msg2 = string.new()
+            msg2.append_str("Struct `")
+            msg2.append_str(tname)
+            msg2.append_str("` has no field named `")
+            msg2.append_str(text_of(p, field.s0))
+            msg2.append_str("`.")
+            hint2 = string.new()
+            hint2.append_str("Fields: ")
+            names = field_list(p, c, owner)
+            hint2.append_str(names.as_str())
+            hint2.append_str(".")
+            err_at(p, c, fid, msg2.as_str(), hint2.as_str(), true)
+            infer(p, c, field.c0, 0)
+        else:
+            dup = false
+            s: usize = 0
+            while s < seen.len:
+                if seen[s] == raw:
+                    dup = true
+                s += 1
+            if dup:
+                msg3 = string.new()
+                msg3.append_str("Field `")
+                msg3.append_str(text_of(p, field.s0))
+                msg3.append_str("` provided twice.")
+                err_at(p, c, fid, msg3.as_str(), "", false)
+            else:
+                seen.push(raw)
+            vt = expr_value(p, c, field.c0, fty)
+            expect_type(p, c, fty, vt, field.c0)
+            if field_held(c, owner, raw):
+                note_copy(p, c, field.c0, fty)
+        k += 1
+    missing = string.new()
+    any = false
+    f: usize = 0
+    while f < c.fields.len:
+        if c.fields[f].owner == owner:
+            got = false
+            s2: usize = 0
+            while s2 < seen.len:
+                if seen[s2] == c.fields[f].name:
+                    got = true
+                s2 += 1
+            if not got:
+                if any:
+                    missing.append_str(", ")
+                any = false
+                any = true
+                missing.append_str(p.lx.names.text(c.fields[f].name))
+        f += 1
+    if any:
+        msg4 = string.new()
+        msg4.append_str("Missing field(s) in `")
+        msg4.append_str(tname)
+        msg4.append_str("` value: ")
+        msg4.append_str(missing.as_str())
+        msg4.append_str(".")
+        err_at(p, c, id, msg4.as_str(), "Must provide values for all fields (no default values in v0).", true)
+    return canon
+
+fn infer_method(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    mname = text_of(p, n.s0)
+    obj = node_at(p, n.c0)
+    if obj.kind == 41 and find_enum(c, raw_name(p, obj.s0)):
+        return variant_call(p, c, id, raw_name(p, obj.s0), n.s0)
+    if obj.kind == 54:
+        got = infer(p, c, n.c0, 0)
+        if got == c.err_ty:
+            type_quiet(p, c, n.lo, n.hi)
+            return c.err_ty
+        if find_enum(c, raw_name(p, got)):
+            return variant_call(p, c, id, raw_name(p, got), n.s0)
+    if obj.kind == 53 and enum_index(p, c, n.c0):
+        got3 = index_as_type(p, c, n.c0)
+        if got3 == c.err_ty:
+            type_quiet(p, c, n.lo, n.hi)
+            return c.err_ty
+        if find_enum(c, raw_name(p, got3)):
+            return variant_call(p, c, id, raw_name(p, got3), n.s0)
+    if obj.kind == 41 and lookup(c, raw_name(p, obj.s0)) == 0 and find_type(c, raw_name(p, obj.s0)):
+        slot = find_method(c, raw_name(p, obj.s0), raw_name(p, n.s0))
+        if slot != 0:
+            info = c.funcs[slot - 1]
+            d = node_at(p, info.decl)
+            is_self = false
+            if d.lo != d.hi and string.str_eq(text_of(p, node_at(p, p.ids[d.lo]).s0), "self"):
+                is_self = true
+            if not is_self:
+                edited = p.nodes[id]
+                edited.s1 = obj.s0
+                p.nodes[id] = edited
+                return call_args(p, c, id, info.decl, d.lo, text_of(p, obj.s0), mname, info.ret)
+    ot = expr_value(p, c, n.c0, 0)
+    if ot == c.err_ty:
+        a = n.lo
+        while a < n.hi:
+            infer(p, c, p.ids[a], 0)
+            a += 1
+        return c.err_ty
+    owner = raw_name(p, ot)
+    edited2 = p.nodes[id]
+    edited2.s1 = ot
+    p.nodes[id] = edited2
+    slot2 = find_method(c, owner, raw_name(p, n.s0))
+    if slot2 == 0:
+        slot2 = method_inst(p, c, ot, n.s0, id)
+    if slot2 == 0:
+        msg = string.new()
+        msg.append_str("Type `")
+        msg.append_str(text_of(p, ot))
+        msg.append_str("` has no method named `")
+        msg.append_str(mname)
+        msg.append_str("`.")
+        names = method_list(p, c, owner)
+        if generic_shaped(text_of(p, ot)):
+            base_s = base_text(text_of(p, ot))
+            listed = tmpl_methods(p, c, p.lx.names.put(base_s.as_str()))
+            if listed.as_str().len > 0:
+                names = listed
+        hint = string.new()
+        if names.as_str().len == 0:
+            hint.append_str("You can define with `fn ")
+            hint.append_str(text_of(p, ot))
+            hint.append_str(".")
+            hint.append_str(mname)
+            hint.append_str("(self: ")
+            hint.append_str(text_of(p, ot))
+            hint.append_str("):`.")
+        else:
+            hint.append_str("`")
+            hint.append_str(text_of(p, ot))
+            hint.append_str("` methods: ")
+            hint.append_str(names.as_str())
+            hint.append_str(".")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        b = n.lo
+        while b < n.hi:
+            infer(p, c, p.ids[b], 0)
+            b += 1
+        return c.err_ty
+    info2 = c.funcs[slot2 - 1]
+    saved_m = c.binds.len
+    if info2.inst:
+        apply_saved(c, info2.blo, info2.bhi)
+    d2 = node_at(p, info2.decl)
+    start = d2.lo
+    if d2.lo != d2.hi and string.str_eq(text_of(p, node_at(p, p.ids[d2.lo]).s0), "self"):
+        first = node_at(p, p.ids[d2.lo])
+        if string.str_eq(text_of(p, first.s1), "lend"):
+            check_mutable(p, c, n.c0, true, mname)
+        start = d2.lo + 1
+    shown = dump.unparse(p, n.c0)
+    gotm = call_args(p, c, id, info2.decl, start, shown.as_str(), mname, info2.ret)
+    recv: usize = 0
+    if start != d2.lo:
+        recv = n.c0
+    alias_args(p, c, recv, info2.decl, d2.lo, id)
+    trim_binds(c, saved_m)
+    return gotm
+
+fn call_args(p: lend cursor.Parser, c: lend Checker, id: usize, decl: usize, param_lo: usize, display: str, method: str, ret: usize) -> usize:
+    n = node_at(p, id)
+    d = node_at(p, decl)
+    nargs: i64 = 0
+    a = n.lo
+    while a < n.hi:
+        nargs += 1
+        a += 1
+    nparams: i64 = 0
+    q = param_lo
+    while q < d.hi:
+        nparams += 1
+        q += 1
+    if nargs != nparams:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(display)
+        if method.len > 0:
+            msg.append_str(".")
+            msg.append_str(method)
+        msg.append_str("` expects ")
+        msg.append_i64(nparams)
+        msg.append_str(" argument(s), found ")
+        msg.append_i64(nargs)
+        msg.append_str(".")
+        hint = string.new()
+        hint.append_str("Signature: ")
+        hint.append_str(display)
+        if method.len > 0:
+            hint.append_str(".")
+            hint.append_str(method)
+        hint.append_str("(")
+        first = true
+        s = param_lo
+        while s < d.hi:
+            if not first:
+                hint.append_str(", ")
+            first = false
+            param = node_at(p, p.ids[s])
+            mode = text_of(p, param.s1)
+            if mode.len > 0 and not string.str_eq(mode, "val"):
+                hint.append_str(mode)
+                hint.append_str(" ")
+            hint.append_str(text_of(p, param.s0))
+            hint.append_str(": ")
+            hint.append_str(text_of(p, resolve_type(p, c, param.c0)))
+            s += 1
+        hint.append_str(")")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        b = n.lo
+        while b < n.hi:
+            infer(p, c, p.ids[b], 0)
+            b += 1
+    else:
+        ai = n.lo
+        pi = param_lo
+        while ai < n.hi:
+            param2 = node_at(p, p.ids[pi])
+            pty = resolve_type(p, c, param2.c0)
+            mark_slice(p, p.ids[ai])
+            got = expr_value(p, c, p.ids[ai], pty)
+            expect_type(p, c, pty, got, p.ids[ai])
+            if string.str_eq(text_of(p, param2.s1), "consume"):
+                note_consume(p, c, p.ids[ai], pty)
+            ai += 1
+            pi += 1
+    if ret == 0:
+        return c.void_ty
+    return ret
+
+fn type_quiet(p: lend cursor.Parser, c: lend Checker, lo: usize, hi: usize):
+    i = lo
+    while i < hi:
+        infer(p, c, p.ids[i], 0)
+        i += 1
+
+fn variant_names(p: read cursor.Parser, c: read Checker, owner: usize) -> string:
+    out = string.new()
+    first = true
+    i: usize = 0
+    while i < c.variants.len:
+        if c.variants[i].owner == owner:
+            if not first:
+                out.append_str(", ")
+            first = false
+            out.append_str(p.lx.names.text(c.variants[i].name))
+        i += 1
+    return out
+
+fn payload_types(p: read cursor.Parser, c: read Checker, slot: usize) -> string:
+    rec = c.variants[slot - 1]
+    out = string.new()
+    i = rec.lo
+    first = true
+    while i < rec.hi:
+        if not first:
+            out.append_str(", ")
+        first = false
+        out.append_str(text_of(p, c.payloads[i]))
+        i += 1
+    return out
+
+fn payload_sig(p: read cursor.Parser, c: read Checker, slot: usize) -> string:
+    rec = c.variants[slot - 1]
+    out = string.new()
+    i = rec.lo
+    first = true
+    while i < rec.hi:
+        if not first:
+            out.append_str(", ")
+        first = false
+        if not typeinfo.is_prim(text_of(p, c.payloads[i])):
+            out.append_str("consume ")
+        out.append_str(text_of(p, c.payloads[i]))
+        i += 1
+    return out
+
+fn pattern_text(p: read cursor.Parser, c: read Checker, slot: usize) -> string:
+    rec = c.variants[slot - 1]
+    out = string.new()
+    out.append_str(p.lx.names.text(rec.name))
+    n = rec.hi - rec.lo
+    if n == 0:
+        return out
+    out.append_str("(")
+    i: usize = 0
+    while i < n:
+        if i > 0:
+            out.append_str(", ")
+        out.append_str("_")
+        i += 1
+    out.append_str("):")
+    return out
+
+fn unknown_variant(p: lend cursor.Parser, c: lend Checker, id: usize, owner: usize, vname: str):
+    msg = string.new()
+    msg.append_str("`")
+    msg.append_str(p.lx.names.text(owner))
+    msg.append_str("` enum has no variant named `")
+    msg.append_str(vname)
+    msg.append_str("`.")
+    hint = string.new()
+    hint.append_str("`")
+    hint.append_str(p.lx.names.text(owner))
+    hint.append_str("` variants: ")
+    names = variant_names(p, c, owner)
+    hint.append_str(names.as_str())
+    hint.append_str(".")
+    err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+
+fn variant_unit(p: lend cursor.Parser, c: lend Checker, id: usize, owner: usize, vpacked: usize) -> usize:
+    slot = find_variant(c, owner, raw_name(p, vpacked))
+    vname = text_of(p, vpacked)
+    if slot == 0:
+        unknown_variant(p, c, id, owner, vname)
+        return c.err_ty
+    rec = c.variants[slot - 1]
+    if rec.hi != rec.lo:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(vname)
+        msg.append_str("` variant has ")
+        msg.append_i64(i64(rec.hi - rec.lo))
+        msg.append_str(" payload field(s), value must be provided.")
+        hint = string.new()
+        hint.append_str("Construct as `")
+        hint.append_str(p.lx.names.text(owner))
+        hint.append_str(".")
+        hint.append_str(vname)
+        hint.append_str("(")
+        types = payload_types(p, c, slot)
+        hint.append_str(types.as_str())
+        hint.append_str(")`.")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        return c.err_ty
+    return pack(p, p.lx.names.text(owner))
+
+fn variant_call(p: lend cursor.Parser, c: lend Checker, id: usize, owner: usize, vpacked: usize) -> usize:
+    n = node_at(p, id)
+    slot = find_variant(c, owner, raw_name(p, vpacked))
+    vname = text_of(p, vpacked)
+    base = p.lx.names.text(owner)
+    if slot == 0:
+        unknown_variant(p, c, id, owner, vname)
+        type_quiet(p, c, n.lo, n.hi)
+        return c.err_ty
+    rec = c.variants[slot - 1]
+    nargs: i64 = 0
+    a = n.lo
+    while a < n.hi:
+        nargs += 1
+        a += 1
+    nparams: i64 = i64(rec.hi - rec.lo)
+    if nparams == 0:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(vname)
+        msg.append_str("` variant has no payload, do not write parentheses.")
+        hint = string.new()
+        hint.append_str("Write `")
+        hint.append_str(base)
+        hint.append_str(".")
+        hint.append_str(vname)
+        hint.append_str("`.")
+        err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        type_quiet(p, c, n.lo, n.hi)
+        return c.err_ty
+    if nargs != nparams:
+        msg2 = string.new()
+        msg2.append_str("`")
+        msg2.append_str(base)
+        msg2.append_str(".")
+        msg2.append_str(vname)
+        msg2.append_str("` expects ")
+        msg2.append_i64(nparams)
+        msg2.append_str(" argument(s), found ")
+        msg2.append_i64(nargs)
+        msg2.append_str(".")
+        hint2 = string.new()
+        hint2.append_str("Signature: ")
+        hint2.append_str(base)
+        hint2.append_str(".")
+        hint2.append_str(vname)
+        hint2.append_str("(")
+        sig = payload_sig(p, c, slot)
+        hint2.append_str(sig.as_str())
+        hint2.append_str(")")
+        err_at(p, c, id, msg2.as_str(), hint2.as_str(), true)
+        type_quiet(p, c, n.lo, n.hi)
+        return c.err_ty
+    ai = n.lo
+    pi = rec.lo
+    while ai < n.hi:
+        got = expr_value(p, c, p.ids[ai], c.payloads[pi])
+        expect_type(p, c, c.payloads[pi], got, p.ids[ai])
+        if needs_drop(p, c, c.payloads[pi]):
+            note_consume(p, c, p.ids[ai], c.payloads[pi])
+        ai += 1
+        pi += 1
+    return pack(p, base)
+
+fn check_lend(p: lend cursor.Parser, c: lend Checker, id: usize):
+    root = root_place(p, id)
+    if root == 0:
+        return
+    slot = lookup(c, raw_name(p, node_at(p, root).s0))
+    if slot == 0:
+        return
+    rec = c.vars[slot - 1]
+    if rec.mutable or rec.kind != 1:
+        return
+    nm = text_of(p, node_at(p, root).s0)
+    shown = dump.unparse(p, id)
+    msg = string.new()
+    msg.append_str("`")
+    msg.append_str(shown.as_str())
+    msg.append_str("` cannot be `lend`ed: `")
+    msg.append_str(nm)
+    msg.append_str("` is immutable.")
+    hint = string.new()
+    hint.append_str("Change `")
+    hint.append_str(nm)
+    hint.append_str("` declaration to `var ")
+    hint.append_str(nm)
+    hint.append_str(" = ...` (or `var ")
+    hint.append_str(nm)
+    hint.append_str(": type = ...`).")
+    origin = node_at(p, rec.origin)
+    desc = string.new()
+    desc.append_str("Declare `")
+    desc.append_str(nm)
+    desc.append_str("` with `var` so it can be changed")
+    n = node_at(p, id)
+    report(p, c, n.line, n.col, n.length, msg.as_str(), hint.as_str(), true, true, desc.as_str(), origin.line, origin.col, origin.line, origin.col, "var ", "likely")
+
+fn is_underscore(p: read cursor.Parser, packed: usize) -> bool:
+    s = text_of(p, packed)
+    return s.len == 1 and s[0] == 95
+
+fn covered_has(names: read List[usize], name: usize) -> bool:
+    i: usize = 0
+    while i < names.len:
+        if names[i] == name:
+            return true
+        i += 1
+    return false
+
+fn arm_scope(p: lend cursor.Parser, c: lend Checker, mode: str, arm: usize, slot: usize, use_err: bool):
+    node = node_at(p, arm)
+    push_frame(c)
+    i = node.lo
+    pi: usize = 0
+    if slot != 0 and not use_err:
+        pi = c.variants[slot - 1].lo
+    while i < node.hi:
+        b = node_at(p, p.ids[i])
+        if not is_underscore(p, b.s0):
+            ty = c.err_ty
+            if slot != 0 and not use_err:
+                ty = c.payloads[pi]
+            pkind: u8 = 2
+            if string.str_eq(mode, "lend"):
+                pkind = 4
+            elif string.str_eq(mode, "consume"):
+                pkind = 5
+            mutable = pkind == 4 or pkind == 5
+            bind(p, c, b.s0, ty, mutable, pkind, p.ids[i])
+        if slot != 0 and not use_err:
+            pi += 1
+        i += 1
+    s = node.lo2
+    while s < node.hi2:
+        walk_stmt(p, c, p.ids[s])
+        s += 1
+    pop_frame(c)
+
+fn pat_class(p: read cursor.Parser, id: usize) -> i32:
+    n = node_at(p, id)
+    if n.kind == 35 or n.kind == 39 or n.kind == 40:
+        return 1
+    if n.kind == 43 and string.str_eq(text_of(p, n.s0), "-") and node_at(p, n.c0).kind == 35:
+        return 1
+    if n.kind == 37:
+        return 2
+    return 0
+
+fn pat_int(p: read cursor.Parser, id: usize) -> i64:
+    n = node_at(p, id)
+    if n.kind == 43:
+        return 0 - lit_i64(p, n.c0)
+    if n.kind == 40:
+        return n.i0
+    if n.kind == 39:
+        if n.f0:
+            return 1
+        return 0
+    return lit_i64(p, id)
+
+fn interval_inside(los: read List[i64], his: read List[i64], lo: i64, hi: i64) -> bool:
+    i: usize = 0
+    while i < los.len:
+        if los[i] <= lo and hi <= his[i]:
+            return true
+        i += 1
+    return false
+
+fn record_interval(p: lend cursor.Parser, c: lend Checker, id: usize, lo: i64, hi: i64, los: lend List[i64], his: lend List[i64]):
+    if interval_inside(los, his, lo, hi):
+        shown = dump.unparse(p, id)
+        msg = string.new()
+        msg.append_str("unreachable pattern: `")
+        msg.append_str(shown.as_str())
+        msg.append_str("` is already covered by previous arms.")
+        err_at(p, c, id, msg.as_str(), "Remove the pattern.", true)
+    los.push(lo)
+    his.push(hi)
+
+fn scalar_covered(ty: str, los: read List[i64], his: read List[i64]) -> bool:
+    if string.str_eq(ty, "str"):
+        return false
+    lo: i64 = 0
+    hi: i64 = 1
+    if not string.str_eq(ty, "bool"):
+        lo = typeinfo.int_min(ty)
+        hi = typeinfo.int_max(ty)
+    a = List[i64]()
+    b = List[i64]()
+    i: usize = 0
+    while i < los.len:
+        a.push(los[i])
+        b.push(his[i])
+        i += 1
+    n: usize = 1
+    while n < a.len:
+        key_a = a[n]
+        key_b = b[n]
+        j = n
+        while j > 0 and a[j - 1] > key_a:
+            a[j] = a[j - 1]
+            b[j] = b[j - 1]
+            j -= 1
+        a[j] = key_a
+        b[j] = key_b
+        n += 1
+    cur = lo
+    k: usize = 0
+    while k < a.len:
+        if a[k] > cur:
+            return false
+        if b[k] >= hi:
+            return true
+        if b[k] + 1 > cur:
+            cur = b[k] + 1
+        k += 1
+    return cur > hi
+
+fn value_hit(los: read List[i64], his: read List[i64], v: i64) -> bool:
+    i: usize = 0
+    while i < los.len:
+        if los[i] <= v and v <= his[i]:
+            return true
+        i += 1
+    return false
+
+fn str_seen(p: read cursor.Parser, nodes: read List[usize], id: usize) -> usize:
+    text = text_of(p, node_at(p, id).s0)
+    i: usize = 0
+    while i < nodes.len:
+        if string.str_eq(text_of(p, node_at(p, nodes[i]).s0), text):
+            return nodes[i]
+        i += 1
+    return 0
+
+fn scalar_pat(p: lend cursor.Parser, c: lend Checker, id: usize, ty: str, los: lend List[i64], his: lend List[i64], strs: lend List[usize]):
+    n = node_at(p, id)
+    if n.kind == 26:
+        if not typeinfo.is_int(ty):
+            msg = string.new()
+            msg.append_str("Range patterns can only be used with integers and chars, found `")
+            msg.append_str(ty)
+            msg.append_str("`.")
+            err_at(p, c, id, msg.as_str(), "", false)
+            return
+        if pat_class(p, n.c0) == 0 or pat_class(p, n.c1) == 0:
+            bad = n.c0
+            if pat_class(p, n.c0) != 0:
+                bad = n.c1
+            err_at(p, c, bad, "Range pattern bounds must be literals.", "Write e.g. `1..=5` or `'a'..='z'`.", true)
+            return
+        t0 = expr_value(p, c, n.c0, pack(p, ty))
+        if t0 != c.err_ty and not same(p, t0, pack(p, ty)):
+            expect_type(p, c, pack(p, ty), t0, n.c0)
+            return
+        t1 = expr_value(p, c, n.c1, pack(p, ty))
+        if t1 != c.err_ty and not same(p, t1, pack(p, ty)):
+            expect_type(p, c, pack(p, ty), t1, n.c1)
+            return
+        lo = pat_int(p, n.c0)
+        hi = pat_int(p, n.c1)
+        if not n.f0:
+            hi -= 1
+        if lo > hi:
+            err_at(p, c, id, "Empty range pattern.", "The lower bound must be smaller than the upper bound.", true)
+            return
+        record_interval(p, c, id, lo, hi, los, his)
+        return
+    if pat_class(p, id) == 0:
+        err_at(p, c, id, "`match` pattern must be a literal, range or `_`.", "Patterns can be numbers, characters, strings or `true`/`false`.", true)
+        return
+    got = expr_value(p, c, id, pack(p, ty))
+    if got == c.err_ty:
+        return
+    if not same(p, got, pack(p, ty)):
+        expect_type(p, c, pack(p, ty), got, id)
+        return
+    if pat_class(p, id) == 2:
+        first = str_seen(p, strs, id)
+        if first != 0:
+            shown = dump.unparse(p, id)
+            msg2 = string.new()
+            msg2.append_str("duplicate arm: `")
+            msg2.append_str(shown.as_str())
+            msg2.append_str("` has already been handled in this match.")
+            err_at(p, c, id, msg2.as_str(), "Remove the duplicate arm.", true)
+        else:
+            strs.push(id)
+        return
+    v = pat_int(p, id)
+    record_interval(p, c, id, v, v, los, his)
+
+fn walk_scalar(p: lend cursor.Parser, c: lend Checker, id: usize, ty: str, mode: str):
+    n = node_at(p, id)
+    wild: usize = 0
+    los = List[i64]()
+    his = List[i64]()
+    strs = List[usize]()
+    a = n.lo
+    while a < n.hi:
+        arm = p.ids[a]
+        an = node_at(p, arm)
+        late = wild != 0
+        if late:
+            err_at(p, c, arm, "unreachable arm: cannot write arm after `_` arm.", "Move this arm before the `_` arm or remove it.", true)
+        elif an.s0 != 0:
+            msg = string.new()
+            msg.append_str("`")
+            msg.append_str(text_of(p, an.s0))
+            msg.append_str("` is not a valid pattern when matching `")
+            msg.append_str(ty)
+            msg.append_str("`.")
+            err_at(p, c, arm, msg.as_str(), "Write a literal (`1:`, `'a':`, `\"text\":`, `true:`), a range (`1..=5:`) or `_:`.", true)
+        elif an.lo3 == an.hi3:
+            if scalar_covered(ty, los, his):
+                err_at(p, c, arm, "redundant `_` arm: all values are already covered.", "Remove the `_` arm.", true)
+            wild = arm
+        q = an.lo3
+        while q < an.hi3:
+            scalar_pat(p, c, p.ids[q], ty, los, his, strs)
+            q += 1
+        arm_scope(p, c, mode, arm, 0, late)
+        a += 1
+    if wild == 0 and not scalar_covered(ty, los, his):
+        if string.str_eq(ty, "bool"):
+            missing = string.new()
+            any = false
+            if not value_hit(los, his, 1):
+                missing.append_str("`true`")
+                any = true
+            if not value_hit(los, his, 0):
+                if any:
+                    missing.append_str(", ")
+                missing.append_str("`false`")
+            msg2 = string.new()
+            msg2.append_str("match does not cover all cases: missing ")
+            msg2.append_str(missing.as_str())
+            err_at(p, c, id, msg2.as_str(), "Add the missing arms or write a `_:` arm to catch the rest.", true)
+        else:
+            msg3 = string.new()
+            msg3.append_str("match on `")
+            msg3.append_str(ty)
+            msg3.append_str("` does not cover all cases.")
+            err_at(p, c, id, msg3.as_str(), "Add a `_:` arm to catch the remaining values.", true)
+
+fn walk_enum_match(p: lend cursor.Parser, c: lend Checker, id: usize, owner: usize, mode: str):
+    n = node_at(p, id)
+    base = p.lx.names.text(owner)
+    covered = List[usize]()
+    wild: usize = 0
+    total: usize = 0
+    t: usize = 0
+    while t < c.variants.len:
+        if c.variants[t].owner == owner:
+            total += 1
+        t += 1
+    a = n.lo
+    while a < n.hi:
+        arm = p.ids[a]
+        an = node_at(p, arm)
+        slot: usize = 0
+        use_err = false
+        if an.lo3 != an.hi3:
+            err_at(p, c, arm, "Literal/range patterns can only be used when matching integer, char, bool or string values.", "Write enum variants here (e.g. `Variant:` or `Variant(x):`).", true)
+        elif wild != 0:
+            err_at(p, c, arm, "unreachable arm: cannot write arm after `_` arm.", "Move this arm before the `_` arm or remove it.", true)
+            use_err = true
+        elif an.s0 == 0:
+            if covered.len == total:
+                err_at(p, c, arm, "redundant `_` arm: all variants are already covered.", "Remove the `_` arm.", true)
+            wild = arm
+        else:
+            vname = text_of(p, an.s0)
+            if an.s1 != 0 and not string.str_eq(text_of(p, an.s1), base):
+                msg = string.new()
+                msg.append_str("Pattern specifies `")
+                msg.append_str(text_of(p, an.s1))
+                msg.append_str("` enum, but matched value is `")
+                msg.append_str(base)
+                msg.append_str("`.")
+                hint = string.new()
+                hint.append_str("Write `")
+                hint.append_str(vname)
+                hint.append_str("` or `")
+                hint.append_str(base)
+                hint.append_str(".")
+                hint.append_str(vname)
+                hint.append_str("`.")
+                err_at(p, c, arm, msg.as_str(), hint.as_str(), true)
+                use_err = true
+            else:
+                slot = find_variant(c, owner, raw_name(p, an.s0))
+                if slot == 0:
+                    msg2 = string.new()
+                    msg2.append_str("`")
+                    msg2.append_str(vname)
+                    msg2.append_str("` is not a variant of this enum.")
+                    hint2 = string.new()
+                    hint2.append_str("`")
+                    hint2.append_str(base)
+                    hint2.append_str("` variants: ")
+                    names = variant_names(p, c, owner)
+                    hint2.append_str(names.as_str())
+                    hint2.append_str(". Write `_:` to catch the rest.")
+                    err_at(p, c, arm, msg2.as_str(), hint2.as_str(), true)
+                    use_err = true
+                else:
+                    vraw = raw_name(p, an.s0)
+                    if covered_has(covered, vraw):
+                        msg3 = string.new()
+                        msg3.append_str("duplicate arm: variant `")
+                        msg3.append_str(vname)
+                        msg3.append_str("` has already been handled in this match.")
+                        err_at(p, c, arm, msg3.as_str(), "Remove the duplicate arm.", true)
+                    else:
+                        covered.push(vraw)
+                    rec = c.variants[slot - 1]
+                    binds: i64 = 0
+                    b = an.lo
+                    while b < an.hi:
+                        binds += 1
+                        b += 1
+                    pays: i64 = i64(rec.hi - rec.lo)
+                    if binds != pays:
+                        msg4 = string.new()
+                        msg4.append_str("`")
+                        msg4.append_str(vname)
+                        msg4.append_str("` variant has ")
+                        if pays == 0:
+                            msg4.append_str("no payload, pattern has ")
+                            msg4.append_i64(binds)
+                            msg4.append_str(" name(s).")
+                            hint4 = string.new()
+                            hint4.append_str("Write `")
+                            hint4.append_str(vname)
+                            hint4.append_str(":`.")
+                            err_at(p, c, arm, msg4.as_str(), hint4.as_str(), true)
+                        else:
+                            msg4.append_i64(pays)
+                            msg4.append_str(" payload field(s), pattern has ")
+                            msg4.append_i64(binds)
+                            msg4.append_str(" name(s).")
+                            hint5 = string.new()
+                            hint5.append_str("Write as `")
+                            piece = pattern_text(p, c, slot)
+                            hint5.append_str(piece.as_str())
+                            hint5.append_str("` (`_` for unused fields).")
+                            err_at(p, c, arm, msg4.as_str(), hint5.as_str(), true)
+                        use_err = true
+                        slot = 0
+        arm_scope(p, c, mode, arm, slot, use_err)
+        a += 1
+    if wild == 0:
+        shown = string.new()
+        pats = string.new()
+        any = false
+        i: usize = 0
+        while i < c.variants.len:
+            if c.variants[i].owner == owner and not covered_has(covered, c.variants[i].name):
+                if any:
+                    shown.append_str(", ")
+                    pats.append_str(", ")
+                any = true
+                shown.append_str("`")
+                shown.append_str(p.lx.names.text(c.variants[i].name))
+                shown.append_str("`")
+                piece2 = pattern_text(p, c, i + 1)
+                pats.append_str(piece2.as_str())
+            i += 1
+        if any:
+            msg5 = string.new()
+            msg5.append_str("match does not cover all cases: missing ")
+            msg5.append_str(shown.as_str())
+            hint6 = string.new()
+            hint6.append_str("Add missing arms (")
+            hint6.append_str(pats.as_str())
+            hint6.append_str(") or write a `_:` arm to catch the rest.")
+            err_at(p, c, id, msg5.as_str(), hint6.as_str(), true)
+
+fn walk_match(p: lend cursor.Parser, c: lend Checker, id: usize):
+    n = node_at(p, id)
+    ty = expr_value(p, c, n.c0, 0)
+    mode = text_of(p, n.s0)
+    if ty != c.err_ty and mode.len > 0:
+        root = root_place(p, n.c0)
+        rooted = false
+        if root != 0:
+            rooted = lookup(c, raw_name(p, node_at(p, root).s0)) != 0
+        k = node_at(p, n.c0).kind
+        place = k == 41 or k == 42 or k == 53
+        if not rooted and not (string.str_eq(mode, "consume") and not place):
+            msg = string.new()
+            msg.append_str("Value for `match ")
+            msg.append_str(mode)
+            msg.append_str("` must be addressable (variable or field).")
+            hint = string.new()
+            hint.append_str("First assign the value to a `var` variable, then write `match ")
+            hint.append_str(mode)
+            hint.append_str(" variable:`.")
+            err_at(p, c, n.c0, msg.as_str(), hint.as_str(), true)
+            ty = c.err_ty
+    if ty != c.err_ty and string.str_eq(mode, "lend"):
+        check_lend(p, c, n.c0)
+    elif ty != c.err_ty and string.str_eq(mode, "consume"):
+        can_move(p, c, n.c0, ty)
+    enum_owner: usize = 0
+    if ty != c.err_ty and find_enum(c, raw_name(p, ty)):
+        enum_owner = raw_name(p, ty)
+    tname = ""
+    if ty != c.err_ty:
+        tname = text_of(p, ty)
+    scalar = enum_owner == 0 and ty != c.err_ty and (typeinfo.is_int(tname) or string.str_eq(tname, "bool") or string.str_eq(tname, "str"))
+    if ty != c.err_ty and enum_owner == 0 and not scalar:
+        msg2 = string.new()
+        msg2.append_str("`match` can only be used on enum, integer, char, bool and string values, found `")
+        msg2.append_str(tname)
+        msg2.append_str("`.")
+        err_at(p, c, n.c0, msg2.as_str(), "Use `if`/`elif` for other types.", true)
+    if scalar and mode.len > 0:
+        msg3 = string.new()
+        msg3.append_str("`match ")
+        msg3.append_str(mode)
+        msg3.append_str("` can only be used on enum values, found `")
+        msg3.append_str(tname)
+        msg3.append_str("`.")
+        err_at(p, c, id, msg3.as_str(), "Remove the mode keyword.", true)
+    if scalar:
+        walk_scalar(p, c, id, tname, mode)
+        return
+    if enum_owner != 0:
+        walk_enum_match(p, c, id, enum_owner, mode)
+        return
+    a = n.lo
+    while a < n.hi:
+        arm_scope(p, c, mode, p.ids[a], 0, true)
+        a += 1
+
+fn mark_slice(p: lend cursor.Parser, id: usize):
+    if id == 0:
+        return
+    if node_at(p, id).kind != 56:
+        return
+    n = p.nodes[id]
+    n.f1 = true
+    p.nodes[id] = n
+
+fn infer_array(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    n = node_at(p, id)
+    count = i64(n.hi - n.lo)
+    if exp != 0 and typeinfo.is_array_type(text_of(p, exp)):
+        if count == 0:
+            return exp
+        return typed_array(p, c, id, exp, count)
+    return fresh_array(p, c, id, count)
+
+fn typed_array(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize, count: i64) -> usize:
+    en = typeinfo.array_len(text_of(p, exp))
+    elem = pack(p, typeinfo.array_elem(text_of(p, exp)))
+    if count != en:
+        msg = string.new()
+        msg.append_str("Array size mismatch: expected ")
+        msg.append_i64(en)
+        msg.append_str(", found ")
+        msg.append_i64(count)
+        msg.append_str(".")
+        err_at(p, c, id, msg.as_str(), "", false)
+    n = node_at(p, id)
+    i = n.lo
+    while i < n.hi:
+        got = expr_value(p, c, p.ids[i], elem)
+        expect_type(p, c, elem, got, p.ids[i])
+        i += 1
+    return exp
+
+fn fresh_array(p: lend cursor.Parser, c: lend Checker, id: usize, count: i64) -> usize:
+    n = node_at(p, id)
+    if count == 0:
+        err_at(p, c, id, "Cannot determine type of empty array; specify type explicitly.", "", false)
+        return c.err_ty
+    first = expr_value(p, c, p.ids[n.lo], 0)
+    i = n.lo + 1
+    while i < n.hi:
+        got = expr_value(p, c, p.ids[i], first)
+        expect_type(p, c, first, got, p.ids[i])
+        i += 1
+    shown = string.new()
+    shown.append_byte(91)
+    shown.append_i64(count)
+    shown.append_byte(93)
+    shown.append_str(text_of(p, first))
+    return pack(p, shown.as_str())
+
+fn infer_repeat(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    n = node_at(p, id)
+    count: i64 = -1
+    match eval_int(p, c, n.c1):
+        Valid(v):
+            count = v
+        None:
+            count = -1
+    if count < 0:
+        err_at(p, c, n.c1, "Array repeat count must be a positive constant integer.", "", false)
+        return c.err_ty
+    if exp != 0 and typeinfo.is_array_type(text_of(p, exp)):
+        en = typeinfo.array_len(text_of(p, exp))
+        if count != en:
+            msg = string.new()
+            msg.append_str("Array size mismatch: expected ")
+            msg.append_i64(en)
+            msg.append_str(", found ")
+            msg.append_i64(count)
+            msg.append_str(".")
+            err_at(p, c, id, msg.as_str(), "", false)
+        elem = pack(p, typeinfo.array_elem(text_of(p, exp)))
+        got = expr_value(p, c, n.c0, elem)
+        expect_type(p, c, elem, got, n.c0)
+        return exp
+    vt = expr_value(p, c, n.c0, 0)
+    shown = string.new()
+    shown.append_byte(91)
+    shown.append_i64(count)
+    shown.append_byte(93)
+    shown.append_str(text_of(p, vt))
+    return pack(p, shown.as_str())
+
+fn infer_index(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    if n.f0:
+        err_at(p, c, id, "`trust` indexing can only be used inside an `unsafe` block or `hot fn`.", "", false)
+    ot = expr_value(p, c, n.c0, 0)
+    it = expr_value(p, c, n.c1, 0)
+    if it != c.err_ty and not typeinfo.is_int(text_of(p, it)):
+        msg = string.new()
+        msg.append_str("Array index must be an integer, found `")
+        msg.append_str(text_of(p, it))
+        msg.append_str("`.")
+        err_at(p, c, n.c1, msg.as_str(), "", false)
+    if ot == c.err_ty:
+        return c.err_ty
+    tname = text_of(p, ot)
+    if typeinfo.is_array_type(tname):
+        match eval_int(p, c, n.c1):
+            Valid(v):
+                alen = typeinfo.array_len(tname)
+                if v < 0 or v >= alen:
+                    msg2 = string.new()
+                    msg2.append_str("Constant index ")
+                    msg2.append_i64(v)
+                    msg2.append_str(" out of bounds (array length ")
+                    msg2.append_i64(alen)
+                    msg2.append_str(").")
+                    err_at(p, c, id, msg2.as_str(), "Index must be between 0 and length-1.", true)
+            None:
+                pass
+        return pack(p, typeinfo.array_elem(tname))
+    if string.str_eq(tname, "str"):
+        match eval_int(p, c, n.c1):
+            Valid(v):
+                if v < 0:
+                    msg3 = string.new()
+                    msg3.append_str("Constant index ")
+                    msg3.append_i64(v)
+                    msg3.append_str(" cannot be negative.")
+                    err_at(p, c, id, msg3.as_str(), "Index must be 0 or greater.", true)
+                elif node_at(p, n.c0).kind == 37:
+                    slen = i64(text_of(p, node_at(p, n.c0).s0).len)
+                    if v >= slen:
+                        msg4 = string.new()
+                        msg4.append_str("Constant index ")
+                        msg4.append_i64(v)
+                        msg4.append_str(" out of bounds (string length ")
+                        msg4.append_i64(slen)
+                        msg4.append_str(").")
+                        err_at(p, c, id, msg4.as_str(), "Index must be between 0 and length-1.", true)
+            None:
+                pass
+        return pack(p, "u8")
+    msg5 = string.new()
+    msg5.append_str("Type `")
+    msg5.append_str(tname)
+    msg5.append_str("` cannot be indexed.")
+    err_at(p, c, n.c0, msg5.as_str(), "", false)
+    return c.err_ty
+
+fn infer_slice(p: lend cursor.Parser, c: lend Checker, id: usize) -> usize:
+    n = node_at(p, id)
+    ot = expr_value(p, c, n.c0, 0)
+    elem = ""
+    known = false
+    if ot != c.err_ty:
+        tname = text_of(p, ot)
+        if typeinfo.is_array_type(tname):
+            elem = typeinfo.array_elem(tname)
+            known = true
+        elif typeinfo.is_slice_type(tname):
+            elem = typeinfo.slice_elem(tname)
+            known = true
+        elif string.str_eq(tname, "str"):
+            err_at(p, c, n.c0, "Strings cannot be sliced (v2).", "", false)
+        else:
+            msg = string.new()
+            msg.append_str("Type `")
+            msg.append_str(tname)
+            msg.append_str("` cannot be sliced.")
+            err_at(p, c, n.c0, msg.as_str(), "", false)
+    if n.c1 != 0:
+        st = expr_value(p, c, n.c1, 0)
+        if st != c.err_ty and not typeinfo.is_int(text_of(p, st)):
+            msg2 = string.new()
+            msg2.append_str("Slice start must be an integer, found `")
+            msg2.append_str(text_of(p, st))
+            msg2.append_str("`.")
+            err_at(p, c, n.c1, msg2.as_str(), "", false)
+    if n.c2 != 0:
+        et = expr_value(p, c, n.c2, 0)
+        if et != c.err_ty and not typeinfo.is_int(text_of(p, et)):
+            msg3 = string.new()
+            msg3.append_str("Slice end must be an integer, found `")
+            msg3.append_str(text_of(p, et))
+            msg3.append_str("`.")
+            err_at(p, c, n.c2, msg3.as_str(), "", false)
+    if not n.f1:
+        err_at(p, c, id, "Slice expression can only be used in argument position.", "Slices cannot be stored in local variables (`s = a[1..3]` error).", true)
+        return c.err_ty
+    if not known:
+        return c.err_ty
+    shown = string.new()
+    shown.append_str("[]")
+    shown.append_str(elem)
+    return pack(p, shown.as_str())
+
+fn find_const(p: read cursor.Parser, c: read Checker, packed: usize) -> usize:
+    want = text_of(p, packed)
+    i: usize = 0
+    while i < c.consts.len:
+        if string.str_eq(p.lx.names.text(c.consts[i].name), want):
+            return i + 1
+        i += 1
+    return 0
+
+fn const_declared(p: read cursor.Parser, lo: usize, hi: usize, packed: usize) -> bool:
+    want = text_of(p, packed)
+    i = lo
+    while i < hi:
+        n = node_at(p, p.ids[i])
+        if n.kind == 3 and string.str_eq(text_of(p, n.s0), want):
+            return true
+        i += 1
+    return false
+
+fn reserved_const(name: str) -> bool:
+    if typeinfo.is_prim(name) or string.str_eq(name, "string") or string.str_eq(name, "int") or string.str_eq(name, "float"):
+        return true
+    if string.str_eq(name, "print") or string.str_eq(name, "eprint") or string.str_eq(name, "panic"):
+        return true
+    if string.str_eq(name, "Optional") or string.str_eq(name, "Result") or string.str_eq(name, "List") or string.str_eq(name, "Box"):
+        return true
+    return string.str_eq(name, "Valid") or string.str_eq(name, "None") or string.str_eq(name, "Ok") or string.str_eq(name, "Err")
+
+fn valid_const(p: lend cursor.Parser, c: lend Checker, id: usize, lo: usize, hi: usize):
+    n = node_at(p, id)
+    if n.kind == 35 or n.kind == 36 or n.kind == 37 or n.kind == 39:
+        return
+    if n.kind == 41:
+        if find_const(p, c, n.s0) != 0:
+            return
+        if const_declared(p, lo, hi, n.s0):
+            msg = string.new()
+            msg.append_str("`")
+            msg.append_str(text_of(p, n.s0))
+            msg.append_str("` constant has not been declared yet.")
+            err_at(p, c, id, msg.as_str(), "Constants can only use constants declared before them.", true)
+        else:
+            msg2 = string.new()
+            msg2.append_str("`")
+            msg2.append_str(text_of(p, n.s0))
+            msg2.append_str("` is not a defined constant.")
+            err_at(p, c, id, msg2.as_str(), "Constant expression can only use previously declared constants and literals.", true)
+        return
+    if n.kind == 43:
+        valid_const(p, c, n.c0, lo, hi)
+        return
+    if n.kind == 44:
+        valid_const(p, c, n.c0, lo, hi)
+        valid_const(p, c, n.c1, lo, hi)
+        return
+    if n.kind == 45:
+        valid_const(p, c, n.c0, lo, hi)
+        return
+    msg3 = string.new()
+    msg3.append_str("Cannot use `")
+    msg3.append_str(ast.kind_name(n.kind))
+    msg3.append_str("` in constant expression.")
+    err_at(p, c, id, msg3.as_str(), "Only literals, previously declared constants, and arithmetic/bitwise/cast operations may be used.", true)
+
+fn collect_consts(p: lend cursor.Parser, c: lend Checker, lo: usize, hi: usize):
+    i = lo
+    while i < hi:
+        id = p.ids[i]
+        n = node_at(p, id)
+        if n.kind == 3:
+            raw = raw_name(p, n.s0)
+            if find_type(c, raw) or find_enum(c, raw):
+                msg = string.new()
+                msg.append_str("`")
+                msg.append_str(text_of(p, n.s0))
+                msg.append_str("` is a type name, cannot be a constant name.")
+                err_at(p, c, id, msg.as_str(), "", false)
+            elif find_const(p, c, n.s0) != 0:
+                msg2 = string.new()
+                msg2.append_str("`")
+                msg2.append_str(text_of(p, n.s0))
+                msg2.append_str("` constant is already defined.")
+                err_at(p, c, id, msg2.as_str(), "Constant names must be unique.", true)
+            elif reserved_const(text_of(p, n.s0)):
+                msg3 = string.new()
+                msg3.append_str("`")
+                msg3.append_str(text_of(p, n.s0))
+                msg3.append_str("` is a reserved name.")
+                err_at(p, c, id, msg3.as_str(), "", false)
+            else:
+                valid_const(p, c, n.c1, lo, hi)
+                ty: usize = 0
+                if n.c0 != 0:
+                    ty = resolve_type(p, c, n.c0)
+                    got = expr_value(p, c, n.c1, ty)
+                    if ty != c.err_ty and got != c.err_ty:
+                        expect_type(p, c, ty, got, n.c1)
+                else:
+                    ty = expr_value(p, c, n.c1, 0)
+                if typeinfo.is_slice_type(text_of(p, ty)):
+                    err_at(p, c, id, "Slice (`[]T`) cannot be a constant type.", "", false)
+                val: i64 = 0
+                has = false
+                if typeinfo.is_int(text_of(p, ty)):
+                    match eval_int(p, c, n.c1):
+                        Valid(v):
+                            val = v
+                            has = true
+                            if v < typeinfo.int_min(text_of(p, ty)) or v > typeinfo.int_max(text_of(p, ty)):
+                                msg4 = string.new()
+                                msg4.append_str("Constant value ")
+                                msg4.append_i64(v)
+                                msg4.append_str(" is out of range [")
+                                msg4.append_i64(typeinfo.int_min(text_of(p, ty)))
+                                msg4.append_str(", ")
+                                msg4.append_i64(typeinfo.int_max(text_of(p, ty)))
+                                msg4.append_str("] for `")
+                                msg4.append_str(text_of(p, ty))
+                                msg4.append_str("`.")
+                                err_at(p, c, n.c1, msg4.as_str(), "", false)
+                        None:
+                            has = false
+                c.consts.push(ConstRec{ name: raw, ty: ty, decl: id, val: val, has_i: has })
+        i += 1
+
+fn walk_yield(p: lend cursor.Parser, c: lend Checker, id: usize):
+    if c.yields.len == 0:
+        return
+    n = node_at(p, id)
+    frame = c.yields[c.yields.len - 1]
+    exp = frame.ty
+    if exp == 0:
+        exp = frame.exp
+    vt = expr_value(p, c, n.c0, exp)
+    if vt == c.err_ty:
+        return
+    if typeinfo.is_slice_type(text_of(p, vt)):
+        err_at(p, c, n.c0, "Slice (`[]T`) cannot be an arm value; can only be a function parameter.", "", false)
+        return
+    if frame.ty == 0:
+        frame.ty = vt
+    else:
+        expect_type(p, c, frame.ty, vt, n.c0)
+    note_copy(p, c, n.c0, vt)
+    c.yields[c.yields.len - 1] = frame
+
+fn infer_block(p: lend cursor.Parser, c: lend Checker, id: usize, exp: usize) -> usize:
+    n = node_at(p, id)
+    c.yields.push(YieldRec{ ty: 0, exp: exp })
+    walk_stmt(p, c, n.c0)
+    match c.yields.pop():
+        Valid(frame):
+            if frame.ty == 0:
+                return c.err_ty
+            return frame.ty
+        None:
+            return c.err_ty
+
+fn field_held(c: read Checker, owner: usize, name: usize) -> bool:
+    i: usize = 0
+    while i < c.fields.len:
+        if c.fields[i].owner == owner and c.fields[i].name == name:
+            return c.fields[i].held
+        i += 1
+    return false
+
+fn heap_name(name: str) -> bool:
+    if string.str_eq(name, "string"):
+        return true
+    if name.len >= 5 and string.str_eq(string.substr(name, 0, 5), "List["):
+        return true
+    if name.len >= 4 and string.str_eq(string.substr(name, 0, 4), "Box["):
+        return true
+    return false
+
+fn drop_seen(p: lend cursor.Parser, c: read Checker, ty: usize, seen: lend List[usize]) -> bool:
+    if ty == 0 or ty == c.err_ty:
+        return false
+    name = text_of(p, ty)
+    if typeinfo.is_prim(name) or typeinfo.is_slice_type(name):
+        return false
+    if typeinfo.is_array_type(name):
+        return drop_seen(p, c, pack(p, typeinfo.array_elem(name)), seen)
+    if heap_name(name):
+        return true
+    raw = raw_name(p, ty)
+    i: usize = 0
+    while i < seen.len:
+        if seen[i] == raw:
+            return false
+        i += 1
+    if find_type(c, raw):
+        seen.push(raw)
+        f: usize = 0
+        while f < c.fields.len:
+            if c.fields[f].owner == raw and c.fields[f].held and drop_seen(p, c, c.fields[f].ty, seen):
+                return true
+            f += 1
+        return false
+    if find_enum(c, raw):
+        seen.push(raw)
+        v: usize = 0
+        while v < c.variants.len:
+            if c.variants[v].owner == raw:
+                q = c.variants[v].lo
+                while q < c.variants[v].hi:
+                    if drop_seen(p, c, c.payloads[q], seen):
+                        return true
+                    q += 1
+            v += 1
+    return false
+
+fn needs_drop(p: lend cursor.Parser, c: read Checker, ty: usize) -> bool:
+    seen = List[usize]()
+    return drop_seen(p, c, ty, seen)
+
+fn set_moved(p: lend cursor.Parser, id: usize):
+    n = p.nodes[id]
+    n.f7 = true
+    p.nodes[id] = n
+
+fn can_move(p: lend cursor.Parser, c: lend Checker, id: usize, ty: usize) -> bool:
+    k = node_at(p, id).kind
+    if k == 53:
+        err_at(p, c, id, "Array element cannot be moved.", "Only whole structures can be moved.", true)
+        return false
+    if k == 56:
+        err_at(p, c, id, "Slice cannot be moved.", "Slice ownership cannot be transferred.", true)
+        return false
+    if k == 42 and needs_drop(p, c, ty):
+        shown = dump.unparse(p, id)
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(shown.as_str())
+        msg.append_str("` cannot be moved: heap-owning fields cannot be moved alone (no partial moves).")
+        err_at(p, c, id, msg.as_str(), "Move the entire variable or mutate by reassigning the field.", true)
+        return false
+    root = root_place(p, id)
+    if root == 0:
+        return true
+    slot = lookup(c, raw_name(p, node_at(p, root).s0))
+    if slot == 0:
+        return true
+    rec = c.vars[slot - 1]
+    if rec.kind != 2 and rec.kind != 3 and rec.kind != 4:
+        return true
+    what = "value"
+    if rec.kind == 3:
+        what = "`read` (read-only)"
+    elif rec.kind == 4:
+        what = "borrowed (`lend`)"
+    nm = text_of(p, node_at(p, root).s0)
+    shown2 = dump.unparse(p, id)
+    msg2 = string.new()
+    msg2.append_str("`")
+    msg2.append_str(shown2.as_str())
+    msg2.append_str("` cannot be moved: `")
+    msg2.append_str(nm)
+    msg2.append_str("` is a ")
+    msg2.append_str(what)
+    msg2.append_str(" parameter, you do not own it.")
+    hint = string.new()
+    hint.append_str("To take ownership, make parameter `")
+    hint.append_str(nm)
+    hint.append_str(": consume Type`.")
+    err_at(p, c, id, msg2.as_str(), hint.as_str(), true)
+    return false
+
+fn note_consume(p: lend cursor.Parser, c: lend Checker, id: usize, ty: usize):
+    if typeinfo.is_slice_type(text_of(p, ty)):
+        err_at(p, c, id, "Slice cannot be moved.", "Slice ownership cannot be transferred.", true)
+        return
+    if not needs_drop(p, c, ty) and typeinfo.is_prim(text_of(p, ty)):
+        return
+    k = node_at(p, id).kind
+    if k != 41 and k != 42 and k != 53 and k != 56:
+        return
+    if can_move(p, c, id, ty):
+        set_moved(p, id)
+
+fn note_copy(p: lend cursor.Parser, c: lend Checker, id: usize, ty: usize):
+    if not needs_drop(p, c, ty):
+        return
+    k = node_at(p, id).kind
+    if k != 41 and k != 42 and k != 53:
+        return
+    if can_move(p, c, id, ty):
+        set_moved(p, id)
+
+fn mv_new() -> Mv:
+    return Mv{
+        moved: List[Moved](),
+        lnames: List[usize](),
+        ltop: 0,
+        lmarks: List[usize](),
+        ctx_on: false,
+        ctx_method: false,
+        ctx_decl: 0,
+        ctx_arg: 0,
+        reassign: 0,
+    }
+
+fn mv_clone(src: read Mv) -> Mv:
+    out = mv_new()
+    i: usize = 0
+    while i < src.moved.len:
+        out.moved.push(src.moved[i])
+        i += 1
+    i = 0
+    while i < src.lnames.len:
+        out.lnames.push(src.lnames[i])
+        i += 1
+    i = 0
+    while i < src.lmarks.len:
+        out.lmarks.push(src.lmarks[i])
+        i += 1
+    out.ltop = src.ltop
+    out.ctx_on = src.ctx_on
+    out.ctx_method = src.ctx_method
+    out.ctx_decl = src.ctx_decl
+    out.ctx_arg = src.ctx_arg
+    out.reassign = src.reassign
+    return out
+
+fn mv_union(dst: lend Mv, src: read Mv):
+    i: usize = 0
+    while i < src.moved.len:
+        item = src.moved[i]
+        found = false
+        j: usize = 0
+        while j < dst.moved.len:
+            if dst.moved[j].path == item.path:
+                found = true
+            j += 1
+        if not found:
+            dst.moved.push(item)
+        i += 1
+
+fn mv_set(dst: lend Mv, src: read Mv):
+    dst.moved.clear()
+    i: usize = 0
+    while i < src.moved.len:
+        dst.moved.push(src.moved[i])
+        i += 1
+
+fn place_path(p: lend cursor.Parser, id: usize) -> usize:
+    if id == 0:
+        return 0
+    n = node_at(p, id)
+    if n.kind == 41:
+        return n.s0
+    if n.kind == 48:
+        return place_path(p, n.c0)
+    if n.kind == 42 or n.kind == 53 or n.kind == 56:
+        base = place_path(p, n.c0)
+        if base == 0:
+            return 0
+        if n.kind != 42:
+            return base
+        joined = string.new()
+        joined.append_str(text_of(p, base))
+        joined.append_str(".")
+        joined.append_str(text_of(p, n.s0))
+        return p.lx.names.put(joined.as_str()) + 1
+    return 0
+
+fn root_pack(p: lend cursor.Parser, path: usize) -> usize:
+    text = text_of(p, path)
+    i: usize = 0
+    while i < text.len:
+        if text[i] == 46:
+            return pack(p, string.substr(text, 0, i))
+        i += 1
+    return path
+
+fn path_under(p: read cursor.Parser, path: usize, parent: usize) -> bool:
+    pref = string.new()
+    pref.append_str(text_of(p, parent))
+    pref.append_str(".")
+    return string.str_starts_with(text_of(p, path), pref.as_str())
+
+fn path_field(p: read cursor.Parser, path: usize) -> bool:
+    text = text_of(p, path)
+    i: usize = 0
+    while i < text.len:
+        if text[i] == 46:
+            return true
+        i += 1
+    return false
+
+fn loop_enter(m: lend Mv):
+    m.lmarks.push(m.ltop)
+
+fn loop_add(m: lend Mv, name: usize):
+    if m.ltop < m.lnames.len:
+        m.lnames[m.ltop] = name
+    else:
+        m.lnames.push(name)
+    m.ltop += 1
+
+fn loop_leave(m: lend Mv):
+    if m.lmarks.len == 0:
+        return
+    m.ltop = m.lmarks[m.lmarks.len - 1]
+    match m.lmarks.pop():
+        Valid(_):
+            return
+        None:
+            return
+
+fn loop_has(m: read Mv, root: usize) -> bool:
+    if m.lmarks.len == 0:
+        return false
+    i = m.lmarks[m.lmarks.len - 1]
+    while i < m.ltop:
+        if m.lnames[i] == root:
+            return true
+        i += 1
+    return false
+
+fn mv_keep(m: lend Mv, keep: read List[Moved]):
+    m.moved.clear()
+    i: usize = 0
+    while i < keep.len:
+        m.moved.push(keep[i])
+        i += 1
+
+fn mv_forget_root(p: lend cursor.Parser, m: lend Mv, name: usize):
+    keep = List[Moved]()
+    i: usize = 0
+    while i < m.moved.len:
+        if root_pack(p, m.moved[i].path) != name:
+            keep.push(m.moved[i])
+        i += 1
+    mv_keep(m, keep)
+
+fn mv_forget_prefix(p: read cursor.Parser, m: lend Mv, path: usize):
+    keep = List[Moved]()
+    i: usize = 0
+    while i < m.moved.len:
+        item = m.moved[i]
+        if item.path != path and not path_under(p, item.path, path):
+            keep.push(item)
+        i += 1
+    mv_keep(m, keep)
+
+fn mv_use(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize):
+    path = place_path(p, id)
+    if path == 0:
+        return
+    keep = List[Moved]()
+    i: usize = 0
+    while i < m.moved.len:
+        item = m.moved[i]
+        whole = path == item.path or path_under(p, path, item.path)
+        partial = path_under(p, item.path, path)
+        if not whole and not partial:
+            keep.push(item)
+        else:
+            kind = "variable"
+            if path_field(p, item.path):
+                kind = "field"
+            root = root_pack(p, item.path)
+            rn = text_of(p, root)
+            moved = text_of(p, item.path)
+            msg = string.new()
+            if whole:
+                msg.append_str("`")
+                msg.append_str(moved)
+                msg.append_str("` ")
+                msg.append_str(kind)
+                msg.append_str(" was moved (`consume`), can no longer be used.")
+            else:
+                msg.append_str("`")
+                msg.append_str(text_of(p, path))
+                msg.append_str("` cannot be used: field `")
+                msg.append_str(moved)
+                msg.append_str("` was moved (`consume`).")
+            hint = string.new()
+            hint.append_str("Use before moving; or if `")
+            hint.append_str(rn)
+            hint.append_str("` is `var`, reassign a value after moving.")
+            n = node_at(p, id)
+            if item.param != 0 and item.mlen != 0:
+                desc = string.new()
+                desc.append_str("Remove `consume` from `")
+                desc.append_str(text_of(p, item.param))
+                desc.append_str("` so the caller keeps ownership")
+                report(p, c, n.line, n.col, n.length, msg.as_str(), hint.as_str(), true, true, desc.as_str(), item.mline, item.mcol, item.mline, item.mcol + item.mlen, "", "likely")
+            else:
+                err_at(p, c, id, msg.as_str(), hint.as_str(), true)
+        i += 1
+    mv_keep(m, keep)
+
+fn mv_record(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize):
+    path = place_path(p, id)
+    if path == 0:
+        return
+    root = root_pack(p, path)
+    if m.lmarks.len > 0 and not loop_has(m, root) and root != m.reassign:
+        rn = text_of(p, root)
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(rn)
+        msg.append_str("` is defined outside the loop and is moved (`consume`) on each iteration of the loop.")
+        err_at(p, c, id, msg.as_str(), "Move the consume outside the loop or declare the variable inside the loop.", true)
+        return
+    param: usize = 0
+    mline: i32 = 0
+    mcol: i32 = 0
+    mlen: i32 = 0
+    if m.ctx_on and m.ctx_decl != 0:
+        d = node_at(p, m.ctx_decl)
+        slot = m.ctx_arg
+        if m.ctx_method and d.lo != d.hi and string.str_eq(text_of(p, node_at(p, p.ids[d.lo]).s0), "self"):
+            slot += 1
+        if d.lo + slot < d.hi:
+            param_n = node_at(p, p.ids[d.lo + slot])
+            if string.str_eq(text_of(p, param_n.s1), "consume") and param_n.i3 != 0:
+                param = param_n.s0
+                mline = param_n.i1
+                mcol = param_n.i2
+                mlen = param_n.i3
+    n = node_at(p, id)
+    m.moved.push(Moved{
+        path: path,
+        line: n.line,
+        col: n.col,
+        length: n.length,
+        param: param,
+        mline: mline,
+        mcol: mcol,
+        mlen: mlen,
+    })
+
+fn mv_expr(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize):
+    if id == 0:
+        return
+    n = node_at(p, id)
+    if n.kind == 41 or n.kind == 42:
+        if place_path(p, id) != 0:
+            mv_use(p, c, m, id)
+            if n.f7:
+                mv_record(p, c, m, id)
+        elif n.kind == 42:
+            mv_expr(p, c, m, n.c0)
+        return
+    if n.kind == 53:
+        if place_path(p, id) != 0:
+            mv_use(p, c, m, id)
+        mv_expr(p, c, m, n.c0)
+        mv_expr(p, c, m, n.c1)
+        return
+    if n.kind == 56:
+        if place_path(p, id) != 0:
+            mv_use(p, c, m, id)
+        mv_expr(p, c, m, n.c0)
+        mv_expr(p, c, m, n.c1)
+        mv_expr(p, c, m, n.c2)
+        return
+    if n.kind == 43 or n.kind == 45 or n.kind == 47 or n.kind == 48 or n.kind == 55:
+        mv_expr(p, c, m, n.c0)
+        return
+    if n.kind == 44:
+        mv_expr(p, c, m, n.c0)
+        mv_expr(p, c, m, n.c1)
+        return
+    if n.kind == 49:
+        mv_args(p, c, m, id, func_decl(c, raw_name(p, n.s0)), false)
+        return
+    if n.kind == 50:
+        mv_expr(p, c, m, n.c0)
+        decl: usize = 0
+        if n.s1 != 0:
+            slot = find_method(c, raw_name(p, n.s1), raw_name(p, n.s0))
+            if slot != 0:
+                decl = c.funcs[slot - 1].decl
+        mv_args(p, c, m, id, decl, true)
+        return
+    if n.kind == 52 or n.kind == 57 or n.kind == 38:
+        i = n.lo
+        while i < n.hi:
+            child = p.ids[i]
+            if n.kind == 52:
+                mv_expr(p, c, m, node_at(p, child).c0)
+            else:
+                mv_expr(p, c, m, child)
+            i += 1
+        return
+    if n.kind == 58:
+        mv_expr(p, c, m, n.c0)
+        mv_expr(p, c, m, n.c1)
+        return
+    if n.kind == 34:
+        if not mv_stmt(p, c, m, n.c0):
+            m.moved.clear()
+        return
+
+fn mv_args(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize, decl: usize, method: bool):
+    n = node_at(p, id)
+    saved_on = m.ctx_on
+    saved_method = m.ctx_method
+    saved_decl = m.ctx_decl
+    saved_arg = m.ctx_arg
+    m.ctx_on = true
+    m.ctx_method = method
+    m.ctx_decl = decl
+    i: usize = 0
+    a = n.lo
+    while a < n.hi:
+        m.ctx_arg = i
+        mv_expr(p, c, m, p.ids[a])
+        i += 1
+        a += 1
+    m.ctx_on = saved_on
+    m.ctx_method = saved_method
+    m.ctx_decl = saved_decl
+    m.ctx_arg = saved_arg
+
+fn func_decl(c: read Checker, name: usize) -> usize:
+    slot = find_func(c, name)
+    if slot == 0:
+        return 0
+    return c.funcs[slot - 1].decl
+
+fn mv_block(p: lend cursor.Parser, c: lend Checker, m: lend Mv, lo: usize, hi: usize) -> bool:
+    i = lo
+    while i < hi:
+        if not mv_stmt(p, c, m, p.ids[i]):
+            return false
+        i += 1
+    return true
+
+fn mv_stmt(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize) -> bool:
+    n = node_at(p, id)
+    if n.kind == 13:
+        mv_expr(p, c, m, n.c1)
+        mv_forget_root(p, m, n.s0)
+        if m.lmarks.len > 0:
+            loop_add(m, n.s0)
+        return true
+    if n.kind == 14:
+        mv_assign(p, c, m, id)
+        return true
+    if n.kind == 28:
+        mv_expr(p, c, m, n.c0)
+        if node_at(p, n.c0).kind == 49 and string.str_eq(text_of(p, node_at(p, n.c0).s0), "panic"):
+            return false
+        return true
+    if n.kind == 20:
+        mv_expr(p, c, m, n.c0)
+        return false
+    if n.kind == 21 or n.kind == 22:
+        return false
+    if n.kind == 15:
+        return mv_if(p, c, m, id)
+    if n.kind == 17:
+        loop_enter(m)
+        mv_expr(p, c, m, n.c0)
+        snap = mv_clone(m)
+        mv_block(p, c, snap, n.lo, n.hi)
+        loop_leave(m)
+        return true
+    if n.kind == 18:
+        mv_expr(p, c, m, n.c0)
+        mv_expr(p, c, m, n.c1)
+        mv_expr(p, c, m, n.c2)
+        loop_enter(m)
+        loop_add(m, n.s0)
+        copy2 = mv_clone(m)
+        mv_block(p, c, copy2, n.lo, n.hi)
+        loop_leave(m)
+        return true
+    if n.kind == 19:
+        mv_expr(p, c, m, n.c0)
+        loop_enter(m)
+        loop_add(m, n.s0)
+        if n.s1 != 0:
+            loop_add(m, n.s1)
+        copy3 = mv_clone(m)
+        mv_block(p, c, copy3, n.lo, n.hi)
+        loop_leave(m)
+        return true
+    if n.kind == 23:
+        return mv_match(p, c, m, id)
+    if n.kind == 30:
+        mv_expr(p, c, m, n.c0)
+        return true
+    if n.kind == 29:
+        mv_stmt(p, c, m, n.c0)
+        return true
+    if n.kind == 34:
+        return mv_stmt(p, c, m, n.c0)
+    return true
+
+fn mv_if(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize) -> bool:
+    n = node_at(p, id)
+    acc = mv_new()
+    any = false
+    b = n.lo
+    while b < n.hi:
+        br = node_at(p, p.ids[b])
+        mv_expr(p, c, m, br.c0)
+        snap = mv_clone(m)
+        if mv_block(p, c, snap, br.lo, br.hi):
+            any = true
+            mv_union(acc, snap)
+        b += 1
+    if n.f0:
+        copy2 = mv_clone(m)
+        if mv_block(p, c, copy2, n.lo2, n.hi2):
+            any = true
+            mv_union(acc, copy2)
+    else:
+        any = true
+        mv_union(acc, m)
+    if not any:
+        return false
+    mv_set(m, acc)
+    return true
+
+fn mv_match(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize) -> bool:
+    n = node_at(p, id)
+    mv_expr(p, c, m, n.c0)
+    if string.str_eq(text_of(p, n.s0), "consume"):
+        mv_record(p, c, m, n.c0)
+    acc = mv_new()
+    any = false
+    a = n.lo
+    while a < n.hi:
+        arm = node_at(p, p.ids[a])
+        bi = arm.lo
+        while bi < arm.hi:
+            binding = node_at(p, p.ids[bi])
+            mv_forget_root(p, m, binding.s0)
+            if m.lmarks.len > 0:
+                loop_add(m, binding.s0)
+            bi += 1
+        snap = mv_clone(m)
+        if mv_block(p, c, snap, arm.lo2, arm.hi2):
+            any = true
+            mv_union(acc, snap)
+        a += 1
+    if not any:
+        return false
+    mv_set(m, acc)
+    return true
+
+fn mv_assign(p: lend cursor.Parser, c: lend Checker, m: lend Mv, id: usize):
+    n = node_at(p, id)
+    path = place_path(p, n.c0)
+    root: usize = 0
+    if path != 0 and string.str_eq(text_of(p, n.s0), "="):
+        root = root_pack(p, path)
+    saved = m.reassign
+    m.reassign = root
+    mv_expr(p, c, m, n.c1)
+    m.reassign = saved
+    if path == 0:
+        return
+    if not string.str_eq(text_of(p, n.s0), "="):
+        mv_use(p, c, m, n.c0)
+        return
+    blocked = false
+    i: usize = 0
+    while i < m.moved.len:
+        if path_under(p, path, m.moved[i].path):
+            blocked = true
+        i += 1
+    if blocked:
+        mv_use(p, c, m, n.c0)
+        return
+    mv_forget_prefix(p, m, path)
+
+fn move_func(p: lend cursor.Parser, c: lend Checker, index: usize):
+    info = c.funcs[index]
+    d = node_at(p, info.decl)
+    m = mv_new()
+    mv_block(p, c, m, d.lo2, d.hi2)
+
+fn move_program(p: lend cursor.Parser, c: lend Checker):
+    i: usize = 0
+    while i < c.funcs.len:
+        if c.funcs[i].inst or c.funcs[i].decl >= c.pre_nodes:
+            saved_m = c.binds.len
+            if c.funcs[i].inst:
+                apply_saved(c, c.funcs[i].blo, c.funcs[i].bhi)
+            move_func(p, c, i)
+            trim_binds(c, saved_m)
+        i += 1
+
+fn poke_tie_at(c: lend Checker, slot: usize, tie: usize):
+    if slot == 0 or slot > c.vars.len:
+        return
+    rec = c.vars[slot - 1]
+    rec.tie = tie
+    c.vars[slot - 1] = rec
+
+fn poke_tie(c: lend Checker, tie: usize):
+    poke_tie_at(c, c.vars.len, tie)
+
+fn ref_place(p: read cursor.Parser, id: usize) -> bool:
+    if id == 0:
+        return false
+    k = node_at(p, id).kind
+    if k == 48:
+        return ref_place(p, node_at(p, id).c0)
+    return k == 41 or k == 42 or k == 53
+
+fn tie_root(p: lend cursor.Parser, c: read Checker, id: usize) -> usize:
+    if id == 0:
+        return 0
+    n = node_at(p, id)
+    if n.kind == 48 or n.kind == 42 or n.kind == 53 or n.kind == 56:
+        return tie_root(p, c, n.c0)
+    if n.kind == 41:
+        slot = lookup(c, raw_name(p, n.s0))
+        if slot != 0 and c.vars[slot - 1].tie != 0:
+            return c.vars[slot - 1].tie
+        return n.s0
+    return 0
+
+fn lend_store(p: lend cursor.Parser, c: lend Checker, id: usize):
+    root = root_place(p, id)
+    if root != 0:
+        slot = lookup(c, raw_name(p, node_at(p, root).s0))
+        if slot != 0 and (c.vars[slot - 1].kind == 3 or c.vars[slot - 1].kind == 6):
+            nm = text_of(p, node_at(p, root).s0)
+            msg = string.new()
+            msg.append_str("Cannot take `lend` from `")
+            msg.append_str(nm)
+            msg.append_str("`: it is a `read` reference.")
+            err_at(p, c, id, msg.as_str(), "Mutating through a shared reference is not allowed.", true)
+            return
+    check_lend(p, c, id)
+
+fn rebind_ref(p: lend cursor.Parser, c: lend Checker, id: usize, slot: usize):
+    n = node_at(p, id)
+    rec = c.vars[slot - 1]
+    if not rec.mutable:
+        nm = text_of(p, node_at(p, n.c0).s0)
+        msg = string.new()
+        msg.append_str("Cannot rebind `")
+        msg.append_str(nm)
+        msg.append_str("`: the reference binding is immutable.")
+        hint = string.new()
+        hint.append_str("Declare it with `var` to retie it: `var ")
+        hint.append_str(nm)
+        hint.append_str("`.")
+        err_at(p, c, n.c0, msg.as_str(), hint.as_str(), true)
+    tt = infer(p, c, n.c0, 0)
+    vt = expr_value(p, c, n.c1, tt)
+    if tt != c.err_ty and vt != c.err_ty:
+        expect_type(p, c, tt, vt, n.c1)
+    if not ref_place(p, n.c1):
+        err_at(p, c, n.c1, "A reference can only be retied to a place or another reference.", "", false)
+    elif rec.kind == 7:
+        lend_store(p, c, n.c1)
+    root = tie_root(p, c, n.c1)
+    edited = p.nodes[id]
+    edited.f0 = true
+    if rec.kind == 7:
+        edited.s1 = pack(p, "lend")
+    else:
+        edited.s1 = pack(p, "read")
+    edited.s2 = root
+    p.nodes[id] = edited
+    poke_tie_at(c, slot, root)
+
+fn arg_mode(p: lend cursor.Parser, c: lend Checker, param: usize) -> usize:
+    n = node_at(p, param)
+    mode = text_of(p, n.s1)
+    if mode.len == 0 or string.str_eq(mode, "val"):
+        if needs_drop(p, c, resolve_type(p, c, n.c0)):
+            return pack(p, "read")
+        return pack(p, "val")
+    return n.s1
+
+fn alias_path(p: lend cursor.Parser, c: read Checker, id: usize) -> usize:
+    path = place_path(p, id)
+    if path == 0:
+        return 0
+    root = root_pack(p, path)
+    slot = lookup(c, raw_name(p, root))
+    if slot == 0 or c.vars[slot - 1].tie == 0:
+        return path
+    tie = c.vars[slot - 1].tie
+    if path == root:
+        return tie
+    joined = string.new()
+    joined.append_str(text_of(p, tie))
+    joined.append_str(string.substr(text_of(p, path), text_of(p, root).len, text_of(p, path).len))
+    return pack(p, joined.as_str())
+
+fn alias_args(p: lend cursor.Parser, c: lend Checker, recv: usize, decl: usize, param_start: usize, call: usize):
+    n = node_at(p, call)
+    d = node_at(p, decl)
+    p0 = param_start
+    if recv != 0:
+        p0 = param_start + 1
+    nargs: i64 = 0
+    a = n.lo
+    while a < n.hi:
+        nargs += 1
+        a += 1
+    nparams: i64 = 0
+    q = p0
+    while q < d.hi:
+        nparams += 1
+        q += 1
+    if nargs != nparams:
+        return
+    modes = List[usize]()
+    paths = List[usize]()
+    nodes = List[usize]()
+    tys = List[usize]()
+    if recv != 0 and param_start < d.hi:
+        modes.push(arg_mode(p, c, p.ids[param_start]))
+        paths.push(alias_path(p, c, recv))
+        nodes.push(recv)
+        tys.push(resolve_type(p, c, node_at(p, p.ids[param_start]).c0))
+    ai = n.lo
+    pi = p0
+    while ai < n.hi and pi < d.hi:
+        modes.push(arg_mode(p, c, p.ids[pi]))
+        paths.push(alias_path(p, c, p.ids[ai]))
+        nodes.push(p.ids[ai])
+        tys.push(resolve_type(p, c, node_at(p, p.ids[pi]).c0))
+        ai += 1
+        pi += 1
+    seen = List[usize]()
+    i: usize = 0
+    while i < nodes.len:
+        j = i + 1
+        while j < nodes.len:
+            already = false
+            s: usize = 0
+            while s < seen.len:
+                if seen[s] == nodes[j]:
+                    already = true
+                s += 1
+            mi = text_of(p, modes[i])
+            mj = text_of(p, modes[j])
+            lend_i = string.str_eq(mi, "lend")
+            lend_j = string.str_eq(mj, "lend")
+            if not already and paths[i] != 0 and paths[j] != 0 and (lend_i or lend_j) and (paths[i] == paths[j] or path_under(p, paths[i], paths[j]) or path_under(p, paths[j], paths[i])):
+                seen.push(nodes[j])
+                left = dump.unparse(p, nodes[i])
+                right = dump.unparse(p, nodes[j])
+                msg = string.new()
+                hint = string.new()
+                if lend_i and lend_j:
+                    if string.str_eq(left.as_str(), right.as_str()):
+                        msg.append_str("`")
+                        msg.append_str(right.as_str())
+                        msg.append_str("` cannot be borrowed as `lend` multiple times in the same call.")
+                    else:
+                        msg.append_str("`")
+                        msg.append_str(right.as_str())
+                        msg.append_str("` and `")
+                        msg.append_str(left.as_str())
+                        msg.append_str("` cannot be borrowed as `lend` in the same call (conflicting memory access).")
+                    hint.append_str("Cannot grant two mutating accesses to the same data simultaneously; split the call in two.")
+                elif string.str_eq(mi, "consume") or string.str_eq(mj, "consume"):
+                    shown = right
+                    if string.str_eq(mi, "consume"):
+                        shown = left
+                    msg.append_str("`")
+                    msg.append_str(shown.as_str())
+                    msg.append_str("` cannot be borrowed as `lend` while being moved (`consume`).")
+                    hint.append_str("Borrow before moving or split the call in two.")
+                elif string.str_eq(mi, "read") or string.str_eq(mj, "read"):
+                    shown2 = right
+                    if string.str_eq(mi, "read"):
+                        shown2 = left
+                    msg.append_str("`")
+                    msg.append_str(shown2.as_str())
+                    msg.append_str("` cannot be borrowed as both `read` and `lend` at the same time (risk of data race).")
+                    hint.append_str("No other `read` allowed while `lend` is active; split the call.")
+                else:
+                    val_ty = tys[j]
+                    shown3 = right
+                    if not lend_j:
+                        val_ty = tys[i]
+                        shown3 = left
+                    tname = text_of(p, val_ty)
+                    if val_ty != c.err_ty and not typeinfo.is_prim(tname):
+                        msg.append_str("`")
+                        msg.append_str(shown3.as_str())
+                        msg.append_str("` is both borrowed as `lend` and read (aliasing risk).")
+                        hint.append_str("`copy` value to a local variable before call or split the call.")
+                if msg.as_str().len > 0:
+                    err_at(p, c, nodes[j], msg.as_str(), hint.as_str(), true)
+            j += 1
+        i += 1
+
+struct Bond:
+    name: usize
+    root: usize
+    mode: usize
+    node: usize
+
+struct Bw:
+    dname: List[usize]
+    dval: List[i32]
+    kname: List[usize]
+    kref: List[bool]
+    tname: List[usize]
+    troot: List[usize]
+
+fn bw_new() -> Bw:
+    return Bw{
+        dname: List[usize](),
+        dval: List[i32](),
+        kname: List[usize](),
+        kref: List[bool](),
+        tname: List[usize](),
+        troot: List[usize](),
+    }
+
+fn bw_clone(src: read List[Bond]) -> List[Bond]:
+    out = List[Bond]()
+    i: usize = 0
+    while i < src.len:
+        out.push(src[i])
+        i += 1
+    return out
+
+fn bw_set_depth(b: lend Bw, name: usize, depth: i32):
+    b.dname.push(name)
+    b.dval.push(depth)
+
+fn bw_depth(b: read Bw, name: usize) -> i32:
+    i = b.dname.len
+    while i > 0:
+        i -= 1
+        if b.dname[i] == name:
+            return b.dval[i]
+    return -1
+
+fn bw_set_kind(b: lend Bw, name: usize, is_ref: bool):
+    b.kname.push(name)
+    b.kref.push(is_ref)
+
+fn bw_is_ref(b: read Bw, name: usize) -> bool:
+    i = b.kname.len
+    while i > 0:
+        i -= 1
+        if b.kname[i] == name:
+            return b.kref[i]
+    return false
+
+fn bw_set_tie(b: lend Bw, name: usize, root: usize):
+    b.tname.push(name)
+    b.troot.push(root)
+
+fn bw_tie(b: read Bw, name: usize) -> usize:
+    i = b.tname.len
+    while i > 0:
+        i -= 1
+        if b.tname[i] == name:
+            return b.troot[i]
+    return 0
+
+fn bw_has(bonds: read List[Bond], name: usize) -> bool:
+    i: usize = 0
+    while i < bonds.len:
+        if bonds[i].name == name:
+            return true
+        i += 1
+    return false
+
+fn bw_drop_name(bonds: lend List[Bond], name: usize):
+    keep = List[Bond]()
+    i: usize = 0
+    while i < bonds.len:
+        if bonds[i].name != name:
+            keep.push(bonds[i])
+        i += 1
+    bonds.clear()
+    i = 0
+    while i < keep.len:
+        bonds.push(keep[i])
+        i += 1
+
+fn bw_follow(p: lend cursor.Parser, b: read Bw, id: usize) -> usize:
+    if id == 0:
+        return 0
+    n = node_at(p, id)
+    if n.kind == 48 or n.kind == 42 or n.kind == 53 or n.kind == 56:
+        return bw_follow(p, b, n.c0)
+    if n.kind == 41:
+        name = n.s0
+        guard: i32 = 0
+        while bw_tie(b, name) != 0 and guard < 8:
+            nxt = bw_tie(b, name)
+            if nxt == name:
+                return name
+            name = nxt
+            guard += 1
+        return name
+    return 0
+
+fn bw_collect(p: lend cursor.Parser, id: usize, out: lend List[usize]):
+    if id == 0:
+        return
+    n = node_at(p, id)
+    if n.kind == 41:
+        out.push(n.s0)
+    if n.kind == 42 or n.kind == 43 or n.kind == 45 or n.kind == 47 or n.kind == 48 or n.kind == 53 or n.kind == 55 or n.kind == 13 or n.kind == 20 or n.kind == 28 or n.kind == 29 or n.kind == 30 or n.kind == 34:
+        bw_collect(p, n.c0, out)
+    if n.kind == 53 or n.kind == 56 or n.kind == 44 or n.kind == 14 or n.kind == 18:
+        bw_collect(p, n.c1, out)
+    if n.kind == 56 or n.kind == 18:
+        bw_collect(p, n.c2, out)
+    if n.kind == 49 or n.kind == 50 or n.kind == 52 or n.kind == 57 or n.kind == 38 or n.kind == 15 or n.kind == 16 or n.kind == 17 or n.kind == 19 or n.kind == 23 or n.kind == 32:
+        i = n.lo
+        while i < n.hi:
+            child = p.ids[i]
+            if n.kind == 52:
+                bw_collect(p, node_at(p, child).c0, out)
+            else:
+                bw_collect(p, child, out)
+            i += 1
+    if n.kind == 15 and n.f0:
+        e = n.lo2
+        while e < n.hi2:
+            bw_collect(p, p.ids[e], out)
+            e += 1
+    if n.kind == 24:
+        b = n.lo2
+        while b < n.hi2:
+            bw_collect(p, p.ids[b], out)
+            b += 1
+
+fn bw_uses(p: lend cursor.Parser, ids: read List[usize], name: usize) -> bool:
+    i: usize = 0
+    while i < ids.len:
+        found = List[usize]()
+        bw_collect(p, ids[i], found)
+        j: usize = 0
+        while j < found.len:
+            if found[j] == name:
+                return true
+            j += 1
+        i += 1
+    return false
+
+fn bw_escape(p: lend cursor.Parser, c: lend Checker, b: read Bw, holder: usize, root: usize, node: usize):
+    hd = bw_depth(b, holder)
+    rd = bw_depth(b, root)
+    if rd >= 0 and hd >= 0 and rd > hd:
+        msg = string.new()
+        msg.append_str("`")
+        msg.append_str(text_of(p, root))
+        msg.append_str("` does not live long enough for `")
+        msg.append_str(text_of(p, holder))
+        msg.append_str("` to reference it.")
+        hint = string.new()
+        hint.append_str("`")
+        hint.append_str(text_of(p, root))
+        hint.append_str("` is declared in an inner scope; borrow a value from the outer scope.")
+        err_at(p, c, node, msg.as_str(), hint.as_str(), true)
+
+fn bw_add(p: lend cursor.Parser, c: lend Checker, b: lend Bw, bonds: lend List[Bond], name: usize, root: usize, mode: usize, node: usize):
+    if root == 0:
+        return
+    bonds.push(Bond{ name: name, root: root, mode: mode, node: node })
+    bw_escape(p, c, b, name, root, node)
+
+fn bw_events(p: lend cursor.Parser, c: read Checker, b: read Bw, id: usize, kinds: lend List[u8], roots: lend List[usize], nodes: lend List[usize]):
+    if id == 0:
+        return
+    n = node_at(p, id)
+    if (n.kind == 41 or n.kind == 42) and n.f7:
+        root = bw_follow(p, b, id)
+        if root != 0:
+            kinds.push(2)
+            roots.push(root)
+            nodes.push(id)
+    if n.kind == 49 or n.kind == 50:
+        decl: usize = 0
+        param0 = 0
+        method = false
+        if n.kind == 49:
+            decl = func_decl(c, raw_name(p, n.s0))
+        elif n.s1 != 0:
+            slot = find_method(c, raw_name(p, n.s1), raw_name(p, n.s0))
+            if slot != 0:
+                decl = c.funcs[slot - 1].decl
+                method = true
+        if decl != 0:
+            d = node_at(p, decl)
+            arg_at = d.lo
+            if method and d.lo != d.hi and string.str_eq(text_of(p, node_at(p, p.ids[d.lo]).s0), "self"):
+                if string.str_eq(text_of(p, node_at(p, p.ids[d.lo]).s1), "lend"):
+                    root = bw_follow(p, b, n.c0)
+                    if root != 0:
+                        kinds.push(3)
+                        roots.push(root)
+                        nodes.push(id)
+                arg_at = d.lo + 1
+            ai = n.lo
+            while ai < n.hi and arg_at < d.hi:
+                if string.str_eq(text_of(p, node_at(p, p.ids[arg_at]).s1), "lend"):
+                    root2 = bw_follow(p, b, p.ids[ai])
+                    if root2 != 0:
+                        kinds.push(3)
+                        roots.push(root2)
+                        nodes.push(p.ids[ai])
+                ai += 1
+                arg_at += 1
+    if n.kind == 48 and string.str_eq(text_of(p, n.s0), "lend"):
+        root3 = bw_follow(p, b, n.c0)
+        if root3 != 0:
+            kinds.push(3)
+            roots.push(root3)
+            nodes.push(id)
+    if n.kind == 13 and string.str_eq(text_of(p, n.s1), "lend") and n.s2 != 0:
+        kinds.push(3)
+        roots.push(n.s2)
+        nodes.push(id)
+    if n.kind == 14 and n.f0 and string.str_eq(text_of(p, n.s1), "lend") and n.s2 != 0:
+        kinds.push(3)
+        roots.push(n.s2)
+        nodes.push(id)
+    elif n.kind == 14:
+        root4 = bw_follow(p, b, n.c0)
+        if root4 != 0:
+            kinds.push(4)
+            roots.push(root4)
+            nodes.push(id)
+    if n.kind == 41:
+        kinds.push(1)
+        roots.push(n.s0)
+        nodes.push(id)
+    if n.kind == 42 or n.kind == 43 or n.kind == 45 or n.kind == 47 or n.kind == 48 or n.kind == 53 or n.kind == 55 or n.kind == 13 or n.kind == 20 or n.kind == 28 or n.kind == 29 or n.kind == 30 or n.kind == 34:
+        bw_events(p, c, b, n.c0, kinds, roots, nodes)
+    if n.kind == 53 or n.kind == 56 or n.kind == 44 or n.kind == 14 or n.kind == 18:
+        bw_events(p, c, b, n.c1, kinds, roots, nodes)
+    if n.kind == 56 or n.kind == 18:
+        bw_events(p, c, b, n.c2, kinds, roots, nodes)
+    if n.kind == 49 or n.kind == 50 or n.kind == 52 or n.kind == 57 or n.kind == 38 or n.kind == 16 or n.kind == 17 or n.kind == 19 or n.kind == 32:
+        i = n.lo
+        while i < n.hi:
+            child = p.ids[i]
+            if n.kind == 52:
+                bw_events(p, c, b, node_at(p, child).c0, kinds, roots, nodes)
+            else:
+                bw_events(p, c, b, child, kinds, roots, nodes)
+            i += 1
+
+fn bw_invalid(p: lend cursor.Parser, c: lend Checker, b: read Bw, bonds: read List[Bond], id: usize, later: read List[usize]):
+    if bonds.len == 0:
+        return
+    kinds = List[u8]()
+    roots = List[usize]()
+    nodes = List[usize]()
+    bw_events(p, c, b, id, kinds, roots, nodes)
+    h: usize = 0
+    while h < bonds.len:
+        bond = bonds[h]
+        if bw_uses(p, later, bond.name):
+            e: usize = 0
+            while e < kinds.len:
+                if roots[e] == bond.root:
+                    use = kinds[e] == 1
+                    if not (use and string.str_eq(text_of(p, bond.mode), "read")) and not (use and nodes[e] == bond.node):
+                        msg = string.new()
+                        hint = string.new()
+                        if string.str_eq(text_of(p, bond.mode), "read"):
+                            verb = "is reassigned"
+                            if kinds[e] == 2:
+                                verb = "is moved (`consume`)"
+                            elif kinds[e] == 3:
+                                verb = "is borrowed as `lend`"
+                            msg.append_str("`")
+                            msg.append_str(text_of(p, bond.root))
+                            msg.append_str("` ")
+                            msg.append_str(verb)
+                            msg.append_str(", but `")
+                            msg.append_str(text_of(p, bond.name))
+                            msg.append_str("` is still tied to it (`read`) and used later.")
+                            hint.append_str("Finish using `")
+                            hint.append_str(text_of(p, bond.name))
+                            hint.append_str("` first or defer mutating `")
+                            hint.append_str(text_of(p, bond.root))
+                            hint.append_str("`.")
+                        else:
+                            msg.append_str("`")
+                            msg.append_str(text_of(p, bond.root))
+                            msg.append_str("` is borrowed as `lend` by `")
+                            msg.append_str(text_of(p, bond.name))
+                            msg.append_str("`; no other access is permitted while `")
+                            msg.append_str(text_of(p, bond.name))
+                            msg.append_str("` is live.")
+                            hint.append_str("Access `")
+                            hint.append_str(text_of(p, bond.root))
+                            hint.append_str("` after finishing with `")
+                            hint.append_str(text_of(p, bond.name))
+                            hint.append_str("`.")
+                        err_at(p, c, nodes[e], msg.as_str(), hint.as_str(), true)
+                e += 1
+        h += 1
+
+fn bw_drop_moved(p: read cursor.Parser, id: usize, bonds: lend List[Bond]):
+    if id == 0:
+        return
+    n = node_at(p, id)
+    if n.kind == 41 and n.f7:
+        bw_drop_name(bonds, n.s0)
+    if n.kind == 42 or n.kind == 43 or n.kind == 45 or n.kind == 47 or n.kind == 48 or n.kind == 53 or n.kind == 13 or n.kind == 20 or n.kind == 28 or n.kind == 29 or n.kind == 30 or n.kind == 34:
+        bw_drop_moved(p, n.c0, bonds)
+    if n.kind == 53 or n.kind == 44 or n.kind == 14 or n.kind == 18:
+        bw_drop_moved(p, n.c1, bonds)
+    if n.kind == 49 or n.kind == 50 or n.kind == 52 or n.kind == 57 or n.kind == 16 or n.kind == 17 or n.kind == 19 or n.kind == 23:
+        i = n.lo
+        while i < n.hi:
+            child = p.ids[i]
+            if n.kind == 52:
+                bw_drop_moved(p, node_at(p, child).c0, bonds)
+            else:
+                bw_drop_moved(p, child, bonds)
+            i += 1
+
+fn bw_merge(base: read List[Bond], local: read List[Bond], into: lend List[Bond]):
+    into.clear()
+    i: usize = 0
+    while i < base.len:
+        key_name = base[i].name
+        seen_root = List[usize]()
+        seen_mode = List[usize]()
+        src_i: usize = 0
+        while src_i < local.len:
+            item = local[src_i]
+            if item.name == key_name:
+                found = false
+                s: usize = 0
+                while s < seen_root.len:
+                    if seen_root[s] == item.root and seen_mode[s] == item.mode:
+                        found = true
+                    s += 1
+                if not found:
+                    seen_root.push(item.root)
+                    seen_mode.push(item.mode)
+                    into.push(item)
+            src_i += 1
+        i += 1
+
+fn bw_block(p: lend cursor.Parser, c: lend Checker, b: lend Bw, bonds: lend List[Bond], lo: usize, hi: usize, later: read List[usize], depth: i32):
+    i = lo
+    while i < hi:
+        rest = List[usize]()
+        j = i + 1
+        while j < hi:
+            rest.push(p.ids[j])
+            j += 1
+        k: usize = 0
+        while k < later.len:
+            rest.push(later[k])
+            k += 1
+        bw_stmt(p, c, b, bonds, p.ids[i], rest, depth)
+        i += 1
+
+fn bw_stmt(p: lend cursor.Parser, c: lend Checker, b: lend Bw, bonds: lend List[Bond], id: usize, later: read List[usize], depth: i32):
+    n = node_at(p, id)
+    if n.kind == 15:
+        br = n.lo
+        while br < n.hi:
+            bw_invalid(p, c, b, bonds, node_at(p, p.ids[br]).c0, later)
+            br += 1
+    elif n.kind == 17:
+        bw_invalid(p, c, b, bonds, n.c0, later)
+    elif n.kind == 18:
+        bw_invalid(p, c, b, bonds, n.c0, later)
+        bw_invalid(p, c, b, bonds, n.c1, later)
+    elif n.kind == 19 or n.kind == 23:
+        bw_invalid(p, c, b, bonds, n.c0, later)
+    else:
+        bw_invalid(p, c, b, bonds, id, later)
+    bw_drop_moved(p, id, bonds)
+    if n.kind == 13:
+        bw_set_depth(b, n.s0, depth)
+        mode = text_of(p, n.s1)
+        if string.str_eq(mode, "read") or string.str_eq(mode, "lend"):
+            bw_set_kind(b, n.s0, true)
+            if n.s2 != 0:
+                bw_set_tie(b, n.s0, n.s2)
+            bw_add(p, c, b, bonds, n.s0, n.s2, n.s1, id)
+        else:
+            bw_set_kind(b, n.s0, false)
+    elif n.kind == 14 and n.f0 and node_at(p, n.c0).kind == 41:
+        name = node_at(p, n.c0).s0
+        if n.s2 != 0:
+            bw_set_tie(b, name, n.s2)
+        bw_drop_name(bonds, name)
+        bw_add(p, c, b, bonds, name, n.s2, n.s1, id)
+    elif n.kind == 20 and n.c0 != 0 and node_at(p, n.c0).kind == 41:
+        d = node_at(p, c.cur_decl)
+        if not d.f1:
+            name2 = node_at(p, n.c0).s0
+            h: usize = 0
+            while h < bonds.len:
+                if bonds[h].name == name2 and not bw_is_ref(b, bonds[h].root):
+                    msg = string.new()
+                    msg.append_str("`")
+                    msg.append_str(text_of(p, bonds[h].root))
+                    msg.append_str("` is destroyed upon returning from the function; a reference tied to it cannot be returned.")
+                    hint = string.new()
+                    hint.append_str("Make `")
+                    hint.append_str(text_of(p, bonds[h].root))
+                    hint.append_str("` a `read`/`lend` parameter or copy the value (`copy`).")
+                    err_at(p, c, bonds[h].node, msg.as_str(), hint.as_str(), true)
+                h += 1
+    if n.kind == 15:
+        base = bw_clone(bonds)
+        acc = List[Bond]()
+        any = false
+        br2 = n.lo
+        while br2 < n.hi:
+            arm = node_at(p, p.ids[br2])
+            local = bw_clone(bonds)
+            bw_block(p, c, b, local, arm.lo, arm.hi, later, depth + 1)
+            if not any:
+                bw_merge(base, local, acc)
+                any = true
+            else:
+                extra = List[Bond]()
+                bw_merge(base, local, extra)
+                e: usize = 0
+                while e < extra.len:
+                    acc.push(extra[e])
+                    e += 1
+            br2 += 1
+        if n.f0:
+            local2 = bw_clone(bonds)
+            bw_block(p, c, b, local2, n.lo2, n.hi2, later, depth + 1)
+            extra2 = List[Bond]()
+            bw_merge(base, local2, extra2)
+            e2: usize = 0
+            while e2 < extra2.len:
+                acc.push(extra2[e2])
+                e2 += 1
+        else:
+            extra3 = List[Bond]()
+            bw_merge(base, bonds, extra3)
+            e3: usize = 0
+            while e3 < extra3.len:
+                acc.push(extra3[e3])
+                e3 += 1
+        uniq = List[Bond]()
+        bw_merge(base, acc, uniq)
+        bonds.clear()
+        u: usize = 0
+        while u < uniq.len:
+            bonds.push(uniq[u])
+            u += 1
+    elif n.kind == 17 or n.kind == 18 or n.kind == 19:
+        body_lo = n.lo
+        body_hi = n.hi
+        extra_ids = List[usize]()
+        t = body_lo
+        while t < body_hi:
+            extra_ids.push(p.ids[t])
+            t += 1
+        k: usize = 0
+        while k < later.len:
+            extra_ids.push(later[k])
+            k += 1
+        base2 = bw_clone(bonds)
+        local3 = bw_clone(bonds)
+        bw_block(p, c, b, local3, body_lo, body_hi, extra_ids, depth + 1)
+        merged = List[Bond]()
+        bw_merge(base2, local3, merged)
+        keep = List[Bond]()
+        bw_merge(base2, bonds, keep)
+        m: usize = 0
+        while m < merged.len:
+            keep.push(merged[m])
+            m += 1
+        uniq2 = List[Bond]()
+        bw_merge(base2, keep, uniq2)
+        bonds.clear()
+        u2: usize = 0
+        while u2 < uniq2.len:
+            bonds.push(uniq2[u2])
+            u2 += 1
+    elif n.kind == 23:
+        base3 = bw_clone(bonds)
+        acc2 = List[Bond]()
+        started = false
+        ar = n.lo
+        while ar < n.hi:
+            arm2 = node_at(p, p.ids[ar])
+            local4 = bw_clone(bonds)
+            bw_block(p, c, b, local4, arm2.lo2, arm2.hi2, later, depth + 1)
+            part = List[Bond]()
+            bw_merge(base3, local4, part)
+            pidx: usize = 0
+            while pidx < part.len:
+                acc2.push(part[pidx])
+                pidx += 1
+            started = true
+            ar += 1
+        if started:
+            uniq3 = List[Bond]()
+            bw_merge(base3, acc2, uniq3)
+            bonds.clear()
+            u3: usize = 0
+            while u3 < uniq3.len:
+                bonds.push(uniq3[u3])
+                u3 += 1
+
+fn bw_tied(p: lend cursor.Parser, c: lend Checker, lo: usize, hi: usize):
+    i = lo
+    while i < hi:
+        id = p.ids[i]
+        n = node_at(p, id)
+        if n.kind == 4:
+            f = n.lo
+            while f < n.hi:
+                field = node_at(p, p.ids[f])
+                if field.s1 != 0 and field.s2 != 0 and not string.str_eq(text_of(p, field.s2), "self"):
+                    msg = string.new()
+                    msg.append_str("Field `")
+                    msg.append_str(text_of(p, field.s0))
+                    msg.append_str("` specifies `tied to ")
+                    msg.append_str(text_of(p, field.s2))
+                    msg.append_str("`, but fields can only be tied to `self`.")
+                    hint = string.new()
+                    hint.append_str("Write `")
+                    hint.append_str(text_of(p, field.s0))
+                    hint.append_str(": ")
+                    hint.append_str(text_of(p, field.s1))
+                    hint.append_str(" ")
+                    if field.c0 != 0:
+                        hint.append_str(text_of(p, node_at(p, field.c0).s0))
+                    hint.append_str(" tied to self`.")
+                    err_at(p, c, p.ids[f], msg.as_str(), hint.as_str(), true)
+                f += 1
+        i += 1
+
+fn bw_params(p: lend cursor.Parser, c: lend Checker, b: lend Bw, decl: usize):
+    d = node_at(p, decl)
+    names = List[usize]()
+    pi = d.lo
+    while pi < d.hi:
+        names.push(node_at(p, p.ids[pi]).s0)
+        pi += 1
+    i = d.lo
+    while i < d.hi:
+        param = node_at(p, p.ids[i])
+        if param.s2 != 0:
+            if param.s2 == param.s0:
+                msg = string.new()
+                msg.append_str("`")
+                msg.append_str(text_of(p, param.s0))
+                msg.append_str("` cannot be tied to itself.")
+                err_at(p, c, p.ids[i], msg.as_str(), "Tie to another parameter.", true)
+            else:
+                found = false
+                target: usize = 0
+                n: usize = 0
+                while n < names.len:
+                    if names[n] == param.s2:
+                        found = true
+                        target = d.lo + n
+                    n += 1
+                if not found:
+                    msg2 = string.new()
+                    msg2.append_str("`tied to ")
+                    msg2.append_str(text_of(p, param.s2))
+                    msg2.append_str("`: no parameter named `")
+                    msg2.append_str(text_of(p, param.s2))
+                    msg2.append_str("`.")
+                    hint2 = string.new()
+                    hint2.append_str("Parameters: ")
+                    if names.len == 0:
+                        hint2.append_str("(none)")
+                    else:
+                        first = true
+                        k: usize = 0
+                        while k < names.len:
+                            if not first:
+                                hint2.append_str(", ")
+                            first = false
+                            hint2.append_str(text_of(p, names[k]))
+                            k += 1
+                    hint2.append_str(".")
+                    err_at(p, c, p.ids[i], msg2.as_str(), hint2.as_str(), true)
+                else:
+                    other = node_at(p, p.ids[target])
+                    omode = text_of(p, other.s1)
+                    oty = resolve_type(p, c, other.c0)
+                    owned = omode.len == 0 or string.str_eq(omode, "val")
+                    if owned and needs_drop(p, c, oty):
+                        owned = false
+                    if owned:
+                        msg3 = string.new()
+                        msg3.append_str("`")
+                        msg3.append_str(text_of(p, param.s0))
+                        msg3.append_str("` cannot be tied to a value parameter (`")
+                        msg3.append_str(text_of(p, other.s0))
+                        msg3.append_str("`): it will be destroyed when the function returns.")
+                        hint3 = string.new()
+                        hint3.append_str("Make parameter `")
+                        hint3.append_str(text_of(p, other.s0))
+                        hint3.append_str("` `read` or `lend`.")
+                        err_at(p, c, p.ids[i], msg3.as_str(), hint3.as_str(), true)
+        mode = text_of(p, param.s1)
+        is_ref = string.str_eq(mode, "read") or string.str_eq(mode, "lend")
+        if not is_ref and (mode.len == 0 or string.str_eq(mode, "val")) and needs_drop(p, c, resolve_type(p, c, param.c0)):
+            is_ref = true
+        bw_set_depth(b, param.s0, 0)
+        bw_set_kind(b, param.s0, is_ref)
+        i += 1
+
+fn borrow_func(p: lend cursor.Parser, c: lend Checker, index: usize):
+    info = c.funcs[index]
+    c.cur_decl = info.decl
+    b = bw_new()
+    bonds = List[Bond]()
+    bw_params(p, c, b, info.decl)
+    d = node_at(p, info.decl)
+    none = List[usize]()
+    bw_block(p, c, b, bonds, d.lo2, d.hi2, none, 1)
+    c.cur_decl = 0
+
+fn borrow_program(p: lend cursor.Parser, c: lend Checker, root: usize):
+    top = node_at(p, root)
+    bw_tied(p, c, top.lo, top.hi)
+    i: usize = 0
+    while i < c.funcs.len:
+        if c.funcs[i].inst or c.funcs[i].decl >= c.pre_nodes:
+            saved_b2 = c.binds.len
+            if c.funcs[i].inst:
+                apply_saved(c, c.funcs[i].blo, c.funcs[i].bhi)
+            borrow_func(p, c, i)
+            trim_binds(c, saved_b2)
+        i += 1

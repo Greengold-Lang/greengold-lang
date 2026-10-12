@@ -1,0 +1,14 @@
+# conformance: SPEC section 16 (Imports and the library), example 5
+# expect-output:
+#   7 0
+
+fn answer() -> i32:
+    return 7
+
+private
+
+fn hidden() -> i32:
+    return 0
+
+fn main():
+    print(answer(), hidden())

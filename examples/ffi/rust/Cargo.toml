@@ -1,0 +1,12 @@
+[package]
+name = "gg_rustlib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# Static library exposing C ABI: Greengold links this via `--link-file`.
+
+crate-type = ["staticlib"]
+
+[profile.release]
+panic = "abort"

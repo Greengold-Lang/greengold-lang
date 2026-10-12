@@ -1,0 +1,9 @@
+Error: `names[0]` cannot be moved out: the element belongs to `names`.
+ --> <source>:4:13  GG0313 cannot-move
+  |
+4 |     first = names[0]
+  |             ^^^^^^^^
+  = help: Move a copy with `names[0].clone()`, or take the element out with `pop()`.
+  = fix (likely): Move a copy: `names[0].clone()`
+
+1 error found.

@@ -1,0 +1,32 @@
+enum Shape:
+    Circle(f32)
+    Rect(f32, f32)
+    Empty
+
+fn area(s: Shape) -> f32:
+    match s:
+        Circle(r):
+            return 3.0 * r * r
+        Rect(w, h):
+            return w * h
+        Empty:
+            return 0.0
+
+fn grow(s: lend Shape):
+    match lend s:
+        Circle(r):
+            r += 1.0
+        Rect(w, _):
+            w *= 2.0
+        Empty:
+            pass
+
+fn main():
+    s = Shape.Rect(2.0, 3.0)
+    print(area(s))
+    grow(s)
+    print(area(s))
+    c = Shape.Circle(1.0)
+    grow(c)
+    print(area(c))
+    print(area(Shape.Empty))

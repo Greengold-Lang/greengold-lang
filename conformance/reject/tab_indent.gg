@@ -1,0 +1,5 @@
+# conformance: SPEC section 17, rejected form: a tab used for indentation
+# expect-error: GG0101 at line 5
+
+fn main():
+	pass

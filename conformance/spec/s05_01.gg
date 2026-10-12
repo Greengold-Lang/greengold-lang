@@ -1,0 +1,8 @@
+# conformance: SPEC section 5 (Copy and move), example 1
+# expect-output:
+#   3 3
+
+fn main():
+    n = 3
+    m = copy n
+    print(n, m)

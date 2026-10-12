@@ -1,0 +1,15 @@
+Error: `v` cannot be `lend`ed: `v` is declared `fixed`.
+ --> <source>:6:9  GG0310 lend-immutable
+  |
+6 |     add(v)
+  |         ^
+  |
+5 |     fixed v = List[i32]()
+  |     ^^^^^^^^^^^^^^^^^^^^^ `v` is declared here
+  |
+1 | fn add(xs: List[i32]):
+  |        ^^ `add` changes `xs`, so it takes it as `lend` (inferred)
+  = help: Delete `fixed` from the declaration of `v`.
+  = fix (likely): Delete `fixed` so `v` can be changed
+
+1 error found.

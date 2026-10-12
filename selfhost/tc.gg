@@ -1,0 +1,65 @@
+# Type-check driver. Grammar stays in the parser; this file only runs the checker.
+import std.fs
+import std.process
+import lex
+import cursor
+import decl
+import dump
+import check
+
+fn begin_user(p: lend cursor.Parser):
+    p.pos = 0
+    p.bad = false
+    p.export = false
+    p.pat_only = false
+    p.lifted.clear()
+    p.ak.clear()
+    p.av.clear()
+
+fn check_user(user: str):
+    lx = lex.lexer_new(user)
+    lx.run()
+    p = cursor.parser_new(lx)
+    root = decl.parse_program(p)
+    if p.lx.diags.len > 0:
+        dump.print_diags(p)
+        process.process_exit(1)
+    check.check_program(p, root)
+    if p.lx.diags.len > 0:
+        dump.print_diags(p)
+        process.process_exit(1)
+
+fn check_with_prelude(pre: str, user: str):
+    lx = lex.lexer_new(pre)
+    lx.run()
+    p = cursor.parser_new(lx)
+    proot = decl.parse_program(p)
+    if p.lx.diags.len > 0:
+        dump.print_diags(p)
+        process.process_exit(1)
+    p.prelude = proot
+    p.pre_nodes = p.nodes.len
+    p.lx.rebind(user)
+    begin_user(p)
+    root = decl.parse_program(p)
+    if p.lx.diags.len > 0:
+        dump.print_diags(p)
+        process.process_exit(1)
+    check.check_program(p, root)
+    if p.lx.diags.len > 0:
+        dump.print_diags(p)
+        process.process_exit(1)
+
+fn main():
+    text = fs.read_file_to_string("gg_selfhost_in.txt")
+    pre = fs.read_file_to_string("gg_prelude.gg")
+    match text:
+        None:
+            print("cannot read gg_selfhost_in.txt")
+            process.process_exit(2)
+        Valid(user):
+            match pre:
+                None:
+                    check_user(user.as_str())
+                Valid(src):
+                    check_with_prelude(src.as_str(), user.as_str())

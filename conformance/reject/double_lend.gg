@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: two overlapping `lend` arguments
+# expect-error: GG0305 at line 9
+
+fn two(a: lend i32, b: lend i32):
+    pass
+
+fn main():
+    n = 1
+    two(n, n)

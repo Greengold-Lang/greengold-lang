@@ -1,0 +1,4 @@
+fn divide(a: i32, b: i32) -> Result[i32, str]:
+    if b == 0:
+        return Err("zero")
+    return Ok(a / b)

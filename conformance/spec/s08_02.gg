@@ -1,0 +1,11 @@
+# conformance: SPEC section 8 (Generics and features), example 2
+# expect-output:
+#   1 a
+
+struct Pair[A, B]:
+    first: A
+    second: B
+
+fn main():
+    p = Pair{ first: 1, second: "a" }
+    print(p.first, p.second)

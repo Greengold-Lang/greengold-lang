@@ -1,0 +1,6 @@
+fn main():
+    n = 0
+    end: u8 = 255
+    for i in 0..=end:
+        n += 1
+    print(n)

@@ -1,0 +1,989 @@
+# Expressions: precedence, postfix, literals, calls, f-strings, lambdas.
+import std.string
+import lex
+import ast
+import cursor
+import ty
+import dump
+import stmt
+
+public
+
+struct Brack:
+    close: i32
+    comma: bool
+
+fn cmp_op(s: str) -> bool:
+    if string.str_eq(s, "==") or string.str_eq(s, "!=") or string.str_eq(s, "<") or string.str_eq(s, "<="):
+        return true
+    if string.str_eq(s, ">") or string.str_eq(s, ">="):
+        return true
+    return false
+
+fn bin_prec(p: read cursor.Parser, t: lex.Token) -> i32:
+    if cursor.kind_is(p, t, "NAME"):
+        w = p.lx.names.text(t.text)
+        if string.str_eq(w, "wrapping_add") or string.str_eq(w, "wrapping_sub") or string.str_eq(w, "saturating_add") or string.str_eq(w, "saturating_sub") or string.str_eq(w, "checked_add") or string.str_eq(w, "checked_sub"):
+            return 9
+        if string.str_eq(w, "wrapping_mul") or string.str_eq(w, "saturating_mul") or string.str_eq(w, "checked_mul"):
+            return 10
+        return 0
+    if cursor.kind_is(p, t, "or"):
+        return 1
+    if cursor.kind_is(p, t, "and"):
+        return 2
+    if cursor.kind_is(p, t, "==") or cursor.kind_is(p, t, "!=") or cursor.kind_is(p, t, "<") or cursor.kind_is(p, t, "<=") or cursor.kind_is(p, t, ">") or cursor.kind_is(p, t, ">="):
+        return 4
+    if cursor.kind_is(p, t, "|"):
+        return 5
+    if cursor.kind_is(p, t, "^"):
+        return 6
+    if cursor.kind_is(p, t, "&"):
+        return 7
+    if cursor.kind_is(p, t, "<<") or cursor.kind_is(p, t, ">>"):
+        return 8
+    if cursor.kind_is(p, t, "+") or cursor.kind_is(p, t, "-"):
+        return 9
+    if cursor.kind_is(p, t, "*") or cursor.kind_is(p, t, "/") or cursor.kind_is(p, t, "%"):
+        return 10
+    return 0
+
+fn anchor_from(p: lend cursor.Parser, id: usize, src: usize):
+    s = p.nodes[src]
+    fake = cursor.cur(p)
+    fake.line = s.line
+    fake.col = s.col
+    fake.length = s.length
+    cursor.anchor(p, id, fake)
+
+fn parse_expr(p: lend cursor.Parser, min_prec: i32) -> usize:
+    if p.bad:
+        return 0
+    t = cursor.cur(p)
+    left: usize = 0
+    if cursor.kind_is(p, t, "not"):
+        cursor.advance(p)
+        operand = parse_expr(p, 4)
+        if p.bad:
+            return 0
+        n = ast.blank()
+        n.kind = 43
+        n.s0 = cursor.sid(p, "not")
+        n.c0 = operand
+        left = cursor.push_node(p, n)
+        cursor.anchor(p, left, t)
+    elif cursor.kind_is(p, t, "-") or cursor.kind_is(p, t, "~"):
+        cursor.advance(p)
+        operand2 = parse_expr(p, 11)
+        if p.bad:
+            return 0
+        n2 = ast.blank()
+        n2.kind = 43
+        n2.s0 = cursor.sid(p, p.lx.names.text(t.text))
+        n2.c0 = operand2
+        left = cursor.push_node(p, n2)
+        cursor.anchor(p, left, t)
+    else:
+        left = parse_postfix(p)
+    while not p.bad:
+        t2 = cursor.cur(p)
+        prec = bin_prec(p, t2)
+        if prec == 0 or prec < min_prec:
+            break
+        op = cursor.advance(p)
+        op_s = p.lx.names.text(op.text)
+        if cmp_op(op_s) and p.nodes[left].kind == 44 and cmp_op(cursor.packed_text(p, p.nodes[left].s0)):
+            cursor.fail(p, op.line, op.col, op.length, "Chained comparison operations are not supported.", "Write `a < b and b < c`.", true)
+            return 0
+        right = parse_expr(p, prec + 1)
+        if p.bad:
+            return 0
+        n3 = ast.blank()
+        n3.kind = 44
+        n3.s0 = cursor.sid(p, op_s)
+        n3.c0 = left
+        n3.c1 = right
+        left = cursor.push_node(p, n3)
+        anchor_from(p, left, n3.c0)
+    return left
+
+fn parse_postfix(p: lend cursor.Parser) -> usize:
+    expr = parse_primary(p)
+    while not p.bad and (cursor.at(p, ".") or cursor.at(p, "[") or cursor.at(p, "?")):
+        if cursor.eat(p, "?"):
+            n = ast.blank()
+            n.kind = 55
+            n.c0 = expr
+            id = cursor.push_node(p, n)
+            anchor_from(p, id, expr)
+            expr = id
+        elif cursor.at(p, ".") and (cursor.kind_is(p, cursor.peek_at(p, 1), "INT") or cursor.kind_is(p, cursor.peek_at(p, 1), "FLOAT")):
+            cursor.advance(p)
+            num = cursor.advance(p)
+            text = p.lx.names.text(num.text)
+            part = string.new()
+            i: usize = 0
+            bad_part = false
+            while i <= text.len:
+                cut = false
+                if i == text.len or text[i] == 46:
+                    cut = true
+                if cut:
+                    if part.as_str().len == 0:
+                        bad_part = true
+                    j: usize = 0
+                    while j < part.as_str().len:
+                        if part.as_str()[j] < 48 or part.as_str()[j] > 57:
+                            bad_part = true
+                        j += 1
+                    if bad_part:
+                        cursor.fail(p, num.line, num.col, num.length, "Invalid tuple index.", "", false)
+                        return 0
+                    field = string.new()
+                    field.append_str("f")
+                    field.append_str(part.as_str())
+                    n2 = ast.blank()
+                    n2.kind = 42
+                    n2.c0 = expr
+                    n2.s0 = cursor.sid(p, field.as_str())
+                    id2 = cursor.push_node(p, n2)
+                    anchor_from(p, id2, expr)
+                    expr = id2
+                    part = string.new()
+                else:
+                    part.append_byte(text[i])
+                i += 1
+        elif cursor.eat(p, "."):
+            if not cursor.expect_kind(p, "NAME", "Expected field or method name after `.`", "", false):
+                return 0
+            name = p.lx.tokens[p.pos - 1]
+            if p.nodes[expr].kind == 41 and cursor.at(p, "["):
+                br = bracket_scan(p, p.pos)
+                after_paren = false
+                if br.close >= 0:
+                    nxt = p.lx.tokens[usize(br.close) + 1]
+                    after_paren = cursor.kind_is(p, nxt, "(")
+                if after_paren:
+                    call = qualified_call(p, expr, name)
+                    if call != 0:
+                        expr = call
+                        continue
+            if cursor.at(p, "("):
+                args = List[usize]()
+                parse_args(p, args)
+                if p.bad:
+                    return 0
+                sp = cursor.flush(p, args)
+                n3 = ast.blank()
+                n3.kind = 50
+                n3.c0 = expr
+                n3.s0 = cursor.sid(p, p.lx.names.text(name.text))
+                n3.lo = sp.lo
+                n3.hi = sp.hi
+                id3 = cursor.push_node(p, n3)
+                anchor_from(p, id3, expr)
+                expr = id3
+            else:
+                n4 = ast.blank()
+                n4.kind = 42
+                n4.c0 = expr
+                n4.s0 = cursor.sid(p, p.lx.names.text(name.text))
+                id4 = cursor.push_node(p, n4)
+                anchor_from(p, id4, expr)
+                expr = id4
+        else:
+            expr = index_suffix(p, expr)
+    return expr
+
+fn index_suffix(p: lend cursor.Parser, obj: usize) -> usize:
+    if p.bad:
+        return 0
+    cursor.advance(p)
+    if cursor.at(p, "..") or cursor.at(p, "..="):
+        range_tok = cursor.advance(p)
+        inclusive = cursor.kind_is(p, range_tok, "..=")
+        end: usize = 0
+        if not cursor.at(p, "]"):
+            end = parse_expr(p, 0)
+        cursor.expect_kind(p, "]", "Expected `]`", "", false)
+        if p.bad:
+            return 0
+        n = ast.blank()
+        n.kind = 56
+        n.c0 = obj
+        n.c2 = end
+        n.f0 = inclusive
+        id = cursor.push_node(p, n)
+        anchor_from(p, id, obj)
+        return id
+    first = parse_expr(p, 0)
+    if cursor.at(p, "..") or cursor.at(p, "..="):
+        range_tok2 = cursor.advance(p)
+        inclusive2 = cursor.kind_is(p, range_tok2, "..=")
+        end2: usize = 0
+        if not cursor.at(p, "]"):
+            end2 = parse_expr(p, 0)
+        cursor.expect_kind(p, "]", "Expected `]`", "", false)
+        if p.bad:
+            return 0
+        n2 = ast.blank()
+        n2.kind = 56
+        n2.c0 = obj
+        n2.c1 = first
+        n2.c2 = end2
+        n2.f0 = inclusive2
+        id2 = cursor.push_node(p, n2)
+        anchor_from(p, id2, obj)
+        return id2
+    cursor.expect_kind(p, "]", "Expected `]`", "", false)
+    if p.bad:
+        return 0
+    n3 = ast.blank()
+    n3.kind = 53
+    n3.c0 = obj
+    n3.c1 = first
+    id3 = cursor.push_node(p, n3)
+    anchor_from(p, id3, obj)
+    return id3
+
+fn bracket_scan(p: read cursor.Parser, open_pos: usize) -> Brack:
+    depth: i32 = 0
+    comma = false
+    i = open_pos
+    while i < p.lx.tokens.len:
+        k = p.lx.tokens[i]
+        if cursor.kind_is(p, k, "(") or cursor.kind_is(p, k, "[") or cursor.kind_is(p, k, "{"):
+            depth += 1
+        elif cursor.kind_is(p, k, ")") or cursor.kind_is(p, k, "]") or cursor.kind_is(p, k, "}"):
+            depth -= 1
+            if depth == 0:
+                if cursor.kind_is(p, k, "]"):
+                    return Brack{ close: i32(i), comma: comma }
+                return Brack{ close: -1, comma: comma }
+        elif cursor.kind_is(p, k, ",") and depth == 1:
+            comma = true
+        elif cursor.kind_is(p, k, "NEWLINE") or cursor.kind_is(p, k, "EOF"):
+            break
+        i += 1
+    return Brack{ close: -1, comma: false }
+
+fn bracketed_name(p: lend cursor.Parser, name: lex.Token) -> usize:
+    open_pos = p.pos
+    br = bracket_scan(p, open_pos)
+    after = ""
+    if br.close >= 0:
+        nxt = p.lx.tokens[usize(br.close) + 1]
+        if cursor.kind_is(p, nxt, "("):
+            after = "("
+        elif cursor.kind_is(p, nxt, "{"):
+            after = "{"
+        elif cursor.kind_is(p, nxt, "."):
+            after = "."
+    if br.comma or string.str_eq(after, "(") or string.str_eq(after, "{"):
+        sp = ty.type_args(p)
+        if p.bad:
+            return 0
+        if cursor.at(p, "("):
+            args = List[usize]()
+            parse_args(p, args)
+            if p.bad:
+                return 0
+            asp = cursor.flush(p, args)
+            n = ast.blank()
+            n.kind = 49
+            n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+            n.lo = asp.lo
+            n.hi = asp.hi
+            n.lo2 = sp.lo
+            n.hi2 = sp.hi
+            id = cursor.push_node(p, n)
+            cursor.anchor(p, id, name)
+            return id
+        if cursor.at(p, "{"):
+            return struct_lit(p, name, sp, 0)
+        n2 = ast.blank()
+        n2.kind = 54
+        n2.s0 = cursor.sid(p, p.lx.names.text(name.text))
+        n2.lo = sp.lo
+        n2.hi = sp.hi
+        id2 = cursor.push_node(p, n2)
+        cursor.anchor(p, id2, name)
+        return id2
+    base_n = ast.blank()
+    base_n.kind = 41
+    base_n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    base = cursor.push_node(p, base_n)
+    cursor.anchor(p, base, name)
+    m = cursor.here(p)
+    node = index_suffix(p, base)
+    if p.bad:
+        cursor.rewind(p, m)
+        m2 = cursor.here(p)
+        ty.type_args(p)
+        ok = not p.bad
+        cursor.rewind(p, m2)
+        if not ok:
+            return index_suffix(p, base)
+        sp2 = ty.type_args(p)
+        if p.bad:
+            return 0
+        n3 = ast.blank()
+        n3.kind = 54
+        n3.s0 = cursor.sid(p, p.lx.names.text(name.text))
+        n3.lo = sp2.lo
+        n3.hi = sp2.hi
+        id3 = cursor.push_node(p, n3)
+        cursor.anchor(p, id3, name)
+        return id3
+    return node
+
+fn parse_primary(p: lend cursor.Parser) -> usize:
+    if p.bad:
+        return 0
+    t = cursor.cur(p)
+    if cursor.kind_is(p, t, "INT"):
+        cursor.advance(p)
+        n = ast.blank()
+        n.kind = 35
+        n.s0 = cursor.sid(p, p.lx.names.text(t.text))
+        id = cursor.push_node(p, n)
+        cursor.anchor(p, id, t)
+        return id
+    if cursor.kind_is(p, t, "FLOAT"):
+        cursor.advance(p)
+        n2 = ast.blank()
+        n2.kind = 36
+        n2.s0 = cursor.sid(p, p.lx.names.text(t.text))
+        id2 = cursor.push_node(p, n2)
+        cursor.anchor(p, id2, t)
+        return id2
+    if cursor.kind_is(p, t, "STRING"):
+        cursor.advance(p)
+        n3 = ast.blank()
+        n3.kind = 37
+        n3.s0 = cursor.sid(p, p.lx.names.text(t.text))
+        id3 = cursor.push_node(p, n3)
+        cursor.anchor(p, id3, t)
+        return id3
+    if cursor.kind_is(p, t, "FSTRING"):
+        cursor.advance(p)
+        return parse_fstring(p, t)
+    if cursor.kind_is(p, t, "CHAR"):
+        cursor.advance(p)
+        v: i64 = 0
+        match string.parse_i64(p.lx.names.text(t.text)):
+            Valid(x):
+                v = x
+            None:
+                v = 0
+        n4 = ast.blank()
+        n4.kind = 40
+        n4.i0 = v
+        id4 = cursor.push_node(p, n4)
+        cursor.anchor(p, id4, t)
+        return id4
+    if cursor.kind_is(p, t, "true") or cursor.kind_is(p, t, "false"):
+        cursor.advance(p)
+        n5 = ast.blank()
+        n5.kind = 39
+        n5.f0 = cursor.kind_is(p, t, "true")
+        id5 = cursor.push_node(p, n5)
+        cursor.anchor(p, id5, t)
+        return id5
+    if cursor.kind_is(p, t, "NAME"):
+        cursor.advance(p)
+        word = p.lx.names.text(t.text)
+        if ty.is_cast_name(word) and cursor.at(p, "("):
+            cursor.advance(p)
+            arg = parse_expr(p, 0)
+            cursor.expect_kind(p, ")", "Expected `)`", "", false)
+            if p.bad:
+                return 0
+            n6 = ast.blank()
+            n6.kind = 45
+            n6.s0 = cursor.sid(p, ty.canon(word))
+            n6.c0 = arg
+            id6 = cursor.push_node(p, n6)
+            cursor.anchor(p, id6, t)
+            return id6
+        if cursor.at(p, "["):
+            return bracketed_name(p, t)
+        if cursor.at(p, "("):
+            args = List[usize]()
+            parse_args(p, args)
+            if p.bad:
+                return 0
+            sp = cursor.flush(p, args)
+            n7 = ast.blank()
+            n7.kind = 49
+            n7.s0 = cursor.sid(p, word)
+            n7.lo = sp.lo
+            n7.hi = sp.hi
+            id7 = cursor.push_node(p, n7)
+            cursor.anchor(p, id7, t)
+            return id7
+        if cursor.at(p, "{"):
+            return struct_lit(p, t, cursor.empty_span(), 0)
+        if cursor.at(p, ".") and cursor.kind_is(p, cursor.peek_at(p, 1), "NAME"):
+            lit = qualified_struct(p, t)
+            if lit != 0:
+                return lit
+        n8 = ast.blank()
+        n8.kind = 41
+        n8.s0 = cursor.sid(p, word)
+        id8 = cursor.push_node(p, n8)
+        cursor.anchor(p, id8, t)
+        return id8
+    if cursor.kind_is(p, t, "["):
+        return parse_array(p, t)
+    if cursor.kind_is(p, t, "("):
+        return parse_paren(p, t)
+    if cursor.kind_is(p, t, "fn"):
+        return parse_lambda(p)
+    if cursor.kind_is(p, t, "if"):
+        return parse_if_expr(p)
+    if cursor.kind_is(p, t, "match"):
+        m = stmt.parse_match(p, true)
+        if p.bad:
+            return 0
+        n9 = ast.blank()
+        n9.kind = 34
+        n9.c0 = m
+        id9 = cursor.push_node(p, n9)
+        cursor.anchor(p, id9, t)
+        return id9
+    if cursor.kind_is(p, t, "copy"):
+        cursor.advance(p)
+        target = parse_expr(p, 8)
+        if p.bad:
+            return 0
+        n10 = ast.blank()
+        n10.kind = 47
+        n10.c0 = target
+        id10 = cursor.push_node(p, n10)
+        cursor.anchor(p, id10, t)
+        return id10
+    if cursor.kind_is(p, t, "read") or cursor.kind_is(p, t, "lend"):
+        cursor.advance(p)
+        target2 = parse_expr(p, 8)
+        if p.bad:
+            return 0
+        n11 = ast.blank()
+        n11.kind = 48
+        n11.s0 = cursor.sid(p, p.lx.names.text(t.text))
+        n11.c0 = target2
+        id11 = cursor.push_node(p, n11)
+        cursor.anchor(p, id11, t)
+        return id11
+    if cursor.kind_is(p, t, "trust"):
+        cursor.advance(p)
+        target3 = parse_postfix(p)
+        if p.bad:
+            return 0
+        if p.nodes[target3].kind != 53:
+            cursor.fail(p, t.line, t.col, t.length, "`trust` can only be applied to an indexing expression, e.g. `trust items[i]`.", "", false)
+            return 0
+        n12 = p.nodes[target3]
+        n12.f0 = true
+        p.nodes[target3] = n12
+        return target3
+    if cursor.kind_is(p, t, "soa"):
+        cursor.advance(p)
+        tr = ty.parse_type(p, "variable")
+        if cursor.at(p, "("):
+            cursor.advance(p)
+            cursor.expect_kind(p, ")", "Expected `)`", "", false)
+        if p.bad:
+            return 0
+        n13 = ast.blank()
+        n13.kind = 46
+        n13.c0 = tr
+        id13 = cursor.push_node(p, n13)
+        cursor.anchor(p, id13, t)
+        return id13
+    if cursor.kind_is(p, t, "consume"):
+        cursor.fail(p, t.line, t.col, t.length, "`consume` can only be used in a parameter definition.", "Ownership moves when the parameter is `consume`, or when a move type is assigned.", true)
+        return 0
+    full = string.new()
+    full.append_str("Expected expression (found ")
+    cursor.describe(p, t, full)
+    full.append_str(").")
+    cursor.fail(p, t.line, t.col, t.length, full.as_str(), "", false)
+    return 0
+
+fn parse_array(p: lend cursor.Parser, start_tok: lex.Token) -> usize:
+    cursor.advance(p)
+    if cursor.eat(p, "]"):
+        n = ast.blank()
+        n.kind = 57
+        id = cursor.push_node(p, n)
+        cursor.anchor(p, id, start_tok)
+        return id
+    first = parse_expr(p, 0)
+    if cursor.eat(p, ";"):
+        count = parse_expr(p, 0)
+        cursor.expect_kind(p, "]", "Expected `]`", "", false)
+        if p.bad:
+            return 0
+        n2 = ast.blank()
+        n2.kind = 58
+        n2.c0 = first
+        n2.c1 = count
+        id2 = cursor.push_node(p, n2)
+        cursor.anchor(p, id2, start_tok)
+        return id2
+    elems = List[usize]()
+    elems.push(first)
+    while not p.bad and cursor.eat(p, ","):
+        if cursor.at(p, "]"):
+            break
+        elems.push(parse_expr(p, 0))
+    cursor.expect_kind(p, "]", "Expected `]`", "", false)
+    if p.bad:
+        return 0
+    sp = cursor.flush(p, elems)
+    n3 = ast.blank()
+    n3.kind = 57
+    n3.lo = sp.lo
+    n3.hi = sp.hi
+    id3 = cursor.push_node(p, n3)
+    cursor.anchor(p, id3, start_tok)
+    return id3
+
+fn parse_paren(p: lend cursor.Parser, t: lex.Token) -> usize:
+    cursor.advance(p)
+    inner = parse_expr(p, 0)
+    if cursor.at(p, ","):
+        elems = List[usize]()
+        elems.push(inner)
+        while not p.bad and cursor.eat(p, ","):
+            if cursor.at(p, ")"):
+                break
+            elems.push(parse_expr(p, 0))
+        cursor.expect_kind(p, ")", "Expected `)`", "", false)
+        if p.bad:
+            return 0
+        if elems.len < 2 or elems.len > 6:
+            cursor.fail(p, t.line, t.col, t.length, "Tuples must have 2 to 6 elements.", "", false)
+            return 0
+        inits = List[usize]()
+        i: usize = 0
+        while i < elems.len:
+            fname = string.new()
+            fname.append_str("f")
+            fname.append_i64(i64(i))
+            f = ast.blank()
+            f.kind = 51
+            f.s0 = cursor.sid(p, fname.as_str())
+            f.c0 = elems[i]
+            f.s1 = p.z
+            fid = cursor.push_node(p, f)
+            anchor_from(p, fid, elems[i])
+            inits.push(fid)
+            i += 1
+        sp = cursor.flush(p, inits)
+        tn = string.new()
+        tn.append_str("Tuple")
+        tn.append_i64(i64(elems.len))
+        n = ast.blank()
+        n.kind = 52
+        n.s0 = cursor.sid(p, tn.as_str())
+        n.lo = sp.lo
+        n.hi = sp.hi
+        id = cursor.push_node(p, n)
+        cursor.anchor(p, id, t)
+        return id
+    cursor.expect_kind(p, ")", "Expected `)`", "", false)
+    return inner
+
+fn parse_args(p: lend cursor.Parser, args: lend List[usize]):
+    cursor.expect_kind(p, "(", "Expected `(`", "", false)
+    if p.bad:
+        return
+    if not cursor.at(p, ")"):
+        while not p.bad:
+            args.push(parse_expr(p, 0))
+            if not cursor.eat(p, ","):
+                break
+    cursor.expect_kind(p, ")", "Expected `)`", "Separate arguments with commas and close with `)`.", true)
+
+fn struct_lit(p: lend cursor.Parser, name: lex.Token, targs: cursor.Span, qual: usize) -> usize:
+    cursor.expect_kind(p, "{", "Expected `{`", "", false)
+    inits = List[usize]()
+    while not p.bad and not cursor.at(p, "}") and not cursor.at(p, "EOF"):
+        if not cursor.expect_kind(p, "NAME", "Expected field name", "Write in the form `Type{ field: value, ... }`.", true):
+            return 0
+        fname = p.lx.tokens[p.pos - 1]
+        cursor.expect_kind(p, ":", "Expected `:` after field name", "", false)
+        value = parse_expr(p, 0)
+        if p.bad:
+            return 0
+        f = ast.blank()
+        f.kind = 51
+        f.s0 = cursor.sid(p, p.lx.names.text(fname.text))
+        f.c0 = value
+        f.s1 = p.z
+        fid = cursor.push_node(p, f)
+        cursor.anchor(p, fid, fname)
+        inits.push(fid)
+        if not cursor.eat(p, ","):
+            if not cursor.at(p, "}") and not (cursor.at(p, "NAME") and cursor.kind_is(p, cursor.peek_at(p, 1), ":")):
+                full = string.new()
+                full.append_str("Expected `,` or `}` (found ")
+                cursor.describe(p, cursor.cur(p), full)
+                full.append_str(").")
+                cursor.fail_here(p, full.as_str(), "", false)
+                return 0
+    cursor.expect_kind(p, "}", "Expected `}`", "", false)
+    if p.bad:
+        return 0
+    sp = cursor.flush(p, inits)
+    n = ast.blank()
+    n.kind = 52
+    n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    n.lo = sp.lo
+    n.hi = sp.hi
+    n.lo2 = targs.lo
+    n.hi2 = targs.hi
+    n.s1 = qual
+    id = cursor.push_node(p, n)
+    cursor.anchor(p, id, name)
+    return id
+
+fn qualified_call(p: lend cursor.Parser, mod_id: usize, name: lex.Token) -> usize:
+    m = cursor.here(p)
+    sp = ty.type_args(p)
+    if p.bad or not cursor.at(p, "("):
+        cursor.rewind(p, m)
+        return 0
+    args = List[usize]()
+    parse_args(p, args)
+    if p.bad:
+        cursor.rewind(p, m)
+        return 0
+    asp = cursor.flush(p, args)
+    n = ast.blank()
+    n.kind = 49
+    n.s0 = cursor.sid(p, p.lx.names.text(name.text))
+    n.lo = asp.lo
+    n.hi = asp.hi
+    n.lo2 = sp.lo
+    n.hi2 = sp.hi
+    n.s1 = p.nodes[mod_id].s0
+    id = cursor.push_node(p, n)
+    anchor_from(p, id, mod_id)
+    return id
+
+fn qualified_struct(p: lend cursor.Parser, mod: lex.Token) -> usize:
+    m = cursor.here(p)
+    cursor.advance(p)
+    if not cursor.expect_kind(p, "NAME", "Expected type name after `.`", "", false):
+        cursor.rewind(p, m)
+        return 0
+    member = p.lx.tokens[p.pos - 1]
+    targs = cursor.empty_span()
+    if cursor.at(p, "["):
+        br = bracket_scan(p, p.pos)
+        after_brace = false
+        if br.close >= 0:
+            nxt = p.lx.tokens[usize(br.close) + 1]
+            after_brace = cursor.kind_is(p, nxt, "{")
+        if not after_brace:
+            cursor.rewind(p, m)
+            return 0
+        targs = ty.type_args(p)
+        if p.bad:
+            cursor.rewind(p, m)
+            return 0
+    if not cursor.at(p, "{"):
+        cursor.rewind(p, m)
+        return 0
+    id = struct_lit(p, member, targs, cursor.sid(p, p.lx.names.text(mod.text)))
+    if p.bad:
+        return 0
+    n = p.nodes[id]
+    n.line = mod.line
+    n.col = mod.col
+    p.nodes[id] = n
+    return id
+
+fn parse_if_expr(p: lend cursor.Parser) -> usize:
+    start = cursor.advance(p)
+    branches = List[usize]()
+    kw = start
+    while not p.bad:
+        cond = parse_expr(p, 0)
+        cursor.expect_kind(p, "then", "Expected `then` after condition in `if` expression", "Write in the form `if cond then a else b`.", true)
+        first = cursor.cur(p)
+        value = parse_expr(p, 0)
+        if p.bad:
+            return 0
+        y = ast.blank()
+        y.kind = 30
+        y.c0 = value
+        yid = cursor.push_node(p, y)
+        cursor.anchor(p, yid, first)
+        body = List[usize]()
+        body.push(yid)
+        bsp = cursor.flush(p, body)
+        br = ast.blank()
+        br.kind = 16
+        br.c0 = cond
+        br.lo = bsp.lo
+        br.hi = bsp.hi
+        bid = cursor.push_node(p, br)
+        cursor.header(p, bid, kw)
+        branches.push(bid)
+        if cursor.at(p, "elif"):
+            kw = cursor.advance(p)
+            continue
+        break
+    if not cursor.at(p, "else"):
+        cursor.fail_here(p, "`if` expression cannot produce a value without `else`.", "Write in the form `if cond then a else b`.", true)
+        return 0
+    cursor.advance(p)
+    first2 = cursor.cur(p)
+    value2 = parse_expr(p, 0)
+    if p.bad:
+        return 0
+    y2 = ast.blank()
+    y2.kind = 30
+    y2.c0 = value2
+    yid2 = cursor.push_node(p, y2)
+    cursor.anchor(p, yid2, first2)
+    else_body = List[usize]()
+    else_body.push(yid2)
+    esp = cursor.flush(p, else_body)
+    bsp2 = cursor.flush(p, branches)
+    iff = ast.blank()
+    iff.kind = 15
+    iff.lo = bsp2.lo
+    iff.hi = bsp2.hi
+    iff.f0 = true
+    iff.lo2 = esp.lo
+    iff.hi2 = esp.hi
+    iid = cursor.push_node(p, iff)
+    cursor.header(p, iid, start)
+    blk = ast.blank()
+    blk.kind = 34
+    blk.c0 = iid
+    id = cursor.push_node(p, blk)
+    cursor.anchor(p, id, start)
+    return id
+
+fn parse_lambda(p: lend cursor.Parser) -> usize:
+    start = cursor.advance(p)
+    cursor.expect_kind(p, "(", "Expected `(` after `fn` in lambda", "", false)
+    params = List[usize]()
+    if not p.bad and not cursor.at(p, ")"):
+        while not p.bad:
+            params.push(ty.parse_param(p))
+            if not cursor.eat(p, ","):
+                break
+    cursor.expect_kind(p, ")", "Expected `)`", "", false)
+    ret: usize = 0
+    if not p.bad and cursor.eat(p, "->"):
+        ret = ty.parse_type(p, "return")
+    cursor.expect_kind(p, "=>", "Expected `=>` in lambda", "Write in the form `fn(x: i32) -> i32 => x + 1`.", true)
+    body_expr = parse_expr(p, 0)
+    if p.bad:
+        return 0
+    body = List[usize]()
+    if ret != 0:
+        rn = ast.blank()
+        rn.kind = 20
+        rn.c0 = body_expr
+        rid = cursor.push_node(p, rn)
+        anchor_from(p, rid, body_expr)
+        body.push(rid)
+    else:
+        bk = p.nodes[body_expr].kind
+        if bk != 49 and bk != 50:
+            cursor.fail(p, p.nodes[body_expr].line, p.nodes[body_expr].col, p.nodes[body_expr].length, "A lambda without `->` must be a call (no result).", "Add a result type: `fn(x: i32) -> i32 => x + 1`.", true)
+            return 0
+        es = ast.blank()
+        es.kind = 28
+        es.c0 = body_expr
+        eid = cursor.push_node(p, es)
+        anchor_from(p, eid, body_expr)
+        body.push(eid)
+    psp = cursor.flush(p, params)
+    bsp = cursor.flush(p, body)
+    p.lambda_counter += 1
+    nm = string.new()
+    nm.append_str("__lambda_0_")
+    nm.append_i64(i64(p.lambda_counter))
+    fd = ast.blank()
+    fd.kind = 9
+    fd.s0 = cursor.sid(p, nm.as_str())
+    fd.lo = psp.lo
+    fd.hi = psp.hi
+    fd.c0 = ret
+    fd.lo2 = bsp.lo
+    fd.hi2 = bsp.hi
+    fd.s3 = p.z
+    did = cursor.push_node(p, fd)
+    cursor.header(p, did, start)
+    p.lifted.push(did)
+    nn = ast.blank()
+    nn.kind = 41
+    nn.s0 = fd.s0
+    nid = cursor.push_node(p, nn)
+    cursor.anchor(p, nid, start)
+    return nid
+
+fn repack(dst: lend cursor.Parser, src: read cursor.Parser, packed: usize) -> usize:
+    if packed == 0:
+        return 0
+    return cursor.sid(dst, cursor.packed_text(src, packed))
+
+fn graft_span(dst: lend cursor.Parser, src: read cursor.Parser, lo: usize, hi: usize) -> cursor.Span:
+    tmp = List[usize]()
+    i = lo
+    while i < hi:
+        tmp.push(graft(dst, src, src.ids[i]))
+        i += 1
+    return cursor.flush(dst, tmp)
+
+fn graft(dst: lend cursor.Parser, src: read cursor.Parser, id: usize) -> usize:
+    if id == 0:
+        return 0
+    m = src.nodes[id]
+    c0 = m.c0
+    c1 = m.c1
+    c2 = m.c2
+    c3 = m.c3
+    lo = m.lo
+    hi = m.hi
+    lo2 = m.lo2
+    hi2 = m.hi2
+    lo3 = m.lo3
+    hi3 = m.hi3
+    m.s0 = repack(dst, src, m.s0)
+    m.s1 = repack(dst, src, m.s1)
+    m.s2 = repack(dst, src, m.s2)
+    m.s3 = repack(dst, src, m.s3)
+    m.s4 = repack(dst, src, m.s4)
+    m.c0 = graft(dst, src, c0)
+    m.c1 = graft(dst, src, c1)
+    m.c2 = graft(dst, src, c2)
+    m.c3 = graft(dst, src, c3)
+    sp = graft_span(dst, src, lo, hi)
+    sp2 = graft_span(dst, src, lo2, hi2)
+    sp3 = graft_span(dst, src, lo3, hi3)
+    m.lo = sp.lo
+    m.hi = sp.hi
+    m.lo2 = sp2.lo
+    m.hi2 = sp2.hi
+    m.lo3 = sp3.lo
+    m.hi3 = sp3.hi
+    m.bk0 = 0
+    m.bk1 = 0
+    return cursor.push_node(dst, m)
+
+fn parse_fstring(p: lend cursor.Parser, tok: lex.Token) -> usize:
+    text = p.lx.names.text(tok.text)
+    parts = List[usize]()
+    buf = string.new()
+    i: usize = 0
+    while i < text.len:
+        if i + 1 < text.len and text[i] == 123 and text[i + 1] == 123:
+            buf.append_byte(123)
+            i += 2
+            continue
+        if i + 1 < text.len and text[i] == 125 and text[i + 1] == 125:
+            buf.append_byte(125)
+            i += 2
+            continue
+        if text[i] == 123:
+            if buf.as_str().len > 0:
+                sn = ast.blank()
+                sn.kind = 37
+                sn.s0 = cursor.sid(p, buf.as_str())
+                sid = cursor.push_node(p, sn)
+                cursor.anchor(p, sid, tok)
+                parts.push(sid)
+                buf = string.new()
+            j = i + 1
+            depth: i32 = 1
+            while j < text.len and depth > 0:
+                if text[j] == 34:
+                    j += 1
+                    while j < text.len and text[j] != 34:
+                        if text[j] == 92 and j + 1 < text.len:
+                            j += 2
+                        else:
+                            j += 1
+                    if j < text.len:
+                        j += 1
+                    continue
+                if text[j] == 39:
+                    j += 1
+                    while j < text.len and text[j] != 39:
+                        if text[j] == 92 and j + 1 < text.len:
+                            j += 2
+                        else:
+                            j += 1
+                    if j < text.len:
+                        j += 1
+                    continue
+                if text[j] == 123:
+                    depth += 1
+                elif text[j] == 125:
+                    depth -= 1
+                j += 1
+            if depth != 0:
+                cursor.soft(p, tok.line, tok.col + i32(i), 1, "Unclosed `{` in formatted string literal.", "Add matching `}`.", true)
+                break
+            inner = string.substr(text, i + 1, j - 1)
+            trimmed = string.str_trim(inner)
+            if trimmed.len == 0:
+                cursor.soft(p, tok.line, tok.col + i32(i), 1, "Empty expression in formatted string literal `{}`.", "Provide an expression to format, e.g. `{var}`.", true)
+            else:
+                src = string.new()
+                src.append_str(trimmed)
+                child_lx = lex.lexer_new(src.as_str())
+                child_lx.run()
+                lex_n = child_lx.diags.len
+                child = cursor.parser_new(child_lx)
+                if lex_n == 0:
+                    inner_id = parse_expr(child, 0)
+                    if not child.bad and inner_id != 0:
+                        gid = graft(p, child, inner_id)
+                        parts.push(gid)
+                d: usize = 0
+                while d < child.lx.diags.len:
+                    item = child.lx.diags[d]
+                    msg = child.lx.names.text(item.msg)
+                    hint = child.lx.names.text(item.hint)
+                    col = item.col
+                    if d < lex_n:
+                        col = tok.col + i32(i) + item.col
+                    cursor.push_diag(p, tok.line, col, item.length, msg, hint, item.has_hint, false, "", 0, 0, 0, 0, "")
+                    d += 1
+            i = j
+            continue
+        buf.append_byte(text[i])
+        i += 1
+    if buf.as_str().len > 0:
+        sn2 = ast.blank()
+        sn2.kind = 37
+        sn2.s0 = cursor.sid(p, buf.as_str())
+        sid2 = cursor.push_node(p, sn2)
+        cursor.anchor(p, sid2, tok)
+        parts.push(sid2)
+    if parts.len == 0:
+        sn3 = ast.blank()
+        sn3.kind = 37
+        sn3.s0 = p.z
+        sid3 = cursor.push_node(p, sn3)
+        cursor.anchor(p, sid3, tok)
+        parts.push(sid3)
+    sp = cursor.flush(p, parts)
+    fs = ast.blank()
+    fs.kind = 38
+    fs.lo = sp.lo
+    fs.hi = sp.hi
+    id = cursor.push_node(p, fs)
+    cursor.anchor(p, id, tok)
+    return id

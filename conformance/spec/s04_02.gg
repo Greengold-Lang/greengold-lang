@@ -1,0 +1,22 @@
+# conformance: SPEC section 4 (Functions), example 2
+# expect-output:
+#   2
+#   2
+
+struct Counter:
+    value: i32
+
+fn show(c: Counter):
+    print(c.value)
+
+fn bump(c: lend Counter):
+    c.value += 1
+
+fn finish(c: consume Counter):
+    print(c.value)
+
+fn main():
+    c = Counter{ value: 1 }
+    bump(c)
+    show(c)
+    finish(c)

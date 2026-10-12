@@ -1,0 +1,17 @@
+# conformance: SPEC section 7 (Structs, methods, enums), example 6
+# expect-output:
+#   work
+#   close 2
+#   close 1
+
+struct Fd:
+    n: i32
+
+impl Fd:
+    fn drop(self: lend Self):
+        print(f"close {self.n}")
+
+fn main():
+    a = Fd{ n: 1 }
+    b = Fd{ n: 2 }
+    print("work")

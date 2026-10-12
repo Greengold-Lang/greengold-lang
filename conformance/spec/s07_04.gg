@@ -1,0 +1,15 @@
+# conformance: SPEC section 7 (Structs, methods, enums), example 4
+# expect-output:
+#   2
+
+fn label(n: i32) -> i32:
+    match n:
+        0 | 1:
+            return 1
+        2..=4:
+            return 2
+        _:
+            return 0
+
+fn main():
+    print(label(3))

@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: a view that outlives its owner
+# expect-error: GG0315 at line 8
+
+fn main():
+    t = "x"
+    if true:
+        s = string.from("a")
+        t = s.as_str()
+    print(t)

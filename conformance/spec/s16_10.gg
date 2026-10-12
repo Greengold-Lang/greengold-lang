@@ -1,0 +1,7 @@
+# conformance: SPEC section 16 (Imports and the library), example 10
+# stdin: abc
+# expect-output:
+#   abc
+
+fn main():
+    print(input())

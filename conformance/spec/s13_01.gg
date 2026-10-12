@@ -1,0 +1,7 @@
+# conformance: SPEC section 13 (Expressions), example 1
+# expect-output:
+#   9
+
+fn main():
+    n = 2
+    print(if n == 0 then 0 elif n == 1 then 1 else 9)

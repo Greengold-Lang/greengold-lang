@@ -1,0 +1,7 @@
+# conformance: SPEC section 17, rejected form: `[value; count]` with a moved value
+# expect-error: GG0301 at line 6
+
+fn main():
+    s = string.from("a")
+    xs = [s; 2]
+    print(xs)

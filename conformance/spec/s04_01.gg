@@ -1,0 +1,9 @@
+# conformance: SPEC section 4 (Functions), example 1
+# expect-output:
+#   5
+
+fn add(a: i32, b: i32) -> i32:
+    return a + b
+
+fn main():
+    print(add(2, 3))

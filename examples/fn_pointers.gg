@@ -1,0 +1,28 @@
+﻿type BinOp = fn(i32, i32) -> i32
+
+struct Button:
+    id: i32
+    on_click: fn(i32)
+
+fn add(a: i32, b: i32) -> i32:
+    return a + b
+
+fn twice(f: fn(i32) -> i32, x: i32) -> i32:
+    return f(f(x))
+
+fn apply(op: BinOp, a: i32, b: i32) -> i32:
+    return op(a, b)
+
+fn hello(id: i32):
+    print("clicked", id)
+
+fn main():
+    print(apply(add, 3, 4))
+    print(apply(fn(a: i32, b: i32) -> i32 => a * b, 3, 4))
+    print(twice(fn(x: i32) -> i32 => x + 10, 1))
+    f = add
+    print(f(1, 2))
+    btn = Button{ id: 7, on_click: hello }
+    btn.on_click(btn.id)
+    g = fn(s: str) => print(s)
+    g("lambda ok")

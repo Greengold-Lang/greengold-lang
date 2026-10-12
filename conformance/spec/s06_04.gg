@@ -1,0 +1,8 @@
+# conformance: SPEC section 6 (Statements), example 4
+# expect-output:
+#   1
+#   2
+
+fn main():
+    defer print(2)
+    print(1)

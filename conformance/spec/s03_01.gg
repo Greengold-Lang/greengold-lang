@@ -1,0 +1,11 @@
+# conformance: SPEC section 3 (Bindings), example 1
+# expect-output:
+#   5 7 10
+
+fn main():
+    fixed limit = 10
+    x = 5
+    y = 5
+    y = 6
+    y += 1
+    print(x, y, limit)

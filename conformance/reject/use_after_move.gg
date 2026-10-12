@@ -1,0 +1,10 @@
+# conformance: SPEC section 17, rejected form: using a name after it was moved
+# expect-error: GG0301 at line 10
+
+fn take(xs: consume List[i32]):
+    pass
+
+fn main():
+    xs = List[i32]()
+    take(xs)
+    print(xs.len)

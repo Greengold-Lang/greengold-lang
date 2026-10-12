@@ -1,0 +1,534 @@
+{
+  "fib": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.545374300000276,
+      "binary_size_kb": 63.9609375,
+      "median_ms": 252.99249999989115,
+      "mean_ms": 258.99332000008144,
+      "peak_mem_mb": 5.02734375,
+      "output": "165580141"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.24573019999979806,
+      "binary_size_kb": 137.0,
+      "median_ms": 358.91250000031505,
+      "mean_ms": 382.85160000014,
+      "peak_mem_mb": 4.546875,
+      "output": "165580141"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.4304469999997309,
+      "binary_size_kb": 58.3359375,
+      "median_ms": 26.15990000003876,
+      "mean_ms": 30.138799999986077,
+      "peak_mem_mb": 4.4375,
+      "output": "165580141"
+    }
+  },
+  "collatz": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.39287140000033105,
+      "binary_size_kb": 59.3779296875,
+      "median_ms": 468.8611999999921,
+      "mean_ms": 474.7865999998794,
+      "peak_mem_mb": 4.9921875,
+      "output": "3732423\n596"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.16353570000001127,
+      "binary_size_kb": 128.0,
+      "median_ms": 406.74970000009125,
+      "mean_ms": 421.8648799999755,
+      "peak_mem_mb": 4.5234375,
+      "output": "3732423\n596"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.3830975999999282,
+      "binary_size_kb": 58.318359375,
+      "median_ms": 403.7125999998352,
+      "mean_ms": 407.6165599998603,
+      "peak_mem_mb": 4.4375,
+      "output": "3732423\n596"
+    }
+  },
+  "fannkuch": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.41519919999973354,
+      "binary_size_kb": 59.7548828125,
+      "median_ms": 435.75590000000375,
+      "mean_ms": 442.13040000004185,
+      "peak_mem_mb": 4.99609375,
+      "output": "292784\n38"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.19312070000023596,
+      "binary_size_kb": 128.5,
+      "median_ms": 373.39639999981955,
+      "mean_ms": 395.9680199999639,
+      "peak_mem_mb": 4.53515625,
+      "output": "292784\n38"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.43615219999992405,
+      "binary_size_kb": 60.052734375,
+      "median_ms": 370.23750000025757,
+      "mean_ms": 374.17656000015995,
+      "peak_mem_mb": 4.4375,
+      "output": "292784\n38"
+    }
+  },
+  "mandel": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.38433610000038243,
+      "binary_size_kb": 59.7001953125,
+      "median_ms": 317.259599999943,
+      "mean_ms": 323.6245199998848,
+      "peak_mem_mb": 4.9921875,
+      "output": "1632341"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.21281130000033954,
+      "binary_size_kb": 127.5,
+      "median_ms": 318.048699999963,
+      "mean_ms": 350.85591999995813,
+      "peak_mem_mb": 4.52734375,
+      "output": "1632341"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.40214179999975386,
+      "binary_size_kb": 59.5458984375,
+      "median_ms": 319.5987999997669,
+      "mean_ms": 322.80813999987004,
+      "peak_mem_mb": 4.44140625,
+      "output": "1632341"
+    }
+  },
+  "nbody": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.6552467999999863,
+      "binary_size_kb": 65.341796875,
+      "median_ms": 255.83019999976386,
+      "mean_ms": 261.8546599999718,
+      "peak_mem_mb": 5.04296875,
+      "output": "-51022\n15923\n45852"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.22932559999981095,
+      "binary_size_kb": 132.5,
+      "median_ms": 247.8937999999289,
+      "mean_ms": 253.82280000003448,
+      "peak_mem_mb": 4.5703125,
+      "output": "-51022\n15923\n45852"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.6554283000000396,
+      "binary_size_kb": 62.087890625,
+      "median_ms": 266.51959999981045,
+      "mean_ms": 274.4358399999328,
+      "peak_mem_mb": 4.48828125,
+      "output": "-51022\n15923\n45852"
+    }
+  },
+  "spectral": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.5065541999997549,
+      "binary_size_kb": 62.1240234375,
+      "median_ms": 216.585699999996,
+      "mean_ms": 222.31720000008863,
+      "peak_mem_mb": 5.015625,
+      "output": "1122277722"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.19838129999970988,
+      "binary_size_kb": 129.0,
+      "median_ms": 207.726200000252,
+      "mean_ms": 233.08649999999034,
+      "peak_mem_mb": 4.55078125,
+      "output": "1122277722"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.43055679999997665,
+      "binary_size_kb": 59.9208984375,
+      "median_ms": 215.12159999974756,
+      "mean_ms": 217.69257999976617,
+      "peak_mem_mb": 4.45703125,
+      "output": "1122277722"
+    }
+  },
+  "matmul": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.46408340000016324,
+      "binary_size_kb": 63.2119140625,
+      "median_ms": 301.02209999995466,
+      "mean_ms": 312.3665999998593,
+      "peak_mem_mb": 38.40625,
+      "output": "86306145685\n58018\n58672"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.25642640000023675,
+      "binary_size_kb": 130.0,
+      "median_ms": 303.5562000000027,
+      "mean_ms": 333.07704000008016,
+      "peak_mem_mb": 37.96484375,
+      "output": "86306145685\n58018\n58672"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.42051309999988007,
+      "binary_size_kb": 60.7880859375,
+      "median_ms": 295.1034999996409,
+      "mean_ms": 298.2318400000622,
+      "peak_mem_mb": 39.97265625,
+      "output": "86306145685\n58018\n58672"
+    }
+  },
+  "heat": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.46315439999989394,
+      "binary_size_kb": 62.185546875,
+      "median_ms": 129.04329999992115,
+      "mean_ms": 134.5863599999575,
+      "peak_mem_mb": 20.5546875,
+      "output": "9259564379"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.29136000000016793,
+      "binary_size_kb": 130.5,
+      "median_ms": 126.27999999995154,
+      "mean_ms": 182.3145199999999,
+      "peak_mem_mb": 20.12109375,
+      "output": "9259564379"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.43699500000002445,
+      "binary_size_kb": 60.7880859375,
+      "median_ms": 130.18319999991945,
+      "mean_ms": 139.31805999982316,
+      "peak_mem_mb": 21.04296875,
+      "output": "9259564379"
+    }
+  },
+  "monte": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.414910499999678,
+      "binary_size_kb": 59.2763671875,
+      "median_ms": 417.29140000006737,
+      "mean_ms": 423.4927200000129,
+      "peak_mem_mb": 5.00390625,
+      "output": "94241925"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.19307619999972303,
+      "binary_size_kb": 128.0,
+      "median_ms": 383.4014999997635,
+      "mean_ms": 389.6388399998614,
+      "peak_mem_mb": 4.53125,
+      "output": "94241925"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.3895827000001191,
+      "binary_size_kb": 58.318359375,
+      "median_ms": 418.72319999993124,
+      "mean_ms": 422.92462000013984,
+      "peak_mem_mb": 4.43359375,
+      "output": "94241925"
+    }
+  },
+  "fnv": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.435414099999889,
+      "binary_size_kb": 61.4560546875,
+      "median_ms": 295.4828999995698,
+      "mean_ms": 300.90507999984766,
+      "peak_mem_mb": 12.1796875,
+      "output": "16483032082770582304"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.23541309999973237,
+      "binary_size_kb": 128.0,
+      "median_ms": 293.58289999981935,
+      "mean_ms": 322.6287399999819,
+      "peak_mem_mb": 11.73828125,
+      "output": "16483032082770582304"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.3972623999998177,
+      "binary_size_kb": 59.751953125,
+      "median_ms": 295.6905999999435,
+      "mean_ms": 299.75914000006014,
+      "peak_mem_mb": 13.015625,
+      "output": "16483032082770582304"
+    }
+  },
+  "qsort": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.5133367000003091,
+      "binary_size_kb": 63.755859375,
+      "median_ms": 530.1196000000346,
+      "mean_ms": 536.1492400000316,
+      "peak_mem_mb": 35.125,
+      "output": "14\n1073845253\n2147483383\n8590112052113664\n0"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.2368157999999312,
+      "binary_size_kb": 130.5,
+      "median_ms": 494.23239999987345,
+      "mean_ms": 528.7175800000114,
+      "peak_mem_mb": 34.15234375,
+      "output": "14\n1073845253\n2147483383\n8590112052113664\n0"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.45386269999971773,
+      "binary_size_kb": 60.78125,
+      "median_ms": 431.7630000000463,
+      "mean_ms": 433.9219800000137,
+      "peak_mem_mb": 36.55859375,
+      "output": "14\n1073845253\n2147483383\n8590112052113664\n0"
+    }
+  },
+  "dijkstra": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.4697458999999071,
+      "binary_size_kb": 61.9638671875,
+      "median_ms": 189.33919999972204,
+      "mean_ms": 193.6541999999463,
+      "peak_mem_mb": 4.5234375,
+      "output": "251696"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.19340580000016416,
+      "binary_size_kb": 129.0,
+      "median_ms": 214.61839999983567,
+      "mean_ms": 238.206960000025,
+      "peak_mem_mb": 4.07421875,
+      "output": "251696"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.5043151999998372,
+      "binary_size_kb": 60.3173828125,
+      "median_ms": 170.68550000021787,
+      "mean_ms": 181.90402000009271,
+      "peak_mem_mb": 3.96875,
+      "output": "251696"
+    }
+  },
+  "sieve": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.4403769000000466,
+      "binary_size_kb": 61.55859375,
+      "median_ms": 17.18589999973119,
+      "mean_ms": 22.766959999989922,
+      "peak_mem_mb": 11.640625,
+      "output": "539777"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.1789478999999119,
+      "binary_size_kb": 128.0,
+      "median_ms": 18.367600000146922,
+      "mean_ms": 73.36942000010822,
+      "peak_mem_mb": 11.21875,
+      "output": "539777"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.41525080000019443,
+      "binary_size_kb": 59.751953125,
+      "median_ms": 21.508999999696243,
+      "mean_ms": 25.308959999983927,
+      "peak_mem_mb": 12.55859375,
+      "output": "539777"
+    }
+  },
+  "primes": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.36780080000016824,
+      "binary_size_kb": 94.3291015625,
+      "median_ms": 20038.814000000002,
+      "mean_ms": 20038.814000000002,
+      "peak_mem_mb": 4.55078125,
+      "output": "Passes: 31443, Time: 20.000549, Avg: 0.000636, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_cpp;31443;20.000549;1;algorithm=base,faithful=yes,bits=1",
+      "passes": 31443,
+      "passes_per_sec": 1569.1048382404267,
+      "valid": "1",
+      "drag_race_tag": "davepl_cpp;31443;20.000549;1;algorithm=base,faithful=yes,bits=1"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.2070915999997851,
+      "binary_size_kb": 155.0,
+      "median_ms": 20046.2878000003,
+      "mean_ms": 20046.2878000003,
+      "peak_mem_mb": 4.13671875,
+      "output": "Passes: 35826, Time: 20.000753, Avg: 0.000558, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_rust;35826;20.000753;1;algorithm=base,faithful=yes,bits=1",
+      "passes": 35826,
+      "passes_per_sec": 1787.1638059590996,
+      "valid": "1",
+      "drag_race_tag": "davepl_rust;35826;20.000753;1;algorithm=base,faithful=yes,bits=1"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.46482049999985975,
+      "binary_size_kb": 60.677734375,
+      "median_ms": 20027.366899999834,
+      "mean_ms": 20027.366899999834,
+      "peak_mem_mb": 4.3984375,
+      "output": "Passes: 34027, Time: 20.000221, Avg: 0.000588, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_gg;34027;20.000221;1;algorithm=base,faithful=yes,bits=1",
+      "passes": 34027,
+      "passes_per_sec": 1699.0251474346476,
+      "valid": "1",
+      "drag_race_tag": "davepl_gg;34027;20.000221;1;algorithm=base,faithful=yes,bits=1"
+    }
+  },
+  "vector": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.458075000000008,
+      "binary_size_kb": 61.466796875,
+      "median_ms": 91.27770000031887,
+      "mean_ms": 94.599400000061,
+      "peak_mem_mb": 261.03125,
+      "output": "20000000\n199999990000000"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.20693149999988236,
+      "binary_size_kb": 128.5,
+      "median_ms": 92.94169999975566,
+      "mean_ms": 97.91055999994569,
+      "peak_mem_mb": 260.62109375,
+      "output": "20000000\n199999990000000"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.44738009999991846,
+      "binary_size_kb": 59.751953125,
+      "median_ms": 92.75530000013532,
+      "mean_ms": 101.05190000003859,
+      "peak_mem_mb": 260.5703125,
+      "output": "20000000\n199999990000000"
+    }
+  },
+  "trees": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.9008102000002509,
+      "binary_size_kb": 110.6025390625,
+      "median_ms": 525.0484999996843,
+      "mean_ms": 515.216799999962,
+      "peak_mem_mb": 8.21484375,
+      "output": "5242880"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.17974490000005972,
+      "binary_size_kb": 129.0,
+      "median_ms": 532.9453999997895,
+      "mean_ms": 544.8045800000727,
+      "peak_mem_mb": 7.6875,
+      "output": "5242880"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.41019939999978305,
+      "binary_size_kb": 60.6728515625,
+      "median_ms": 476.5646000000743,
+      "mean_ms": 490.15621999997165,
+      "peak_mem_mb": 8.09765625,
+      "output": "5242880"
+    }
+  },
+  "particle": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.46179630000006,
+      "binary_size_kb": 60.5,
+      "median_ms": 18.43959999996514,
+      "mean_ms": 25.225120000050083,
+      "peak_mem_mb": 5.13671875,
+      "output": "5.99982e+07"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.2054518999998436,
+      "binary_size_kb": 150.0,
+      "median_ms": 21.109599999817874,
+      "mean_ms": 70.81222000006164,
+      "peak_mem_mb": 4.6640625,
+      "output": "59998190"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 186.93738679999979,
+      "binary_size_kb": 58.9892578125,
+      "median_ms": 12.40269999971133,
+      "mean_ms": 16.341059999922436,
+      "peak_mem_mb": 4.7734375,
+      "output": "5.99982e+07"
+    }
+  },
+  "wordfreq": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.7157004999999117,
+      "binary_size_kb": 105.466796875,
+      "median_ms": 184.63040000006004,
+      "mean_ms": 192.45095999986006,
+      "peak_mem_mb": 37.06640625,
+      "output": "19860 kalo 1605 lolo 1417 vivisatoru 1"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.4218174000002364,
+      "binary_size_kb": 145.0,
+      "median_ms": 168.2784999998148,
+      "mean_ms": 191.0936400000537,
+      "peak_mem_mb": 38.03515625,
+      "output": "19860 kalo 1605 lolo 1417 vivisatoru 1"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.7962827000001198,
+      "binary_size_kb": 65.6142578125,
+      "median_ms": 184.4229999996969,
+      "mean_ms": 188.49879999988843,
+      "peak_mem_mb": 37.19921875,
+      "output": "19860 kalo 1605 lolo 1417 vivisatoru 1"
+    }
+  },
+  "jsonparse": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 0.7334850000002007,
+      "binary_size_kb": 107.9404296875,
+      "median_ms": 484.989399999904,
+      "mean_ms": 485.58232000004864,
+      "peak_mem_mb": 341.65625,
+      "output": "28067294 2400001 9507071 66667 20095649993"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.3014023000000634,
+      "binary_size_kb": 138.0,
+      "median_ms": 368.52490000001126,
+      "mean_ms": 375.25417999995625,
+      "peak_mem_mb": 239.63671875,
+      "output": "28067294 2400001 9507071 66667 20095649993"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.6513570000001891,
+      "binary_size_kb": 66.470703125,
+      "median_ms": 369.9213999998392,
+      "mean_ms": 371.89726000005976,
+      "peak_mem_mb": 239.515625,
+      "output": "28067294 2400001 9507071 66667 20095649993"
+    }
+  },
+  "gpumatmul": {
+    "C++ (GCC -O3)": {
+      "compile_time_s": 2.7392276000000493,
+      "binary_size_kb": 97.794921875,
+      "median_ms": 486.4517999999407,
+      "mean_ms": 520.26853999987,
+      "peak_mem_mb": 214.625,
+      "output": "294743112\n4035566\n127"
+    },
+    "Rust (opt-level=3)": {
+      "compile_time_s": 0.24555499999996755,
+      "binary_size_kb": 136.0,
+      "median_ms": 472.68460000032064,
+      "mean_ms": 478.95828000009715,
+      "peak_mem_mb": 214.03125,
+      "output": "294743112\n4035566\n127"
+    },
+    "Greengold (Release)": {
+      "compile_time_s": 0.5644972999998572,
+      "binary_size_kb": 62.78125,
+      "median_ms": 461.66100000027654,
+      "mean_ms": 464.96670000005906,
+      "peak_mem_mb": 214.078125,
+      "output": "294743112\n4035566\n127"
+    }
+  }
+}

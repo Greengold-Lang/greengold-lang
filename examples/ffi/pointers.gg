@@ -1,0 +1,37 @@
+# Raw pointer operations: only inside `unsafe:`. No C library needed.
+#   python -m greengold run examples/ffi/pointers.gg
+
+struct Cursor:
+    data: *mut i32
+    pos: usize
+
+fn sum_raw(p: *i32, n: usize) -> i32:
+    total = 0
+    unsafe:
+        for i in 0..n:
+            total += p[i]
+    return total
+
+fn first_or(p: *i32, fallback: i32) -> i32:
+    unsafe:
+        if p == null:
+            return fallback
+        return p[0]
+    return fallback
+
+fn main():
+    nums = [10, 20, 30, 40]
+    unsafe:
+        print("total:", sum_raw(addr(nums), 4))
+        print("first:", first_or(addr(nums), -1), first_or(null, -1))
+
+        c = Cursor{ data: addr_mut(nums), pos: 2 }
+        c.data[c.pos] = 99
+        print("nums[2] =", nums[2])
+
+        third = ptr_offset(addr(nums), 3)
+        print("nums[3] =", third[0])
+
+        as_int = ptr_to_int(addr(nums))
+        back = int_to_ptr[*i32](as_int)
+        print("round trip:", back[1], back == addr(nums))

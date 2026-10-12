@@ -1,0 +1,9 @@
+fn fib(n: i32) -> i32:
+    overflow: wrap
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+fn main():
+    res = fib(41)
+    print(res)

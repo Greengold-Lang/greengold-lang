@@ -1,0 +1,7 @@
+# conformance: SPEC section 16 (Imports and the library), example 8
+# expect-output:
+#   0 3
+
+fn main():
+    xs: [3]i32 = [0; 3]
+    print(xs[0], xs.len)

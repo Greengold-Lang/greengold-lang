@@ -1,0 +1,11 @@
+# conformance: SPEC section 16 (Imports and the library), example 6
+# expect-output:
+#   1 1
+
+fn length(xs: List[i32]) -> usize:
+    return xs.len
+
+fn main():
+    xs = List[i32]()
+    xs.push(1)
+    print(length(xs), xs.len)

@@ -1,0 +1,23 @@
+﻿struct Counter:
+    cur: i32
+    end: i32
+
+impl Counter:
+    fn next(self: lend Self) -> Optional[i32]:
+        if self.cur >= self.end:
+            return None
+        v = self.cur
+        self.cur += 1
+        return Valid(v)
+
+fn make(n: i32) -> Counter:
+    return Counter{ cur: 0, end: n }
+
+fn main():
+    c = Counter{ cur: 1, end: 4 }
+    for x in c:
+        print(x)
+    for y in make(3):
+        if y == 1:
+            continue
+        print("y", y)

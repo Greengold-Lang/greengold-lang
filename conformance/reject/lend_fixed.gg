@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: lending a `fixed` variable
+# expect-error: GG0310 at line 9
+
+fn bump(x: lend i32):
+    x += 1
+
+fn main():
+    fixed n = 1
+    bump(n)

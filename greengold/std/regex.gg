@@ -1,0 +1,622 @@
+# std.regex: regular expressions, matched in time linear in the text (no backtracking blowup).
+#
+#     r = regex.compile("(\\w+)@(\\w+)\\.com")?
+#     match r.find("mail ada@example.com now"):
+#         Valid(m): print(m.text(), m.group(1))           # ada@example.com ada
+#         None: pass
+#
+# Syntax: literals, `.` (any character but a newline), `[abc]`, `[a-z]`, `[^...]`, `\d \w \s` and
+# `\D \W \S`, `^` and `$` (start and end of the text), `\b` and `\B` (word boundary), groups `(...)`,
+# `(?:...)` without capture, `|`, and `*`, `+`, `?`, `{n}`, `{n,}`, `{n,m}`, each followed by `?` to
+# take as little as possible. `\` before any other punctuation is that character; `\n`, `\t`, `\r`.
+# Characters are UTF-8 code points. Of several matches the leftmost wins; among those starting there,
+# the one the pattern prefers (as in Perl or RE2).
+
+public
+struct Regex:
+    private
+    prog: List[_Inst]
+    classes: List[_Class]
+    groups: usize
+
+# Where a match is in the text, and its groups (`group(0)` is the whole match).
+struct Match:
+    public
+    start: usize
+    end: usize
+    private
+    text_copy: string  # the matched text; every group lies inside it
+    spans: List[i64]
+
+public
+fn compile(pattern: str) -> Result[Regex, string]:
+    p = _Parser{ pat: pattern, pos: 0, nodes: List[_Node](), classes: List[_Class](), groups: 1, error: string.new() }
+    root = p.alternation()
+    if p.error.len() == 0 and p.pos < pattern.len:
+        p.fail("unmatched `)`")
+    if p.error.len() > 0:
+        return Err(p.error.clone())
+    c = _Compiler{ nodes: p.nodes.clone(), prog: List[_Inst]() }
+    c.emit(_SAVE, 0, 0)
+    c.node(root)
+    c.emit(_SAVE, 1, 0)
+    c.emit(_MATCH, 0, 0)
+    if c.prog.len > 100000:
+        return Err(string.from("the pattern is too large"))
+    return Ok(Regex{ prog: c.prog.clone(), classes: p.classes.clone(), groups: p.groups })
+
+impl Regex:
+    # Number of capture groups, counting the whole match as group 0.
+    fn group_count(self: read Self) -> usize:
+        return self.groups
+
+    fn is_match(self: read Self, text: str) -> bool:
+        return self.search(text, 0).len > 0
+
+    # The leftmost match, or None.
+    fn find(self: read Self, text: str) -> Optional[Match]:
+        return self.find_from(text, 0)
+
+    # The leftmost match that starts at byte `start` or later.
+    fn find_from(self: read Self, text: str, start: usize) -> Optional[Match]:
+        spans = self.search(text, start)
+        if spans.len == 0:
+            return None
+        return Valid(_match(text, spans))
+
+    # Every match that does not overlap the one before, left to right.
+    fn find_all(self: read Self, text: str) -> List[Match]:
+        out = List[Match]()
+        at: usize = 0
+        while at <= text.len:
+            spans = self.search(text, at)
+            if spans.len == 0:
+                break
+            s = usize(spans[0])
+            e = usize(spans[1])
+            out.push(_match(text, spans))
+            if e > s:
+                at = e
+            elif e < text.len:
+                at = e + text.char_len_at(e)
+            else:
+                break
+        return out
+
+    # The text with every match replaced. In `with`, `$0`..`$9` stand for a group's text and `$$` for `$`.
+    fn replace_all(self: read Self, text: str, with: str) -> string:
+        out = string.new()
+        last: usize = 0
+        for m in self.find_all(text):
+            out.append_str(text[last..m.start])
+            i: usize = 0
+            while i < with.len:
+                c = with[i]
+                if c == '$' and i + 1 < with.len and with[i + 1] >= '0' and with[i + 1] <= '9':
+                    g = usize(with[i + 1] - '0')
+                    if g < m.spans.len / 2 and m.spans[g * 2] >= 0:
+                        out.append_str(text[usize(m.spans[g * 2])..usize(m.spans[g * 2 + 1])])
+                    i += 2
+                elif c == '$' and i + 1 < with.len and with[i + 1] == '$':
+                    out.append_byte('$')
+                    i += 2
+                else:
+                    out.append_byte(c)
+                    i += 1
+            last = m.end
+        out.append_str(text[last..])
+        return out
+
+    # The pieces of the text between matches.
+    fn split(self: read Self, text: str) -> List[string]:
+        out = List[string]()
+        last: usize = 0
+        for m in self.find_all(text):
+            if m.end == m.start and (m.start == 0 or m.start == text.len):
+                continue
+            out.push(string.from(text[last..m.start]))
+            last = m.end
+        out.push(string.from(text[last..]))
+        return out
+
+    private
+    # Group spans `[start0, end0, start1, end1, ...]` (-1 for a group that did not take part) of the
+    # leftmost match at or after `from`, or an empty list.
+    fn search(self: read Self, text: str, from: usize) -> List[i64]:
+        ncap = self.groups * 2
+        n = self.prog.len
+        clist = _Threads{ pcs: List[usize](), caps: List[i64]() }
+        nlist = _Threads{ pcs: List[usize](), caps: List[i64]() }
+        seen = List[i64]()
+        for _i in 0..n:
+            seen.push(-1)
+        cur = List[i64]()  # the captures of the thread being added; SAVE changes it and puts it back
+        for _i in 0..ncap:
+            cur.push(-1)
+        best = List[i64]()
+        pos = from
+        while true:
+            if best.len == 0:
+                for k in 0..ncap:
+                    cur[k] = -1
+                self.add(clist, seen, 0, pos, text, cur)
+            if clist.pcs.len == 0:
+                if best.len > 0 or pos >= text.len:
+                    break
+                pos += text.char_len_at(pos)  # nothing started here: try the next character
+                continue
+            cp: u32 = 0
+            step: usize = 0
+            if pos < text.len:
+                cp = text.char_at(pos)
+                step = text.char_len_at(pos)
+            next = pos + step
+            for t in 0..clist.pcs.len:
+                inst = self.prog[clist.pcs[t]]
+                if inst.op == _MATCH:
+                    best = _caps_of(clist, t, ncap)
+                    break  # threads after this one have lower priority
+                if pos >= text.len:
+                    continue
+                ok = false
+                if inst.op == _CHAR:
+                    ok = cp == u32(inst.x)
+                elif inst.op == _ANY:
+                    ok = cp != '\n'
+                elif inst.op == _CLASS:
+                    ok = self.classes[usize(inst.x)].has(cp)
+                if ok:
+                    for k in 0..ncap:
+                        cur[k] = clist.caps[t * ncap + k]
+                    self.add(nlist, seen, clist.pcs[t] + 1, next, text, cur)
+            if pos >= text.len:
+                break
+            clist.pcs.clear()
+            clist.caps.clear()
+            for t in 0..nlist.pcs.len:
+                clist.pcs.push(nlist.pcs[t])
+            for k in 0..nlist.caps.len:
+                clist.caps.push(nlist.caps[k])
+            nlist.pcs.clear()
+            nlist.caps.clear()
+            pos = next
+        return best
+
+    # Adds the thread at `pc` to `list`, following jumps, splits, saves, and assertions first.
+    fn add(self: read Self, list: lend _Threads, seen: lend List[i64], pc: usize, pos: usize, text: str, caps: lend List[i64]):
+        if seen[pc] == i64(pos):
+            return
+        seen[pc] = i64(pos)
+        inst = self.prog[pc]
+        if inst.op == _JMP:
+            self.add(list, seen, usize(inst.x), pos, text, caps)
+        elif inst.op == _SPLIT:
+            self.add(list, seen, usize(inst.x), pos, text, caps)
+            self.add(list, seen, usize(inst.y), pos, text, caps)
+        elif inst.op == _SAVE:
+            k = usize(inst.x)
+            old = caps[k]
+            caps[k] = i64(pos)
+            self.add(list, seen, pc + 1, pos, text, caps)
+            caps[k] = old
+        elif inst.op == _BOL:
+            if pos == 0:
+                self.add(list, seen, pc + 1, pos, text, caps)
+        elif inst.op == _EOL:
+            if pos == text.len:
+                self.add(list, seen, pc + 1, pos, text, caps)
+        elif inst.op == _WORDB or inst.op == _NWORDB:
+            before = pos > 0 and _is_word(u32(text[pos - 1]))
+            after = pos < text.len and _is_word(u32(text[pos]))
+            boundary = before != after
+            if boundary == (inst.op == _WORDB):
+                self.add(list, seen, pc + 1, pos, text, caps)
+        else:
+            list.pcs.push(pc)
+            for k in 0..caps.len:
+                list.caps.push(caps[k])
+
+public
+impl Match:
+    # The matched text.
+    fn text(self: read Self) -> string:
+        return self.text_copy.clone()
+
+    # The text of group `i`, or None when it did not take part in the match.
+    fn group(self: read Self, i: usize) -> Optional[string]:
+        if i * 2 >= self.spans.len or self.spans[i * 2] < 0:
+            return None
+        return Valid(string.from(self.text_copy.as_str()[usize(self.spans[i * 2]) - self.start..usize(self.spans[i * 2 + 1]) - self.start]))
+
+    # Byte span of group `i`: (start, end), or None.
+    fn group_start(self: read Self, i: usize) -> Optional[usize]:
+        if i * 2 >= self.spans.len or self.spans[i * 2] < 0:
+            return None
+        return Valid(usize(self.spans[i * 2]))
+
+    fn group_end(self: read Self, i: usize) -> Optional[usize]:
+        if i * 2 >= self.spans.len or self.spans[i * 2] < 0:
+            return None
+        return Valid(usize(self.spans[i * 2 + 1]))
+
+private
+const _CHAR: u8 = 1
+const _ANY: u8 = 2
+const _CLASS: u8 = 3
+const _SPLIT: u8 = 4
+const _JMP: u8 = 5
+const _SAVE: u8 = 6
+const _MATCH: u8 = 7
+const _BOL: u8 = 8
+const _EOL: u8 = 9
+const _WORDB: u8 = 10
+const _NWORDB: u8 = 11
+
+struct _Inst:
+    op: u8
+    x: i64
+    y: i64
+
+struct _Class:
+    ranges: List[u32]  # lo, hi pairs
+    negated: bool
+
+impl _Class:
+    fn has(self: read Self, cp: u32) -> bool:
+        i: usize = 0
+        while i < self.ranges.len:
+            if cp >= self.ranges[i] and cp <= self.ranges[i + 1]:
+                return not self.negated
+            i += 2
+        return self.negated
+
+struct _Threads:
+    pcs: List[usize]
+    caps: List[i64]
+
+fn _match(text: str, spans: List[i64]) -> Match:
+    s = usize(spans[0])
+    e = usize(spans[1])
+    return Match{ start: s, end: e, text_copy: string.from(text[s..e]), spans: spans }
+
+fn _caps_of(list: read _Threads, t: usize, ncap: usize) -> List[i64]:
+    out = List[i64]()
+    for k in t * ncap..t * ncap + ncap:
+        out.push(list.caps[k])
+    return out
+
+fn _is_word(c: u32) -> bool:
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_'
+
+# -- parsing -------------------------------------------------------------------------------------
+
+const _N_EMPTY: u8 = 0
+const _N_CHAR: u8 = 1
+const _N_ANY: u8 = 2
+const _N_CLASS: u8 = 3
+const _N_CAT: u8 = 4
+const _N_ALT: u8 = 5
+const _N_REPEAT: u8 = 6
+const _N_GROUP: u8 = 7
+const _N_ASSERT: u8 = 8  # x is the instruction (_BOL, _EOL, _WORDB, _NWORDB)
+
+struct _Node:
+    kind: u8
+    x: i64      # character, class, group number, or assertion
+    a: i64      # child
+    b: i64      # second child
+    lo: i64     # repeat bounds; hi -1 means no limit
+    hi: i64
+    greedy: bool
+
+struct _Parser:
+    pat: str
+    pos: usize
+    nodes: List[_Node]
+    classes: List[_Class]
+    groups: usize
+    error: string
+
+impl _Parser:
+    fn fail(self: lend Self, msg: str):
+        if self.error.len() == 0:
+            self.error.append(f"{msg} at byte {self.pos}")
+
+    fn add(self: lend Self, kind: u8, x: i64, a: i64, b: i64) -> i64:
+        self.nodes.push(_Node{ kind: kind, x: x, a: a, b: b, lo: 0, hi: 0, greedy: true })
+        return i64(self.nodes.len - 1)
+
+    fn more(self: read Self) -> bool:
+        return self.pos < self.pat.len and self.error.len() == 0
+
+    fn alternation(self: lend Self) -> i64:
+        left = self.concat()
+        while self.more() and self.pat[self.pos] == '|':
+            self.pos += 1
+            right = self.concat()
+            left = self.add(_N_ALT, 0, left, right)
+        return left
+
+    fn concat(self: lend Self) -> i64:
+        node = self.add(_N_EMPTY, 0, -1, -1)
+        while self.more() and self.pat[self.pos] != '|' and self.pat[self.pos] != ')':
+            next = self.repeat()
+            node = self.add(_N_CAT, 0, node, next)
+        return node
+
+    fn repeat(self: lend Self) -> i64:
+        atom = self.atom()
+        while self.more():
+            c = self.pat[self.pos]
+            lo: i64 = 0
+            hi: i64 = -1
+            if c == '*':
+                self.pos += 1
+            elif c == '+':
+                lo = 1
+                self.pos += 1
+            elif c == '?':
+                hi = 1
+                self.pos += 1
+            elif c == '{' and self.counted_ahead():
+                self.pos += 1
+                lo = self.number()
+                hi = lo
+                if self.pat[self.pos] == ',':
+                    self.pos += 1
+                    hi = if self.pat[self.pos] == '}' then -1 else self.number()
+                self.pos += 1  # '}'
+                if (hi >= 0 and hi < lo) or lo > 1000 or hi > 1000:
+                    self.fail("bad repeat count")
+                    return atom
+            else:
+                return atom
+            greedy = true
+            if self.pos < self.pat.len and self.pat[self.pos] == '?':
+                greedy = false
+                self.pos += 1
+            k = self.nodes[usize(atom)].kind
+            if k == _N_EMPTY or k == _N_ASSERT:
+                self.fail("nothing to repeat")
+                return atom
+            r = self.add(_N_REPEAT, 0, atom, -1)
+            self.nodes[usize(r)].lo = lo
+            self.nodes[usize(r)].hi = hi
+            self.nodes[usize(r)].greedy = greedy
+            atom = r
+        return atom
+
+    # `{` starts a count only when `{n}`, `{n,}`, or `{n,m}` follows; otherwise it is a literal `{`.
+    fn counted_ahead(self: read Self) -> bool:
+        i = self.pos + 1
+        digits = 0
+        while i < self.pat.len and self.pat[i] >= '0' and self.pat[i] <= '9':
+            i += 1
+            digits += 1
+        if digits == 0 or i >= self.pat.len:
+            return false
+        if self.pat[i] == '}':
+            return true
+        if self.pat[i] != ',':
+            return false
+        i += 1
+        while i < self.pat.len and self.pat[i] >= '0' and self.pat[i] <= '9':
+            i += 1
+        return i < self.pat.len and self.pat[i] == '}'
+
+    fn number(self: lend Self) -> i64:
+        v: i64 = 0
+        while self.pos < self.pat.len and self.pat[self.pos] >= '0' and self.pat[self.pos] <= '9':
+            v = v * 10 + i64(self.pat[self.pos] - '0')
+            if v > 100000:
+                v = 100000
+            self.pos += 1
+        return v
+
+    fn atom(self: lend Self) -> i64:
+        c = self.pat[self.pos]
+        if c == '(':
+            self.pos += 1
+            capture = true
+            if self.pos + 1 < self.pat.len and self.pat[self.pos] == '?' and self.pat[self.pos + 1] == ':':
+                capture = false
+                self.pos += 2
+            index = self.groups
+            if capture:
+                self.groups += 1
+            inner = self.alternation()
+            if self.pos >= self.pat.len or self.pat[self.pos] != ')':
+                self.fail("missing `)`")
+                return inner
+            self.pos += 1
+            if not capture:
+                return inner
+            return self.add(_N_GROUP, i64(index), inner, -1)
+        if c == '[':
+            return self.bracket()
+        if c == '.':
+            self.pos += 1
+            return self.add(_N_ANY, 0, -1, -1)
+        if c == '^':
+            self.pos += 1
+            return self.add(_N_ASSERT, i64(_BOL), -1, -1)
+        if c == '$':
+            self.pos += 1
+            return self.add(_N_ASSERT, i64(_EOL), -1, -1)
+        if c == '*' or c == '+' or c == '?':
+            self.fail("nothing to repeat")
+            return self.add(_N_EMPTY, 0, -1, -1)
+        if c == '\\':
+            self.pos += 1
+            if self.pos >= self.pat.len:
+                self.fail("`\\` at the end of the pattern")
+                return self.add(_N_EMPTY, 0, -1, -1)
+            e = self.pat[self.pos]
+            if e == 'b' or e == 'B':
+                self.pos += 1
+                return self.add(_N_ASSERT, i64(if e == 'b' then _WORDB else _NWORDB), -1, -1)
+            cls = self.shorthand(e)
+            if cls >= 0:
+                self.pos += 1
+                return self.add(_N_CLASS, cls, -1, -1)
+            return self.add(_N_CHAR, i64(self.escaped()), -1, -1)
+        cp = self.pat.char_at(self.pos)
+        self.pos += self.pat.char_len_at(self.pos)
+        return self.add(_N_CHAR, i64(cp), -1, -1)
+
+    # The character after a `\` (at `pos`), which it consumes.
+    fn escaped(self: lend Self) -> u32:
+        e = self.pat[self.pos]
+        if e == 'n':
+            self.pos += 1
+            return '\n'
+        if e == 't':
+            self.pos += 1
+            return '\t'
+        if e == 'r':
+            self.pos += 1
+            return '\r'
+        if _is_word(u32(e)):
+            self.fail("unknown escape")
+        cp = self.pat.char_at(self.pos)
+        self.pos += self.pat.char_len_at(self.pos)
+        return cp
+
+    # `\d \w \s \D \W \S` as a class index, or -1.
+    fn shorthand(self: lend Self, e: u8) -> i64:
+        r = List[u32]()
+        if e == 'd' or e == 'D':
+            _push_range(r, '0', '9')
+        elif e == 'w' or e == 'W':
+            _push_range(r, 'a', 'z')
+            _push_range(r, 'A', 'Z')
+            _push_range(r, '0', '9')
+            _push_range(r, '_', '_')
+        elif e == 's' or e == 'S':
+            _push_range(r, ' ', ' ')
+            _push_range(r, '\t', '\r')
+        else:
+            return -1
+        self.classes.push(_Class{ ranges: r, negated: e == 'D' or e == 'W' or e == 'S' })
+        return i64(self.classes.len - 1)
+
+    fn bracket(self: lend Self) -> i64:
+        self.pos += 1
+        negated = false
+        if self.pos < self.pat.len and self.pat[self.pos] == '^':
+            negated = true
+            self.pos += 1
+        r = List[u32]()
+        first = true
+        while true:
+            if self.pos >= self.pat.len:
+                self.fail("missing `]`")
+                break
+            c = self.pat[self.pos]
+            if c == ']' and not first:
+                self.pos += 1
+                break
+            first = false
+            lo: u32 = 0
+            if c == '\\':
+                self.pos += 1
+                if self.pos >= self.pat.len:
+                    continue
+                e = self.pat[self.pos]
+                cls = self.shorthand(e)
+                if cls >= 0:
+                    self.pos += 1
+                    sub = self.classes.pop()
+                    match sub:
+                        Valid(k):
+                            if k.negated:
+                                self.fail("`\\D`, `\\W`, `\\S` inside `[...]` are not supported")
+                            for x in k.ranges:
+                                r.push(x)
+                        None: pass
+                    continue
+                lo = self.escaped()
+            else:
+                lo = self.pat.char_at(self.pos)
+                self.pos += self.pat.char_len_at(self.pos)
+            hi = lo
+            if self.pos + 1 < self.pat.len and self.pat[self.pos] == '-' and self.pat[self.pos + 1] != ']':
+                self.pos += 1
+                if self.pat[self.pos] == '\\':
+                    self.pos += 1
+                    hi = self.escaped()
+                else:
+                    hi = self.pat.char_at(self.pos)
+                    self.pos += self.pat.char_len_at(self.pos)
+                if hi < lo:
+                    self.fail("bad range in `[...]`")
+            _push_range(r, lo, hi)
+        self.classes.push(_Class{ ranges: r, negated: negated })
+        return self.add(_N_CLASS, i64(self.classes.len - 1), -1, -1)
+
+fn _push_range(r: lend List[u32], lo: u32, hi: u32):
+    r.push(lo)
+    r.push(hi)
+
+# -- compiling to instructions -------------------------------------------------------------------
+
+struct _Compiler:
+    nodes: List[_Node]
+    prog: List[_Inst]
+
+impl _Compiler:
+    fn emit(self: lend Self, op: u8, x: i64, y: i64) -> usize:
+        self.prog.push(_Inst{ op: op, x: x, y: y })
+        return self.prog.len - 1
+
+    fn node(self: lend Self, i: i64):
+        n = self.nodes[usize(i)]
+        if n.kind == _N_EMPTY:
+            return
+        if n.kind == _N_CHAR:
+            self.emit(_CHAR, n.x, 0)
+        elif n.kind == _N_ANY:
+            self.emit(_ANY, 0, 0)
+        elif n.kind == _N_CLASS:
+            self.emit(_CLASS, n.x, 0)
+        elif n.kind == _N_ASSERT:
+            self.emit(u8(n.x), 0, 0)
+        elif n.kind == _N_CAT:
+            self.node(n.a)
+            self.node(n.b)
+        elif n.kind == _N_GROUP:
+            self.emit(_SAVE, n.x * 2, 0)
+            self.node(n.a)
+            self.emit(_SAVE, n.x * 2 + 1, 0)
+        elif n.kind == _N_ALT:
+            split = self.emit(_SPLIT, 0, 0)
+            self.prog[split].x = i64(self.prog.len)
+            self.node(n.a)
+            jmp = self.emit(_JMP, 0, 0)
+            self.prog[split].y = i64(self.prog.len)
+            self.node(n.b)
+            self.prog[jmp].x = i64(self.prog.len)
+        else:
+            self.repeat(n)
+
+    fn repeat(self: lend Self, n: _Node):
+        for _k in 0..n.lo:
+            self.node(n.a)
+        if n.hi < 0:  # then any number more: L: split body, out; body; jmp L
+            top = self.emit(_SPLIT, 0, 0)
+            self.node(n.a)
+            self.emit(_JMP, i64(top), 0)
+            self.branch(top, top + 1, self.prog.len, n.greedy)
+            return
+        holes = List[usize]()
+        for _k in n.lo..n.hi:  # each optional copy: split body, out
+            s = self.emit(_SPLIT, 0, 0)
+            holes.push(s)
+            self.node(n.a)
+            self.prog[s].x = i64(s + 1)
+        for s in holes:
+            self.branch(s, s + 1, self.prog.len, n.greedy)
+
+    fn branch(self: lend Self, at: usize, body: usize, out: usize, greedy: bool):
+        self.prog[at].x = i64(if greedy then body else out)
+        self.prog[at].y = i64(if greedy then out else body)

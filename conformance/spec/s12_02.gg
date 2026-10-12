@@ -1,0 +1,6 @@
+# conformance: SPEC section 12 (Numbers), example 2
+# expect-output:
+#   4 true true
+
+fn main():
+    print(i64(3) + 1, not false, 1 < 2 and 2 < 3)

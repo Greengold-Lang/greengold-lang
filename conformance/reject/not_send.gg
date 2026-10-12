@@ -1,0 +1,9 @@
+# conformance: SPEC section 17, rejected form: a view sent to another thread
+# expect-error: GG0326 at line 8
+
+import std.thread { Thread }
+
+fn main():
+    name = "x"
+    t = Thread.spawn(fn() => print(name))
+    t.join()

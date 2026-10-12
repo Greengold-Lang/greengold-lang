@@ -1,0 +1,10 @@
+# conformance: SPEC section 6 (Statements), example 3
+# expect-output:
+#   63
+
+fn main():
+    xs: [3]i32 = [10, 20, 30]
+    total = 0
+    for i, x in xs:
+        total += i32(i) + x
+    print(total)

@@ -1,0 +1,5 @@
+# conformance: SPEC section 17, rejected form: `&&` from other languages
+# expect-error: GG0133 at line 5
+
+fn main():
+    print(true && false)

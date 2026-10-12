@@ -1,0 +1,6 @@
+# conformance: SPEC section 17, rejected form: assigning a `fixed` variable
+# expect-error: GG0309 at line 6
+
+fn main():
+    fixed n = 1
+    n = 2

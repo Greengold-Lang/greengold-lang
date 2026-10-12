@@ -1,0 +1,82 @@
+# Canonical type-name helpers. A type is an interned string: "i32", "Pair[i32, f64]", "[]i32".
+import std.string
+
+public
+
+fn is_signed(s: str) -> bool:
+    if string.str_eq(s, "i8") or string.str_eq(s, "i16") or string.str_eq(s, "i32") or string.str_eq(s, "i64"):
+        return true
+    return string.str_eq(s, "isize")
+
+fn is_unsigned(s: str) -> bool:
+    if string.str_eq(s, "u8") or string.str_eq(s, "u16") or string.str_eq(s, "u32") or string.str_eq(s, "u64"):
+        return true
+    return string.str_eq(s, "usize")
+
+fn is_int(s: str) -> bool:
+    return is_signed(s) or is_unsigned(s)
+
+fn is_float(s: str) -> bool:
+    return string.str_eq(s, "f32") or string.str_eq(s, "f64")
+
+fn is_numeric(s: str) -> bool:
+    return is_int(s) or is_float(s)
+
+fn is_slice_type(s: str) -> bool:
+    return s.len >= 2 and s[0] == 91 and s[1] == 93
+
+fn is_array_type(s: str) -> bool:
+    return s.len >= 2 and s[0] == 91 and s[1] != 93
+
+fn array_len(s: str) -> i64:
+    i: usize = 1
+    while i < s.len and s[i] != 93:
+        i += 1
+    got = string.parse_i64(string.substr(s, 1, i))
+    match got:
+        Valid(v):
+            return v
+        None:
+            return -1
+
+fn array_elem(s: str) -> str:
+    i: usize = 1
+    while i < s.len and s[i] != 93:
+        i += 1
+    if i >= s.len:
+        return ""
+    return string.substr(s, i + 1, s.len)
+
+fn slice_elem(s: str) -> str:
+    if s.len < 2:
+        return ""
+    return string.substr(s, 2, s.len)
+
+fn is_prim(s: str) -> bool:
+    return is_numeric(s) or string.str_eq(s, "bool") or string.str_eq(s, "str")
+
+fn int_min(s: str) -> i64:
+    if string.str_eq(s, "i8"):
+        return -128
+    if string.str_eq(s, "i16"):
+        return -32768
+    if string.str_eq(s, "i32"):
+        return -2147483648
+    if is_unsigned(s):
+        return 0
+    return -9223372036854775807 - 1
+
+fn int_max(s: str) -> i64:
+    if string.str_eq(s, "i8"):
+        return 127
+    if string.str_eq(s, "i16"):
+        return 32767
+    if string.str_eq(s, "i32"):
+        return 2147483647
+    if string.str_eq(s, "u8"):
+        return 255
+    if string.str_eq(s, "u16"):
+        return 65535
+    if string.str_eq(s, "u32"):
+        return 4294967295
+    return 9223372036854775807

@@ -1,0 +1,21 @@
+﻿struct Entity:
+    hp: i32
+    id: i32
+
+fn heal_all(xs: lend []Entity):
+    for e in xs:
+        e.hp += 10
+
+fn main():
+    ents = [Entity{hp: 1, id: 1}, Entity{hp: 2, id: 2}]
+    for e in ents:
+        print("before", e.id, e.hp)
+    heal_all(ents)
+    for e in ents:
+        e = Entity{hp: e.hp * 2, id: e.id}
+    for k, e in ents:
+        print("after", k, e.hp)
+    nums = [1, 2, 3]
+    for v in nums:
+        v *= 2
+    print(nums[0], nums[1], nums[2])

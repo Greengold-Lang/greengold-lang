@@ -1,0 +1,22 @@
+# conformance: SPEC section 13 (Expressions), example 6
+# expect-output:
+#   0
+#   1
+#   2
+
+struct Count:
+    cur: i32
+    end: i32
+
+impl Count:
+    fn next(self: lend Self) -> Optional[i32]:
+        if self.cur >= self.end:
+            return None
+        v = self.cur
+        self.cur += 1
+        return Valid(v)
+
+fn main():
+    c = Count{ cur: 0, end: 3 }
+    for x in c:
+        print(x)

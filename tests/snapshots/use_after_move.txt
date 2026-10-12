@@ -1,0 +1,16 @@
+Error: `v` variable was moved (`consume`), can no longer be used.
+ --> example.gg:4:11  GG0301 use-after-consume
+  |
+4 |     print(v.len, w.len)
+  |           ^^^^^
+  |
+3 |     w = v
+  |         ^ `v` is consumed here
+  |
+2 |     v = List[i32]()
+  |     ^^^^^^^^^^^^^^^ `v` is declared here
+  = help: Move a copy with `v.clone()` to keep using `v`, use it before the move, or reassign it after the move.
+  = fix (likely): Move a copy instead: `v.clone()`
+  = fix (manual): Use `v` before it is consumed, or do not use it afterwards
+
+1 error found.

@@ -1,0 +1,162 @@
+# Inference-style matrix products on the GPU through OpenCL: 4096 token vectors of width 2048 go through 8
+# dense layers (f32 weights, ReLU, then requantized to integers 0..127 as an int8 model does).
+# OpenCL is loaded at run time (OpenCL.dll, libOpenCL.so.1, or the macOS framework), so nothing extra is
+# linked. Every product is an integer below 2^24, so f32 is exact and the printed numbers are the same on
+# every GPU.
+
+extern "windows.h" fn LoadLibraryA(name: str) -> *mut u8
+extern "windows.h" fn GetProcAddress(lib: *mut u8, name: str) -> *mut u8
+weak extern "dlfcn.h" fn dlopen(name: str, flags: i32) -> *mut u8
+weak extern "dlfcn.h" fn dlsym(lib: *mut u8, name: str) -> *mut u8
+
+const TOKENS: usize = 4096
+const WIDTH: usize = 2048
+const LAYERS: usize = 8
+const TILE: usize = 16
+
+const KERNEL = """#define TILE 16
+__kernel void layer(__global const float* x, __global const float* w, __global float* y, int k, int n) {
+    __local float xs[TILE][TILE];
+    __local float ws[TILE][TILE];
+    int col = get_global_id(0);
+    int row = get_global_id(1);
+    int lc = get_local_id(0);
+    int lr = get_local_id(1);
+    float acc = 0.0f;
+    for (int t = 0; t < k; t += TILE) {
+        xs[lr][lc] = x[row * k + t + lc];
+        ws[lr][lc] = w[(t + lr) * n + col];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (int i = 0; i < TILE; i++)
+            acc += xs[lr][i] * ws[i][lc];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    y[row * n + col] = fmin(floor(fmax(acc, 0.0f) / 32.0f), 127.0f);
+}
+"""
+
+fn open_opencl() -> *mut u8:
+    unsafe:
+        if target_os() == "windows":
+            return LoadLibraryA("OpenCL.dll")
+        elif target_os() == "macos":
+            return dlopen("/System/Library/Frameworks/OpenCL.framework/OpenCL", 2)
+        else:
+            return dlopen("libOpenCL.so.1", 2)
+
+fn sym(lib: *mut u8, name: str) -> *mut u8:
+    unsafe:
+        p: *mut u8 = null
+        if target_os() == "windows":
+            p = GetProcAddress(lib, name)
+        else:
+            p = dlsym(lib, name)
+        if p == null:
+            panic("OpenCL function missing")
+        return p
+
+# Reads a symbol address as a function value of type F.
+fn as_fn[F](p: *mut u8) -> F:
+    unsafe:
+        return ptr_read[F](addr(p))
+
+fn check(code: i32, what: str):
+    if code != 0:
+        print(what, code)
+        panic("OpenCL call failed")
+
+# The same linear congruential generator as the C++ and Rust versions; no product overflows 64 bits.
+fn next(state: lend u64) -> u64:
+    state = (state * 1103515245 + 12345) % 2147483648
+    return state >> 16
+
+fn main():
+    lib = open_opencl()
+    if lib == null:
+        panic("OpenCL is not installed")
+    unsafe:
+        get_platforms = as_fn[fn(u32, *mut *mut u8, *mut u32) -> i32](sym(lib, "clGetPlatformIDs"))
+        get_devices = as_fn[fn(*mut u8, u64, u32, *mut *mut u8, *mut u32) -> i32](sym(lib, "clGetDeviceIDs"))
+        create_context = as_fn[fn(*u8, u32, **mut u8, *u8, *u8, *mut i32) -> *mut u8](sym(lib, "clCreateContext"))
+        create_queue = as_fn[fn(*mut u8, *mut u8, u64, *mut i32) -> *mut u8](sym(lib, "clCreateCommandQueue"))
+        create_program = as_fn[fn(*mut u8, u32, **u8, *u8, *mut i32) -> *mut u8](sym(lib, "clCreateProgramWithSource"))
+        build_program = as_fn[fn(*mut u8, u32, **mut u8, *u8, *u8, *u8) -> i32](sym(lib, "clBuildProgram"))
+        create_kernel = as_fn[fn(*mut u8, *u8, *mut i32) -> *mut u8](sym(lib, "clCreateKernel"))
+        create_buffer = as_fn[fn(*mut u8, u64, usize, *u8, *mut i32) -> *mut u8](sym(lib, "clCreateBuffer"))
+        set_arg = as_fn[fn(*mut u8, u32, usize, *u8) -> i32](sym(lib, "clSetKernelArg"))
+        enqueue_kernel = as_fn[fn(*mut u8, *mut u8, u32, *usize, *usize, *usize, u32, *u8, *u8) -> i32](sym(lib, "clEnqueueNDRangeKernel"))
+        read_buffer = as_fn[fn(*mut u8, *mut u8, u32, usize, usize, *mut u8, u32, *u8, *u8) -> i32](sym(lib, "clEnqueueReadBuffer"))
+        finish = as_fn[fn(*mut u8) -> i32](sym(lib, "clFinish"))
+
+        platform: *mut u8 = null
+        device: *mut u8 = null
+        count: u32 = 0
+        err: i32 = 0
+        check(get_platforms(1, addr_mut(platform), addr_mut(count)), "clGetPlatformIDs")
+        check(get_devices(platform, 4, 1, addr_mut(device), addr_mut(count)), "clGetDeviceIDs (GPU)")
+        context = create_context(null, 1, addr(device), null, null, addr_mut(err))
+        check(err, "clCreateContext")
+        queue = create_queue(context, device, 0, addr_mut(err))
+        check(err, "clCreateCommandQueue")
+
+        source = string_to_cstr(KERNEL)
+        program = create_program(context, 1, addr(source), null, addr_mut(err))
+        check(err, "clCreateProgramWithSource")
+        check(build_program(program, 1, addr(device), null, null, null), "clBuildProgram")
+        kernel = create_kernel(program, string_to_cstr("layer"), addr_mut(err))
+        check(err, "clCreateKernel")
+
+        state: u64 = 1
+        x = List[f32]()
+        x.reserve(TOKENS * WIDTH)
+        for i in 0..TOKENS * WIDTH:
+            x.push(f32(next(state) % 128))
+        bytes = TOKENS * WIDTH * 4
+        # CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR
+        xs = x[..]
+        cur = create_buffer(context, 33, bytes, ptr_cast[*u8](addr(xs)), addr_mut(err))
+        check(err, "clCreateBuffer")
+        out = create_buffer(context, 1, bytes, null, addr_mut(err))
+        check(err, "clCreateBuffer")
+
+        global: [2]usize = [WIDTH, TOKENS]
+        local: [2]usize = [TILE, TILE]
+        k = i32(WIDTH)
+        n = i32(WIDTH)
+        for l in 0..LAYERS:
+            w = List[f32]()
+            w.reserve(WIDTH * WIDTH)
+            for i in 0..WIDTH * WIDTH:
+                w.push(f32(i64(next(state) % 5) - 2))
+            # CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR
+            ws = w[..]
+            weights = create_buffer(context, 36, WIDTH * WIDTH * 4, ptr_cast[*u8](addr(ws)), addr_mut(err))
+            check(err, "clCreateBuffer")
+            check(set_arg(kernel, 0, 8, ptr_cast[*u8](addr(cur))), "clSetKernelArg")
+            check(set_arg(kernel, 1, 8, ptr_cast[*u8](addr(weights))), "clSetKernelArg")
+            check(set_arg(kernel, 2, 8, ptr_cast[*u8](addr(out))), "clSetKernelArg")
+            check(set_arg(kernel, 3, 4, ptr_cast[*u8](addr(k))), "clSetKernelArg")
+            check(set_arg(kernel, 4, 4, ptr_cast[*u8](addr(n))), "clSetKernelArg")
+            check(enqueue_kernel(queue, kernel, 2, null, addr(global), addr(local), 0, null, null), "clEnqueueNDRangeKernel")
+            check(finish(queue), "clFinish")
+            swap = cur
+            cur = out
+            out = swap
+
+        y = List[f32]()
+        y.reserve(TOKENS * WIDTH)
+        for i in 0..TOKENS * WIDTH:
+            y.push(0.0)
+        ys = y[..]
+        check(read_buffer(queue, cur, 1, 0, bytes, ptr_cast[*mut u8](addr(ys)), 0, null, null), "clEnqueueReadBuffer")
+
+        sum: i64 = 0
+        active: i64 = 0
+        for i in 0..TOKENS * WIDTH:
+            v = i64(y[i])
+            sum += v
+            if v != 0:
+                active += 1
+        print(sum)
+        print(active)
+        print(i64(y[TOKENS * WIDTH / 2 + 7]))

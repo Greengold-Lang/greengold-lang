@@ -1,0 +1,8 @@
+Error: `s.value` cannot be changed: `s` is a `Shared` value, which is read-only.
+ --> <source>:3:5  GG0499 unclassified
+  |
+3 |     s.value.push(1)
+  |     ^^^^^^^
+  = help: Other owners may see the same value. Clone the inner value to change a private copy: `mine = s.value.clone()`.
+
+1 error found.

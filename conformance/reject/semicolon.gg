@@ -1,0 +1,5 @@
+# conformance: SPEC section 17, rejected form: `;` between statements
+# expect-error: GG0133 at line 5
+
+fn main():
+    x = 1; print(x)

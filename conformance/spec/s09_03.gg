@@ -1,0 +1,15 @@
+# conformance: SPEC section 9 (Optional, Result, and `?`), example 3
+# expect-output:
+#   1
+#   4
+
+fn main():
+    items = List[i32]()
+    items.push(1)
+    while let Valid(top) = items.pop():
+        print(top)
+    n: Optional[i32] = Valid(4)
+    if let Valid(v) = n:
+        print(v)
+    else:
+        print(0)

@@ -1,0 +1,9 @@
+# conformance: SPEC section 16 (Imports and the library), example 9
+# expect-output:
+#   11
+
+fn main():
+    xs: [2]i32 = [1, 2]
+    for x in xs:
+        x = x + 10
+    print(xs[0])

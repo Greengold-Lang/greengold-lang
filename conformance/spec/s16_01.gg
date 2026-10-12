@@ -1,0 +1,19 @@
+# conformance: SPEC section 16 (Imports and the library), example 1
+# expect-output:
+#   one
+#   two
+
+import std.thread { Thread, Queue }
+
+fn main():
+    q = Arc[Queue[string]](Queue[string].new())
+    mine = q.clone()
+    worker = Thread.spawn(fn() => drain(mine))
+    q.value.send("one")
+    q.value.send("two")
+    q.value.close()
+    worker.join()
+
+fn drain(q: Arc[Queue[string]]):
+    while let Valid(job) = q.value.recv():
+        print(job)

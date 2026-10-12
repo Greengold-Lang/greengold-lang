@@ -1,0 +1,20 @@
+# conformance: SPEC section 8 (Generics and features), example 3
+# expect-output:
+#   6 6 8
+
+fn total[N: usize](xs: [N]i32) -> i32:
+    s = 0
+    for x in xs:
+        s += x
+    return s
+
+struct Grid[W: usize, H: usize]:
+    cells: [W][H]i32
+
+impl Grid[W, H]:
+    fn area(self) -> usize:
+        return W * H
+
+fn main():
+    g = Grid{ cells: [[1, 2, 3], [4, 5, 6]] }
+    print(total([1, 2, 3]), g.area(), total[2]([4, 4]))

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "greengold"
+version = "0.3.3"
+description = "Greengold language: compiler emitting LLVM IR for .gg files (read/lend/consume, comptime, soa, LLVM backend)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Umut Faruk Dilli", email = "founder@greengoldlang.com" }]
+keywords = ["programming-language", "compiler", "llvm", "systems-programming", "memory-safety"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Compilers",
+]
+requires-python = ">=3.10"
+dependencies = ["llvmlite>=0.50"]  # LLVM 22
+
+[project.optional-dependencies]
+test = ["pytest"]
+# `pip install greengold[toolchain]`: zig cc links programs with no C compiler installed, for every target
+toolchain = ["ziglang>=0.11"]
+standalone = ["pyinstaller>=6"]
+
+[project.urls]
+Homepage = "https://greengoldlang.com"
+Repository = "https://github.com/UmutFarukDilli/Greengold-lang"
+Issues = "https://github.com/UmutFarukDilli/Greengold-lang/issues"
+
+[project.scripts]
+gg = "greengold.cli:main"
+
+[tool.setuptools]
+packages = ["greengold"]
+
+[tool.setuptools.package-data]
+greengold = ["core/core.gg", "std/*.gg", "debug/*.py"]  # Core: Optional/Result (written in Greengold, OS-independent)
+
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

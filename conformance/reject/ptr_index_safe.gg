@@ -1,0 +1,6 @@
+# conformance: SPEC section 17, rejected form: pointer indexing outside `unsafe:`
+# expect-error: GG0406 at line 6
+
+fn main():
+    p: *i32 = null
+    print(p[0])

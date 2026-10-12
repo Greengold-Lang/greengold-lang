@@ -1,0 +1,35 @@
+# Spectral norm of the Hilbert-like matrix used by the language benchmarks game.
+# A(i, j) = 1 / ((i+j)(i+j+1)/2 + i + 1). Forty applications of A twice. n = 1600.
+
+import std.math
+
+hot fn apply(out: exclusive lend List[f64], v: exclusive lend List[f64], n: usize):
+    overflow: wrap
+    unsafe:
+        for i in 0..n:
+            sum: f64 = 0.0
+            j: usize = 0
+            while j < n:
+                ij = i + j
+                den = ij * (ij + 1) / 2 + i + 1
+                sum += (1.0 / f64(den)) * trust v[j]
+                j += 1
+            trust out[i] = sum
+
+fn main():
+    n: usize = 1600
+    u = List[f64]()
+    v = List[f64]()
+    for i in 0..n:
+        u.push(1.0)
+        v.push(0.0)
+    for iter in 0..40:
+        apply(v, u, n)
+        apply(u, v, n)
+    uv: f64 = 0.0
+    vv: f64 = 0.0
+    for i in 0..n:
+        uv += u[i] * v[i]
+        vv += v[i] * v[i]
+    norm = math.sqrt(uv / vv)
+    print(i64(norm * 1000000000.0))

@@ -1,0 +1,42 @@
+{
+  "comments": {
+    "lineComment": "#"
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "'", "close": "'", "notIn": ["string", "comment"] }
+  ],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*(?:(?:extern|hot|packed|weak)\\s+)?(fn|struct|enum|union|feature|impl|test|if|elif|else|while|for|match|unsafe|comptime|wrapping)\\b.*:\\s*(#.*)?$|^\\s*(?:align\\s*\\([^)]*\\)\\s+)?([^:#]+|\"[^\"]*\"|'[^']*'):\\s*(#.*)?$",
+    "decreaseIndentPattern": "^\\s*(elif|else)\\b.*:\\s*(#.*)?$"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*(?:(?:extern|hot|packed|weak)\\s+)?(fn|struct|enum|union|feature|impl|test|if|elif|else|while|for|match|unsafe|comptime|wrapping)\\b.*:\\s*(#.*)?$|^\\s*(?:align\\s*\\([^)]*\\)\\s+)?([^:#]+|\"[^\"]*\"|'[^']*'):\\s*(#.*)?$",
+      "action": {
+        "indentAction": "Indent"
+      }
+    },
+    {
+      "beforeText": "^\\s*(return|pass|break|continue|panic\\(.*\\))\\b.*$",
+      "action": {
+        "indentAction": "Outdent"
+      }
+    }
+  ]
+}

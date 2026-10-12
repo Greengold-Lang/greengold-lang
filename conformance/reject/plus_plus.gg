@@ -1,0 +1,6 @@
+# conformance: SPEC section 17, rejected form: `x++`
+# expect-error: GG0133 at line 6
+
+fn main():
+    x = 1
+    x++

@@ -1,0 +1,15 @@
+# conformance: SPEC section 15 (Foreign functions and pointers), example 1
+# expect-output:
+#   false true
+
+extern "stdio.h" fn printf(fmt: str, ...) -> i32 as c_printf
+extern struct CPoint:
+    x: i32
+    y: i32
+
+fn main():
+    n: i32 = 5
+    p: *CPoint = null
+    unsafe:
+        q = addr(n)
+        print(ptr_to_int(q) == 0, p == null)

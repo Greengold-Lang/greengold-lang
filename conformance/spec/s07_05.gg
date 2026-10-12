@@ -1,0 +1,22 @@
+# conformance: SPEC section 7 (Structs, methods, enums), example 5
+# expect-output:
+#   big 12
+
+fn sign(n: i32) -> str:
+    match n:
+        0:
+            return "zero"
+        v if v < 0:
+            return "negative"
+        _:
+            return "positive"
+
+fn main():
+    o: Optional[i32] = Valid(12)
+    match o:
+        Valid(x) if x > 10:
+            print("big", x)
+        Valid(x):
+            print(x)
+        None:
+            print(sign(-3))

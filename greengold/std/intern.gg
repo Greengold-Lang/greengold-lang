@@ -1,0 +1,57 @@
+# std.intern: one stable copy of each distinct byte string.
+# The id is a usize, so it can be a HashMap key. The bytes do not move when the table grows.
+import std.string
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+
+public
+struct Intern:
+    private
+    ptrs: List[usize]
+    lens: List[usize]
+
+public
+# Empty intern table.
+fn intern_new() -> Intern:
+    return Intern{ ptrs: List[usize](), lens: List[usize]() }
+
+impl Intern:
+    public
+    # Copy `text` unless those bytes are already stored. Returns the id.
+    fn put(self: lend Intern, text: str) -> usize:
+        i: usize = 0
+        while i < self.lens.len:
+            if self.lens[i] == text.len:
+                same = false
+                unsafe:
+                    view = str_from_raw(int_to_ptr[*u8](self.ptrs[i]), self.lens[i])
+                    same = string.str_eq(view, text)
+                if same:
+                    return i
+            i += 1
+        raw: usize = 0
+        unsafe:
+            buf = malloc(text.len + 1)
+            if ptr_to_int(buf) == 0:
+                panic("intern: out of memory")
+            n: usize = 0
+            while n < text.len:
+                buf[n] = text[n]
+                n += 1
+            buf[text.len] = 0
+            raw = ptr_to_int(buf)
+        id = self.ptrs.len
+        self.ptrs.push(raw)
+        self.lens.push(text.len)
+        return id
+
+    # Bytes stored for `id`. The view stays valid while this table is alive.
+    fn text(self: read Intern, id: usize) -> str:
+        view: str = ""
+        unsafe:
+            view = str_from_raw(int_to_ptr[*u8](self.ptrs[id]), self.lens[id])
+        return view
+
+    fn len(self: read Intern) -> usize:
+        return self.ptrs.len

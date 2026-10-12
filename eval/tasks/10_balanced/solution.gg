@@ -1,0 +1,13 @@
+fn balanced(text: str) -> bool:
+    depth: i32 = 0
+    for i in 0..text.len:
+        c = text[i]
+        if c == '(':
+            depth += 1
+        elif c == ')':
+            depth -= 1
+            if depth < 0:
+                return false
+        else:
+            return false
+    return depth == 0

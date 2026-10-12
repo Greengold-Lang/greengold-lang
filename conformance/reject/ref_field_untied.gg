@@ -1,0 +1,11 @@
+# conformance: SPEC section 17, rejected form: a reference field with no `tied to`
+# expect-error: GG0321 at line 8
+
+struct P:
+    hp: i32
+
+struct S:
+    p: read P
+
+fn main():
+    pass

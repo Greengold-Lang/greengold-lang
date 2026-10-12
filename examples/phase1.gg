@@ -1,0 +1,58 @@
+﻿type Pair = (i32, f64)
+
+struct Vec2:
+    x: f64
+    y: f64
+
+impl Vec2:
+    fn add(self, o: Vec2) -> Vec2:
+        return Vec2{ x: self.x + o.x, y: self.y + o.y }
+
+    fn sub(self, o: Vec2) -> Vec2:
+        return Vec2{ x: self.x - o.x, y: self.y - o.y }
+
+    fn mul(self, k: f64) -> Vec2:
+        return Vec2{ x: self.x * k, y: self.y * k }
+
+    fn neg(self) -> Vec2:
+        return Vec2{ x: -self.x, y: -self.y }
+
+    fn eq(self, o: Vec2) -> bool:
+        return self.x == o.x and self.y == o.y
+
+    fn lt(self, o: Vec2) -> bool:
+        return self.x < o.x
+
+fn divmod(a: i32, b: i32) -> (i32, i32):
+    return (a / b, a % b)
+
+fn first(p: Pair) -> i32:
+    return p.0
+
+fn main():
+    q, r = divmod(17, 5)
+    print(q, r)
+    t = (1, 2.5, true)
+    print(t.0, t.1, t.2)
+    p: Pair = (7, 1.5)
+    print(first(p), p.1)
+
+    a = Vec2{ x: 1.0, y: 2.0 }
+    b = Vec2{ x: 3.0, y: 5.0 }
+    c = a + b * 2.0 - a
+    n = -c
+    print(c.x, c.y, n.x, n.y)
+    print(a == b, a != b, a < b, a == a)
+
+    o = Valid(41)
+    if let Valid(v) = o:
+        print("some", v + 1)
+    else:
+        print("none")
+
+    items = List[i32]()
+    items.push(1)
+    items.push(2)
+    while let Valid(top) = items.pop():
+        print("pop", top)
+

@@ -1,0 +1,24 @@
+hot fn sieve(limit: usize) -> usize:
+    overflow: wrap
+    is_prime = List[u8]()
+    for i in 0..limit:
+        is_prime.push(1)
+
+    p: usize = 2
+    while p * p < limit:
+        if trust is_prime[p] == 1:
+            k: usize = p * p
+            while k < limit:
+                trust is_prime[k] = 0
+                k += p
+        p += 1
+
+    count: usize = 0
+    for i in 2..limit:
+        if trust is_prime[i] == 1:
+            count += 1
+    return count
+
+fn main():
+    cnt = sieve(8000000)
+    print(cnt)

@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "model": "ReferenceModel",
+  "repair_cap": 5,
+  "tasks": [
+    {
+      "id": "01_stack",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 307
+    },
+    {
+      "id": "02_parse_i32",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 258
+    },
+    {
+      "id": "03_ring",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 373
+    },
+    {
+      "id": "04_reverse",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 170
+    },
+    {
+      "id": "05_translate",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 160
+    },
+    {
+      "id": "06_count_byte",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 135
+    },
+    {
+      "id": "07_median3",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 173
+    },
+    {
+      "id": "08_bsearch",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 202
+    },
+    {
+      "id": "09_divide",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 164
+    },
+    {
+      "id": "10_balanced",
+      "first_try_compile": true,
+      "repair_rounds": 0,
+      "compiled": true,
+      "tests_passed": 2,
+      "tests_failed": 0,
+      "tests_total": 2,
+      "tests_ran": true,
+      "tokens": 182
+    }
+  ],
+  "summary": {
+    "tasks": 10,
+    "first_try_compile": 10,
+    "compiled": 10,
+    "tests_passed": 20,
+    "tests_total": 20,
+    "tokens": 2124,
+    "mean_repair_rounds": 0.0
+  }
+}

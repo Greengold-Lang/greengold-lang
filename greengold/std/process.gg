@@ -1,0 +1,183 @@
+# std.process: process control and command execution.
+import std.fs
+import std.string
+import std.time
+
+private
+extern "stdlib.h" fn exit(code: i32)
+extern "stdlib.h" fn getenv(name: *u8) -> *u8
+extern "stdlib.h" fn system(cmd: *u8) -> i32
+extern fn gg_argc() -> i32
+extern fn gg_argv_at(index: i32) -> *mut u8
+
+public
+fn process_exit(code: i32):
+    unsafe:
+        exit(code)
+
+# Returns the value of an environment variable (name must be a literal / NUL-terminated).
+fn env_get(name: str) -> Optional[string]:
+    unsafe:
+        p = getenv(string_to_cstr(name))
+        if ptr_to_int(p) == 0:
+            return None
+        s = string.new()
+        i: usize = 0
+        while p[i] != 0:
+            s.append_byte(p[i])
+            i += 1
+        return Valid(s)
+
+# True on Windows. Used by std.fs directory commands.
+fn host_is_windows() -> bool:
+    match consume env_get("OS"):
+        Valid(v):
+            return string.str_eq(v.as_str(), "Windows_NT")
+        None:
+            return false
+
+struct ProcessResult:
+    code: i32
+    out: string
+    err: string
+
+private
+fn _needs_quote(text: str) -> bool:
+    if text.len == 0:
+        return true
+    for i in 0..text.len:
+        c = text[i]
+        if not ((c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '.' or c == '_' or c == '-' or c == '+' or c == '/' or c == ':' or c == '@'):
+            return true
+    return false
+
+fn _quote_win(text: str) -> string:
+    o = string.new()
+    o.append_byte('"')
+    for i in 0..text.len:
+        if text[i] == '"':
+            o.append_byte('"')
+            o.append_byte('"')
+        else:
+            o.append_byte(text[i])
+    o.append_byte('"')
+    return o
+
+fn _quote_sh(text: str) -> string:
+    o = string.new()
+    o.append_byte('\'')
+    for i in 0..text.len:
+        if text[i] == '\'':
+            o.append_str("'\\''")
+        else:
+            o.append_byte(text[i])
+    o.append_byte('\'')
+    return o
+
+fn _quote(text: str) -> string:
+    if host_is_windows():
+        if not _needs_quote(text):
+            return string.from(text)
+        return _quote_win(text)
+    return _quote_sh(text)
+
+fn _quote_always(text: str) -> string:
+    if host_is_windows():
+        return _quote_win(text)
+    return _quote_sh(text)
+
+fn _temp_root() -> string:
+    match consume env_get("TEMP"):
+        Valid(v):
+            return v
+        None:
+            pass
+    match consume env_get("TMPDIR"):
+        Valid(v):
+            return v
+        None:
+            pass
+    match consume env_get("TMP"):
+        Valid(v):
+            return v
+        None:
+            return string.from("/tmp")
+
+fn _temp_file(tag: str) -> string:
+    root = _temp_root()
+    n: i64 = 0
+    while n < 1000:
+        name = string.from("gg_")
+        name.append_i64(time.clock_ticks())
+        name.append_byte('_')
+        name.append_i64(n)
+        name.append_byte('_')
+        name.append_str(tag)
+        name.append_str(".tmp")
+        path = fs.path_join(root.as_str(), name.as_str())
+        if not fs.file_exists(path.as_str()):
+            return path
+        n += 1
+    return fs.path_join(root.as_str(), "gg_fallback.tmp")
+
+private
+fn _arg_text(index: i32) -> str:
+    view: str = ""
+    unsafe:
+        view = cstr_to_string(gg_argv_at(index))
+    return view
+
+public
+# Arguments of this process. Index 0 is the program name.
+fn args() -> List[str]:
+    out = List[str]()
+    n = gg_argc()
+    i: i32 = 0
+    while i < n:
+        out.push(_arg_text(i))
+        i += 1
+    return out
+
+# Run `argv` through the system shell. Captures stdout and stderr.
+# `None` means the shell could not be started. `code` is the process exit code.
+fn process_run(argv: read List[str]) -> Optional[ProcessResult]:
+    if argv.len == 0:
+        return None
+    out_path = _temp_file("out")
+    err_path = _temp_file("err")
+    cmd = string.new()
+    for i in 0..argv.len:
+        if i > 0:
+            cmd.append_byte(' ')
+        piece = _quote(argv[i])
+        cmd.append_str(piece.as_str())
+    cmd.append_str(" > ")
+    quoted_out = _quote_always(out_path.as_str())
+    cmd.append_str(quoted_out.as_str())
+    cmd.append_str(" 2> ")
+    quoted_err = _quote_always(err_path.as_str())
+    cmd.append_str(quoted_err.as_str())
+    cmd.append_byte(0)
+    raw: i32 = -1
+    unsafe:
+        raw = system(string_to_cstr(cmd.as_str()))
+    out = string.new()
+    err = string.new()
+    match consume fs.read_file_to_string(out_path.as_str()):
+        Valid(s):
+            out = s
+        None:
+            pass
+    match consume fs.read_file_to_string(err_path.as_str()):
+        Valid(s):
+            err = s
+        None:
+            pass
+    fs.remove_file(out_path.as_str())
+    fs.remove_file(err_path.as_str())
+    if raw < 0:
+        return None
+    code = raw
+    if not host_is_windows():
+        code = (raw >> 8) & 255
+    return Valid(ProcessResult{ code: code, out: out, err: err })

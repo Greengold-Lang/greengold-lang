@@ -1,0 +1,779 @@
+# Python dump_ast and unparse.
+import std.string
+import ast
+import cursor
+
+public
+
+fn pad(out: lend string, n: i32):
+    i: i32 = 0
+    while i < n:
+        out.append_str("  ")
+        i += 1
+
+fn nl(out: lend string):
+    out.append_byte(10)
+
+fn hex_byte(out: lend string, c: u8):
+    digits = "0123456789abcdef"
+    v = usize(c)
+    out.append_byte(digits[v / 16])
+    out.append_byte(digits[v % 16])
+
+fn append_py(out: lend string, s: str):
+    sq = false
+    dq = false
+    i: usize = 0
+    while i < s.len:
+        if s[i] == 39:
+            sq = true
+        if s[i] == 34:
+            dq = true
+        i += 1
+    q: u8 = 39
+    if sq and not dq:
+        q = 34
+    out.append_byte(q)
+    i = 0
+    while i < s.len:
+        c = s[i]
+        if c == 92:
+            out.append_byte(92)
+            out.append_byte(92)
+        elif c == q:
+            out.append_byte(92)
+            out.append_byte(q)
+        elif c == 10:
+            out.append_byte(92)
+            out.append_byte(110)
+        elif c == 13:
+            out.append_byte(92)
+            out.append_byte(114)
+        elif c == 9:
+            out.append_byte(92)
+            out.append_byte(116)
+        elif c < 32 or c >= 127:
+            out.append_byte(92)
+            out.append_byte(120)
+            hex_byte(out, c)
+        else:
+            out.append_byte(c)
+        i += 1
+    out.append_byte(q)
+
+fn py_byte(out: lend string, b: u8):
+    tmp = string.new()
+    tmp.append_byte(b)
+    append_py(out, tmp.as_str())
+
+fn key(out: lend string, indent: i32, name: str):
+    pad(out, indent)
+    out.append_str(name)
+
+fn none_f(out: lend string, indent: i32, name: str):
+    key(out, indent, name)
+    out.append_str(": None")
+    nl(out)
+
+fn bool_f(out: lend string, indent: i32, name: str, v: bool):
+    key(out, indent, name)
+    out.append_str(": ")
+    if v:
+        out.append_str("True")
+    else:
+        out.append_str("False")
+    nl(out)
+
+fn i64_f(out: lend string, indent: i32, name: str, v: i64):
+    key(out, indent, name)
+    out.append_str(": ")
+    out.append_i64(v)
+    nl(out)
+
+fn i32_f(out: lend string, indent: i32, name: str, v: i32):
+    i64_f(out, indent, name, i64(v))
+
+fn text_f(out: lend string, indent: i32, name: str, text: str, quoted: bool):
+    key(out, indent, name)
+    out.append_str(": ")
+    if quoted:
+        append_py(out, text)
+    else:
+        out.append_str(text)
+    nl(out)
+
+fn opt_str(p: read cursor.Parser, out: lend string, indent: i32, name: str, packed: usize):
+    if packed == 0:
+        none_f(out, indent, name)
+        return
+    text_f(out, indent, name, cursor.packed_text(p, packed), true)
+
+fn begin(p: read cursor.Parser, out: lend string, indent: i32, id: usize):
+    n = p.nodes[id]
+    pad(out, indent)
+    out.append_str(ast.kind_name(n.kind))
+    nl(out)
+    none_f(out, indent + 1, "filename")
+
+fn dump_at(p: read cursor.Parser, id: usize, indent: i32, out: lend string):
+    if id == 0:
+        return
+    begin(p, out, indent, id)
+    n = p.nodes[id]
+    k = n.kind
+    d = indent + 1
+    if k == 1:
+        id_list(p, out, d, "decls", n.lo, n.hi)
+        text_f(out, d, "type_order", "[]", false)
+        text_f(out, d, "struct_infos", "{}", false)
+        text_f(out, d, "enum_infos", "{}", false)
+        text_f(out, d, "func_instances", "[]", false)
+        text_f(out, d, "imports", "{}", false)
+        return
+    if k == 2:
+        text_f(out, d, "path", cursor.packed_text(p, n.s0), true)
+        opt_str(p, out, d, "alias", n.s1)
+        str_list(p, out, d, "names", n.slo, n.shi)
+        return
+    if k == 3:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "type_ref", n.c0)
+        opt_node(p, out, d, "value", n.c1)
+        bool_f(out, d, "is_pub", n.f0)
+        return
+    if k == 4:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "fields", n.lo, n.hi)
+        str_list(p, out, d, "type_params", n.slo, n.shi)
+        bounds_f(p, out, d, n.bk0, n.bk1)
+        bool_f(out, d, "is_extern", n.f0)
+        bool_f(out, d, "is_pub", n.f1)
+        return
+    if k == 5:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "type_ref", n.c0)
+        text_f(out, d, "mode", cursor.packed_text(p, n.s1), true)
+        opt_str(p, out, d, "tied_to", n.s2)
+        bool_f(out, d, "is_soa", n.f0)
+        bool_f(out, d, "is_pub", n.f1)
+        return
+    if k == 6:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "variants", n.lo, n.hi)
+        str_list(p, out, d, "type_params", n.slo, n.shi)
+        bounds_f(p, out, d, n.bk0, n.bk1)
+        bool_f(out, d, "is_pub", n.f0)
+        return
+    if k == 7:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "payload", n.lo, n.hi)
+        return
+    if k == 8:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "methods", n.lo, n.hi)
+        bool_f(out, d, "is_pub", n.f0)
+        return
+    if k == 9:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "params", n.lo, n.hi)
+        opt_node(p, out, d, "ret", n.c0)
+        id_list(p, out, d, "body", n.lo2, n.hi2)
+        str_list(p, out, d, "type_params", n.slo, n.shi)
+        str_list(p, out, d, "owner_params", n.slo2, n.shi2)
+        bounds_f(p, out, d, n.bk0, n.bk1)
+        none_f(out, d, "inst_note")
+        bool_f(out, d, "from_prelude", n.f0)
+        bool_f(out, d, "ret_view", n.f1)
+        bool_f(out, d, "ret_lend", n.f2)
+        opt_str(p, out, d, "ret_tied", n.s1)
+        bool_f(out, d, "is_comptime", n.f3)
+        opt_str(p, out, d, "overflow_mode", n.s2)
+        bool_f(out, d, "is_hot", n.f4)
+        bool_f(out, d, "is_test", n.f5)
+        text_f(out, d, "test_label", cursor.packed_text(p, n.s3), true)
+        bool_f(out, d, "is_pub", n.f6)
+        opt_str(p, out, d, "owner_qualifier", n.s4)
+        return
+    if k == 10:
+        opt_str(p, out, d, "header", n.s0)
+        text_f(out, d, "name", cursor.packed_text(p, n.s1), true)
+        id_list(p, out, d, "params", n.lo, n.hi)
+        opt_node(p, out, d, "ret", n.c0)
+        bool_f(out, d, "variadic", n.f0)
+        none_f(out, d, "ret_ty")
+        text_f(out, d, "c_symbol", cursor.packed_text(p, n.s2), true)
+        bool_f(out, d, "is_pub", n.f1)
+        return
+    if k == 11:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "type_ref", n.c0)
+        text_f(out, d, "mode", cursor.packed_text(p, n.s1), true)
+        opt_str(p, out, d, "tied_to", n.s2)
+        bool_f(out, d, "exclusive", n.f0)
+        i32_f(out, d, "mode_line", n.i1)
+        i32_f(out, d, "mode_col", n.i2)
+        i32_f(out, d, "mode_length", n.i3)
+        return
+    if k == 12:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "size_expr", n.c0)
+        opt_node(p, out, d, "elem", n.c1)
+        bool_f(out, d, "is_slice", n.f0)
+        bool_f(out, d, "is_array", n.f1)
+        opt_str(p, out, d, "base", n.s1)
+        id_list(p, out, d, "args", n.lo, n.hi)
+        bool_f(out, d, "is_ptr", n.f2)
+        bool_f(out, d, "ptr_mut", n.f3)
+        bool_f(out, d, "is_fn", n.f4)
+        id_list(p, out, d, "fn_params", n.lo2, n.hi2)
+        opt_node(p, out, d, "fn_ret", n.c2)
+        bool_f(out, d, "is_bounded", n.f5)
+        if n.f5:
+            i64_f(out, d, "range_lo", n.i0)
+            i64_f(out, d, "range_hi", n.j0)
+        else:
+            none_f(out, d, "range_lo")
+            none_f(out, d, "range_hi")
+        opt_str(p, out, d, "qualifier", n.s2)
+        return
+    if k == 13:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        bool_f(out, d, "mutable", n.f0)
+        opt_node(p, out, d, "type_ref", n.c0)
+        opt_node(p, out, d, "value", n.c1)
+        bool_f(out, d, "is_soa", n.f1)
+        bool_f(out, d, "is_comptime_val", n.f2)
+        text_f(out, d, "ref_mode", cursor.packed_text(p, n.s1), true)
+        opt_str(p, out, d, "ref_root", n.s2)
+        return
+    if k == 14:
+        opt_node(p, out, d, "target", n.c0)
+        text_f(out, d, "op", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "value", n.c1)
+        bool_f(out, d, "rebind", n.f0)
+        text_f(out, d, "ref_mode", cursor.packed_text(p, n.s1), true)
+        opt_str(p, out, d, "ref_root", n.s2)
+        return
+    if k == 15:
+        id_list(p, out, d, "branches", n.lo, n.hi)
+        maybe_list(p, out, d, "else_body", n.f0, n.lo2, n.hi2)
+        bool_f(out, d, "unsafe", n.f1)
+        return
+    if k == 16:
+        opt_node(p, out, d, "cond", n.c0)
+        id_list(p, out, d, "body", n.lo, n.hi)
+        return
+    if k == 17:
+        opt_node(p, out, d, "cond", n.c0)
+        id_list(p, out, d, "body", n.lo, n.hi)
+        return
+    if k == 18:
+        text_f(out, d, "var", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "start", n.c0)
+        opt_node(p, out, d, "end", n.c1)
+        bool_f(out, d, "inclusive", n.f0)
+        id_list(p, out, d, "body", n.lo, n.hi)
+        opt_node(p, out, d, "step", n.c2)
+        return
+    if k == 19:
+        text_f(out, d, "var", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "iterable", n.c0)
+        id_list(p, out, d, "body", n.lo, n.hi)
+        bool_f(out, d, "mutable", n.f0)
+        opt_str(p, out, d, "index_var", n.s1)
+        return
+    if k == 20:
+        opt_node(p, out, d, "value", n.c0)
+        return
+    if k == 21 or k == 22 or k == 27:
+        return
+    if k == 23:
+        opt_node(p, out, d, "scrutinee", n.c0)
+        text_f(out, d, "mode", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "arms", n.lo, n.hi)
+        return
+    if k == 24:
+        opt_str(p, out, d, "variant", n.s0)
+        opt_str(p, out, d, "qualifier", n.s1)
+        id_list(p, out, d, "bindings", n.lo, n.hi)
+        id_list(p, out, d, "body", n.lo2, n.hi2)
+        bool_f(out, d, "has_parens", n.f0)
+        id_list(p, out, d, "pats", n.lo3, n.hi3)
+        return
+    if k == 25:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        return
+    if k == 26:
+        opt_node(p, out, d, "lo", n.c0)
+        opt_node(p, out, d, "hi", n.c1)
+        bool_f(out, d, "inclusive", n.f0)
+        return
+    if k == 28:
+        opt_node(p, out, d, "expr", n.c0)
+        return
+    if k == 29:
+        opt_node(p, out, d, "stmt", n.c0)
+        return
+    if k == 30:
+        opt_node(p, out, d, "value", n.c0)
+        return
+    if k == 31:
+        opt_node(p, out, d, "cond", n.c0)
+        return
+    if k == 32:
+        id_list(p, out, d, "body", n.lo, n.hi)
+        return
+    if k == 33:
+        text_f(out, d, "mode", cursor.packed_text(p, n.s0), true)
+        return
+    if k == 34:
+        opt_node(p, out, d, "stmt", n.c0)
+        return
+    if k == 35:
+        text_f(out, d, "value", cursor.packed_text(p, n.s0), false)
+        return
+    if k == 36:
+        text_f(out, d, "text", cursor.packed_text(p, n.s0), true)
+        return
+    if k == 37:
+        text_f(out, d, "value", cursor.packed_text(p, n.s0), true)
+        return
+    if k == 38:
+        id_list(p, out, d, "parts", n.lo, n.hi)
+        return
+    if k == 39:
+        bool_f(out, d, "value", n.f0)
+        return
+    if k == 40:
+        i64_f(out, d, "value", n.i0)
+        py_byte_f(out, d, "text", u8(n.i0))
+        return
+    if k == 41:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        return
+    if k == 42:
+        opt_node(p, out, d, "obj", n.c0)
+        text_f(out, d, "field_name", cursor.packed_text(p, n.s0), true)
+        return
+    if k == 43:
+        text_f(out, d, "op", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "operand", n.c0)
+        return
+    if k == 44:
+        text_f(out, d, "op", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "left", n.c0)
+        opt_node(p, out, d, "right", n.c1)
+        return
+    if k == 45:
+        text_f(out, d, "target_type", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "expr", n.c0)
+        return
+    if k == 46:
+        opt_node(p, out, d, "type_ref", n.c0)
+        return
+    if k == 47:
+        opt_node(p, out, d, "expr", n.c0)
+        return
+    if k == 48:
+        text_f(out, d, "mode", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "expr", n.c0)
+        return
+    if k == 49:
+        text_f(out, d, "callee", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "args", n.lo, n.hi)
+        id_list(p, out, d, "type_args", n.lo2, n.hi2)
+        opt_str(p, out, d, "qualifier", n.s1)
+        return
+    if k == 50:
+        opt_node(p, out, d, "obj", n.c0)
+        text_f(out, d, "method", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "args", n.lo, n.hi)
+        return
+    if k == 51:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        opt_node(p, out, d, "value", n.c0)
+        text_f(out, d, "ref_mode", cursor.packed_text(p, n.s1), true)
+        return
+    if k == 52:
+        text_f(out, d, "type_name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "fields", n.lo, n.hi)
+        id_list(p, out, d, "type_args", n.lo2, n.hi2)
+        opt_str(p, out, d, "qualifier", n.s1)
+        return
+    if k == 53:
+        opt_node(p, out, d, "obj", n.c0)
+        opt_node(p, out, d, "index", n.c1)
+        bool_f(out, d, "trusted", n.f0)
+        return
+    if k == 54:
+        text_f(out, d, "name", cursor.packed_text(p, n.s0), true)
+        id_list(p, out, d, "type_args", n.lo, n.hi)
+        return
+    if k == 55:
+        opt_node(p, out, d, "operand", n.c0)
+        none_f(out, d, "operand_ty")
+        none_f(out, d, "ret_ty")
+        return
+    if k == 56:
+        opt_node(p, out, d, "obj", n.c0)
+        opt_node(p, out, d, "start", n.c1)
+        opt_node(p, out, d, "end", n.c2)
+        bool_f(out, d, "inclusive", n.f0)
+        return
+    if k == 57:
+        id_list(p, out, d, "elements", n.lo, n.hi)
+        return
+    if k == 58:
+        opt_node(p, out, d, "value", n.c0)
+        return
+
+fn py_byte_f(out: lend string, indent: i32, name: str, b: u8):
+    key(out, indent, name)
+    out.append_str(": ")
+    py_byte(out, b)
+    nl(out)
+
+fn opt_node(p: read cursor.Parser, id_out: lend string, indent: i32, name: str, id: usize):
+    if id == 0:
+        none_f(id_out, indent, name)
+        return
+    key(id_out, indent, name)
+    id_out.append_str(":")
+    nl(id_out)
+    dump_at(p, id, indent + 1, id_out)
+
+fn id_list(p: read cursor.Parser, out: lend string, indent: i32, name: str, lo: usize, hi: usize):
+    if lo == hi:
+        key(out, indent, name)
+        out.append_str(": []")
+        nl(out)
+        return
+    key(out, indent, name)
+    out.append_str(":")
+    nl(out)
+    i = lo
+    while i < hi:
+        dump_at(p, p.ids[i], indent + 1, out)
+        i += 1
+
+fn maybe_list(p: read cursor.Parser, out: lend string, indent: i32, name: str, has: bool, lo: usize, hi: usize):
+    if not has:
+        none_f(out, indent, name)
+        return
+    id_list(p, out, indent, name, lo, hi)
+
+fn str_list(p: read cursor.Parser, out: lend string, indent: i32, name: str, lo: usize, hi: usize):
+    if lo == hi:
+        key(out, indent, name)
+        out.append_str(": []")
+        nl(out)
+        return
+    key(out, indent, name)
+    out.append_str(":")
+    nl(out)
+    i = lo
+    while i < hi:
+        pad(out, indent + 1)
+        append_py(out, p.lx.names.text(p.strs[i]))
+        nl(out)
+        i += 1
+
+fn binding_repr(p: read cursor.Parser, out: lend string, id: usize):
+    n = p.nodes[id]
+    out.append_str("Binding(line=")
+    out.append_i64(i64(n.line))
+    out.append_str(", col=")
+    out.append_i64(i64(n.col))
+    out.append_str(", length=")
+    out.append_i64(i64(n.length))
+    out.append_str(", filename=None, name=")
+    append_py(out, cursor.packed_text(p, n.s0))
+    out.append_str(")")
+
+fn bounds_f(p: read cursor.Parser, out: lend string, indent: i32, bk0: usize, bk1: usize):
+    key(out, indent, "bounds")
+    if bk0 == bk1:
+        out.append_str(": {}")
+        nl(out)
+        return
+    out.append_str(": {")
+    i = bk0
+    while i < bk1:
+        if i > bk0:
+            out.append_str(", ")
+        append_py(out, p.lx.names.text(p.bkeys[i]))
+        out.append_str(": [")
+        j = p.bvlo[i]
+        end = p.bvhi[i]
+        while j < end:
+            if j > p.bvlo[i]:
+                out.append_str(", ")
+            binding_repr(p, out, p.ids[j])
+            j += 1
+        out.append_str("]")
+        i += 1
+    out.append_str("}")
+    nl(out)
+
+fn print_ast(p: read cursor.Parser, id: usize):
+    out = string.new()
+    dump_at(p, id, 0, out)
+    text = out.as_str()
+    i: usize = 0
+    start: usize = 0
+    while i < text.len:
+        if text[i] == 10:
+            print(string.substr(text, start, i))
+            start = i + 1
+        i += 1
+    if start < text.len:
+        print(string.substr(text, start, text.len))
+
+fn print_diags(p: read cursor.Parser):
+    d: usize = 0
+    while d < p.lx.diags.len:
+        item = p.lx.diags[d]
+        row = string.new()
+        row.append_str("DIAG ")
+        row.append_str(p.lx.names.text(item.code))
+        row.append_str(" ")
+        row.append_i64(i64(item.line))
+        row.append_str(" ")
+        row.append_i64(i64(item.col))
+        row.append_str(" ")
+        row.append_i64(i64(item.length))
+        row.append_str(" ")
+        row.append_str(p.lx.names.text(item.msg))
+        print(row.as_str())
+        if item.has_hint:
+            hrow = string.new()
+            hrow.append_str("HINT ")
+            hrow.append_str(p.lx.names.text(item.hint))
+            print(hrow.as_str())
+        if item.has_fix:
+            frow = string.new()
+            if item.app == 0:
+                frow.append_str("FIX safe|")
+            else:
+                frow.append_str("FIX ")
+                frow.append_str(p.lx.names.text(item.app - 1))
+                frow.append_str("|")
+            frow.append_str(p.lx.names.text(item.fix_desc))
+            frow.append_str("|")
+            frow.append_i64(i64(item.esl))
+            frow.append_str(":")
+            frow.append_i64(i64(item.esc))
+            frow.append_str(":")
+            frow.append_i64(i64(item.eel))
+            frow.append_str(":")
+            frow.append_i64(i64(item.eec))
+            frow.append_str("|")
+            frow.append_str(p.lx.names.text(item.repl))
+            print(frow.as_str())
+        d += 1
+
+fn join_comma(p: read cursor.Parser, out: lend string, lo: usize, hi: usize, types: bool):
+    i = lo
+    first = true
+    while i < hi:
+        if not first:
+            out.append_str(", ")
+        first = false
+        if types:
+            n = p.nodes[p.ids[i]]
+            out.append_str(cursor.packed_text(p, n.s0))
+        else:
+            piece = unparse(p, p.ids[i])
+            out.append_str(piece.as_str())
+        i += 1
+
+fn unparse(p: read cursor.Parser, id: usize) -> string:
+    out = string.new()
+    if id == 0:
+        out.append_str("...")
+        return out
+    n = p.nodes[id]
+    k = n.kind
+    if k == 35:
+        out.append_str(cursor.packed_text(p, n.s0))
+        return out
+    if k == 36:
+        out.append_str(cursor.packed_text(p, n.s0))
+        return out
+    if k == 37:
+        out.append_byte(34)
+        s = cursor.packed_text(p, n.s0)
+        i: usize = 0
+        while i < s.len:
+            c = s[i]
+            if c == 92 or c == 34:
+                out.append_byte(92)
+                out.append_byte(c)
+            elif c == 10:
+                out.append_byte(92)
+                out.append_byte(110)
+            else:
+                out.append_byte(c)
+            i += 1
+        out.append_byte(34)
+        return out
+    if k == 39:
+        if n.f0:
+            out.append_str("true")
+        else:
+            out.append_str("false")
+        return out
+    if k == 40:
+        out.append_byte(39)
+        if n.i0 >= 0 and n.i0 < 128:
+            out.append_byte(u8(n.i0))
+        out.append_byte(39)
+        return out
+    if k == 41 or k == 54:
+        out.append_str(cursor.packed_text(p, n.s0))
+        if k == 54:
+            out.append_byte(91)
+            join_comma(p, out, n.lo, n.hi, true)
+            out.append_byte(93)
+        return out
+    if k == 42:
+        a = unparse(p, n.c0)
+        out.append_str(a.as_str())
+        out.append_byte(46)
+        out.append_str(cursor.packed_text(p, n.s0))
+        return out
+    if k == 43:
+        out.append_str(cursor.packed_text(p, n.s0))
+        if cursor.packed_text(p, n.s0).len == 3:
+            out.append_byte(32)
+        b = unparse(p, n.c0)
+        out.append_str(b.as_str())
+        return out
+    if k == 44:
+        l = unparse(p, n.c0)
+        out.append_str(l.as_str())
+        out.append_byte(32)
+        out.append_str(cursor.packed_text(p, n.s0))
+        out.append_byte(32)
+        r = unparse(p, n.c1)
+        out.append_str(r.as_str())
+        return out
+    if k == 45:
+        out.append_str(cursor.packed_text(p, n.s0))
+        out.append_byte(40)
+        e = unparse(p, n.c0)
+        out.append_str(e.as_str())
+        out.append_byte(41)
+        return out
+    if k == 47:
+        out.append_str("copy ")
+        e2 = unparse(p, n.c0)
+        out.append_str(e2.as_str())
+        return out
+    if k == 48:
+        out.append_str(cursor.packed_text(p, n.s0))
+        out.append_byte(32)
+        e3 = unparse(p, n.c0)
+        out.append_str(e3.as_str())
+        return out
+    if k == 49:
+        out.append_str(cursor.packed_text(p, n.s0))
+        if n.lo2 != n.hi2:
+            out.append_byte(91)
+            join_comma(p, out, n.lo2, n.hi2, true)
+            out.append_byte(93)
+        out.append_byte(40)
+        join_comma(p, out, n.lo, n.hi, false)
+        out.append_byte(41)
+        return out
+    if k == 50:
+        o = unparse(p, n.c0)
+        out.append_str(o.as_str())
+        out.append_byte(46)
+        out.append_str(cursor.packed_text(p, n.s0))
+        out.append_byte(40)
+        join_comma(p, out, n.lo, n.hi, false)
+        out.append_byte(41)
+        return out
+    if k == 52:
+        out.append_str(cursor.packed_text(p, n.s0))
+        if n.lo2 != n.hi2:
+            out.append_byte(91)
+            join_comma(p, out, n.lo2, n.hi2, true)
+            out.append_byte(93)
+        out.append_str("{ ")
+        fi = n.lo
+        first = true
+        while fi < n.hi:
+            if not first:
+                out.append_str(", ")
+            first = false
+            f = p.nodes[p.ids[fi]]
+            out.append_str(cursor.packed_text(p, f.s0))
+            out.append_str(": ")
+            fv = unparse(p, f.c0)
+            out.append_str(fv.as_str())
+            fi += 1
+        out.append_str(" }")
+        return out
+    if k == 53:
+        o2 = unparse(p, n.c0)
+        out.append_str(o2.as_str())
+        out.append_byte(91)
+        ix = unparse(p, n.c1)
+        out.append_str(ix.as_str())
+        out.append_byte(93)
+        return out
+    if k == 55:
+        o3 = unparse(p, n.c0)
+        out.append_str(o3.as_str())
+        out.append_byte(63)
+        return out
+    if k == 56:
+        o4 = unparse(p, n.c0)
+        out.append_str(o4.as_str())
+        out.append_byte(91)
+        if n.c1 != 0:
+            st = unparse(p, n.c1)
+            out.append_str(st.as_str())
+        if n.f0:
+            out.append_str("..=")
+        else:
+            out.append_str("..")
+        if n.c2 != 0:
+            en = unparse(p, n.c2)
+            out.append_str(en.as_str())
+        out.append_byte(93)
+        return out
+    if k == 57:
+        out.append_byte(91)
+        join_comma(p, out, n.lo, n.hi, false)
+        out.append_byte(93)
+        return out
+    if k == 58:
+        out.append_byte(91)
+        v = unparse(p, n.c0)
+        out.append_str(v.as_str())
+        out.append_str("; ")
+        c = unparse(p, n.c1)
+        out.append_str(c.as_str())
+        out.append_byte(93)
+        return out
+    if k == 34:
+        if p.nodes[n.c0].kind == 15:
+            out.append_str("if ... then ... else ...")
+        else:
+            out.append_str("match ...")
+        return out
+    if k == 26:
+        lo = unparse(p, n.c0)
+        out.append_str(lo.as_str())
+        if n.f0:
+            out.append_str("..=")
+        else:
+            out.append_str("..")
+        hi = unparse(p, n.c1)
+        out.append_str(hi.as_str())
+        return out
+    out.append_str("...")
+    return out

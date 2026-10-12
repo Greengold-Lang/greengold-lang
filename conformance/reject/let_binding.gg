@@ -1,0 +1,6 @@
+# conformance: SPEC section 17, rejected form: `let x = ...`
+# expect-error: GG0133 at line 5
+
+fn main():
+    let x = 1
+    print(x)

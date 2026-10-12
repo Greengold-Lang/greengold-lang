@@ -1,0 +1,9 @@
+# conformance: SPEC section 2 (Names, types, and literals), example 2
+# expect-output:
+#   hello gg
+#   [3.14] [   42] [0xff] [--gg--]
+
+fn main():
+    name = "gg"
+    print(f"hello {name}")
+    print(f"[{3.14159:.2}] [{42:>5}] [{255:#x}] [{name:-^6}]")

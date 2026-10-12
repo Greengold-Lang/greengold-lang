@@ -1,0 +1,18 @@
+# conformance: SPEC section 11 (References), example 2
+# expect-output:
+#   2 6
+
+struct Player:
+    hp: i32
+
+struct Slot:
+    who: read Player tied to self
+
+fn pick(a: read Player, b: read Player) -> ref Player tied to b:
+    return b
+
+fn main():
+    hero = Player{ hp: 2 }
+    s = Slot{ who: hero }
+    ally = Player{ hp: 6 }
+    print(s.who.hp, pick(hero, ally).hp)

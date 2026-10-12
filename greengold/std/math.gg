@@ -1,0 +1,118 @@
+﻿# std.math: floating point math over libm.
+# The name after `fn` is the C symbol. `as` is the name used inside this module.
+private
+extern "math.h" fn sqrt(x: f64) -> f64 as c_sqrt
+extern "math.h" fn sin(x: f64) -> f64 as c_sin
+extern "math.h" fn cos(x: f64) -> f64 as c_cos
+extern "math.h" fn tan(x: f64) -> f64 as c_tan
+extern "math.h" fn atan2(y: f64, x: f64) -> f64 as c_atan2
+extern "math.h" fn pow(x: f64, y: f64) -> f64 as c_pow
+extern "math.h" fn exp(x: f64) -> f64 as c_exp
+extern "math.h" fn log(x: f64) -> f64 as c_log
+extern "math.h" fn floor(x: f64) -> f64 as c_floor
+extern "math.h" fn ceil(x: f64) -> f64 as c_ceil
+extern "math.h" fn fmod(x: f64, y: f64) -> f64 as c_fmod
+
+public
+fn pi() -> f64:
+    return 3.14159265358979323846
+
+fn e_const() -> f64:
+    return 2.71828182845904523536
+
+fn sqrt(x: f64) -> f64:
+    unsafe:
+        return c_sqrt(x)
+
+fn sin(x: f64) -> f64:
+    unsafe:
+        return c_sin(x)
+
+fn cos(x: f64) -> f64:
+    unsafe:
+        return c_cos(x)
+
+fn tan(x: f64) -> f64:
+    unsafe:
+        return c_tan(x)
+
+fn atan2(y: f64, x: f64) -> f64:
+    unsafe:
+        return c_atan2(y, x)
+
+fn pow(x: f64, y: f64) -> f64:
+    unsafe:
+        return c_pow(x, y)
+
+fn exp(x: f64) -> f64:
+    unsafe:
+        return c_exp(x)
+
+fn ln(x: f64) -> f64:
+    unsafe:
+        return c_log(x)
+
+fn floor(x: f64) -> f64:
+    unsafe:
+        return c_floor(x)
+
+fn ceil(x: f64) -> f64:
+    unsafe:
+        return c_ceil(x)
+
+fn fmod(x: f64, y: f64) -> f64:
+    unsafe:
+        return c_fmod(x, y)
+
+fn abs_f64(x: f64) -> f64:
+    if x < 0.0:
+        return 0.0 - x
+    return x
+
+fn abs_i64(x: i64) -> i64:
+    if x < 0:
+        return 0 - x
+    return x
+
+fn min_i64(a: i64, b: i64) -> i64:
+    if a < b:
+        return a
+    return b
+
+fn max_i64(a: i64, b: i64) -> i64:
+    if a > b:
+        return a
+    return b
+
+fn min_f64(a: f64, b: f64) -> f64:
+    if a < b:
+        return a
+    return b
+
+fn max_f64(a: f64, b: f64) -> f64:
+    if a > b:
+        return a
+    return b
+
+fn clamp_i64(x: i64, lo: i64, hi: i64) -> i64:
+    return min_i64(max_i64(x, lo), hi)
+
+fn gcd_u64(a: u64, b: u64) -> u64:
+    x = a
+    y = b
+    while y != 0:
+        t = x % y
+        x = y
+        y = t
+    return x
+
+fn pow_i64(base: i64, exp_: u32) -> i64:
+    result: i64 = 1
+    b = base
+    n = exp_
+    while n > 0:
+        if n % 2 == 1:
+            result = result * b
+        b = b * b
+        n = n / 2
+    return result

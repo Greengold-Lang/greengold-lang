@@ -1,0 +1,19 @@
+# conformance: SPEC section 12 (Numbers), example 1
+# expect-output:
+#   100
+#   4
+#   3
+#   4 4 false
+
+fn add(a: u8, b: u8) -> u8 overflow: wrap:
+    return a + b
+
+fn main():
+    n: int in 0..256 = 100
+    print(i64(n))
+    print(wrapping_add[u8](250, 10))
+    print(checked_add[i32](1, 2).value_or(0))
+    w: u8 = 250
+    wrapping:
+        w = w + 10
+    print(add(250, 10), w, add_overflows(w, u8(10)))

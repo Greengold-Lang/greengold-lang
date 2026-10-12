@@ -1,0 +1,5 @@
+# conformance: SPEC section 17, rejected form: `def` for `fn`
+# expect-error: GG0133 at line 4
+
+def main():
+    pass

@@ -1,0 +1,20 @@
+# Recursive and iterative fibonacci
+
+fn fib(n: i32) -> i32:
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+fn fib_loop(n: i32) -> i64:
+    a: i64 = 0
+    b: i64 = 1
+    for i in 0..n:
+        t = a + b
+        a = b
+        b = t
+    return a
+
+fn main():
+    for i in 0..=10:
+        print(fib(i))
+    print(fib_loop(50))

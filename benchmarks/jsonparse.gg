@@ -1,0 +1,141 @@
+# JSON: write 200,000 user records as one JSON text, parse it into a tree of values (a
+# recursive enum with lists of members), and walk the tree. Number and string parsing,
+# many small heap allocations, and recursion. The parser is the same in all three languages.
+
+enum Json:
+    Null
+    Bool(bool)
+    Num(f64)
+    Str(string)
+    Arr(List[Json])
+    Obj(List[Member])
+
+struct Member:
+    key: string
+    val: Json
+
+struct Parser:
+    text: str
+    pos: usize
+
+impl Parser:
+    fn ws(self: lend Self):
+        while self.pos < self.text.len and (self.text[self.pos] == ' ' or self.text[self.pos] == '\n'):
+            self.pos += 1
+
+    fn string(self: lend Self) -> string:
+        self.pos += 1  # the opening quote
+        out = string.new()
+        while self.text[self.pos] != '"':
+            c = self.text[self.pos]
+            if c == '\\':
+                self.pos += 1
+                e = self.text[self.pos]
+                out.append_byte(if e == 'n' then '\n' else e)
+            else:
+                out.append_byte(c)
+            self.pos += 1
+        self.pos += 1
+        return out
+
+    fn number(self: lend Self) -> f64:
+        neg = self.text[self.pos] == '-'
+        if neg:
+            self.pos += 1
+        v = 0.0
+        while self.pos < self.text.len and self.text[self.pos] >= '0' and self.text[self.pos] <= '9':
+            v = v * 10.0 + f64(self.text[self.pos] - '0')
+            self.pos += 1
+        if self.pos < self.text.len and self.text[self.pos] == '.':
+            self.pos += 1
+            scale = 0.1
+            while self.pos < self.text.len and self.text[self.pos] >= '0' and self.text[self.pos] <= '9':
+                v += f64(self.text[self.pos] - '0') * scale
+                scale *= 0.1
+                self.pos += 1
+        return if neg then -v else v
+
+    fn value(self: lend Self) -> Json:
+        self.ws()
+        c = self.text[self.pos]
+        if c == '{':
+            self.pos += 1
+            members = List[Member]()
+            self.ws()
+            if self.text[self.pos] == '}':
+                self.pos += 1
+                return Json.Obj(members)
+            while true:
+                self.ws()
+                key = self.string()
+                self.ws()
+                self.pos += 1  # ':'
+                members.push(Member{ key: key, val: self.value() })
+                self.ws()
+                c2 = self.text[self.pos]
+                self.pos += 1
+                if c2 == '}':
+                    return Json.Obj(members)
+        if c == '[':
+            self.pos += 1
+            items = List[Json]()
+            self.ws()
+            if self.text[self.pos] == ']':
+                self.pos += 1
+                return Json.Arr(items)
+            while true:
+                items.push(self.value())
+                self.ws()
+                c2 = self.text[self.pos]
+                self.pos += 1
+                if c2 == ']':
+                    return Json.Arr(items)
+        if c == '"':
+            return Json.Str(self.string())
+        if c == 't':
+            self.pos += 4
+            return Json.Bool(true)
+        if c == 'f':
+            self.pos += 5
+            return Json.Bool(false)
+        if c == 'n':
+            self.pos += 4
+            return Json.Null
+        return Json.Num(self.number())
+
+struct Totals:
+    nums: f64
+    chars: i64
+    trues: i64
+    nodes: i64
+
+fn walk(j: read Json, t: lend Totals):
+    t.nodes += 1
+    match j:
+        Null: pass
+        Bool(b):
+            if b:
+                t.trues += 1
+        Num(x): t.nums += x
+        Str(s): t.chars += i64(s.len())
+        Arr(items):
+            for x in items:
+                walk(x, t)
+        Obj(members):
+            for m in members:
+                t.chars += i64(m.key.len())
+                walk(m.val, t)
+
+fn main():
+    text = string.from("[")
+    for i in 0..200000:
+        if i > 0:
+            text.append_str(",\n")
+        text.append(f"{{\"id\": {i}, \"name\": \"user {i}\", \"score\": {i % 1000}.25, \"active\": {i % 3 == 0}, ")
+        text.append(f"\"tags\": [\"t{i % 7}\", \"q\\\"{i % 11}\"], \"parent\": null, \"pos\": {{\"x\": -{i % 50}.5, \"y\": {i % 9}}}}}")
+    text.append_str("]")
+    p = Parser{ text: text.as_str(), pos: 0 }
+    doc = p.value()
+    t = Totals{ nums: 0.0, chars: 0, trues: 0, nodes: 0 }
+    walk(doc, t)
+    print(text.len(), t.nodes, t.chars, t.trues, i64(t.nums))

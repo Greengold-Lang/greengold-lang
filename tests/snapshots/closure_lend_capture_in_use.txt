@@ -1,0 +1,14 @@
+Error: `out` is borrowed as `lend` by `collect`; no other access is permitted while `collect` is live.
+ --> example.gg:4:11  GG0316 borrow-invalidated
+  |
+4 |     print(out.len)
+  |           ^^^
+  |
+3 |     collect = fn(x: i32) => out.push(x)
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^ `collect` was tied to `out` here
+  |
+2 |     out = List[i32]()
+  |     ^^^^^^^^^^^^^^^^^ `out` is declared here
+  = help: Access `out` after finishing with `collect`.
+
+1 error found.

@@ -1,0 +1,74 @@
+# Pancake flips over all permutations of 0..9.
+# The pass is repeated four times. Prints the summed checksum, then the maximum flip count.
+# Indexes are trusted. The flip counts fit in i32, so wrapping matches the checked sum.
+
+hot fn fannkuch():
+    overflow: wrap
+    n: i32 = 10
+    perm: [12]i32 = [0; 12]
+    perm1: [12]i32 = [0; 12]
+    count: [12]i32 = [0; 12]
+    for i in 0..10:
+        trust perm1[i] = i32(i)
+    max_flips: i32 = 0
+    checksum: i32 = 0
+    nperm: i32 = 0
+    passes: i32 = 0
+    r: i32 = n
+    while true:
+        while r != 1:
+            trust count[r - 1] = r
+            r -= 1
+        if trust perm1[0] != 0:
+            for i in 0..10:
+                trust perm[i] = trust perm1[i]
+            flips: i32 = 0
+            k: i32 = trust perm[0]
+            while k != 0:
+                a: i32 = 0
+                b: i32 = k
+                while a < b:
+                    tmp = trust perm[a]
+                    trust perm[a] = trust perm[b]
+                    trust perm[b] = tmp
+                    a += 1
+                    b -= 1
+                flips += 1
+                k = trust perm[0]
+            if flips > max_flips:
+                max_flips = flips
+            if nperm % 2 == 0:
+                checksum += flips
+            else:
+                checksum -= flips
+        advanced: bool = false
+        restarted: bool = false
+        while not advanced:
+            if r == n:
+                passes += 1
+                if passes == 4:
+                    print(checksum)
+                    print(max_flips)
+                    return
+                for i in 0..10:
+                    trust perm1[i] = i32(i)
+                r = n
+                nperm = 0
+                restarted = true
+                break
+            p0 = trust perm1[0]
+            i: i32 = 0
+            while i < r:
+                trust perm1[i] = trust perm1[i + 1]
+                i += 1
+            trust perm1[r] = p0
+            trust count[r] = trust count[r] - 1
+            if trust count[r] > 0:
+                advanced = true
+            else:
+                r += 1
+        if not restarted:
+            nperm += 1
+
+fn main():
+    fannkuch()

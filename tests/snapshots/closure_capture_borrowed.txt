@@ -1,0 +1,14 @@
+Error: `v` is borrowed as `lend`, but `f` is still tied to it (`read`) and still in use.
+ --> example.gg:4:5  GG0316 borrow-invalidated
+  |
+4 |     v.push(1)
+  |     ^^^^^^^^^
+  |
+3 |     f = fn(i: i32) -> usize => v.len
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `f` was tied to `v` here
+  |
+2 |     v = List[i32]()
+  |     ^^^^^^^^^^^^^^^ `v` is declared here
+  = help: Finish using `f` first or defer mutating `v`.
+
+1 error found.

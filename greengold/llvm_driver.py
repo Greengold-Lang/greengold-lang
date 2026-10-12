@@ -1,0 +1,209 @@
+"""LLVM IR -> object file / bitcode / executable (llvmlite or an outside clang, and the system linker)."""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+from . import llvm_tools
+
+
+class LLVMError(Exception):
+    pass
+
+
+@lru_cache(maxsize=None)
+def has_llvmlite() -> bool:
+    try:
+        import llvmlite.binding  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+PREFERRED_LLVM = 22  # llvmlite 0.50; older LLVMs optimize some loops clearly worse
+
+
+def llvmlite_major() -> int:
+    import llvmlite.binding as llvm
+    return llvm.llvm_version_info[0]
+
+
+def backend() -> str:
+    """`llvmlite` (the LLVM built into llvmlite) or `clang` (an outside LLVM, see llvm_tools).
+    Without GG_BACKEND: llvmlite when its LLVM is PREFERRED_LLVM or newer, else whichever LLVM is newer."""
+    want = os.environ.get("GG_BACKEND", "").strip().lower()
+    if want in ("clang", "llvm", "external"):
+        return "clang"
+    if want == "llvmlite":
+        return "llvmlite"
+    if not has_llvmlite():
+        return "clang"
+    mine = llvmlite_major()
+    if mine >= PREFERRED_LLVM:
+        return "llvmlite"
+    outside = llvm_tools.find()
+    return "clang" if outside is not None and outside[1] > mine else "llvmlite"
+
+
+def describe_backend() -> str:
+    if backend() == "clang":
+        return f"outside LLVM: {llvm_tools.describe()}"
+    import llvmlite
+    import llvmlite.binding as llvm
+    return f"llvmlite {llvmlite.__version__} (LLVM {'.'.join(map(str, llvm.llvm_version_info))}, built in)"
+
+
+def _prepare(ir_text: str, release: bool) -> str:
+    if release and os.environ.get("GG_RECUR_INLINE", "1") != "0":
+        from .recur_inline import recur_inline
+        ir_text = recur_inline(ir_text)
+    return ir_text
+
+
+def parse_module(ir_text: str, triple: str | None = None) -> Any:
+    import llvmlite.binding as llvm
+    from .codegen_llvm import init_llvm
+    init_llvm()
+    try:
+        mod = llvm.parse_assembly(ir_text)
+        mod.verify()
+    except RuntimeError as exc:
+        raise LLVMError(f"generated LLVM IR is invalid (compiler error):\n{exc}") from None
+    return mod
+
+
+def target_machine(triple: str, release: bool) -> Any:
+    import llvmlite.binding as llvm
+    from .codegen_llvm import init_llvm
+    init_llvm()
+    target = llvm.Target.from_triple(triple)
+    reloc = "default" if "windows" in triple else "pic"
+    return target.create_target_machine(opt=3 if release else 0, reloc=reloc, codemodel="default")
+
+
+def optimize(mod: Any, tm: Any, release: bool) -> None:
+    import llvmlite.binding as llvm
+    if hasattr(llvm, "create_pass_builder"):  # llvmlite 0.45+: LLVM's new pass manager (the legacy one is gone)
+        pto = llvm.create_pipeline_tuning_options(speed_level=3 if release else 0)
+        if release:
+            pto.loop_vectorization = True
+            pto.slp_vectorization = True
+            pto.loop_unrolling = True
+            # The inlining threshold stays LLVM's -O3 default: with llvmlite 0.50 a threshold of 275 left
+            # even two-line functions (a list `push`) out of line.
+        pb = llvm.create_pass_builder(tm, pto)
+        pb.getModulePassManager().run(mod, pb)
+        return
+    pmb = llvm.create_pass_manager_builder()
+    pmb.opt_level = 3 if release else 0
+    if release:
+        pmb.loop_vectorize = True
+        pmb.slp_vectorize = True
+        pmb.inlining_threshold = 275
+    pm = llvm.create_module_pass_manager()
+    tm.add_analysis_passes(pm)
+    pmb.populate(pm)
+    pm.run(mod)
+
+
+def compile_ir(ir_text: str, triple: str, release: bool) -> tuple[Any, Any]:
+    """llvmlite only: the parsed and optimized module and its target machine."""
+    mod = parse_module(_prepare(ir_text, release))
+    tm = target_machine(triple, release)
+    optimize(mod, tm, release)
+    return mod, tm
+
+
+def _outside(fn, ir_text: str, triple: str, release: bool):
+    try:
+        return fn(_prepare(ir_text, release), triple, release)
+    except llvm_tools.ToolError as err:
+        raise LLVMError(str(err)) from None
+
+
+def optimized_ir(ir_text: str, triple: str, release: bool) -> str:
+    if backend() == "clang":
+        return _outside(llvm_tools.optimized_ir, ir_text, triple, release)
+    mod, _ = compile_ir(ir_text, triple, release)
+    return str(mod)
+
+
+def bitcode(ir_text: str, triple: str, release: bool) -> bytes:
+    if backend() == "clang":
+        return _outside(llvm_tools.bitcode, ir_text, triple, release)
+    mod, _ = compile_ir(ir_text, triple, release)
+    return mod.as_bitcode()
+
+
+def object_code(ir_text: str, triple: str, release: bool) -> bytes:
+    if backend() == "clang":
+        return _outside(llvm_tools.object_code, ir_text, triple, release)
+    mod, tm = compile_ir(ir_text, triple, release)
+    return tm.emit_object(mod)
+
+
+def link_args(links: list[str] | None) -> list[str]:
+    """Converts `--link`/`--link-path`/`--link-file` inputs to linker flags.
+
+    Items starting with `-` (`-L/dir`, `-lfoo`, `-framework`) or looking like a file path
+    (`.a`, `.o`, `.lib`, `.so`, `.dll`, `.dylib` or containing path separators) are passed as is;
+    plain names become `-l<name>`. The `GG_LINK_ARGS` environment variable is appended raw.
+    """
+    import shlex
+    out: list[str] = []
+    for lib in links or []:
+        looks_like_file = (os.sep in lib or "/" in lib
+                           or lib.lower().endswith((".a", ".o", ".obj", ".lib", ".so", ".dll", ".dylib")))
+        out.append(lib if lib.startswith("-") or looks_like_file else f"-l{lib}")
+    extra = os.environ.get("GG_LINK_ARGS")
+    if extra:
+        out += shlex.split(extra, posix=(os.name != "nt"))
+    return out
+
+
+def find_linker(triple: str) -> list[str] | None:
+    """Linker command (prefix): `$CC`, gcc/cc/clang, or else `zig cc` (see `targets.zig_path`); `GG_LINKER=zig`
+    picks zig first. On Windows, `-target` is added to clang for mingw targets."""
+    env_cc = os.environ.get("CC")
+    if env_cc and shutil.which(env_cc):
+        return [shutil.which(env_cc)]  # type: ignore[list-item]
+    from .targets import zig_linker
+    if os.environ.get("GG_LINKER") == "zig":
+        return zig_linker(triple)
+    names = ("gcc", "cc", "clang") if sys.platform != "darwin" else ("clang", "cc", "gcc")
+    for name in names:
+        path = shutil.which(name)
+        if path:
+            if name == "clang" and "windows" in triple:
+                return [path, "-target", triple]
+            return [path]
+    return zig_linker(triple)
+
+
+def link_executable(obj_path: Path, exe_path: Path, triple: str, links: list[str] | None = None,
+                    freestanding: bool = False) -> int:
+    cmd = find_linker(triple)
+    if cmd is None:
+        print("Error: no linker found. Install gcc or clang, or run `pip install ziglang` (zig cc links with "
+              "nothing else installed). `gg toolchain` shows what was found.", file=sys.stderr)
+        return 2
+    cmd = cmd + [str(obj_path), "-o", str(exe_path)]
+    if freestanding:
+        cmd += ["-nostdlib", "-static"]
+    else:
+        if "windows" not in triple:
+            cmd.append("-lm")
+        cmd += link_args(links)
+        if "windows" in triple:
+            cmd.append("-lws2_32")  # sockets (std.net); unused libraries add nothing
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Error: linking failed:", file=sys.stderr)
+        print(result.stderr, file=sys.stderr)
+        return 1
+    return 0
