@@ -162,7 +162,7 @@ fn main():
 
 A slice is a dynamically sized **read-only window (fat pointer: pointer + length)** over an array or a block of memory.
 
-> **Safety rule:** In Greengold, slices cannot be stored in local variables; **they are accepted only as function parameters**. This makes dangling-pointer errors, which could come from the memory behind them going out of scope, impossible.
+> **Safety rule:** A slice is a view, so it holds the variable it was made from while it is used. That variable cannot change, move, or go away first, and the slice cannot be kept in a variable of an outer scope or returned when the variable is a local. The compiler rejects these cases (GG0315, GG0316), so a slice cannot dangle.
 
 ```gg
 # A function that accepts a slice of an array of any size:

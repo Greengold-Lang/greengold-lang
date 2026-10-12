@@ -226,7 +226,7 @@ class BorrowChecker:
                 results.append(self._branch(s.else_body, holders, depth))
             else:
                 results.append(holders)
-            self._merge_holders(holders, results)
+            self._merge_holders(holders, results, outer=depth)
         elif isinstance(s, (While, For, ForIn)):
             # Twice: ties made by one iteration are in place when the next iteration runs.
             local = self._branch(s.body, holders, depth, silent=True)
@@ -237,7 +237,7 @@ class BorrowChecker:
         elif isinstance(s, Match):
             results = [self._branch(arm.body, holders, depth) for arm in s.arms]
             if results:
-                self._merge_holders(holders, results)
+                self._merge_holders(holders, results, outer=depth)
 
     def _branch(self, body: list[Stmt], holders: dict[str, Holder], depth: int,
                 silent: bool = False) -> dict[str, Holder]:
@@ -251,11 +251,18 @@ class BorrowChecker:
         return local
 
     def _merge_holders(self, holders: dict[str, Holder], results: list[dict[str, Holder]],
-                       keep_new: bool = False) -> None:
+                       keep_new: bool = False, outer: int | None = None) -> None:
         if keep_new:  # a holder that only the loop body created still holds after the loop
             for res in results:
                 for name, h in res.items():
                     if name not in holders:
+                        holders[name] = Holder(h.name, [])
+        elif outer is not None:
+            # A branch gave a variable of the enclosing scope its first view (`v = s.as_str()` in an `if`
+            # when `v` held a literal before): the tie stays after the branch. The branch's own locals do not.
+            for res in results:
+                for name, h in res.items():
+                    if name not in holders and self.var_depth.get(name, 0) <= outer:
                         holders[name] = Holder(h.name, [])
         for name, h in list(holders.items()):
             seen: set[tuple[str, str]] = set()

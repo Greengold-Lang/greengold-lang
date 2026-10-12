@@ -98,3 +98,39 @@ fn main():
     print(hero.hp)
 """
     assert messages(src) == []
+
+
+# Views (`str`, slices, and values that hold them) borrow the variable they were made from.
+_VIEW_ESCAPES = {
+    "outer_scope": 't = "x"\nif true:\n    s = string("hi")\n    t = s.as_str()\nprint(t)',
+    "slice_range": 'xs = List[str]()\nif true:\n    s = string("hi")\n    xs.push(s[0..1])\nprint(xs[0])',
+    "optional": 'o: Optional[str] = None\nif true:\n    s = string("hi")\n    o = Valid(s.as_str())\nmatch o:\n    Valid(x):\n        print(x)\n    None:\n        print("n")',
+    "loop": 't = "x"\nfor i in 0..2:\n    s = string("hi")\n    t = s.trim()\nprint(t)',
+}
+
+
+def test_view_cannot_outlive_its_string():
+    for name, body in _VIEW_ESCAPES.items():
+        assert has(messages(with_main(body)), "does not live long enough"), name
+
+
+def test_view_blocks_change_and_move_of_its_string():
+    assert has(messages(with_main('s = string("hi")\nt = s.as_str()\ns.clear()\nprint(t)')), "still")
+    assert has(messages(with_main('s = string("hi")\nt = s.as_str()\nu = s\nprint(t)')), "still tied")
+
+
+# A view stored in a branch of an `if` or `match` stays tied after the branch (found by tools/fuzz_views.py).
+def test_view_made_in_a_branch_stays_tied_after_it():
+    cases = {
+        "if": 's = string("abc")\nv = "lit"\nif s.len > 1:\n    v = s.as_str()\ns.clear()\nprint(v)',
+        "match": 's = string("abc")\nv = "lit"\nmatch s.len:\n    3:\n        v = s.as_str()\n    _:\n        print("x")\ns = string("zzz")\nprint(v)',
+        "nested": 's = string("abc")\nv = "lit"\nif s.len > 1:\n    if s.len > 2:\n        v = s.as_str()\ns = string("q")\nprint(v)',
+        "loop_carried": 'o = string("d")\nv = "lit"\nfor i in 0..2:\n    if true:\n        o = string("n")\n        print(v)\n        v = o.as_str()',
+    }
+    for name, body in cases.items():
+        assert has(messages(with_main(body)), "still tied"), name
+
+
+def test_view_made_in_a_branch_of_its_own_scope_is_not_kept():
+    src = 'if true:\n    s = string("abc")\n    v = s.as_str()\n    print(v)\ns = string("q")\nprint(s.len)'
+    assert messages(with_main(src)) == []
