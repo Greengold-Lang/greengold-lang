@@ -29,14 +29,14 @@ def test_web_without_llvm_binding():
     assert r.stdout.strip() == "ok", r.stdout + r.stderr
 
 
+def _lf(data: bytes) -> bytes:
+    return data.replace(bytes([13, 10]), bytes([10]))
+
+
 def test_bundle_is_current():
     with zipfile.ZipFile(ROOT / "website" / "playground" / "gg-bundle.zip") as z:
         names = set(z.namelist())
         for rel in ("greengold/web.py", "greengold/cli.py", "greengold/core/core.gg", "llvmlite/ir/__init__.py"):
             assert rel in names, rel
         for rel in ("greengold/web.py", "greengold/cli.py", "greengold/typecheck.py"):
-            assert z.read(rel).replace(b"
-", b"
-") == (ROOT / rel).read_bytes().replace(b"
-", b"
-"), f"{rel} changed: run python tools/build_playground.py"
+            assert _lf(z.read(rel)) == _lf((ROOT / rel).read_bytes()), f"{rel} changed: run python tools/build_playground.py"
