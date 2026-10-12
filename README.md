@@ -32,7 +32,7 @@ Greengold is **pre-1.0 and experimental** (version 0.3.x). The language, the sta
 Known limits:
 
 - **Dangling `str` views.** Memory safety is checked for owners and references, but a `str` view of a `string` is not yet tracked: `t = s.as_str()` can outlive `s`.
-- **Platforms.** Development and testing happen mainly on Windows. Linux is exercised by CI; macOS is untested. The POSIX implementation of `async fn` (`std.tasks`, `ucontext`) and linking through a real `zig cc` have had little testing. Sockets use `poll` / `WSAPoll`, not epoll, kqueue, or IOCP.
+- **Platforms.** Development and testing happen mainly on Windows. CI runs the test suite on Windows, Linux, and macOS (Apple Silicon); Windows gets the most use, so Linux and macOS may still show differences. The POSIX implementation of `async fn` (`std.tasks`, `ucontext`) and linking through a real `zig cc` have had little testing. Sockets use `poll` / `WSAPoll`, not epoll, kqueue, or IOCP.
 - **Function pointers** (`fn(...)`) cannot take heap-owning parameters; use a feature bound or an owned `Fn(...)` closure.
 - **Not implemented:** a MIR / control-flow layer under the borrow checker, and lifetime tracking of stored views beyond the rules in the spec.
 - The compiler is written in Python. It starts fast, but compile times on large programs are slower than a native compiler.

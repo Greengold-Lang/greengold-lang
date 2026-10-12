@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "website"
 SPEC = ROOT / "docs" / "SPEC.md"
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 DOMAIN = "https://greengoldlang.com"
 UPDATED = "2026-10-11"
 
@@ -595,7 +595,7 @@ def build_index(rows: list[dict]) -> str:
     body = f"""    <section class="hero">
       <div class="wrap hero-grid">
         <div>
-          <p class="eyebrow">Version {VERSION}. New in this version: <code>var</code> is gone and mutability is inferred. <a href="roadmap.html">What changed</a></p>
+          <p class="eyebrow">Version {VERSION}. New: one-command install for Windows, Linux, and macOS, and <code>gg update</code>. <a href="roadmap.html">What changed</a></p>
           <h1>Systems speed.<br><span class="accent">Readable ownership.</span></h1>
           <p class="lede">Greengold is a statically typed systems language that compiles to native code through LLVM. Ownership is three words on a parameter, mutability is inferred, and every diagnostic can carry a checked fix.</p>
           <div class="hero-actions">
@@ -1037,6 +1037,12 @@ def build_roadmap() -> str:
         "Faster <code>gg check</code> and <code>gg build</code> via non-recursive AST walks and pickle snapshots",
         "<code>:=</code> removed in favor of <code>=</code>, and VS Code extension with <code>gg fix</code> and debugging",
     ]
+    v04 = [
+        "Installers for Windows, Linux, and macOS that need no Python, and a Windows setup program",
+        "<code>gg update</code> replaces the installed compiler with the newest release; <code>gg update --deps</code> re-resolves dependencies",
+        "Prebuilt <code>gg</code> for Windows x64, Linux x64 and arm64, and macOS arm64, with Zig inside for linking",
+        "VS Code extension runs the installed <code>gg</code>; the <code>.vsix</code> is part of each release",
+    ]
     nxt = [
         "An Intel Mac build (needs an <code>llvmlite</code> wheel for that platform)",
         "Freezing the <code>2026</code> edition for 1.0",
@@ -1056,6 +1062,7 @@ def build_roadmap() -> str:
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.1 <span class="state done">shipped</span></h3>{ul(v031)}</div></div>
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.2 <span class="state done">shipped</span></h3>{ul(v032)}</div></div>
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.3 <span class="state done">shipped</span></h3>{ul(v033)}</div></div>
+          <div class="milestone done reveal"><div class="panel"><h3>In 0.4.x <span class="state done">shipped</span></h3>{ul(v04)}</div></div>
           <div class="milestone next reveal"><div class="panel"><h3>Next <span class="state next">planned</span></h3>{ul(nxt)}</div></div>
           <div class="milestone paused reveal"><div class="panel"><h3>Self-hosting <span class="state paused">paused</span></h3>{ul(paused)}</div></div>
         </div>

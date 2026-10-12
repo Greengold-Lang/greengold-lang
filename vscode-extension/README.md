@@ -195,6 +195,15 @@ You can customize the following options via VS Code settings (`Ctrl+,` -> `green
 
 ---
 
+## 💻 Platform Support
+
+The extension is plain JavaScript with no native code, so it runs on **Windows, macOS and Linux** (x64 and ARM) and needs **VS Code 1.91 or newer**.
+
+- The `gg` compiler is a separate install and must be present on each machine. The extension looks for it in the `greengold.path` setting, then on `PATH`, then in the installer's folder (`~/.greengold/bin/gg` on macOS and Linux, `%LOCALAPPDATA%\Greengold\bin\gg.exe` on Windows).
+- Native debugging needs a debugger extension: CodeLLDB (`vadimcn.vscode-lldb`, preferred) or C/C++ (`ms-vscode.cpptools`, which uses the Visual Studio debugger on Windows, `lldb` on macOS and `gdb` on Linux). Set `greengold.debug.debugger` to choose. On macOS, install the Xcode Command Line Tools.
+
+---
+
 ## 📦 Installation
 
 ### 1. Install the compiler

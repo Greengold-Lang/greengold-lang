@@ -2,7 +2,21 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
-## Unreleased
+## 0.4.2
+
+Install and update
+- Installers that need no Python: `installer/install.ps1`, `installer/install.sh`, and a Windows setup program; all put `gg` on `PATH`.
+- `gg update` replaces the installed `gg` with the newest GitHub release (SHA-256 checked). **Breaking:** re-resolving dependencies is now `gg update --deps`.
+- Release workflow builds `gg` for Windows x64, Linux x64/arm64, and macOS arm64 when a `v*` tag is pushed; the version comes from the tag. There is no Intel Mac build (no `llvmlite` wheel).
+- VS Code extension runs `gg` (setting `greengold.path`, then `PATH`, then the installer folder) and falls back to `python -m greengold`; the release includes `greengold-vscode.vsix`.
+
+Fixes
+- Python 3.10: `tomli` is used where `tomllib` is missing.
+- `gg build -g` on macOS runs `dsymutil`, so lldb finds lines and variables.
+- Language server: a `file:///c:/dir` URI reads as `c:/dir` on every OS.
+- `GG_LEAKCHECK`: the live-block counter is atomic, so threads no longer produce false leak reports.
+- Benchmarks: `run_benchmarks.py` runs on Linux and macOS; the README lists what is needed to reproduce the numbers.
+- Examples and tests no longer depend on tight wall-clock limits.
 
 - Installers that need no Python: `installer/install.ps1`, `installer/install.sh`, and a Windows setup program; all put `gg` on `PATH`.
 - `gg update` replaces the installed `gg` with the newest GitHub release (SHA-256 checked). **Breaking:** re-resolving dependencies is now `gg update --deps`.
