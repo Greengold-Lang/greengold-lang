@@ -11,7 +11,7 @@ struct Item:
 # Satisfies the `describe` method of the Describable feature:
 impl Item:
     fn describe(self) -> string:
-        return self.name
+        return self.name.clone()
 
 # Feature bound: Type T must satisfy the Describable feature
 fn announce[T: Describable](item: T):

@@ -17,7 +17,7 @@ fn kind(c: u8) -> i32:
             return 0
     return 9
 
-fn cmd(s: string):
+fn cmd(s: str):
     match s:
         "quit":
             print("bye")
@@ -30,9 +30,9 @@ fn main():
     for i in 12:
         print(i, name(i))
     print(kind('q'), kind('Q'), kind('5'), kind('!'))
-    cmd("quit".to_string())
-    cmd("run".to_string())
-    cmd("zzz".to_string())
+    cmd("quit")
+    cmd("run")
+    cmd("zzz")
     b = true
     match b:
         true:
