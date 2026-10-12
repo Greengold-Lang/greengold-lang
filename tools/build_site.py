@@ -20,9 +20,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "website"
 SPEC = ROOT / "docs" / "SPEC.md"
-VERSION = "0.4.2"
+VERSION = "0.5.0"
 DOMAIN = "https://greengoldlang.com"
-UPDATED = "2026-10-11"
+UPDATED = "2026-10-12"
 
 # --------------------------------------------------------------------------
 # Icons (24x24 stroke icons)
@@ -1048,6 +1048,11 @@ def build_roadmap() -> str:
         "Prebuilt <code>gg</code> for Windows x64, Linux x64 and arm64, and macOS arm64, with Zig inside for linking",
         "VS Code extension runs the installed <code>gg</code>; the <code>.vsix</code> is part of each release",
     ]
+    v05 = [
+        "Browser playground: live diagnostics, checked fixes, and <strong>Run</strong>, with the compiler running in your browser",
+        "<code>wasm32-wasi</code> target: <code>print</code>, strings, <code>List</code>, and <code>HashMap</code> in WebAssembly",
+        "<code>gg doctor</code>, <code>gg repl</code>, <code>gg run -e</code>, and <code>gg new --template</code>",
+    ]
     nxt = [
         "An Intel Mac build (needs an <code>llvmlite</code> wheel for that platform)",
         "Freezing the <code>2026</code> edition for 1.0",
@@ -1068,6 +1073,7 @@ def build_roadmap() -> str:
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.2 <span class="state done">shipped</span></h3>{ul(v032)}</div></div>
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.3 <span class="state done">shipped</span></h3>{ul(v033)}</div></div>
           <div class="milestone done reveal"><div class="panel"><h3>In 0.4.x <span class="state done">shipped</span></h3>{ul(v04)}</div></div>
+          <div class="milestone done reveal"><div class="panel"><h3>In 0.5.0 <span class="state done">shipped</span></h3>{ul(v05)}</div></div>
           <div class="milestone next reveal"><div class="panel"><h3>Next <span class="state next">planned</span></h3>{ul(nxt)}</div></div>
           <div class="milestone paused reveal"><div class="panel"><h3>Self-hosting <span class="state paused">paused</span></h3>{ul(paused)}</div></div>
         </div>

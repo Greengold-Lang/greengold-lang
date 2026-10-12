@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Roadmap — Greengold</title>
-  <meta name="description" content="Greengold 0.4.2: what shipped, what is next, and the state of self-hosting.">
+  <meta name="description" content="Greengold 0.5.0: what shipped, what is next, and the state of self-hosting.">
   <meta name="theme-color" content="#090d0b">
   <link rel="canonical" href="https://greengoldlang.com/roadmap.html">
   <meta property="og:title" content="Roadmap — Greengold">
-  <meta property="og:description" content="Greengold 0.4.2: what shipped, what is next, and the state of self-hosting.">
+  <meta property="og:description" content="Greengold 0.5.0: what shipped, what is next, and the state of self-hosting.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://greengoldlang.com/roadmap.html">
   <meta property="og:image" content="https://greengoldlang.com/assets/greengold_logo.png">
@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=e3f8070670">
+  <link rel="stylesheet" href="style.css?v=faf6592397">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -28,7 +28,7 @@
       <a href="index.html" class="brand" aria-label="Greengold home">
         <img src="assets/greengold_logo.png" alt="" width="30" height="30">
         <span>Greengold</span>
-        <span class="brand-version">v0.4.2</span>
+        <span class="brand-version">v0.5.0</span>
       </a>
       <nav id="site-nav" class="site-nav" aria-label="Main">
         <a href="why.html">Why</a>
@@ -52,7 +52,7 @@
       <div class="wrap narrow">
         
         <h1>Roadmap</h1>
-        <p class="lede">Version 0.4.2. The compiler is written in Python and emits LLVM IR through <code>llvmlite</code>. Prebuilt downloads are on the <a href="https://github.com/Greengold-Lang/greengold-lang/releases/latest">GitHub releases page</a>.</p>
+        <p class="lede">Version 0.5.0. The compiler is written in Python and emits LLVM IR through <code>llvmlite</code>. Prebuilt downloads are on the <a href="https://github.com/Greengold-Lang/greengold-lang/releases/latest">GitHub releases page</a>.</p>
         
       </div>
     </section>
@@ -64,6 +64,7 @@
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.2 <span class="state done">shipped</span></h3><ul class="ticks"><li>Hardware atomic intrinsics with memory orderings and lock-free <code>Atomic[T]</code></li><li><code>static</code> globals, constant array/struct literals, and <code>volatile_read</code> / <code>volatile_write</code></li><li><code>union</code>, <code>packed struct</code>, <code>align(N) struct</code>, and inline <code>asm[T]</code></li><li>SIMD vector types (<code>f32x4</code>, <code>i32x8</code>, <code>u8x16</code>, ...) lowered to LLVM vectors</li><li><code>allocator alloc, resize, free</code> for a custom or <code>--no-std</code> heap</li><li><code>std.net</code> TCP sockets, <code>std.io</code> <code>File</code> streams, <code>target_os()</code>, and <code>weak extern</code></li></ul></div></div>
           <div class="milestone done reveal"><div class="panel"><h3>In 0.3.3 <span class="state done">shipped</span></h3><ul class="ticks"><li><code>gg build -g</code> emits DWARF debug info for <code>gdb</code> and <code>lldb</code></li><li>Git and registry dependencies, <code>gg.lock</code>, and <code>gg fetch</code> / <code>update</code> / <code>publish</code></li><li>Cross-compilation (<code>--target</code>, <code>gg targets</code>), including <code>wasm32</code> and <code>cortex-m4</code></li><li>C++ interop with <code>gg bindgen --cpp</code> and <code>[native]</code> C/C++ sources in <code>gg.toml</code></li><li>Faster <code>gg check</code> and <code>gg build</code> via non-recursive AST walks and pickle snapshots</li><li><code>:=</code> removed in favor of <code>=</code>, and VS Code extension with <code>gg fix</code> and debugging</li></ul></div></div>
           <div class="milestone done reveal"><div class="panel"><h3>In 0.4.x <span class="state done">shipped</span></h3><ul class="ticks"><li>Installers for Windows, Linux, and macOS that need no Python, and a Windows setup program</li><li><code>gg update</code> replaces the installed compiler with the newest release; <code>gg update --deps</code> re-resolves dependencies</li><li>Prebuilt <code>gg</code> for Windows x64, Linux x64 and arm64, and macOS arm64, with Zig inside for linking</li><li>VS Code extension runs the installed <code>gg</code>; the <code>.vsix</code> is part of each release</li></ul></div></div>
+          <div class="milestone done reveal"><div class="panel"><h3>In 0.5.0 <span class="state done">shipped</span></h3><ul class="ticks"><li>Browser playground: live diagnostics, checked fixes, and <strong>Run</strong>, with the compiler running in your browser</li><li><code>wasm32-wasi</code> target: <code>print</code>, strings, <code>List</code>, and <code>HashMap</code> in WebAssembly</li><li><code>gg doctor</code>, <code>gg repl</code>, <code>gg run -e</code>, and <code>gg new --template</code></li></ul></div></div>
           <div class="milestone next reveal"><div class="panel"><h3>Next <span class="state next">planned</span></h3><ul class="ticks"><li>An Intel Mac build (needs an <code>llvmlite</code> wheel for that platform)</li><li>Freezing the <code>2026</code> edition for 1.0</li></ul></div></div>
           <div class="milestone paused reveal"><div class="panel"><h3>Self-hosting <span class="state paused">paused</span></h3><ul class="ticks"><li>The lexer is written in Greengold and checked against the Python lexer</li><li>The parser, type checker, and code generator stay in Python while the language settles</li></ul></div></div>
         </div>
@@ -109,10 +110,10 @@
       </div>
       <div class="footer-bottom">
         <span>© 2026 Umut Faruk Dilli. Greengold is released under the MIT License.</span>
-        <span>Version 0.4.2</span>
+        <span>Version 0.5.0</span>
       </div>
     </div>
   </footer>
-  <script src="app.js?v=e3f8070670"></script>
+  <script src="app.js?v=faf6592397"></script>
 </body>
 </html>
