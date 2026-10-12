@@ -123,6 +123,13 @@ def target_os(triple: str) -> str:
     return "none"
 
 
+def is_32bit_triple(triple: str) -> bool:
+    """Whether `size_t` is 32 bits for this target. `arm64` and `aarch64` are 64-bit; only 32-bit ARM names
+    (`arm`, `armv7...`, `thumbv7em`) are not, so a plain `startswith("arm")` would be wrong."""
+    arch = triple.split("-", 1)[0]
+    return arch in ("wasm32", "i386", "i486", "i586", "i686", "riscv32", "arm", "armeb") or arch.startswith(("armv", "thumb"))
+
+
 def target_arch(triple: str) -> str:
     """The CPU family of a triple: `x86_64`, `aarch64`, `riscv64`, `wasm32`, ..."""
     arch = triple.split("-", 1)[0]
@@ -186,7 +193,7 @@ class LLVMGen:
         self.windows = "windows" in self.triple
         self.wasi = self.triple.startswith("wasm32") and self.triple.endswith("wasi")
         self.wasi_declared: dict[str, tuple[ir.Type, bool]] = {}  # wasm32 C function -> (declared result, signed)
-        self.size_t = I32 if self.triple.startswith(("wasm32", "i386", "i686", "arm", "thumb", "riscv32")) else I64
+        self.size_t = I32 if is_32bit_triple(self.triple) else I64
         self.mod = ir.Module(name=filename, context=ir.Context())  # fresh context: named types must not leak between compilations
         self.mod.triple = self.triple
         from .debuginfo import DebugInfo
