@@ -240,11 +240,10 @@ def uri_to_path(uri: str) -> Path:
     """Converts LSP URI string to local Path object."""
     parsed = urllib.parse.urlparse(uri)
     path_str = urllib.parse.unquote(parsed.path)
-    if os.name == "nt":
-        if parsed.netloc:
-            path_str = f"//{parsed.netloc}{path_str}"
-        elif path_str.startswith("/") and len(path_str) > 2 and path_str[2] == ":":
-            path_str = path_str[1:]
+    if os.name == "nt" and parsed.netloc:
+        path_str = f"//{parsed.netloc}{path_str}"
+    elif re.match(r"/[A-Za-z]:", path_str):
+        path_str = path_str[1:]  # file:///c:/dir -> c:/dir, the same on every OS
     return Path(path_str)
 
 

@@ -57,7 +57,8 @@ def test_eprint_writes_stderr(tmp_path):
     assert r.stderr.splitlines() == ["err"]
 
 
-def test_process_run_and_directory(tmp_path):
+def test_process_run_and_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("TEMP", str(tmp_path))  # the program reads TEMP; only Windows sets it
     src = """import std.fs
 import std.process
 import std.string

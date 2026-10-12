@@ -35,7 +35,8 @@ fn main():
     hm.push(string.from("pear"))
     hm.push(string.from("apple"))
     hm.push(string.from("zoo"))
-    print(hm.peek(), hm.pop(), hm.len())
+    print(hm.peek())
+    print(hm.pop(), hm.len())
 
     q = collections.priority_queue[f64, string]()
     q.push(2.5, string.from("b"))
@@ -67,7 +68,8 @@ def test_deque_heap_priority_queue_sorted_map(monkeypatch):
         '"b6", "b8", "b10", "b12", "b14", "b16"]',
         "Valid(0)", "Valid(1)", "Valid(102)", "Valid(3)", "Valid(4)",
         "[1, 1, 3, 5, 7, 9]",
-        'zoo Valid("zoo") 2',
+        'zoo',
+        'Valid("zoo") 2',
         '0.5 Valid("a") Valid("b") Valid("c") None',
         '["brown", "dog", "end", "fox", "jumps", "lazy", "over", "quick", "the"] Valid(3) None Valid("brown") '
         'Valid("the")',
