@@ -1,9 +1,30 @@
 name: CI
 
+# README.md, docs/ and Learn/ are not ignored: tests/test_doc_examples.py compiles their examples.
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - "website/**"
+      - "LICENSE"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "CODE_OF_CONDUCT.md"
+      - "SECURITY.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/pull_request_template.md"
+      - ".github/workflows/release.yml"
   pull_request:
+    paths-ignore:
+      - "website/**"
+      - "LICENSE"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "CODE_OF_CONDUCT.md"
+      - "SECURITY.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/pull_request_template.md"
+      - ".github/workflows/release.yml"
 
 jobs:
   test:
