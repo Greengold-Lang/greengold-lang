@@ -1,7 +1,7 @@
 # Using a C library. Compilation:
 #   gcc -c mylib.c -o mylib.o && ar rcs libmylib.a mylib.o
-#   python -m greengold run main.gg -L. --link mylib
-# (or: python -m greengold run main.gg --link-file mylib.o)
+#   gg run main.gg -L. --link mylib
+# (or: gg run main.gg --link-file mylib.o)
 
 extern struct Vec2:
     x: f64

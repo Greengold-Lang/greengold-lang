@@ -9,7 +9,7 @@ A programming language's developer experience (DevEx) is as important as its syn
 Creating a new Greengold project takes a single command:
 
 ```powershell
-python -m greengold new my_project
+gg new my_project
 cd my_project
 ```
 
@@ -50,10 +50,10 @@ For a fast code loop during development, it compiles the program directly and ru
 
 ```powershell
 # Quick run in debug mode:
-python -m greengold run
+gg run
 
 # Run at maximum speed with LLVM -O3 optimizations:
-python -m greengold run --release
+gg run --release
 ```
 
 ### 3.2 Building a Binary (`gg build`)
@@ -61,10 +61,10 @@ Produces a standalone, distribution-ready native executable:
 
 ```powershell
 # Build a debug binary:
-python -m greengold build -o my_app.exe
+gg build -o my_app.exe
 
 # An optimized, minimum-size release binary:
-python -m greengold build --release -o my_app_release.exe
+gg build --release -o my_app_release.exe
 ```
 
 ### 3.3 Smart Build Cache
@@ -77,10 +77,10 @@ Greengold has a smart incremental build cache (`.gg-cache/`) that computes the S
 If the compiler knows the fix for an error, it writes it next to the error and verifies it by trying it on a copy of the file (`fix (verified)`). `gg fix` applies the verified fixes to the file and repeats until no fixes remain:
 
 ```powershell
-python -m greengold fix              # every .gg file in the current folder
-python -m greengold fix src/main.gg  # a single file
-python -m greengold fix --dry-run    # only prints what would be done
-python -m greengold fix --likely     # also applies guess-based fixes that compile
+gg fix              # every .gg file in the current folder
+gg fix src/main.gg  # a single file
+gg fix --dry-run    # only prints what would be done
+gg fix --likely     # also applies guess-based fixes that compile
 ```
 
 There are two kinds of fixes:
@@ -98,10 +98,10 @@ An end to code formatting debates! `gg fmt` brings every file to a single style:
 
 ```powershell
 # Format a specific file or the whole src directory:
-python -m greengold fmt src/
+gg fmt src/
 
 # Only check the formatting (for CI/CD processes):
-python -m greengold fmt --check src/
+gg fmt --check src/
 ```
 
 The formatter cleans up unnecessary whitespace without changing the meaning of your code, and it guarantees the formatting.
@@ -143,10 +143,10 @@ test negatives:
 To run the tests:
 
 ```powershell
-python -m greengold test src/
+gg test src/
 
 # Write the same result as JSON:
-python -m greengold test src/ --json
+gg test src/ --json
 ```
 
 Output:
@@ -177,10 +177,10 @@ To build the documentation:
 
 ```powershell
 # Print to the screen:
-python -m greengold doc src/
+gg doc src/
 
 # Save to a Markdown file:
-python -m greengold doc src/ -o API_DOCS.md
+gg doc src/ -o API_DOCS.md
 ```
 
 ---

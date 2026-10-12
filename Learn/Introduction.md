@@ -49,14 +49,30 @@ This series has 11 chapters that build on each other. Following them in order is
 
 ## 🛠️ Installation and Your First Program
 
-### 1. Development Environment
+### 1. Install Greengold
 
-The Greengold compiler runs on Python 3.10+ and the LLVM / Clang toolchain. From the repository root you can use the `gg` command directly:
+You do not need Python. The installer puts the single `gg` command on your `PATH` (see the [README](../README.md#install) for options).
+
+**Windows** (PowerShell):
 
 ```powershell
-# Check the version and the command list
-python -m greengold --help
+irm https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/installer/install.ps1 | iex
 ```
+
+**Linux and macOS:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/installer/install.sh | sh
+```
+
+Open a new terminal and check it:
+
+```bash
+gg --version
+gg --help
+```
+
+Later, `gg update` installs the newest version. If you work from a source checkout instead, `pip install -e .` gives the same `gg` command, and `python -m greengold` works as well.
 
 ### 2. First Greengold Program: "Hello, Greengold!"
 
@@ -73,20 +89,20 @@ fn main():
 To run your program directly:
 
 ```powershell
-python -m greengold run hello.gg
+gg run hello.gg
 ```
 
 To create an optimized native executable:
 
 ```powershell
-python -m greengold build --release hello.gg -o hello.exe
+gg build --release hello.gg -o hello.exe
 .\hello.exe
 ```
 
 To inspect the LLVM IR output:
 
 ```powershell
-python -m greengold emit-ll hello.gg
+gg emit-ll hello.gg
 ```
 
 ---

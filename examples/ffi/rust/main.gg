@@ -1,10 +1,10 @@
 # Using a Rust library. Compilation (for Windows / mingw `gnu` target required, see README):
 #   cargo build --release --target x86_64-pc-windows-gnu
-#   python -m greengold run main.gg --link-file target/x86_64-pc-windows-gnu/release/libgg_rustlib.a \
+#   gg run main.gg --link-file target/x86_64-pc-windows-gnu/release/libgg_rustlib.a \
 #       --link ws2_32 --link userenv --link ntdll --link bcrypt
 # Linux/macOS:
 #   cargo build --release
-#   python -m greengold run main.gg --link-file target/release/libgg_rustlib.a --link dl --link pthread
+#   gg run main.gg --link-file target/release/libgg_rustlib.a --link dl --link pthread
 # List of required system libraries: `cargo rustc --release -- --print native-static-libs`
 
 extern struct Vec2:

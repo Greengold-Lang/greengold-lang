@@ -1,5 +1,5 @@
 # Raw pointer operations: only inside `unsafe:`. No C library needed.
-#   python -m greengold run examples/ffi/pointers.gg
+#   gg run examples/ffi/pointers.gg
 
 struct Cursor:
     data: *mut i32
