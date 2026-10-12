@@ -35,4 +35,8 @@ def test_bundle_is_current():
         for rel in ("greengold/web.py", "greengold/cli.py", "greengold/core/core.gg", "llvmlite/ir/__init__.py"):
             assert rel in names, rel
         for rel in ("greengold/web.py", "greengold/cli.py", "greengold/typecheck.py"):
-            assert z.read(rel) == (ROOT / rel).read_bytes(), f"{rel} changed: run python tools/build_playground.py"
+            assert z.read(rel).replace(b"
+", b"
+") == (ROOT / rel).read_bytes().replace(b"
+", b"
+"), f"{rel} changed: run python tools/build_playground.py"
