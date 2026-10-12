@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Software Development :: Compilers",
 ]
 requires-python = ">=3.10"
-dependencies = ["llvmlite>=0.50"]  # LLVM 22
+dependencies = ["llvmlite>=0.50", "tomli>=2; python_version < '3.11'"]  # LLVM 22
 
 [project.optional-dependencies]
 test = ["pytest"]

@@ -6,7 +6,10 @@ import json
 import re
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
