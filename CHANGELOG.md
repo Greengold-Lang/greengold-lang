@@ -2,6 +2,13 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
+## Unreleased
+
+Getting started
+- `gg doctor` checks Python, LLVM, the linker, `PATH`, and the current package, and prints a fix for each problem.
+- `gg repl` is an interactive prompt (declarations and bindings are kept; a bare expression is printed). `gg run -e CODE` runs a snippet without a file.
+- `gg new --template bin|lib|cli` starts from a hello world, a library with tests, or a program that reads arguments.
+
 ## 0.4.2
 
 Install and update
