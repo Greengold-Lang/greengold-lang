@@ -1706,3 +1706,15 @@ button.contact {
 .pg-progress { height: 3px; margin: -4px 0 10px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .pg-progress[hidden] { display: none; }
 .pg-progress span { display: block; height: 100%; width: 0; background: var(--green); transition: width .2s ease; }
+
+/* Scrollbars: thin and in the site's colors, in both themes. */
+:root { --scroll-thumb: color-mix(in srgb, var(--text) 22%, transparent); --scroll-thumb-hover: color-mix(in srgb, var(--text) 40%, transparent); scrollbar-color: var(--scroll-thumb) transparent; }
+* { scrollbar-width: thin; }
+html { scrollbar-width: auto; }
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+}
