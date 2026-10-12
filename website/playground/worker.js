@@ -3,7 +3,7 @@ importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
 
 let py = null;
 const ready = (async () => {
-  postMessage({ type: "status", text: "Loading Python…" });
+  postMessage({ type: "status", text: "Starting the compiler…" });
   py = await loadPyodide();
   postMessage({ type: "status", text: "Loading the compiler…" });
   const zip = await (await fetch("gg-bundle.zip", { cache: "no-cache" })).arrayBuffer();
