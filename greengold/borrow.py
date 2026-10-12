@@ -36,7 +36,7 @@ from .ast_nodes import (
 )
 from .diagnostics import DiagnosticBag, Fix, Label, Note
 from .flow import Liveness
-from .typeinfo import generic_parts, is_array_type, is_slice_type, needs_drop
+from .typeinfo import array_info, generic_parts, is_array_type, is_slice_type, needs_drop
 
 
 @dataclass
@@ -268,6 +268,8 @@ class BorrowChecker:
                 results.append(holders)
             self._merge_holders(holders, results, outer=depth)
         elif isinstance(s, (While, For, ForIn)):
+            if isinstance(s, ForIn):
+                self._check_iteration(s)
             # Twice: ties made by one iteration are in place when the next iteration runs.
             local = self._branch(s.body, holders, depth, silent=True)
             entry = {k: Holder(v.name, list(v.refs)) for k, v in holders.items()}
@@ -692,13 +694,25 @@ class BorrowChecker:
             return
         used_here = {n.name for n in nodes if isinstance(n, Name)}
         events = self._events(nodes)
+        replaced = None  # the variable this statement gives a new value, and does not read first
+        if isinstance(stmt, (VarDecl, Assign)) and stmt.value is not None:
+            if isinstance(stmt, VarDecl):
+                replaced = stmt.name
+            elif stmt.op == "=" and isinstance(stmt.target, Name):
+                replaced = stmt.target.name
+            if replaced is not None and any(isinstance(n, Name) and n.name == replaced for n in _walk(stmt.value)):
+                replaced = None  # `v = v.trim()` still reads the old value
         for h in holders.values():
             if h.name not in used_later and h.name not in used_here:
                 continue
+            if h.name == replaced:
+                continue  # `r = lend x` again: the old `r` is dead here, the new one is what lends `x`
             for root, mode, init in h.refs:
                 for kind, ev_root, ev_node in events:
                     if ev_root != root:
                         continue
+                    if h.name in self.ref_ties and self._written_root(ev_node) == h.name:
+                        continue  # the access goes through the reference itself: `slot.bump()`, `slot.hp = 8`
                     if h.name not in used_later and kind not in ("lend", "move"):
                         continue  # used only in this statement: just a `lend` or move next to it conflicts
                     if kind == "use" and mode == "read":
@@ -723,6 +737,84 @@ class BorrowChecker:
                                               getattr(init, "filename", None))] + self._decl_label(root),
                                 details={"referent": root, "holder": h.name, "bond": mode, "event": kind})
 
+    def _path_of(self, e: Node) -> tuple[str, ...] | None:
+        """`a.b[i].c` -> ("a", "b", "[]", "c"); None when it is not a place. The root follows `r = lend x` ties."""
+        while isinstance(e, BorrowExpr):
+            e = e.expr
+        parts: list[str] = []
+        while isinstance(e, (FieldAccess, IndexAccess, SliceExpr)):
+            parts.append(e.field_name if isinstance(e, FieldAccess) else "[]")
+            e = e.obj
+        if not isinstance(e, Name):
+            return None
+        return (self._root_name(e) or e.name, *reversed(parts))
+
+    def _check_iteration(self, s: ForIn) -> None:
+        """`for x in xs:` walks `xs` while the body runs: the body cannot push to it, clear it, reassign it, or
+        move it, because that may free the buffer the loop is reading. Changing an element in place is fine when
+        the elements are plain data."""
+        it = self._path_of(s.iterable)
+        if it is None:
+            return
+        ity = getattr(s.iterable, "ty", None)
+        if not isinstance(ity, str):
+            return
+        parts = generic_parts(ity)
+        if is_array_type(ity):
+            elem = array_info(ity)[1]
+        elif is_slice_type(ity):
+            elem = ity[2:]
+        elif parts is not None and parts[0] == "List":
+            elem = parts[1][0]
+        elif ity == "str":
+            elem = "u8"
+        else:
+            return  # an iterator value (`next(self: lend Self)`) walks itself, it does not borrow a buffer
+        heavy = self._owns_heap(elem) or self._viewish(elem)
+        hits: list[tuple[Node, tuple[str, ...]]] = []
+        for n in _walk(s.body):
+            targets: list[Node] = []
+            if isinstance(n, (Call, MethodCall)):
+                targets += [a for a, m in zip(n.args, getattr(n, "arg_modes", []) or []) if m in ("lend", "consume")]
+                if isinstance(n, MethodCall) and n.self_mode in ("lend", "consume"):
+                    targets.append(n.obj)
+            elif isinstance(n, Assign):
+                targets.append(n.target)
+            elif isinstance(n, BorrowExpr) and n.mode == "lend":
+                targets.append(n.expr)
+            elif isinstance(n, (Name, FieldAccess)) and getattr(n, "is_move", False):
+                targets.append(n)
+            for t in targets:
+                p = self._path_of(t)
+                if p is None:
+                    continue
+                k = min(len(p), len(it))
+                if p[:k] != it[:k]:
+                    continue
+                element_level = "[]" in p[len(it):] if len(p) > len(it) else False
+                if element_level and not heavy:
+                    continue
+                hits.append((t, p))
+        for t, p in hits:
+            root = it[0]
+            self._error(t, f"`{unparse(s.iterable)}` is being walked by this `for` loop, so it cannot be changed inside it.",
+                        "Collect the changes in another list and apply them after the loop, or loop over a copy (`.clone()`).",
+                        rule="borrow-invalidated", labels=self._decl_label(root),
+                        details={"referent": root, "holder": s.var, "bond": "read", "event": "iteration"})
+
+    @staticmethod
+    def _written_root(e: Node) -> str | None:
+        """The variable an access names, before any `r = lend x` tie is followed (`r` in `r.bump()`)."""
+        if isinstance(e, MethodCall):
+            e = e.obj
+        while isinstance(e, BorrowExpr):
+            e = e.expr
+        if isinstance(e, Assign):
+            e = e.target
+        while isinstance(e, (FieldAccess, IndexAccess, SliceExpr)):
+            e = e.obj
+        return e.name if isinstance(e, Name) else None
+
     def _events(self, nodes: list[Node]) -> list[tuple[str, str, Node]]:
         out: list[tuple[str, str, Node]] = []
         for n in nodes:
@@ -744,6 +836,12 @@ class BorrowChecker:
                 r = self._root_name(n.expr)
                 if r:
                     out.append(("lend", r, n))
+            if isinstance(n, StructLit):
+                for f in n.fields:
+                    if f.ref_mode == "lend":
+                        r = self._root_name(f.value)
+                        if r:
+                            out.append(("lend", r, f))
             if isinstance(n, VarDecl) and n.ref_mode == "lend" and n.ref_root:
                 out.append(("lend", n.ref_root, n))
             if isinstance(n, Assign) and getattr(n, "rebind", False) and n.ref_mode == "lend" and n.ref_root:

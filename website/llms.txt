@@ -1,6 +1,6 @@
 # Greengold
 
-Greengold is a statically typed, indentation-sensitive systems language. Programs compile to native code through LLVM. Ownership is written once on a parameter (`read`, `lend`, `consume`); variables are mutable unless declared or inferred `fixed`. The compiler is version 0.3.3.
+Greengold is a statically typed, indentation-sensitive systems language. Programs compile to native code through LLVM. Ownership is written once on a parameter (`read`, `lend`, `consume`); variables are mutable unless declared or inferred `fixed`. The compiler is version 0.5.0.
 
 Site: https://greengoldlang.com/
 

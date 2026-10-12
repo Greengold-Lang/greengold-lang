@@ -207,3 +207,65 @@ def test_storing_into_a_field_is_not_a_read_of_the_struct():
 def test_block_that_returns_does_not_leak_its_views():
     src = 'v = "x"\nfor i in 0..2:\n    s = string("hi")\n    v = s.as_str()\n    return\nprint(1)'
     assert messages(with_main(src)) == []
+
+
+# Found by tools/fuzz_typed.py with the poisoning allocator of tools/safety_oracle.py.
+def test_array_literal_moves_its_heap_elements():
+    ok = 'a = string.from("x")\nb = string.from("y")\narr = [b, a]\nprint(arr.len)'
+    assert messages(with_main(ok)) == []
+    assert has(messages(with_main('a = string.from("x")\narr = [a, string.from("y")]\nprint(a)')), "moved")
+    assert has(messages(with_main('a = string.from("x")\narr = [a, a]\nprint(arr.len)')), "moved")
+    assert has(messages(with_main('a = string.from("x")\none = [a; 1]\nprint(a)')), "moved")
+
+
+def test_lend_reference_can_be_used_through_itself():
+    src = ('struct Pl:\n    k: i32\n\nimpl Pl:\n    fn bump(self: lend Self):\n        self.k += 1\n\n'
+           'fn main():\n    v1 = Pl{ k: 1 }\n    v2 = lend v1\n    v2.bump()\n    v2.k += 1\n    print(v1.k)\n')
+    assert messages(src) == []
+    # ... but the owner is still locked while the reference lives
+    assert has(messages(src.replace("    v2.bump()\n", "    v1.bump()\n")), "still live") or \
+        has(messages(src.replace("    v2.bump()\n", "    v1.bump()\n")), "borrowed as `lend`")
+
+
+# Found by tools/fuzz_typed.py and tools/fuzz_safety.py (the memory-safety oracle).
+def test_lend_and_a_view_of_the_same_place_cannot_share_a_call():
+    prog = 'fn main():\n    s = string.from("abc")\n    {}\n'
+    for call in ("s.append_str(s.as_str())", "s.append_str(s[0..1])", "s.append_str(s.trim())"):
+        assert has(messages(prog.format(call)), "both `read` and `lend`"), call
+    # a copy made first, or a different string, is fine
+    for call in ("s.append_str(s.clone().as_str())", 's.append_str("x")', "s = s + s.as_str()"):
+        assert messages(prog.format(call)) == [], call
+
+
+def test_listing_cannot_change_while_a_for_loop_walks_it():
+    prog = ('struct Hs:\n    names: List[string]\n    items: List[i32]\n\nfn main():\n    xs = List[i32]()\n'
+            '    ys = List[i32]()\n    ls = List[string]()\n    h = Hs{ names: List[string](), items: List[i32]() }\n@@\n')
+    for body in ("    for x in xs:\n        xs.push(x)", "    for x in xs:\n        xs.clear()",
+                 "    for x in xs:\n        xs = List[i32]()", "    for s in ls:\n        ls.push(s.clone())",
+                 "    for s in ls:\n        ls[0].append_str(\"z\")", "    for x in h.items:\n        h.items.push(x)"):
+        assert has(messages(prog.replace("@@", body)), "walked by this `for` loop"), body
+    for body in ("    for x in xs:\n        ys.push(x)", "    for x in xs:\n        xs[0] = 5",
+                 "    for x in h.items:\n        h.names.push(string.from(\"q\"))"):
+        assert messages(prog.replace("@@", body)) == [], body
+
+
+def test_closure_that_lends_a_place_invalidates_a_view_of_it():
+    base = "xs = List[i32]()\nxs.push(1)\n"
+    bad = base + "v = xs[0..1]\nf = fn(x: i32) => xs.push(x)\nf(5)\nfor y in v:\n    print(y)"
+    assert has(messages(with_main(bad)), "lend")
+    ok = base + "for i in 0..3:\n    f = fn(x: i32) => xs.push(x)\n    f(i)\nprint(xs.len)"
+    assert messages(with_main(ok)) == []
+
+
+def test_a_new_lend_reference_each_iteration_is_fine():
+    src = ('struct Pl:\n    k: i32\n\nimpl Pl:\n    fn bump(self: lend Self):\n        self.k += 1\n\n'
+           'fn main():\n    v1 = Pl{ k: 1 }\n    for i in 0..3:\n        v2 = lend v1\n        v2.bump()\n    print(v1.k)\n')
+    assert messages(src) == []
+
+
+def test_defer_cannot_read_what_was_moved_before_the_block_ends():
+    prog = 'fn eat(x: consume string):\n    print(x.len)\n\nfn main():\n    s = string.from("a")\n    defer print(s)\n{}\n'
+    for stmt in ("    t = s", "    eat(s)", "    arr = [s, string.from(\"b\")]"):
+        assert has(messages(prog.format(stmt)), "moved"), stmt
+    for stmt in ("    s.append_str(\"x\")", "    s = string.from(\"b\")", '    print("done")'):
+        assert messages(prog.format(stmt)) == [], stmt
