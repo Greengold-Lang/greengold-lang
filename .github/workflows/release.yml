@@ -91,6 +91,7 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" out/* \
             --title "Greengold ${GITHUB_REF_NAME#v}" \
+            --generate-notes \
             --notes "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md). Install: https://github.com/${GITHUB_REPOSITORY}#install"
       - name: Keep the files (manual run)
         if: "!startsWith(github.ref, 'refs/tags/v')"
