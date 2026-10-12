@@ -39,3 +39,7 @@ When `docs/SPEC.md` changes, run the script again. When the compiler output chan
 - `style.css`, `app.js` — shared by every page (dark and light theme, code tabs, spec contents)
 - `llms.txt`, `robots.txt`, `sitemap.xml`, `_headers`
 - `assets/` — logo and favicon
+
+## Playground
+
+`playground.html` runs the compiler front end in the browser (Pyodide, in a Web Worker). `playground/gg-bundle.zip` holds `greengold/` and `llvmlite.ir`; rebuild it with `python tools/build_playground.py` whenever the compiler changes, then commit it. Pyodide itself loads from the jsDelivr CDN. Running programs would need LLVM in WebAssembly and is not part of the playground yet.

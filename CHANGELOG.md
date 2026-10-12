@@ -8,6 +8,7 @@ Getting started
 - `gg doctor` checks Python, LLVM, the linker, `PATH`, and the current package, and prints a fix for each problem.
 - `gg repl` is an interactive prompt (declarations and bindings are kept; a bare expression is printed). `gg run -e CODE` runs a snippet without a file.
 - `gg new --template bin|lib|cli` starts from a hello world, a library with tests, or a program that reads arguments.
+- Website playground (`playground.html`): the compiler front end runs in the browser through Pyodide, with live diagnostics, checked fixes, `fmt`, and `explain`. It cannot run programs yet. After changing the compiler, run `python tools/build_playground.py` to refresh `website/playground/gg-bundle.zip` (a test checks it).
 
 ## 0.4.2
 

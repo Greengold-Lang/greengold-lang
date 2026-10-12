@@ -254,6 +254,7 @@ NAV = [
     ("why", "why.html", "Why"),
     ("spec", "spec.html", "Spec"),
     ("benchmarks", "benchmarks.html", "Benchmarks"),
+    ("playground", "playground.html", "Playground"),
     ("diagnostics", "diagnostics.html", "Diagnostics"),
     ("roadmap", "roadmap.html", "Roadmap"),
     ("about", "about.html", "About"),
@@ -1073,6 +1074,34 @@ def build_roadmap() -> str:
                   f"Greengold {VERSION}: what shipped, what is next, and the state of self-hosting.", body)
 
 
+def build_playground() -> str:
+    body = page_hero("Playground", "Playground",
+                     "Write Greengold in the browser. The real compiler front end runs here, so errors, checked fixes, "
+                     "and <code>gg explain</code> work as in the terminal. Nothing is uploaded.") + """
+    <section class="section tight" style="padding-top:8px">
+      <div class="wrap">
+        <div class="pg-bar">
+          <select id="pg-examples" aria-label="Examples"><option value="">Examples…</option></select>
+          <button type="button" class="btn btn-ghost" id="pg-fix" title="Apply every verified fix">Fix</button>
+          <button type="button" class="btn btn-ghost" id="pg-fixlikely" title="Also apply fixes that are probably what you meant">Fix (likely)</button>
+          <button type="button" class="btn btn-ghost" id="pg-format">Format</button>
+          <button type="button" class="btn btn-ghost" id="pg-share">Copy link</button>
+          <button type="button" class="btn btn-primary" disabled title="Running programs in the browser is planned. Install gg to run.">Run (soon)</button>
+          <span class="pg-status" id="pg-status" role="status" aria-live="polite">Loading…</span>
+        </div>
+        <div class="pg">
+          <div class="pg-pane"><pre class="pg-gutter" id="pg-gutter" aria-hidden="true">1</pre>
+            <textarea class="pg-editor" id="pg-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code"></textarea></div>
+          <div class="pg-pane"><pre class="pg-out" id="pg-out" aria-label="Diagnostics">Loading the compiler…</pre></div>
+        </div>
+        <p style="margin-top:16px">To run programs, <a href="https://github.com/Greengold-Lang/greengold-lang#install">install gg</a>.</p>
+      </div>
+    </section>
+    <script src="playground/playground.js" defer></script>"""
+    return layout("playground", "playground.html", "Playground",
+                  "Try Greengold in the browser: live diagnostics, checked fixes, and explanations from the real compiler.", body)
+
+
 def build_about() -> str:
     body = page_hero("About", "About",
                      "Greengold is designed by Umut Faruk Dilli: a systems language with C++ and Rust speed that stays friendly to read and to learn.", narrow=True) + f"""
@@ -1243,6 +1272,7 @@ def main() -> None:
         "benchmarks.html": build_benchmarks(rows),
         "diagnostics.html": build_diagnostics(),
         "roadmap.html": build_roadmap(),
+        "playground.html": build_playground(),
         "about.html": build_about(),
     }
     for name, text in pages.items():
@@ -1250,7 +1280,7 @@ def main() -> None:
     shutil.copyfile(SPEC, SITE / "spec.md")
     sitemap = ["<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"]
-    for path in ["", "why.html", "spec.html", "spec.md", "benchmarks.html", "diagnostics.html",
+    for path in ["", "why.html", "spec.html", "spec.md", "benchmarks.html", "playground.html", "diagnostics.html",
                  "roadmap.html", "about.html", "benchmarks/data.json"]:
         sitemap.append(f"  <url><loc>{DOMAIN}/{path}</loc><lastmod>{UPDATED}</lastmod></url>")
     sitemap.append("</urlset>")
