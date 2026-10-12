@@ -56,7 +56,6 @@ ICONS = {
     "moon": icon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', ' class="moon"'),
     "menu": icon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     "code": icon('<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>'),
-    "github": icon('<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>'),
     "file": icon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'),
     "bolt": icon('<path d="M13 2L3 14h9l-1 8 10-12h-9z"/>'),
     "pause": icon('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
@@ -315,6 +314,7 @@ def layout(key: str, path: str, title: str, description: str, body: str) -> str:
 {nav}
       </nav>
       <div class="header-tools">
+        <a class="icon-btn" href="https://github.com/Greengold-Lang/greengold-lang" rel="noopener" aria-label="Greengold on GitHub" title="Greengold on GitHub">{ICONS["github"]}</a>
         <button type="button" class="icon-btn theme-toggle" aria-label="Switch colour theme">{ICONS["sun"]}{ICONS["moon"]}</button>
         <button type="button" class="icon-btn menu-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">{ICONS["menu"]}</button>
       </div>
@@ -705,7 +705,7 @@ def build_index(rows: list[dict]) -> str:
           <div class="panel reveal">
             <h3>{ICONS["cpu"]} The toolchain</h3>
             <dl class="kv">
-              <dt>Version</dt><dd>{VERSION}, not yet released as a package.</dd>
+              <dt>Version</dt><dd>{VERSION}. <a href="https://github.com/Greengold-Lang/greengold-lang/releases/latest">Download</a> for Windows, Linux, and macOS, or <a href="https://github.com/Greengold-Lang/greengold-lang">read the source on GitHub</a>.</dd>
               <dt>Compiler</dt><dd>Written in Python. Emits LLVM IR through <code>llvmlite</code> and links with clang or gcc. LLVM is the only backend.</dd>
               <dt>Tools</dt><dd><code>gg check</code>, <code>run</code>, <code>build</code>, <code>test</code>, <code>fmt</code>, <code>doc</code>, <code>api</code>, <code>bindgen</code>, and a language server with inlay hints.</dd>
               <dt>Self-hosting</dt><dd>Paused. The lexer is written in Greengold; language work happens in the Python compiler for now.</dd>
@@ -1038,7 +1038,7 @@ def build_roadmap() -> str:
         "<code>:=</code> removed in favor of <code>=</code>, and VS Code extension with <code>gg fix</code> and debugging",
     ]
     nxt = [
-        "A first published release package",
+        "An Intel Mac build (needs an <code>llvmlite</code> wheel for that platform)",
         "Freezing the <code>2026</code> edition for 1.0",
     ]
     paused = [
@@ -1048,7 +1048,7 @@ def build_roadmap() -> str:
     def ul(items):
         return "<ul class=\"ticks\">" + "".join(f"<li>{i}</li>" for i in items) + "</ul>"
     body = page_hero("Roadmap", "Roadmap",
-                     f"Version {VERSION}. The compiler is written in Python and emits LLVM IR through <code>llvmlite</code>. A release package is not available yet.", narrow=True) + f"""
+                     f"Version {VERSION}. The compiler is written in Python and emits LLVM IR through <code>llvmlite</code>. Prebuilt downloads are on the <a href=\"https://github.com/Greengold-Lang/greengold-lang/releases/latest\">GitHub releases page</a>.", narrow=True) + f"""
     <section class="section tight" style="padding-top:24px">
       <div class="wrap narrow">
         <div class="timeline">
@@ -1081,6 +1081,7 @@ def build_about() -> str:
         <div class="contact-grid">
           <button type="button" class="contact reveal" data-copy="founder@greengoldlang.com" title="Copy email address">{ICONS["mail"]}<div><span aria-live="polite">Email</span><strong>founder@greengoldlang.com</strong></div></button>
           <a class="contact reveal" href="https://www.linkedin.com/in/umutfarukdilli/">{ICONS["linkedin"]}<div><span>LinkedIn</span><strong>umutfarukdilli</strong></div></a>
+          <a class="contact reveal" href="https://github.com/Greengold-Lang/greengold-lang">{ICONS["github"]}<div><span>Source code</span><strong>Greengold-Lang/greengold-lang</strong></div></a>
           <a class="contact reveal" href="https://github.com/UmutFarukDilli">{ICONS["github"]}<div><span>GitHub</span><strong>UmutFarukDilli</strong></div></a>
         </div>
       </div>
