@@ -1078,6 +1078,15 @@ def build_roadmap() -> str:
                   f"Greengold {VERSION}: what shipped, what is next, and the state of self-hosting.", body)
 
 
+def playground_version() -> str:
+    """Hash of the playground scripts, so a changed script is never served from a stale cache."""
+    import hashlib
+    h = hashlib.sha256()
+    for name in ("highlight.js", "editor.js", "playground.js", "worker.js", "toolchain.js", "runner.js"):
+        h.update((SITE / "playground" / name).read_bytes())
+    return h.hexdigest()[:10]
+
+
 def build_playground() -> str:
     body = page_hero("Playground", "Playground",
                      "Write Greengold, see errors and checked fixes as you type, and run the program, all in the browser. "
@@ -1123,9 +1132,9 @@ def build_playground() -> str:
         <p class="pg-keys">Editor: <kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs, <kbd>Tab</kbd> indents (<kbd>Shift</kbd>+<kbd>Tab</kbd> outdents), <kbd>Ctrl</kbd>+<kbd>/</kbd> comments lines, brackets and quotes close themselves, and <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the editor.</p>
       </div>
     </section>
-    <script src="playground/highlight.js" defer></script>
-    <script src="playground/editor.js" defer></script>
-    <script src="playground/playground.js" defer></script>"""
+    <script src="playground/highlight.js?v=@V@" defer></script>
+    <script src="playground/editor.js?v=@V@" defer></script>
+    <script src="playground/playground.js?v=@V@" defer></script>""".replace("@V@", playground_version())
     return layout("playground", "playground.html", "Playground",
                   "Try Greengold in the browser: live diagnostics, checked fixes, and explanations from the real compiler.", body)
 

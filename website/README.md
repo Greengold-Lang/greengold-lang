@@ -6,7 +6,7 @@ Static site in this directory: HTML, CSS, and JavaScript. Cloudflare Pages publi
 
 The site is published by uploading this folder directly to Cloudflare Pages (not through Git), so what is on disk when you upload is what goes live. From the repository root:
 
-1. **Compiler, standard library, or `docs/` changed?** Rebuild what the site embeds:
+1. **Compiler, standard library, `docs/`, or any `playground/*.js` changed?** Rebuild what the site embeds (`build_site.py` also stamps the scripts' content hash into `playground.html`, so a changed script is never served from a stale cache):
    ```bash
    python tools/build_playground.py   # playground/gg-bundle.zip: the compiler the playground runs
    python tools/build_site.py         # every *.html page, spec.md, sitemap.xml

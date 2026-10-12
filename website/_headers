@@ -31,6 +31,12 @@
 /diagnostics/*.json
   Content-Type: application/json; charset=utf-8
 
+/playground/*.js
+  Cache-Control: no-cache
+
+/playground/examples.json
+  Cache-Control: no-cache
+
 /playground/llvm/*
   Cache-Control: public, max-age=2592000
 
