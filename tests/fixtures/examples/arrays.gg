@@ -1,0 +1,25 @@
+fn sum(a: []i32) -> i32:
+    total = 0
+    for x in a:
+        total += x
+    return total
+
+fn sort(a: lend []i32):
+    i: usize = 0
+    while i < a.len:
+        j: usize = 0
+        while j + 1 < a.len - i:
+            if a[j] > a[j + 1]:
+                t = a[j]
+                a[j] = a[j + 1]
+                a[j + 1] = t
+            j += 1
+        i += 1
+
+fn main():
+    nums = [5, 2, 9, 1, 7]
+    print(sum(nums))
+    sort(nums)
+    for i in 0..nums.len:
+        print(nums[i])
+    print(sum(nums[1..4]))

@@ -1,0 +1,44 @@
+import std.collections
+
+struct Point:
+    x: i32
+    y: i32
+
+# A struct key: `hash` and `eq` methods (`==` calls `eq`).
+impl Point:
+    fn hash(self: Self) -> u64:
+        return hash(i64(self.x) * 100003 + i64(self.y))
+
+    fn eq(self: Self, other: Point) -> bool:
+        return self.x == other.x and self.y == other.y
+
+fn main():
+    m = collections.hashmap_i32[i64]()
+    for i in 0..1000:
+        m.insert(i, i64(i) * 3)
+    print(m.len(), m.get(7).value_or(-1), m.get(5000).value_or(-1), m.contains(999))
+    m.insert(7, 100)
+    print(m.len(), m.get_or(7, 0))
+    for i in 0..500:
+        m.remove(i * 2)
+    print(m.len(), m.contains(4), m.contains(5))
+    names = collections.hashmap_new[str, i32]()
+    names.insert("alice", 30)
+    names.insert("bob", 25)
+    print(names.get_or("alice", 0), names.get_or("bob", 0), names.get_or("carol", -1))
+    pts = collections.hashmap_new[Point, str]()
+    pts.insert(Point{ x: 1, y: 2 }, "a")
+    pts.insert(Point{ x: 3, y: 4 }, "b")
+    print(pts.get_or(Point{ x: 3, y: 4 }, "?"), pts.get_or(Point{ x: 0, y: 0 }, "?"))
+    s = collections.hashset_i32()
+    a1 = s.insert(3)
+    a2 = s.insert(3)
+    a3 = s.insert(4)
+    print(a1, a2, a3, s.len())
+    ks = names.keys()
+    print(ks.len)
+    a = collections.arena_new[Point]()
+    h = a.alloc(Point{ x: 9, y: 8 })
+    a.set(h, Point{ x: 7, y: 6 })
+    print(a.get(h).x, a.len())
+

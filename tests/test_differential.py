@@ -4,10 +4,10 @@ import sys
 
 import pytest
 
-from .helpers import HAS_CC, ROOT
+from .helpers import HAS_CC, ROOT, EXAMPLES_DIR
 
 SKIP = {"bounds_fail.gg", "value_or_panic_fail.gg", "extern_math.gg"}
-EXAMPLES = sorted(p for p in (ROOT / "examples").glob("*.gg") if p.name not in SKIP)
+EXAMPLES = sorted(p for p in (EXAMPLES_DIR).glob("*.gg") if p.name not in SKIP)
 
 
 def _run(path, *flags):

@@ -1,14 +1,14 @@
 """List helper methods (`map`, `filter`, `sort`, ...), written in Greengold in core.gg."""
 from pathlib import Path
 
-from tests.helpers import front_end, messages, run_built
+from tests.helpers import front_end, messages, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_list_helpers_run(monkeypatch):
     monkeypatch.setenv("GG_LEAKCHECK", "1")
-    r = run_built((ROOT / "examples" / "list_helpers.gg").read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / "list_helpers.gg").read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
     assert r.stdout.splitlines() == [

@@ -1,0 +1,37 @@
+import std.thread
+
+fn worker_a():
+    print("Worker A running safely in background thread")
+
+fn worker_b(id: i64):
+    print("Worker B running with ID:", id)
+
+fn main():
+    # 1. Spawn safe thread without arguments (NO unsafe, NO raw pointers)
+    t1 = thread.Thread.spawn(worker_a)
+    t1.join()
+
+    # 2. Spawn safe thread with integer parameter (NO unsafe, NO raw pointers)
+    t2 = thread.Thread.spawn_with_param(worker_b, 42)
+    t2.join()
+
+    # 4. Safe Atomic Operations
+    counter = thread.AtomicI64.new(0)
+    counter.fetch_and_add(10)
+    print("Counter value:", counter.load())
+
+    # 5. Safe Mutex Operations
+    mtx = thread.Mutex.new()
+    mtx.lock()
+    print("Mutex acquired safely!")
+    mtx.unlock()
+
+    # 6. Safe Channel Operations
+    ch = thread.Channel.new()
+    ch.send(100)
+    ch.send(200)
+    if let Valid(val) = ch.recv():
+        print("Received from channel:", val)
+    ch.close()
+
+    print("All native thread operations completed safely!")

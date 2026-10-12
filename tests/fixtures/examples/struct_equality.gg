@@ -1,0 +1,55 @@
+import std.collections
+
+struct Point:
+    x: i32
+    y: i32
+
+struct Named:
+    name: string
+    tags: List[str]
+    at: Point
+
+enum Shape:
+    Circle(f64)
+    Rect(Point, Point)
+    Empty
+
+enum Tree:
+    Leaf(i32)
+    Node(Box[Tree], Box[Tree])
+
+struct Loose:
+    v: i32
+
+impl Loose:
+    fn eq(self: Loose, other: Loose) -> bool:
+        return self.v / 10 == other.v / 10
+
+struct Pair[A, B]:
+    a: A
+    b: B
+
+fn named(n: str) -> Named:
+    tags = List[str]()
+    tags.push("x")
+    return Named{ name: n, tags: tags, at: Point{ x: 1, y: 2 } }
+
+fn main():
+    p = Point{ x: 1, y: 2 }
+    q = Point{ x: 1, y: 2 }
+    print(p == q, p != q, p == Point{ x: 2, y: 2 })
+    print(named("a") == named("a"), named("a") == named("b"))
+    print(Shape.Circle(1.5) == Shape.Circle(1.5), Shape.Rect(p, q) == Shape.Rect(q, p), Shape.Empty == Shape.Circle(0.0))
+    t1 = Tree.Node(Box[Tree](Tree.Leaf(1)), Box[Tree](Tree.Leaf(2)))
+    t2 = Tree.Node(Box[Tree](Tree.Leaf(1)), Box[Tree](Tree.Leaf(3)))
+    print(t1 == t1.clone(), t1 == t2)
+    print(Loose{ v: 11 } == Loose{ v: 19 }, [Loose{ v: 1 }] == [Loose{ v: 25 }])
+    a: Optional[Point] = Valid(p)
+    print(a == Valid(q), (1, "x") == (1, "x"), Pair{ a: 1, b: p } == Pair{ a: 1, b: q })
+    xs = List[Point]()
+    xs.push(p)
+    print(xs.contains(q), xs.index_of(Point{ x: 9, y: 9 }))
+    print(hash(p) == hash(q), hash(p) == hash(Point{ x: 2, y: 1 }), hash(named("a")) == hash(named("a")))
+    m = collections.hashmap_new[Point, str]()
+    m.insert(p, "origin-ish")
+    print(m.get(q), m.get(Point{ x: 0, y: 0 }))

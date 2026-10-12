@@ -1,14 +1,14 @@
 """Lambdas inside generic functions and methods of generic types use the type parameters."""
 from pathlib import Path
 
-from tests.helpers import front_end, run_built
+from tests.helpers import front_end, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_generic_closures(monkeypatch):
     monkeypatch.setenv("GG_LEAKCHECK", "1")
-    r = run_built((ROOT / "examples" / "generic_closures.gg").read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / "generic_closures.gg").read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
     assert r.stdout.splitlines() == ["2 1 [11, 15] [2]", "0 1"]

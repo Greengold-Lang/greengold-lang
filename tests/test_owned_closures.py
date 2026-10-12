@@ -1,14 +1,14 @@
 """`Fn(A) -> R`: owned closure values that can be returned, stored, and shared."""
 from pathlib import Path
 
-from tests.helpers import messages, run_built
+from tests.helpers import messages, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_owned_closures_example(monkeypatch):
     monkeypatch.setenv("GG_LEAKCHECK", "1")
-    r = run_built((ROOT / "examples" / "owned_closures.gg").read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / "owned_closures.gg").read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert r.stdout.splitlines() == ["6 15", "-29", "ok 10", "5"]
     assert "LEAK" not in r.stderr

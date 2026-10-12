@@ -1,0 +1,80 @@
+# Greengold RPG Project: combat.gg
+# Combat logic, damage calculations, and character methods
+
+import "types.gg"
+
+impl types.Player:
+    fn take_damage(self: lend types.Player, dmg: i32):
+        self.hp -= dmg
+        if self.hp < 0:
+            self.hp = 0
+
+    fn heal(self: lend types.Player, amount: i32):
+        self.hp += amount
+        if self.hp > self.max_hp:
+            self.hp = self.max_hp
+
+    fn use_potion(self: lend types.Player) -> Result[i32, str]:
+        if self.potions <= 0:
+            return Err("No potions left in inventory!")
+        if self.hp >= self.max_hp:
+            return Err("Health is already full!")
+        self.potions -= 1
+        self.heal(types.POTION_HEAL)
+        return Ok(types.POTION_HEAL)
+
+    fn is_alive(self: types.Player) -> bool:
+        return self.hp > 0
+
+impl types.Monster:
+    fn take_damage(self: lend types.Monster, dmg: i32):
+        self.hp -= dmg
+        if self.hp < 0:
+            self.hp = 0
+
+    fn is_alive(self: types.Monster) -> bool:
+        return self.hp > 0
+
+fn calc_damage(atk: i32, def_val: i32) -> i32:
+    dmg = atk - def_val
+    if dmg < 1:
+        return 1
+    return dmg
+
+public
+fn execute_round(p: lend types.Player, m: lend types.Monster, act: types.Action) -> types.BattleOutcome:
+    match act:
+        Attack:
+            p_dmg = calc_damage(p.stats.attack, m.stats.defense)
+            m.take_damage(p_dmg)
+            print("->", p.name, "attacks! Damage dealt:", p_dmg)
+            if not m.is_alive():
+                print("->", m.name, "was defeated!")
+                p.gold += m.gold_reward
+                return types.BattleOutcome.Victory(m.gold_reward)
+        Defend:
+            print("->", p.name, "took a defensive stance!")
+        DrinkPotion:
+            match p.use_potion():
+                Ok(healed):
+                    print("->", p.name, "drank a potion and recovered health:", healed)
+                Err(err_msg):
+                    print("-> Potion failed:", err_msg)
+
+    # Monster counter-attack
+    monster_atk = m.stats.attack
+    match act:
+        Defend:
+            monster_atk = monster_atk / 2
+        _:
+            pass
+
+    m_dmg = calc_damage(monster_atk, p.stats.defense)
+    p.take_damage(m_dmg)
+    print("<-", m.name, "counter-attacked! Damage taken:", m_dmg)
+
+    if not p.is_alive():
+        print("->", p.name, "was defeated...")
+        return types.BattleOutcome.Defeat
+
+    return types.BattleOutcome.Ongoing

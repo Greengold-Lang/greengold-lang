@@ -1,0 +1,45 @@
+# Example program showcasing Feature, Defer, and Ref features
+
+# 1. Feature: Structural interface. No explicit `impl` required.
+feature Describable:
+    fn describe(self: Self) -> string
+
+struct Item:
+    name: string
+    quantity: i32
+
+# Satisfies the `describe` method of the Describable feature:
+impl Item:
+    fn describe(self) -> string:
+        return self.name.clone()
+
+# Feature bound: Type T must satisfy the Describable feature
+fn announce[T: Describable](item: T):
+    print("Announcement:", item.describe())
+
+# 2. Ref Return: Read-only view derived from input (first-parameter derivation rule)
+fn get_item_name(it: Item) -> ref string:
+    return it.name
+
+fn process_inventory():
+    # 3. Defer: Runs in reverse order (LIFO) upon scope exit
+    defer print("[defer 2] Inventory processing completed successfully.")
+    defer print("[defer 1] Cleanup checks running...")
+
+    items = List[Item]()
+    items.push(Item{ name: "Healing Potion", quantity: 3 })
+    items.push(Item{ name: "Steel Sword", quantity: 1 })
+
+    print("Total items in inventory:", items.len)
+
+    # List.get(i) returns a bounds-checked `ref Item` view:
+    announce(items.get(0))
+    announce(items.get(1))
+
+    # Using `get_item_name` to directly take a reference to the first item's name:
+    print("First item name (ref):", get_item_name(items.get(0)))
+
+fn main():
+    print("=== Greengold Feature, Defer, Ref Demo ===")
+    process_inventory()
+    print("=== End of Program ===")

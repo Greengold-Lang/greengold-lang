@@ -1,0 +1,19 @@
+enum Cmd:
+    Go
+    Stop
+
+fn pick(i: i32) -> Cmd:
+    if i == 5:
+        return Cmd.Stop
+    return Cmd.Go
+
+fn main():
+    n = 0
+    for i in 0..10:
+        match pick(i):
+            Go:
+                n += 1
+                continue
+            Stop:
+                break
+    print(n)

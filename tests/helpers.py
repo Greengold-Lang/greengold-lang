@@ -49,6 +49,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Tests read their own copy of the examples, so edits to examples/ cannot break them.
+EXAMPLES_DIR = ROOT / "tests" / "fixtures" / "examples"
 HAS_CC = shutil.which("gcc") is not None or shutil.which("clang") is not None
 
 
@@ -61,7 +63,7 @@ def run_gg_source(tmp_path: Path, src: str, release: bool = False):
 
 
 def run_example(name: str, release: bool = False):
-    cmd = [sys.executable, "-m", "greengold", "run", str(ROOT / "examples" / name)] + (["--release"] if release else [])
+    cmd = [sys.executable, "-m", "greengold", "run", str(EXAMPLES_DIR / name)] + (["--release"] if release else [])
     return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", cwd=ROOT, timeout=120)
 
 

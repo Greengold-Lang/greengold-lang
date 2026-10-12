@@ -6,7 +6,7 @@ from greengold.cli import cmd_check
 from greengold.diagnostics import DiagnosticBag
 from greengold.fmt import format_source
 from greengold.lexer import tokenize
-from tests.helpers import ROOT
+from tests.helpers import ROOT, EXAMPLES_DIR
 
 
 def _tokens(src: str):
@@ -18,7 +18,7 @@ def _tokens(src: str):
 
 
 def test_format_is_idempotent_and_keeps_tokens():
-    files = list((ROOT / "examples").rglob("*.gg"))
+    files = list(EXAMPLES_DIR.rglob("*.gg"))
     files += list((ROOT / "greengold").rglob("*.gg"))
     files += list((ROOT / "benchmarks").glob("*.gg"))
     assert files

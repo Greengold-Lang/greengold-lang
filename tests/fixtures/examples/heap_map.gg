@@ -1,0 +1,28 @@
+import std.collections
+
+fn main():
+    groups = collections.hashmap_new[string, List[i32]]()
+    for i in 0..10:
+        key = string.from("odd")
+        if i % 2 == 0:
+            key = string.from("even")
+        if not groups.contains(key):
+            groups.insert(key.clone(), List[i32]())
+        bucket = groups.remove(key).value_or_panic()
+        bucket.push(i)
+        groups.insert(key, bucket)
+    print(groups.len(), groups.get_ref(string.from("even")).len, groups.get_ref(string.from("odd"))[4])
+    got = groups.get(string.from("odd"))
+    match got:
+        Valid(xs):
+            print(xs.len)
+        None:
+            print(-1)
+    words = collections.hashset_new[string]()
+    words.insert(string.from("a"))
+    words.insert(string.from("a"))
+    words.insert(string.from("b"))
+    print(words.len(), words.remove(string.from("a")), words.contains(string.from("a")), words.len())
+    for i in 0..200:
+        groups.insert(string.from("k") + "x", List[i32]())
+    print(groups.len())

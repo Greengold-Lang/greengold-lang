@@ -9,7 +9,7 @@ from greengold.ast_nodes import dump_ast
 from greengold.diagnostics import DiagnosticBag
 from greengold.lexer import tokenize
 from greengold.parser import parse
-from tests.helpers import ROOT
+from tests.helpers import ROOT, EXAMPLES_DIR
 
 PARSER_SRC = ROOT / "selfhost" / "parser.gg"
 
@@ -109,7 +109,7 @@ def py_dump(text: str) -> list[str]:
 
 
 def corpus() -> list[Path]:
-    files = sorted((ROOT / "examples").glob("*.gg"))
+    files = sorted((EXAMPLES_DIR).glob("*.gg"))
     files += sorted((ROOT / "greengold" / "std").glob("*.gg"))
     files += [ROOT / "greengold" / "core" / "core.gg"]
     files += sorted((ROOT / "selfhost").glob("*.gg"))

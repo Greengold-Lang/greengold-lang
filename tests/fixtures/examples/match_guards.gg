@@ -1,0 +1,62 @@
+enum Shape:
+    Circle(f64)
+    Rect(f64, f64)
+    Empty
+
+fn size(n: i32) -> str:
+    match n:
+        0:
+            return "zero"
+        v if v < 0:
+            return "negative"
+        1 | 2 | 3 if n % 2 == 1:
+            return "small odd"
+        v if v > 100:
+            return "big"
+        _:
+            return "medium"
+
+fn kind(s: Shape) -> string:
+    match s:
+        Circle(r) if r > 10.0:
+            return f"big circle {r}"
+        Circle(r):
+            return f"circle {r}"
+        Rect(w, h) if w == h:
+            return f"square {w}"
+        Rect(_, _):
+            return "rect"
+        Empty:
+            return "empty"
+
+fn first_long(words: List[string]) -> string:
+    for w in words:
+        match w.len():
+            n if n > 3:
+                return w.clone()
+            _:
+                pass
+    return "none"
+
+fn main():
+    for n in [0, -5, 1, 2, 3, 50, 500]:
+        print(n, size(n))
+    print(kind(Shape.Circle(20.0)), kind(Shape.Circle(2.0)), kind(Shape.Rect(3.0, 3.0)), kind(Shape.Rect(1.0, 2.0)), kind(Shape.Empty))
+    o: Optional[string] = Valid("hello")
+    match o:
+        Valid(t) if t.len() > 10:
+            print("long", t)
+        Valid(t) if t.starts_with("he"):
+            print("he-word", t)
+        Valid(t):
+            print("other", t)
+        None:
+            print("nothing")
+    ws = List[string]()
+    ws.push("ab")
+    ws.push("abcd")
+    print(first_long(ws))
+    label = match 7:
+        x if x > 5 => "over five"
+        _ => "five or less"
+    print(label)

@@ -1,0 +1,55 @@
+﻿fn name(n: i32) -> string:
+    return match n:
+        1 => "one".to_string()
+        2 | 3 => "few".to_string()
+        4..=9 => "some".to_string()
+        _ => "many".to_string()
+
+fn kind(c: u8) -> i32:
+    match c:
+        'a'..='z':
+            return 1
+        'A'..='Z':
+            return 2
+        '0'..='9':
+            return 3
+        _:
+            return 0
+    return 9
+
+fn cmd(s: str):
+    match s:
+        "quit":
+            print("bye")
+        "go" | "run":
+            print("going")
+        _:
+            print("unknown", s)
+
+fn main():
+    for i in 12:
+        print(i, name(i))
+    print(kind('q'), kind('Q'), kind('5'), kind('!'))
+    cmd("quit")
+    cmd("run")
+    cmd("zzz")
+    b = true
+    match b:
+        true:
+            print("T")
+        false:
+            print("F")
+    x: i64 = -5
+    match x:
+        -5:
+            print("neg five")
+        _:
+            pass
+    for i in 5:
+        match i:
+            2:
+                continue
+            4:
+                break
+            _:
+                print("i", i)

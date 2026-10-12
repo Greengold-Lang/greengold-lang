@@ -1,0 +1,16 @@
+import std.sort
+
+fn desc(a: i32, b: i32) -> bool:
+    return a > b
+
+fn main():
+    v = List[i32]()
+    for x in [5, 3, 9, 1, 7, 3, 8, 2]:
+        v.push(x)
+    sort.sort(v)
+    for x in v:
+        print(x)
+    sort.sort_by(v, desc)
+    print(v[0], v[7])
+    sort.sort(v)
+    print(sort.binary_search(v, 7).value_or(99), sort.binary_search(v, 4).value_or(99))

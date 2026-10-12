@@ -10,6 +10,7 @@ import pytest
 
 from greengold.cli import compile_to_ir
 from greengold.diagnostics import CompileError
+from tests.helpers import EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parent.parent
 GCC = shutil.which("gcc")
@@ -139,7 +140,7 @@ def test_link_args_helper():
 
 @pytest.mark.parametrize("backend", [[]])
 def test_pointers_example(backend: list[str]):
-    res = _gg(["run", "examples/ffi/pointers.gg", *backend], ROOT)
+    res = _gg(["run", str(EXAMPLES_DIR / "ffi" / "pointers.gg"), *backend], ROOT)
     assert res.returncode == 0, res.stderr
     assert res.stdout.split("\n")[:5] == [
         "total: 100", "first: 10 -1", "nums[2] = 99", "nums[3] = 40", "round trip: 20 true"]
@@ -148,7 +149,7 @@ def test_pointers_example(backend: list[str]):
 @needs_gcc
 @pytest.mark.parametrize("backend", [[]])
 def test_c_example(tmp_path: Path, backend: list[str]):
-    src = ROOT / "examples" / "ffi" / "c"
+    src = EXAMPLES_DIR / "ffi" / "c"
     shutil.copy(src / "mylib.c", tmp_path / "mylib.c")
     shutil.copy(src / "main.gg", tmp_path / "main.gg")
     subprocess.run([GCC, "-c", "mylib.c", "-o", "mylib.o"], cwd=tmp_path, check=True)

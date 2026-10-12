@@ -7,7 +7,7 @@ import pytest
 
 from greengold.diagnostics import DiagnosticBag
 from greengold.lexer import tokenize
-from tests.helpers import ROOT
+from tests.helpers import ROOT, EXAMPLES_DIR
 
 LEXER_SRC = ROOT / "selfhost" / "lexer.gg"
 
@@ -24,7 +24,7 @@ def py_tokens(text: str) -> list[str]:
 
 
 def corpus() -> list[Path]:
-    files = sorted((ROOT / "examples").glob("*.gg")) + sorted((ROOT / "greengold" / "std").glob("*.gg"))
+    files = sorted((EXAMPLES_DIR).glob("*.gg")) + sorted((ROOT / "greengold" / "std").glob("*.gg"))
     files += [LEXER_SRC, ROOT / "greengold" / "core" / "core.gg"]
     good = []
     for f in files:

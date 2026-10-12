@@ -5,10 +5,10 @@ import sys
 
 import pytest
 
-from .helpers import HAS_CC, ROOT
+from .helpers import HAS_CC, ROOT, EXAMPLES_DIR
 
 SKIP_EXAMPLES = {"bounds_fail.gg", "value_or_panic_fail.gg", "extern_math.gg"}  # deliberately failing / external dependency
-EXAMPLES = sorted(p for p in (ROOT / "examples").glob("*.gg") if p.name not in SKIP_EXAMPLES)
+EXAMPLES = sorted(p for p in (EXAMPLES_DIR).glob("*.gg") if p.name not in SKIP_EXAMPLES)
 
 
 def _sanitizer_works(tmp_path) -> bool:

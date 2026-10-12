@@ -6,7 +6,7 @@ from greengold.parser import parse
 from greengold.lexer import tokenize
 from greengold.diagnostics import DiagnosticBag
 from greengold.ast_nodes import ImportDecl
-from .helpers import HAS_CC
+from .helpers import HAS_CC, EXAMPLES_DIR
 
 
 def test_import_ast_parsing():
@@ -162,7 +162,7 @@ def test_import_not_found(tmp_path: Path):
 
 @pytest.mark.skipif(not HAS_CC, reason="No C compiler found")
 def test_rpg_example_runs():
-    rpg_main = Path(__file__).resolve().parent.parent / "examples" / "rpg" / "main.gg"
+    rpg_main = EXAMPLES_DIR / "rpg" / "main.gg"
     assert rpg_main.exists()
     code = cmd_run([str(rpg_main)])
     assert code == 0

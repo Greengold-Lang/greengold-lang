@@ -1,0 +1,28 @@
+fn apply_all[T: Num](xs: List[T], k: T) -> List[T]:
+    return xs.map(fn(x: T) -> T => x + k)
+
+fn count_over[T: Ord](xs: List[T], limit: T) -> usize:
+    return xs.count(fn(x: T) -> bool => x > limit)
+
+struct Bag[T]:
+    items: List[T]
+
+impl Bag[T]:
+    fn keep(self, pred: fn(T) -> bool) -> usize:
+        n: usize = 0
+        for x in self.items:
+            if pred(x):
+                n += 1
+        return n
+
+fn total_over[T: Num + Ord](b: Bag[T], limit: T) -> usize:
+    return b.keep(fn(x: T) -> bool => x > limit)
+
+fn main():
+    a = List[i32]()
+    a.push(1)
+    a.push(5)
+    b = List[f64]()
+    b.push(1.5)
+    print(count_over(a, 0), count_over(b, 1.0), apply_all(a, 10), apply_all(b, 0.5))
+    print(total_over(Bag[i64]{ items: List[i64]() }, 1), total_over(Bag{ items: b }, 0.0))

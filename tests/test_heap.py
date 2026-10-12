@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from .helpers import HAS_CC, ROOT, messages
+from .helpers import HAS_CC, ROOT, messages, EXAMPLES_DIR
 
 needs_cc = pytest.mark.skipif(not HAS_CC, reason="No C compiler")
 
@@ -29,7 +29,7 @@ def ok(tmp_path, src, expected):
 
 @needs_cc
 def test_example_list_and_vec(tmp_path):
-    r = subprocess.run([sys.executable, "-m", "greengold", "run", str(ROOT / "examples" / "heap_list.gg")],
+    r = subprocess.run([sys.executable, "-m", "greengold", "run", str(EXAMPLES_DIR / "heap_list.gg")],
                        capture_output=True, text=True, encoding="utf-8", cwd=ROOT,
                        env=dict(os.environ, GG_LEAKCHECK="1"))
     assert r.returncode == 0, r.stderr

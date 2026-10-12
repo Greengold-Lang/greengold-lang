@@ -5,7 +5,7 @@ import sys
 import pytest
 
 from greengold.cli import compile_to_ir
-from tests.helpers import run_built
+from tests.helpers import run_built, EXAMPLES_DIR
 from greengold.diagnostics import CompileError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,7 +25,7 @@ def must_fail(src: str, text: str):
 
 
 def test_extern_math_acceptance():
-    src = (ROOT / "examples" / "extern_math.gg").read_text(encoding="utf-8")
+    src = (EXAMPLES_DIR / "extern_math.gg").read_text(encoding="utf-8")
     res = run_prog(src)
     assert res.returncode == 0
     assert res.stdout.strip() == "1.4142135623731"

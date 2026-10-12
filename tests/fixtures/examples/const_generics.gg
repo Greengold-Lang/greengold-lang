@@ -1,0 +1,28 @@
+fn total[N: usize](xs: [N]i32) -> i32:
+    s = 0
+    for x in xs:
+        s += x
+    return s
+
+fn count[N: usize](xs: [N]i32) -> usize:
+    return N
+
+struct Grid[W: usize, H: usize]:
+    cells: [W][H]i32
+
+impl Grid[W, H]:
+    fn new() -> Grid[W, H]:
+        return Grid[W, H]{ cells: [[0; H]; W] }
+
+    fn area(self) -> usize:
+        return W * H
+
+    fn set(self: lend Self, x: usize, y: usize, v: i32):
+        self.cells[x][y] = v
+
+fn main():
+    print(total([1, 2, 3]), total([5, 5]), count([1, 2, 3, 4]))
+    g = Grid[2, 3].new()
+    g.set(1, 2, 7)
+    print(g.area(), g.cells)
+    print(total[2]([4, 4]))

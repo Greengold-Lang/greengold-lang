@@ -1,13 +1,13 @@
 """Constant parameters: `fn total[N: usize](xs: [N]i32)`, `struct Grid[W: usize, H: usize]`."""
 from pathlib import Path
 
-from tests.helpers import front_end, run_built
+from tests.helpers import front_end, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_const_generics_run():
-    r = run_built((ROOT / "examples" / "const_generics.gg").read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / "const_generics.gg").read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert r.stdout.splitlines() == ["6 10 4", "6 [[0, 0, 0], [0, 0, 7]]", "8"]
 

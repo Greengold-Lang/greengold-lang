@@ -2,14 +2,14 @@
 heap-owning keys and values."""
 from pathlib import Path
 
-from tests.helpers import messages, run_built
+from tests.helpers import messages, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(name, monkeypatch):
     monkeypatch.setenv("GG_LEAKCHECK", "1")
-    r = run_built((ROOT / "examples" / name).read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / name).read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
     return r.stdout.splitlines()

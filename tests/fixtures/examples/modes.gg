@@ -1,0 +1,47 @@
+# Three parameter modes: read (read only) / lend (borrow, mutate) / consume (transfer ownership)
+struct Counter:
+    value: i32
+
+# Default: read-only. No keyword at call site.
+fn show(c: Counter):
+    print(c.value)
+
+# lend: mutations reflect on caller. Argument cannot be `fixed`.
+fn bump(c: lend Counter):
+    c.value += 1
+
+# Works on primitive types as well.
+fn inc(n: lend i32):
+    n += 1
+
+# Passing parameter to another lend / read parameter.
+fn bump_twice(c: lend Counter):
+    bump(c)
+    bump(c)
+    show(c)
+
+# consume: ownership transfer. Variable cannot be used after call.
+fn finish(c: consume Counter):
+    print(c.value)
+
+fn main():
+    c = Counter{ value: 0 }
+    bump(c)
+    bump(c)
+    show(c)
+    finish(c)
+
+    n = 10
+    inc(n)
+    print(n)
+
+    d = Counter{ value: 100 }
+    bump_twice(d)
+    finish(d)
+
+    # If reassigned after being moved, the variable can be used again.
+    d = Counter{ value: 7 }
+    show(d)
+
+    # The line below causes a compile error (c was moved via consume):
+    # show(c)

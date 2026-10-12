@@ -3,14 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers import front_end, run_built
+from tests.helpers import front_end, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_format_specs(monkeypatch):
     monkeypatch.setenv("GG_LEAKCHECK", "1")
-    r = run_built((ROOT / "examples" / "format_specs.gg").read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / "format_specs.gg").read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
     assert r.stdout.splitlines() == [

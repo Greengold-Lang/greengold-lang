@@ -1,13 +1,13 @@
 """`comptime fn` with enums and `match`; enum constants."""
 from pathlib import Path
 
-from tests.helpers import run_built
+from tests.helpers import run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_comptime_enums_and_match():
-    r = run_built((ROOT / "examples" / "comptime_enums.gg").read_text(encoding="utf-8"))
+    r = run_built((EXAMPLES_DIR / "comptime_enums.gg").read_text(encoding="utf-8"))
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "42 -5 [0, 1, -1, 2] Valid(10) None Op.Neg(9)"
 

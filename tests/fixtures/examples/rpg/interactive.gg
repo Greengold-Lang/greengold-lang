@@ -1,0 +1,69 @@
+# Greengold Interactive RPG: interactive.gg
+# Interactive dungeon game communicating with the user via input()
+
+import "types.gg"
+import "combat.gg"
+
+fn main():
+    print("=== Welcome to the Greengold Interactive Dungeon Game! ===")
+    hero_name = input("Enter your hero's name: ")
+    print("Welcome to the adventure,", hero_name, "!\n")
+
+    hero = types.Player{
+        name: hero_name
+        hp: 100
+        max_hp: 100
+        stats: types.Stats{ attack: 25, defense: 8 }
+        potions: 2
+        gold: 10
+    }
+
+    goblin = types.Monster{
+        name: "Dungeon Monster"
+        hp: 50
+        stats: types.Stats{ attack: 18, defense: 4 }
+        gold_reward: 35
+    }
+
+    running = true
+    while running:
+        print("\n------------------------------")
+        print("HP:", hero.hp, "/", hero.max_hp, "| Potions:", hero.potions, "| Gold:", hero.gold)
+        print("Monster HP:", goblin.hp)
+        print("Options: (1) Attack  (2) Defend  (3) Drink Potion  (4) Flee")
+        choice = input("Your choice (1-4): ")
+
+        if choice == "1":
+            res = combat.execute_round(hero, goblin, types.Action.Attack)
+            match res:
+                Victory(reward):
+                    print("Victory! You defeated the monster! Gold earned:", reward)
+                    running = false
+                Defeat:
+                    print("Defeated... Game over.")
+                    running = false
+                Ongoing:
+                    pass
+        elif choice == "2":
+            res = combat.execute_round(hero, goblin, types.Action.Defend)
+            match res:
+                Defeat:
+                    print("Defeated... Game over.")
+                    running = false
+                _:
+                    pass
+        elif choice == "3":
+            res = combat.execute_round(hero, goblin, types.Action.DrinkPotion)
+            match res:
+                Defeat:
+                    print("Defeated... Game over.")
+                    running = false
+                _:
+                    pass
+        elif choice == "4":
+            print("Successfully fled from the dungeon!")
+            running = false
+        else:
+            print("Invalid choice, please enter 1, 2, 3 or 4.")
+
+    print("\nAdventure ended! Total Gold:", hero.gold)

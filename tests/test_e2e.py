@@ -5,9 +5,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from tests.helpers import EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parent.parent
-EXAMPLES = ROOT / "examples"
+EXAMPLES = EXAMPLES_DIR
 
 pytestmark = pytest.mark.skipif(
     shutil.which("gcc") is None and shutil.which("clang") is None,

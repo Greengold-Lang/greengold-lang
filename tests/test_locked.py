@@ -1,14 +1,14 @@
 """`std.thread.Locked[T]`: a value behind its own mutex, changed through a `Guard`."""
 from pathlib import Path
 
-from tests.helpers import front_end, run_built
+from tests.helpers import front_end, run_built, EXAMPLES_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_locked_counter_and_list_across_threads(monkeypatch):
     monkeypatch.setenv("GG_LEAKCHECK", "1")
-    r = run_built((ROOT / "examples" / "locked.gg").read_text(encoding="utf-8"), timeout=60)
+    r = run_built((EXAMPLES_DIR / "locked.gg").read_text(encoding="utf-8"), timeout=60)
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
     assert r.stdout.splitlines() == ["4000 4", "4000 99"]

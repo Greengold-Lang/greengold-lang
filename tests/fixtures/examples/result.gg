@@ -1,0 +1,21 @@
+fn parse_digit(c: u8) -> Result[i32, str]:
+    if c >= '0' and c <= '9':
+        return Ok(i32(c - '0'))
+    return Err("not a digit")
+
+fn add_digits(a: u8, b: u8) -> Result[i32, str]:
+    x = parse_digit(a)?
+    y = parse_digit(b)?
+    return Ok(x + y)
+
+fn main():
+    match add_digits('3', '4'):
+        Ok(v):
+            print(v)
+        Err(e):
+            print(e)
+    match add_digits('3', 'x'):
+        Ok(v):
+            print(v)
+        Err(e):
+            print(e)

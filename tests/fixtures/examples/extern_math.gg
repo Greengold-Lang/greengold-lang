@@ -1,0 +1,4 @@
+extern "math.h" fn sqrt(x: f64) -> f64
+
+fn main():
+    print(sqrt(2.0))

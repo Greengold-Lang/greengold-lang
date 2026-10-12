@@ -1,0 +1,22 @@
+# v2 Stage 3: user-defined generic structs and functions.
+
+struct Pair[A, B]:
+    first: A
+    second: B
+
+impl Pair[A, B]:
+    fn swap(self: Pair[A, B]) -> Pair[B, A]:
+        return Pair[B, A]{ first: self.second, second: self.first }
+
+fn max[T: Ord](a: T, b: T) -> T:
+    if a > b:
+        return a
+    return b
+
+fn main():
+    p = Pair[i32, f64]{ first: 1, second: 2.5 }
+    q = p.swap()
+    print(q.first, q.second)
+    print(max(3, 9))
+    print(max(1.5, 0.5))
+    print(max[i64](5, 2))

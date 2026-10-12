@@ -1,0 +1,34 @@
+# Greengold RPG Project: types.gg
+# Core data models, enums, and game constants
+
+public
+const MAX_POTIONS: i32 = 5
+const POTION_HEAL: i32 = 35
+
+enum Action:
+    Attack
+    Defend
+    DrinkPotion
+
+enum BattleOutcome:
+    Ongoing
+    Victory(i32)
+    Defeat
+
+struct Stats:
+    attack: i32
+    defense: i32
+
+struct Player:
+    name: str
+    hp: i32
+    max_hp: i32
+    stats: Stats
+    potions: i32
+    gold: i32
+
+struct Monster:
+    name: str
+    hp: i32
+    stats: Stats
+    gold_reward: i32

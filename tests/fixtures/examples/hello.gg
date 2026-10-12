@@ -1,0 +1,3 @@
+# First Greengold program
+fn main():
+    print("Hello, Greengold!")

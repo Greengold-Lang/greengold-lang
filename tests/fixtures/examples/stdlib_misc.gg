@@ -1,0 +1,26 @@
+import std.math
+import std.time
+import std.rand
+import std.process
+
+fn main():
+    print(math.sqrt(16.0), math.pow_i64(3, 4), math.gcd_u64(48, 18), math.abs_i64(-5), math.clamp_i64(15, 0, 10))
+    print(math.floor(2.7), math.ceil(2.1), math.pow(2.0, 10.0))
+    r = rand.rng_new(42)
+    a = r.next_u64()
+    r2 = rand.rng_new(42)
+    print(a == r2.next_u64(), r.below(10) < 10, r.range(-5, 5) < 5)
+    f = r.next_f64()
+    print(f >= 0.0 and f < 1.0)
+    print(time.current_time() > 1000000, time.clock_ticks() >= 0)
+    match process.env_get("PATH"):
+        Valid(p):
+            print(p.as_str().len > 0)
+        None:
+            print("no path")
+    match process.env_get("GG_SURELY_UNSET_X"):
+        Valid(_p):
+            print("bad")
+        None:
+            print("unset ok")
+    process.process_exit(3)

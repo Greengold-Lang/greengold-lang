@@ -1,0 +1,15 @@
+fn find(a: []i32, target: i32) -> Optional[usize]:
+    for i in 0..a.len:
+        if a[i] == target:
+            return Valid(i)
+    return None
+
+fn main():
+    nums = [4, 8, 15, 16]
+    r = find(nums, 15)
+    match r:
+        Valid(i):
+            print(i)
+        None:
+            print(-1)
+    print(find(nums, 99).value_or(7))

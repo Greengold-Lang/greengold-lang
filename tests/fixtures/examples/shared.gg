@@ -1,0 +1,26 @@
+struct Config:
+    name: string
+    limits: List[i32]
+
+struct Worker:
+    id: i32
+    cfg: Shared[Config]
+
+fn limit_sum(c: Shared[Config]) -> i32:
+    t = 0
+    for x in c.value.limits:
+        t += x
+    return t
+
+fn main():
+    limits = List[i32]()
+    limits.push(10)
+    limits.push(20)
+    cfg = Shared[Config](Config{ name: string.from("prod"), limits: limits })
+    workers = List[Worker]()
+    for i in 0..3:
+        workers.push(Worker{ id: i, cfg: cfg.clone() })
+    print(workers.len, workers[2].cfg.value.name, limit_sum(cfg), limit_sum(workers[0].cfg))
+    n = Shared[i32](41)
+    m = n.clone()
+    print(n.value + 1, m.value)
