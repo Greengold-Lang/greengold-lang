@@ -6,6 +6,8 @@ Code generation works for every target LLVM knows. Linking needs a toolchain for
 * `<triple>-gcc` on PATH (a cross compiler with its C library), or `$GG_LINKER` (a whole command);
 * `clang --target=<triple>` with `ld.lld`, given a C library through `GG_SYSROOT`, or with no C library
   at all for `--no-std` programs;
+* `wasm-ld` for `wasm32-wasi`, linked against a wasi-libc sysroot named by `$GG_WASI_SYSROOT`
+  (crt1.o, libc.a, and compiler-rt's builtins): `print`, the heap, and `List` work; the WASI calls are imports;
 * `wasm-ld` for `wasm32`, which is always freestanding: the program exports `_start`, and its
   `extern` functions become imports that the host (a browser, a WASI runtime) supplies;
 * `zig cc` (from `pip install ziglang`, `$GG_ZIG`, or `zig` on PATH), which carries clang, lld, and the C
@@ -31,6 +33,7 @@ ALIASES: dict[str, str] = {
     "windows-x64": "x86_64-w64-windows-gnu",
     "windows-arm64": "aarch64-w64-windows-gnu",
     "wasm32": "wasm32-unknown-unknown",
+    "wasm32-wasi": "wasm32-unknown-wasi",
     "cortex-m4": "thumbv7em-none-eabihf",
 }
 
@@ -41,6 +44,23 @@ def triple_of(name: str) -> str:
 
 def is_wasm(triple: str) -> bool:
     return triple.startswith("wasm")
+
+
+def is_wasi(triple: str) -> bool:
+    """`wasm32-wasi`: WebAssembly with a C library (wasi-libc), so `print`, the heap, and `List` work."""
+    return triple.startswith("wasm") and triple.endswith("wasi")
+
+
+def wasi_libs() -> list[str]:
+    """The files a `wasm32-wasi` program links, from the sysroot in `$GG_WASI_SYSROOT`: crt1.o, libc.a, and the
+    compiler-rt builtins. Returns [] when the sysroot is missing."""
+    root = os.environ.get("GG_WASI_SYSROOT")
+    if not root:
+        return []
+    base = Path(root)
+    found = [base / "lib" / "wasm32-wasi" / "crt1.o", base / "lib" / "wasm32-wasi" / "libc.a"]
+    found += sorted(base.glob("lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a"))[:1]
+    return [str(f) for f in found] if all(f.is_file() for f in found) else []
 
 
 def _norm(triple: str) -> tuple[str, str]:
@@ -104,6 +124,8 @@ def cross_linker(triple: str, freestanding: bool) -> list[str] | None:
         return custom.split()
     if is_wasm(triple):
         wl = shutil.which("wasm-ld")
+        if is_wasi(triple) and not wasi_libs():
+            return None  # needs a C library to link against
         return [wl] if wl else None
     for name in _gcc_names(triple):
         found = shutil.which(name)
@@ -120,6 +142,9 @@ def cross_linker(triple: str, freestanding: bool) -> list[str] | None:
 
 
 def link_command(cmd: list[str], triple: str, obj: str, out: str, freestanding: bool) -> list[str]:
+    if is_wasi(triple):
+        libs = wasi_libs()
+        return cmd + [libs[0], obj, *libs[1:], "-o", out]
     if is_wasm(triple):
         return cmd + [obj, "-o", out, "--no-entry", "--export=_start", "--allow-undefined"]
     full = cmd + [obj, "-o", out]
@@ -131,6 +156,10 @@ def link_command(cmd: list[str], triple: str, obj: str, out: str, freestanding: 
 
 
 def how_to_link(triple: str, obj: str) -> str:
+    if is_wasi(triple):
+        return (f"wasm-ld <sysroot>/lib/wasm32-wasi/crt1.o {obj} <sysroot>/lib/wasm32-wasi/libc.a "
+                "<sysroot>/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a -o app.wasm   "
+                "(set GG_WASI_SYSROOT to a wasi-libc sysroot and gg links it; the playground ships one)")
     if is_wasm(triple):
         return f"wasm-ld {obj} -o app.wasm --no-entry --export=_start --allow-undefined"
     return f"{_gcc_names(triple)[-1]} {obj} -o app" + ("" if "windows" in triple else " -lm") + \

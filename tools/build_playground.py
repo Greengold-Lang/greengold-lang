@@ -31,7 +31,7 @@ def main() -> None:
         for name in ("__init__.py", "_version.py"):
             z.write(ll / name, f"llvmlite/{name}")
         add_tree(z, ll.parent, Path("llvmlite") / "ir", lambda p: p.suffix == ".py")
-    examples = {n: (ROOT / "examples" / f"{n}.gg").read_text(encoding="utf-8") for n in EXAMPLES}
+    examples = {n: (ROOT / "examples" / f"{n}.gg").read_text(encoding="utf-8-sig") for n in EXAMPLES}
     (OUT / "examples.json").write_text(json.dumps(examples, indent=1), encoding="utf-8")
     print("wrote", (OUT / "gg-bundle.zip").stat().st_size // 1024, "KiB bundle and", len(examples), "examples")
 

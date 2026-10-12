@@ -25,7 +25,7 @@ print("ok")
 
 
 def test_web_without_llvm_binding():
-    r = subprocess.run([sys.executable, "-c", NO_BINDING], capture_output=True, text=True, cwd=ROOT)
+    r = subprocess.run([sys.executable, "-c", NO_BINDING], capture_output=True, text=True, cwd=ROOT, env={**__import__("os").environ, "GG_WEB_FILE": str(__import__("pathlib").Path(__import__("tempfile").gettempdir()) / "gg_web_test" / "main.gg")})
     assert r.stdout.strip() == "ok", r.stdout + r.stderr
 
 

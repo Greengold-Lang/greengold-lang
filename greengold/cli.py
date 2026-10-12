@@ -710,8 +710,9 @@ def cmd_fix(paths: list[str], dry_run: bool = False, likely: bool = False) -> in
 
 
 def _is_freestanding(target: str | None, no_std: bool) -> bool:
-    from .targets import is_wasm, triple_of
-    return no_std or target == "bare-metal" or (target is not None and is_wasm(triple_of(target)))
+    from .targets import is_wasi, is_wasm, triple_of
+    wasm_free = target is not None and is_wasm(triple_of(target)) and not is_wasi(triple_of(target))
+    return no_std or target == "bare-metal" or wasm_free
 
 
 def _gen_llvm(program: Program, primary_file: str, release: bool, unchecked: bool, target: str | None = None,

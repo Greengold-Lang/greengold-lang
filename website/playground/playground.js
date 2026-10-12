@@ -2,6 +2,10 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var editor = $("pg-editor"), out = $("pg-out"), status = $("pg-status"), gutter = $("pg-gutter");
+  var runOut = $("pg-runout"), runBtn = $("pg-run"), stopBtn = $("pg-stop"), hl = $("pg-hl");
+  var release = false, H = window.GGHighlight;
+  var LIMIT_MS = 10000, LIMIT_CHARS = 200000;
+  var toolchain = null, runner = null, killTimer = null, running = false;
   var examples = {}, seq = 0, pending = {}, ready = false, timer = null, version = 0;
 
   var worker = new Worker("playground/worker.js");
@@ -17,20 +21,23 @@
     return new Promise(function (ok, err) { var id = ++seq; pending[id] = { ok: ok, err: err }; worker.postMessage({ id: id, fn: fn, args: args }); });
   }
   function setStatus(t, kind) { status.textContent = t; status.dataset.kind = kind || ""; }
-  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function esc(s) { return H.esc(s); }
 
   function lines() {
     var n = editor.value.split("\n").length, s = "";
     for (var i = 1; i <= n; i++) s += i + "\n";
     gutter.textContent = s;
-    gutter.scrollTop = editor.scrollTop;
+    hl.innerHTML = H.source(editor.value) + "\n";   // the colored copy under the transparent textarea
+    sync();
+  }
+  function sync() {
+    gutter.scrollTop = hl.scrollTop = editor.scrollTop;
+    hl.scrollLeft = editor.scrollLeft;
   }
 
   function show(text, ok) {
     if (ok) { out.innerHTML = '<span class="pg-ok">No errors.</span>'; return; }
-    out.innerHTML = esc(text)
-      .replace(/(main\.gg):(\d+):(\d+)/g, '<a href="#" data-line="$2" data-col="$3">$1:$2:$3</a>')
-      .replace(/\b(GG\d{4})\b/g, '<a href="#" data-explain="$1">$1</a>');
+    out.innerHTML = H.terminal(text);
   }
 
   function check() {
@@ -49,29 +56,122 @@
   }
   function later() { clearTimeout(timer); timer = setTimeout(check, 350); }
 
+  // ---- Run: front end (Pyodide) -> LLVM IR -> clang + lld (WebAssembly) -> the program, in a worker ----
+  function tab(name) {
+    ["diag", "output"].forEach(function (n) {
+      $("pg-tab-" + n).setAttribute("aria-selected", String(n === name));
+      (n === "diag" ? out : runOut).hidden = n !== name;
+    });
+  }
+  $("pg-tab-diag").addEventListener("click", function () { tab("diag"); });
+  $("pg-tab-output").addEventListener("click", function () { tab("output"); });
+
+  function say(text, cls, colored) {
+    var span = document.createElement("span");
+    if (cls) span.className = cls;
+    if (colored) span.innerHTML = H.terminal(text) + (/\n$/.test(text) ? "\n" : ""); else span.textContent = text;
+    runOut.appendChild(span);
+    runOut.scrollTop = runOut.scrollHeight;
+  }
+  function finish(note, kind) {
+    if (!running) return;
+    running = false;
+    clearTimeout(killTimer);
+    runBtn.hidden = false; stopBtn.hidden = true;
+    if (runner) { runner.terminate(); runner = null; }
+    if (note) say("\n" + note + "\n", "pg-note");
+    setStatus(note || "Done", kind || "ok");
+  }
+  function run() {
+    if (running || !ready) return;
+    running = true;
+    runBtn.hidden = true; stopBtn.hidden = false;
+    runOut.textContent = "";
+    tab("output");
+    setStatus("Building…", "busy");
+    var t0 = performance.now();
+    call("build", editor.value, release).then(function (json) {
+      var r = JSON.parse(json);
+      if (!r.ok) {
+        runOut.innerHTML = H.terminal(r.text);
+        finish("Could not build.", "bad");
+        return null;
+      }
+      if (!toolchain) toolchain = new Worker("playground/toolchain.js");
+      return new Promise(function (ok, fail) {
+        toolchain.onmessage = function (m) {
+          if (m.data.type === "status") setStatus(m.data.text, "busy");
+          else if (m.data.type === "built") ok(m.data);
+          else if (m.data.type === "error") fail(m.data.text);
+        };
+        toolchain.onerror = function (e) { fail("Toolchain error: " + (e.message || e)); };
+        toolchain.postMessage({ type: "build", ir: r.ir });
+      });
+    }).then(function (built) {
+      if (!built || !running) return;
+      var buildMs = Math.round(performance.now() - t0), t1 = performance.now();
+      setStatus("Running…", "busy");
+      runner = new Worker("playground/runner.js");
+      killTimer = setTimeout(function () { finish("Stopped: the program ran longer than " + LIMIT_MS / 1000 + " s.", "bad"); }, LIMIT_MS);
+      var shown = 0;
+      runner.onmessage = function (m) {
+        var d = m.data;
+        if (d.type === "out") {
+          shown += d.text.length;
+          if (shown > LIMIT_CHARS) { finish("Stopped: more than " + LIMIT_CHARS / 1000 + "k characters of output.", "bad"); return; }
+          say(d.text, "", d.fd === 2);
+        } else if (d.type === "done") {
+          finish("exit code " + d.code + " · build " + buildMs + " ms · run " + Math.round(performance.now() - t1) + " ms",
+            d.code === 0 ? "ok" : "bad");
+        } else if (d.type === "error") {
+          finish(d.text, "bad");
+        }
+      };
+      runner.postMessage({ wasm: built.wasm, stdin: $("pg-stdin").value }, [built.wasm]);
+    }).catch(function (e) { runOut.textContent = String(e); finish("Build failed.", "bad"); });
+  }
+  runBtn.addEventListener("click", run);
+  stopBtn.addEventListener("click", function () { finish("Stopped.", "bad"); });
+  editor.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
+  });
+  function onLink(pane) {
+    return function (e) {
+      var a = e.target.closest("a");
+      if (!a) return;
+      e.preventDefault();
+      if (a.dataset.line) {
+        var ls = editor.value.split("\n"), pos = 0, n = +a.dataset.line - 1;
+        for (var i = 0; i < n && i < ls.length; i++) pos += ls[i].length + 1;
+        editor.focus();
+        editor.setSelectionRange(pos + (+a.dataset.col - 1), pos + (ls[n] || "").length);
+      } else if (a.dataset.explain) {
+        call("explain", a.dataset.explain).then(function (t) { pane.innerHTML = "<pre>" + H.esc(t) + "</pre>"; });
+      }
+    };
+  }
+  runOut.addEventListener("click", onLink(runOut));
+  out.addEventListener("click", onLink(out));
+
+  // Debug / Release
+  Array.prototype.forEach.call(document.querySelectorAll("#pg-mode button"), function (b) {
+    b.addEventListener("click", function () {
+      release = b.dataset.mode === "release";
+      Array.prototype.forEach.call(document.querySelectorAll("#pg-mode button"), function (o) {
+        o.setAttribute("aria-checked", String(o === b));
+      });
+    });
+  });
+
   function put(src) { editor.value = src; lines(); saveHash(); check(); }
 
   editor.addEventListener("input", function () { lines(); later(); saveHash(); });
-  editor.addEventListener("scroll", function () { gutter.scrollTop = editor.scrollTop; });
+  editor.addEventListener("scroll", sync);
   editor.addEventListener("keydown", function (e) {
     if (e.key === "Tab") {
       e.preventDefault();
       editor.setRangeText("    ", editor.selectionStart, editor.selectionEnd, "end");
       editor.dispatchEvent(new Event("input"));
-    }
-  });
-
-  out.addEventListener("click", function (e) {
-    var a = e.target.closest("a");
-    if (!a) return;
-    e.preventDefault();
-    if (a.dataset.line) {
-      var ls = editor.value.split("\n"), pos = 0, n = +a.dataset.line - 1;
-      for (var i = 0; i < n; i++) pos += ls[i].length + 1;
-      editor.focus();
-      editor.setSelectionRange(pos + (+a.dataset.col - 1), pos + ls[n].length);
-    } else if (a.dataset.explain) {
-      call("explain", a.dataset.explain).then(function (t) { out.innerHTML = "<pre>" + esc(t) + "</pre>"; });
     }
   });
 

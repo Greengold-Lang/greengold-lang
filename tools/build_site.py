@@ -1076,8 +1076,8 @@ def build_roadmap() -> str:
 
 def build_playground() -> str:
     body = page_hero("Playground", "Playground",
-                     "Write Greengold in the browser. The real compiler front end runs here, so errors, checked fixes, "
-                     "and <code>gg explain</code> work as in the terminal. Nothing is uploaded.") + """
+                     "Write Greengold, see errors and checked fixes as you type, and run the program, all in the browser. "
+                     "The real compiler runs on your machine; nothing is uploaded.") + """
     <section class="section tight" style="padding-top:8px">
       <div class="wrap">
         <div class="pg-bar">
@@ -1086,17 +1086,35 @@ def build_playground() -> str:
           <button type="button" class="btn btn-ghost" id="pg-fixlikely" title="Also apply fixes that are probably what you meant">Fix (likely)</button>
           <button type="button" class="btn btn-ghost" id="pg-format">Format</button>
           <button type="button" class="btn btn-ghost" id="pg-share">Copy link</button>
-          <button type="button" class="btn btn-primary" disabled title="Running programs in the browser is planned. Install gg to run.">Run (soon)</button>
+          <button type="button" class="btn btn-primary" id="pg-run" title="Compile and run in the browser (Ctrl+Enter)">Run</button>
+          <button type="button" class="btn btn-ghost" id="pg-stop" hidden>Stop</button>
+          <div class="pg-seg" id="pg-mode" role="radiogroup" aria-label="Build mode">
+            <button type="button" role="radio" aria-checked="true" data-mode="debug" title="Fast to build, with every runtime check">Debug</button>
+            <button type="button" role="radio" aria-checked="false" data-mode="release" title="Optimized (LLVM -O3); bounds and overflow checks stay on">Release</button>
+          </div>
           <span class="pg-status" id="pg-status" role="status" aria-live="polite">Loading…</span>
         </div>
         <div class="pg">
           <div class="pg-pane"><pre class="pg-gutter" id="pg-gutter" aria-hidden="true">1</pre>
-            <textarea class="pg-editor" id="pg-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code"></textarea></div>
-          <div class="pg-pane"><pre class="pg-out" id="pg-out" aria-label="Diagnostics">Loading the compiler…</pre></div>
+            <div class="pg-code"><pre class="pg-hl" id="pg-hl" aria-hidden="true"></pre>
+              <textarea class="pg-editor" id="pg-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code"></textarea></div></div>
+          <div class="pg-pane pg-right">
+            <div class="pg-tabs" role="tablist">
+              <button type="button" role="tab" id="pg-tab-diag" aria-selected="true">Diagnostics</button>
+              <button type="button" role="tab" id="pg-tab-output" aria-selected="false">Output</button>
+            </div>
+            <pre class="pg-out" id="pg-out" aria-label="Diagnostics">Loading the compiler…</pre>
+            <pre class="pg-out" id="pg-runout" aria-label="Program output" hidden></pre>
+          </div>
         </div>
-        <p style="margin-top:16px">To run programs, <a href="https://github.com/Greengold-Lang/greengold-lang#install">install gg</a>.</p>
+        <details class="pg-stdin"><summary>Input for the program (stdin)</summary>
+          <textarea id="pg-stdin" spellcheck="false" rows="3" aria-label="Program input"></textarea></details>
+        <p style="margin-top:16px">Programs run in your browser: <code>print</code>, strings, <code>List</code>, <code>HashMap</code>, and <code>input</code> work.
+          Threads, tasks, sockets, and files do not; to use them, <a href="https://github.com/Greengold-Lang/greengold-lang#install">install gg</a>.
+          The first Run downloads the compiler once (tens of MB; your browser keeps it).</p>
       </div>
     </section>
+    <script src="playground/highlight.js" defer></script>
     <script src="playground/playground.js" defer></script>"""
     return layout("playground", "playground.html", "Playground",
                   "Try Greengold in the browser: live diagnostics, checked fixes, and explanations from the real compiler.", body)

@@ -42,4 +42,8 @@ When `docs/SPEC.md` changes, run the script again. When the compiler output chan
 
 ## Playground
 
-`playground.html` runs the compiler front end in the browser (Pyodide, in a Web Worker). `playground/gg-bundle.zip` holds `greengold/` and `llvmlite.ir`; rebuild it with `python tools/build_playground.py` whenever the compiler changes, then commit it. Pyodide itself loads from the jsDelivr CDN. Running programs would need LLVM in WebAssembly and is not part of the playground yet.
+`playground.html` compiles and runs Greengold in the browser.
+
+* **Front end:** Pyodide in a Web Worker runs `greengold/` (`playground/worker.js`). `playground/gg-bundle.zip` holds `greengold/` and `llvmlite.ir`; rebuild it with `python tools/build_playground.py` whenever the compiler changes, then commit it (a test checks it). Pyodide loads from the jsDelivr CDN.
+* **Run:** the front end writes LLVM IR for `wasm32-wasi`; `playground/toolchain.js` compiles it with clang and lld as WebAssembly (Ben Smith's builds, `playground/llvm-glue.js`, see `playground/NOTICE.md`) and links it with the wasi-libc files in `playground/wasi/` (committed, about 1 MB); `playground/runner.js` runs the result with a small WASI host. The page ends a program after 10 seconds.
+* **Self-hosting the toolchain:** run `python tools/fetch_llvm.py` before publishing. It checks the SHA-256 of the files, splits `clang` in two (Pages allows 25 MiB per file), and writes `playground/llvm/` (about 51 MB, git-ignored, so deploy with `npx wrangler pages deploy website`, or remove the line from `.gitignore` to commit it). Cloudflare compresses `.wasm`, so visitors download about 20 MB, once. Without `playground/llvm/` the page falls back to binji.github.io/wasm-clang, which is not compressed (about 50 MB) and is not yours to depend on.
