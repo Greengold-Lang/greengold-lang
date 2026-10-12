@@ -22,7 +22,7 @@ jobs:
           - { os: ubuntu-22.04,     asset: gg-linux-x64,       built: dist/gg }
           - { os: ubuntu-22.04-arm, asset: gg-linux-arm64,     built: dist/gg }
           - { os: macos-latest,     asset: gg-macos-arm64,     built: dist/gg }
-          - { os: macos-15-intel,   asset: gg-macos-x64,       built: dist/gg }
+          # No Intel Mac build: llvmlite >= 0.50 ships no macosx x86_64 wheel (it would need a source build against LLVM 22).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,9 +69,28 @@ jobs:
           path: out/*
           if-no-files-found: error
 
+  vsix:
+    name: Build the VS Code extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Package
+        working-directory: vscode-extension
+        run: |
+          npm ci --omit=dev
+          npx --yes @vscode/vsce package --out greengold-vscode.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: greengold-vscode.vsix
+          path: vscode-extension/greengold-vscode.vsix
+          if-no-files-found: error
+
   publish:
     name: Publish release
-    needs: build
+    needs: [build, vsix]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +101,7 @@ jobs:
       - name: Checksums
         run: |
           cd out
-          sha256sum gg-* > SHA256SUMS.txt
+          sha256sum gg-* greengold-vscode.vsix > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: Create the release
         if: startsWith(github.ref, 'refs/tags/v')

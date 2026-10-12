@@ -16,8 +16,57 @@ function getPythonPath() {
     return config.get('pythonPath') || 'python';
 }
 
+function onPath(name) {
+    const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat'] : [''];
+    for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+        if (!dir) continue;
+        for (const ext of exts) {
+            const file = path.join(dir, name + ext);
+            try {
+                if (fs.statSync(file).isFile()) return file;
+            } catch (e) { /* not here */ }
+        }
+    }
+    return null;
+}
+
+/**
+ * How to run the compiler: { cmd, pre } where pre are the leading arguments.
+ * Order: the `greengold.path` setting, `gg` on PATH, the folder the installers use,
+ * and last `python -m greengold` (a pip or source install).
+ */
+function ggInvocation() {
+    const configured = vscode.workspace.getConfiguration('greengold').get('path');
+    if (configured) return { cmd: configured, pre: [] };
+    const found = onPath('gg');
+    if (found) return { cmd: found, pre: [] };
+    const home = require('os').homedir();
+    const installed = process.platform === 'win32'
+        ? path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Greengold', 'bin', 'gg.exe')
+        : path.join(home, '.greengold', 'bin', 'gg');
+    if (fs.existsSync(installed)) return { cmd: installed, pre: [] };
+    return { cmd: getPythonPath(), pre: ['-m', 'greengold'] };
+}
+
+/** The same as a shell command prefix, for terminals and tasks. */
+function ggShell(gg = ggInvocation()) {
+    const quote = (part) => (/[\s"]/.test(part) ? `"${part.replace(/"/g, '\\"')}"` : part);
+    const text = [gg.cmd, ...gg.pre].map(quote).join(' ');
+    // PowerShell needs the call operator in front of a quoted program path.
+    return process.platform === 'win32' && text.startsWith('"') ? `& ${text}` : text;
+}
+
+function notInstalledHint() {
+    vscode.window.showErrorMessage(
+        'Greengold: could not start `gg`. Install it, or set "greengold.path".',
+        'Install instructions'
+    ).then((choice) => {
+        if (choice) vscode.env.openExternal(vscode.Uri.parse('https://github.com/Greengold-Lang/greengold-lang#install'));
+    });
+}
+
 function activate(context) {
-    console.log('Greengold Language Support v0.18.0 activating...');
+    console.log('Greengold Language Support activating...');
 
     // 1. Status Bar Item
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -49,7 +98,7 @@ function activate(context) {
     // 7. Watch configuration changes
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration('greengold.languageServer') || e.affectsConfiguration('greengold.pythonPath')) {
+            if (e.affectsConfiguration('greengold.languageServer') || e.affectsConfiguration('greengold.pythonPath') || e.affectsConfiguration('greengold.path')) {
                 const cfg = vscode.workspace.getConfiguration('greengold');
                 if (cfg.get('languageServer.enable', true)) {
                     await restartLanguageServer(context);
@@ -213,7 +262,7 @@ async function debugCurrentFile(targetUri) {
         filePath = editor.document.fileName;
     }
 
-    const pythonPath = getPythonPath();
+    const gg = ggInvocation();
     const isWindows = process.platform === 'win32';
     const exeExt = isWindows ? '.exe' : '';
     const fileBase = path.basename(filePath, '.gg');
@@ -226,7 +275,7 @@ async function debugCurrentFile(targetUri) {
         cancellable: false
     }, async () => {
         return new Promise((resolve, reject) => {
-            cp.execFile(pythonPath, ['-m', 'greengold', 'build', '-g', '--color', 'never', filePath, '-o', outExe], (err, stdout, stderr) => {
+            cp.execFile(gg.cmd, [...gg.pre, 'build', '-g', '--color', 'never', filePath, '-o', outExe], (err, stdout, stderr) => {
                 if (err) {
                     vscode.window.showErrorMessage(`Greengold build failed:\n${stderr || stdout || err.message}`);
                     reject(err);
@@ -419,7 +468,7 @@ function updateTestsForDocument(document) {
 async function runTestProfile(request, token) {
     if (!testController) return;
     const run = testController.createTestRun(request);
-    const pythonPath = getPythonPath();
+    const gg = ggInvocation();
 
     /** @type {vscode.TestItem[]} */
     const testsToRun = [];
@@ -452,8 +501,8 @@ async function runTestProfile(request, token) {
         try {
             const result = await new Promise((resolve) => {
                 cp.execFile(
-                    pythonPath,
-                    ['-m', 'greengold', 'test', '--json', '--color', 'never', fsPath],
+                    gg.cmd,
+                    [...gg.pre, 'test', '--json', '--color', 'never', fsPath],
                     { maxBuffer: 10 * 1024 * 1024 },
                     (err, stdout, stderr) => {
                         resolve({ err, stdout, stderr, duration: Date.now() - startTime });
@@ -523,8 +572,8 @@ async function runSingleTestCommand(fileUri, testName) {
         terminal = vscode.window.createTerminal(terminalName);
     }
     terminal.show();
-    const pythonPath = getPythonPath();
-    terminal.sendText(`${pythonPath} -m greengold test "${targetFile}"`);
+    const gg = ggInvocation();
+    terminal.sendText(`${ggShell(gg)} test "${targetFile}"`);
 }
 
 // --- CodeLens Provider -------------------------------------------------------
@@ -587,7 +636,7 @@ function registerCodeLens(context) {
 function registerTaskProvider(context) {
     const taskProvider = {
         provideTasks() {
-            const pythonPath = getPythonPath();
+            const gg = ggInvocation();
             const editor = vscode.window.activeTextEditor;
             const currentFile = editor && editor.document.fileName.endsWith('.gg')
                 ? editor.document.fileName
@@ -599,7 +648,7 @@ function registerTaskProvider(context) {
                     vscode.TaskScope.Workspace,
                     'gg build',
                     'greengold',
-                    new vscode.ShellExecution(`${pythonPath} -m greengold build --color never "${currentFile}"`),
+                    new vscode.ShellExecution(`${ggShell(gg)} build --color never "${currentFile}"`),
                     ['$greengold']
                 ),
                 new vscode.Task(
@@ -607,7 +656,7 @@ function registerTaskProvider(context) {
                     vscode.TaskScope.Workspace,
                     'gg build --release',
                     'greengold',
-                    new vscode.ShellExecution(`${pythonPath} -m greengold build --release --color never "${currentFile}"`),
+                    new vscode.ShellExecution(`${ggShell(gg)} build --release --color never "${currentFile}"`),
                     ['$greengold']
                 ),
                 new vscode.Task(
@@ -615,7 +664,7 @@ function registerTaskProvider(context) {
                     vscode.TaskScope.Workspace,
                     'gg check',
                     'greengold',
-                    new vscode.ShellExecution(`${pythonPath} -m greengold check --color never "${currentFile}"`),
+                    new vscode.ShellExecution(`${ggShell(gg)} check --color never "${currentFile}"`),
                     ['$greengold']
                 ),
                 new vscode.Task(
@@ -623,7 +672,7 @@ function registerTaskProvider(context) {
                     vscode.TaskScope.Workspace,
                     'gg test',
                     'greengold',
-                    new vscode.ShellExecution(`${pythonPath} -m greengold test --color never`),
+                    new vscode.ShellExecution(`${ggShell(gg)} test --color never`),
                     ['$greengold']
                 ),
                 new vscode.Task(
@@ -631,14 +680,14 @@ function registerTaskProvider(context) {
                     vscode.TaskScope.Workspace,
                     'gg fix',
                     'greengold',
-                    new vscode.ShellExecution(`${pythonPath} -m greengold fix --color never "${currentFile}"`)
+                    new vscode.ShellExecution(`${ggShell(gg)} fix --color never "${currentFile}"`)
                 ),
                 new vscode.Task(
                     { type: 'greengold', command: 'fmt' },
                     vscode.TaskScope.Workspace,
                     'gg fmt',
                     'greengold',
-                    new vscode.ShellExecution(`${pythonPath} -m greengold fmt`)
+                    new vscode.ShellExecution(`${ggShell(gg)} fmt`)
                 )
             ];
 
@@ -675,13 +724,13 @@ async function createNewPackage() {
     });
     const parentDir = folderUri && folderUri[0] ? folderUri[0].fsPath : null;
 
-    const pythonPath = getPythonPath();
-    const args = ['-m', 'greengold', 'new', name];
+    const gg = ggInvocation();
+    const args = [...gg.pre, 'new', name];
     if (parentDir) {
         args.push('--path', path.join(parentDir, name));
     }
 
-    cp.execFile(pythonPath, args, (err, stdout, stderr) => {
+    cp.execFile(gg.cmd, args, (err, stdout, stderr) => {
         if (err) {
             vscode.window.showErrorMessage(`Failed to create package: ${stderr || err.message}`);
         } else {
@@ -717,12 +766,12 @@ async function generateBindings(headerUri, cpp) {
     }
 
     const outPath = headerPath.replace(/\.(hpp|hh|hxx|h)$/i, '.gg');
-    const pythonPath = getPythonPath();
-    const args = ['-m', 'greengold', 'bindgen'];
+    const gg = ggInvocation();
+    const args = [...gg.pre, 'bindgen'];
     if (cpp) args.push('--cpp');
     args.push(headerPath, '-o', outPath);
 
-    cp.execFile(pythonPath, args, (err, stdout, stderr) => {
+    cp.execFile(gg.cmd, args, (err, stdout, stderr) => {
         if (err) {
             vscode.window.showErrorMessage(`Failed to generate bindings: ${stderr || err.message}`);
         } else {
@@ -742,7 +791,7 @@ async function startLanguageServer(context) {
     }
 
     const config = vscode.workspace.getConfiguration('greengold');
-    const pythonPath = getPythonPath();
+    const gg = ggInvocation();
     const customCommand = config.get('languageServer.command', '');
 
     let serverOptions;
@@ -754,8 +803,8 @@ async function startLanguageServer(context) {
         };
     } else {
         serverOptions = {
-            command: pythonPath,
-            args: ['-m', 'greengold', 'lsp'],
+            command: gg.cmd,
+            args: [...gg.pre, 'lsp'],
             options: {
                 env: {
                     ...process.env,
@@ -788,9 +837,7 @@ async function startLanguageServer(context) {
     } catch (err) {
         console.error('Failed to start Greengold Language Server:', err);
         updateStatusBar('error');
-        vscode.window.showErrorMessage(
-            `Failed to start Greengold Language Server: ${err.message || err}. Check your Python and Greengold installation.`
-        );
+        notInstalledHint();
     }
 }
 
@@ -844,9 +891,9 @@ function runInTerminal(parts) {
         terminal = vscode.window.createTerminal(terminalName);
     }
     terminal.show();
-    const pythonPath = getPythonPath();
+    const gg = ggInvocation();
     const quoted = parts.map((part) => /\s/.test(part) ? `"${part}"` : part);
-    terminal.sendText(`${pythonPath} -m greengold ${quoted.join(' ')}`);
+    terminal.sendText(`${ggShell(gg)} ${quoted.join(' ')}`);
 }
 
 function executeTerminalCommand(cmd, extraArgs = []) {

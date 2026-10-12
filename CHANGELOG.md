@@ -6,7 +6,8 @@ Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0
 
 - Installers that need no Python: `installer/install.ps1`, `installer/install.sh`, and a Windows setup program; all put `gg` on `PATH`.
 - `gg update` replaces the installed `gg` with the newest GitHub release (SHA-256 checked). **Breaking:** re-resolving dependencies is now `gg update --deps`.
-- Release workflow builds `gg` for Windows x64, Linux x64/arm64, and macOS arm64/x64 when a `v*` tag is pushed.
+- VS Code extension runs `gg` (setting `greengold.path`, then `PATH`, then the installer folder) and falls back to `python -m greengold`; the release includes `greengold-vscode.vsix`.
+- Release workflow builds `gg` for Windows x64, Linux x64/arm64, and macOS arm64 when a `v*` tag is pushed.
 
 ## 0.3.3 (first public release)
 

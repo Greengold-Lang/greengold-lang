@@ -59,7 +59,7 @@ irm https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/install
 curl -fsSL https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/installer/install.sh | sh
 ```
 
-Open a new terminal and run `gg --version`. Builds exist for Windows x64, Linux x64 and arm64, and macOS arm64 and x64.
+Open a new terminal and run `gg --version`. Builds exist for Windows x64, Linux x64 and arm64, and macOS on Apple Silicon (arm64). There is no Intel Mac build, because `llvmlite` has no wheel for it; on an Intel Mac, run from source with `pip install -e .`.
 `GG_VERSION=0.3.3` picks a version, `GG_INSTALL_DIR` the folder, `GG_NO_MODIFY_PATH=1` leaves `PATH` alone.
 
 **Update:** `gg update` downloads the newest release, verifies it, and replaces the installed `gg` (`gg update --check` only looks;

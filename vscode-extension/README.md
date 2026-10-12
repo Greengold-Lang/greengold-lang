@@ -9,7 +9,7 @@ In addition to syntax highlighting and modern snippets, it provides an interacti
 ## 🚀 Key Features
 
 ### 1. Language Server Protocol (LSP) Support
-The extension automatically launches the pure-Python zero-dependency Greengold LSP server (`gg lsp`) in the background.
+The extension automatically launches the Greengold LSP server (`gg lsp`) in the background.
 
 - **🔴 Real-Time Diagnostics:**
   - Displays red squiggly underlines for syntax, type mismatch, scoping, and move/borrow errors while typing (`didChange`) and saving (`didSave`).
@@ -166,7 +166,10 @@ You can customize the following options via VS Code settings (`Ctrl+,` -> `green
   // Enable or disable Greengold Language Server support
   "greengold.languageServer.enable": true,
 
-  // Python interpreter path to run the Greengold compiler (default: "python")
+  // Path to the `gg` executable. Blank: `gg` from PATH, then the installer's folder
+  "greengold.path": "",
+
+  // Only used when `gg` is not found: runs `python -m greengold` (pip or source install)
   "greengold.pythonPath": "python",
 
   // Debugger backend to use ("auto", "lldb", "cppvsdbg", "cppdbg")
@@ -192,23 +195,30 @@ You can customize the following options via VS Code settings (`Ctrl+,` -> `green
 
 ---
 
-## 📦 Installation and Packaging
+## 📦 Installation
 
-### Method 1: Installing via VSIX Package (Recommended)
+### 1. Install the compiler
 
-Package and install the extension in VS Code:
+The extension runs the `gg` command. Install it without Python from the
+[latest release](https://github.com/Greengold-Lang/greengold-lang#install) (it also adds `gg` to `PATH`; restart VS Code afterwards).
+If `gg` is somewhere else, set `greengold.path`.
 
-```powershell
-cd vscode-extension
-npx @vscode/vsce package
-code --install-extension greengold-vscode-0.18.0.vsix
+### 2. Install the extension
+
+Download `greengold-vscode.vsix` from the [latest release](https://github.com/Greengold-Lang/greengold-lang/releases/latest), then:
+
+```bash
+code --install-extension greengold-vscode.vsix
 ```
 
-### Method 2: Copying to Extensions Directory
+or use **Extensions → … → Install from VSIX**.
 
-```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.vscode\extensions\greengold.greengold-vscode-*" -ErrorAction SilentlyContinue
-Copy-Item -Recurse -Force .\vscode-extension "$env:USERPROFILE\.vscode\extensions\greengold.greengold-vscode-0.18.0"
+### Building the VSIX yourself
+
+```bash
+cd vscode-extension
+npm ci
+npx @vscode/vsce package
 ```
 
 ---

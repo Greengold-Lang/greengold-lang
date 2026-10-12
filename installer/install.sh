@@ -20,6 +20,9 @@ case "$(uname -m)" in
   arm64|aarch64) arch=arm64 ;;
   *) die "unsupported CPU $(uname -m)" ;;
 esac
+if [ "$os" = macos ] && [ "$arch" = x64 ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" != 1 ]; then
+  die "there is no prebuilt gg for Intel Macs; install from source: pip install -e . (see the README)"
+fi
 # A shell under Rosetta reports x86_64 on an Apple Silicon Mac; prefer the native build.
 if [ "$os" = macos ] && [ "$arch" = x64 ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = 1 ]; then
   arch=arm64

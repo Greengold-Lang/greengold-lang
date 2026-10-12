@@ -360,12 +360,17 @@
         "greengold.languageServer.command": {
           "type": "string",
           "default": "",
-          "description": "Custom command to start the LSP server (defaults to 'python -m greengold lsp' if left blank)."
+          "description": "Custom command to start the LSP server (defaults to 'gg lsp' if left blank)."
+        },
+        "greengold.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the `gg` executable. Leave blank to use `gg` from PATH (or the folder the installers use)."
         },
         "greengold.pythonPath": {
           "type": "string",
           "default": "python",
-          "description": "Python interpreter path to run the Greengold compiler and LSP server."
+          "description": "Only used when `gg` is not found: runs `python -m greengold` (a pip or source install)."
         },
         "greengold.debug.debugger": {
           "type": "string",
