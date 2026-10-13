@@ -250,6 +250,10 @@ python -m pytest -q
 
 End-to-end tests need `gcc` or `clang` on `PATH` for linking. The frozen self-host parity tests run only with `GG_SELFHOST=1`. Every `gg` code block in `README.md`, `docs/`, and `Learn/` that has a `fn main` is type-checked by `tests/test_doc_examples.py`.
 
+## Support
+
+Greengold is a one-person project and stays free and open source. If you want to help pay for development time, Linux and macOS testing, and hosting, you can support it on [Patreon](https://www.patreon.com/greengoldlang). Bug reports, feedback and code contributions help just as much, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
