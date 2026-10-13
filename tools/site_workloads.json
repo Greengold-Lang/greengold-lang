@@ -82,7 +82,7 @@
  [
   "particle",
   "Particle",
-  "20,000 particles, 2,000 steps, then the sum of <code>x</code>. Greengold uses <code>soa Array</code> and indexes it with <code>trust</code> inside <code>hot fn</code>. C++ and Rust store an array of structs. Printed sums: C++ <code>5.99982e+07</code>, Rust <code>59998190</code>, Greengold <code>5.9999e+07</code>. Rust’s mean, 66.71 ms, sits well above its median, 19.81 ms."
+  "20,000 particles, 2,000 steps, then the sum of <code>x</code>. All three programs use a structure of arrays: Greengold with <code>soa Array</code>, indexed with <code>trust</code> inside <code>hot fn</code>; C++ with one <code>std::vector</code> per field; Rust with one <code>Vec</code> per field and <code>zip</code> loops, which need no bounds checks. An earlier version gave C++ and Rust an array of structs, which measured the memory layout rather than the compiler: they took about 20 ms. In Greengold the switch is the one word <code>soa</code>. Printed sums: C++ <code>5.99982e+07</code>, Rust <code>59998190</code>, Greengold <code>5.99982e+07</code>."
  ],
  [
   "wordfreq",

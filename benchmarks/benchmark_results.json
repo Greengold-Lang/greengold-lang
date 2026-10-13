@@ -429,27 +429,27 @@
   },
   "particle": {
     "C++ (GCC -O3)": {
-      "compile_time_s": 0.4838198999987071,
-      "binary_size_kb": 60.5,
-      "median_ms": 19.959800001743133,
-      "mean_ms": 26.524000000063097,
-      "peak_mem_mb": 5.6328125,
+      "compile_time_s": 0.47332490000189864,
+      "binary_size_kb": 61.39453125,
+      "median_ms": 11.479000000690576,
+      "mean_ms": 17.158300001028692,
+      "peak_mem_mb": 4.9609375,
       "output": "5.99982e+07"
     },
     "Rust (opt-level=3)": {
-      "compile_time_s": 0.2037385000003269,
-      "binary_size_kb": 145.0,
-      "median_ms": 19.692899999427027,
-      "mean_ms": 67.32359999987239,
-      "peak_mem_mb": 4.7265625,
+      "compile_time_s": 0.2019886999987648,
+      "binary_size_kb": 147.0,
+      "median_ms": 13.367999999900348,
+      "mean_ms": 17.613560001336737,
+      "peak_mem_mb": 4.13671875,
       "output": "59998190"
     },
     "Greengold (Release)": {
-      "compile_time_s": 7.473920000000362,
+      "compile_time_s": 0.4627392000002146,
       "binary_size_kb": 58.9892578125,
-      "median_ms": 13.073000000076718,
-      "mean_ms": 17.503099999885308,
-      "peak_mem_mb": 4.84765625,
+      "median_ms": 11.899500001163688,
+      "mean_ms": 15.886560000217287,
+      "peak_mem_mb": 4.37109375,
       "output": "5.99982e+07"
     }
   },
