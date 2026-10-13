@@ -2606,11 +2606,14 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             for el in e.elements:
                 et = self._expr(el, exp_elem)
                 self._expect_type(exp_elem, et, el)
+                self._no_implicit_copy(el, et)  # `[a, b]` of heap owners moves `a` and `b` into the array
             return expected
         first_ty = self._expr(e.elements[0])
+        self._no_implicit_copy(e.elements[0], first_ty)
         for el in e.elements[1:]:
             et = self._expr(el, first_ty)
             self._expect_type(first_ty, et, el)
+            self._no_implicit_copy(el, et)
         return f"[{len(e.elements)}]{first_ty}"
 
     def _array_repeat_lit(self, e: ArrayRepeatLit, expected: str | None) -> str:
@@ -2625,9 +2628,13 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             vt = self._expr(e.value, exp_elem)
             self._expect_type(exp_elem, vt, e.value)
             self._repeat_moved(e, exp_elem, count_val)
+            if count_val == 1:
+                self._no_implicit_copy(e.value, vt)
             return expected
         vt = self._expr(e.value)
         self._repeat_moved(e, vt, count_val)
+        if count_val == 1:
+            self._no_implicit_copy(e.value, vt)
         return f"[{count_val}]{vt}"
 
     def _repeat_moved(self, e: ArrayRepeatLit, elem: str, count: int) -> None:
@@ -4645,9 +4652,41 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
                 arg.is_copy = True
 
             path = self._path(arg)
+            is_view = ty == "str" or is_slice_type(ty)
+            if is_view and mode in ("", "read") and not is_copy:
+                # A `str` or a slice points into the memory it was made from: it reads that place, whether the
+                # argument is `s[0..1]`, `s.as_str()`, or `s.trim()`. A `lend` of the same place in this call
+                # could move that memory (`s.append_str(s.as_str())` grows `s` while it copies from it).
+                sources = [path] if path is not None else self._view_paths(arg)
+                for sp in sources:
+                    accesses.append(ArgAccess("read", sp, ty, arg, arg))
+                if path is not None or sources:
+                    continue
             accesses.append(ArgAccess("val" if (is_copy or mode == "") else mode, path, ty, arg, arg))
 
         self._check_aliases(accesses)
+
+    def _view_paths(self, e: Expr) -> list[tuple[str, ...]]:
+        """The places a `str` or slice built right here points into: the receiver and the arguments of the
+        calls it is made from (`s.as_str()`, `p.name.trim()`, `first(a, b)`), however deeply nested."""
+        ety = getattr(e, "ty", None)
+        if not (ety == "str" or is_slice_type(ety or "")):
+            return []  # a fresh owned value (`s.clone()`) does not point into what it was made from
+        if isinstance(e, SliceExpr):  # `s[0..1]` of a `string` is `s.as_str()[0..1]`
+            p = self._path(e.obj)
+            return [p] if p is not None else self._view_paths(e.obj)
+        if not isinstance(e, (MethodCall, Call)):
+            return []
+        out: list[tuple[str, ...]] = []
+        for part in ([e.obj] if isinstance(e, MethodCall) else []) + list(e.args):
+            pty = getattr(part, "ty", None)
+            p = self._path(part)
+            if p is not None and (pty == "str" or is_slice_type(pty or "") or self._moves(pty or "")
+                                  or heap_kind(pty or "") is not None):
+                out.append(p)
+            elif p is None:
+                out += self._view_paths(part)
+        return out
 
     # -- dynamic dispatch: `dyn Feature` ----------------------------------------------------------
     def _dyn_into(self, expected: str, actual: str, node: Node) -> bool:
@@ -4914,6 +4953,14 @@ class _Moved:
 MoveState = dict[str, _Moved]  # moved path ("a" or "a.b") -> where it was consumed
 
 
+def _through_index(e: Expr) -> bool:
+    while isinstance(e, (IndexAccess, FieldAccess)):
+        if isinstance(e, IndexAccess):
+            return True
+        e = e.obj
+    return False
+
+
 def _path_str(e: Expr) -> str | None:
     p = _place_path(e)
     return None if p is None else ".".join(p)
@@ -4939,6 +4986,9 @@ class MoveAnalyzer:
         self.program = program
         self.diags = diags
         self.loops: list[dict] = []  # innermost last: {"breaks": [MoveState], "continues": [MoveState]}
+        # `defer`s of the blocks being analyzed, innermost block last: (the statement, the paths it moves itself).
+        # They run when their block ends, however it ends, so what they read must still be there then.
+        self.defers: list[list[tuple[Defer, set[str]]]] = []
         self.inst_note: Note | None = None  # "instantiated with" note attached to errors in generic instances
         self.reported: set[tuple[int, int, str]] = set()
         self.bound: dict[str, Node] = {}
@@ -4953,6 +5003,7 @@ class MoveAnalyzer:
             if isinstance(d, FuncDecl) and not d.type_params and not d.owner_params:
                 self.current_filename = getattr(d, "filename", None)
                 self.loops = []
+                self.defers = []
                 self.inst_note = d.inst_note
                 self.bound = {p.name: p for p in d.params}
                 self._ctx = None
@@ -4974,11 +5025,28 @@ class MoveAnalyzer:
     def _block(self, stmts: list[Stmt], state: MoveState) -> MoveState | None:
         """Runs block; returns None if block terminates on all paths (return/break)."""
         cur: MoveState | None = state
-        for s in stmts:
-            if cur is None:
-                break  # unreachable code
-            cur = self._stmt(s, cur)
+        self.defers.append([])
+        try:
+            for s in stmts:
+                if cur is None:
+                    break  # unreachable code
+                cur = self._stmt(s, cur)
+            if cur is not None:
+                self._run_defers(self.defers[-1], cur)  # the block ends normally: its defers run now
+        finally:
+            self.defers.pop()
         return cur
+
+    def _run_defers(self, entries: list[tuple[Defer, set[str]]], state: MoveState) -> None:
+        """Checks the deferred statements against the state where they run (innermost block's last first)."""
+        for d, own in reversed(entries):
+            at_exit = {k: v for k, v in state.items() if k not in own}  # what the defer moves itself is its own
+            self._stmt(d.stmt, at_exit)
+
+    def _run_all_defers(self, state: MoveState, depth: int = 0) -> None:
+        """An early exit (`return`, `?`, or `break` out to `depth`) runs the defers of every block it leaves."""
+        for entries in reversed(self.defers[depth:]):
+            self._run_defers(entries, state)
 
     def _stmt(self, s: Stmt, state: MoveState) -> MoveState | None:
         if isinstance(s, VarDecl):
@@ -4996,10 +5064,12 @@ class MoveAnalyzer:
         if isinstance(s, Return):
             if s.value is not None:
                 self._expr(s.value, state)
+            self._run_all_defers(dict(state))
             return None
         if isinstance(s, (Break, Continue)):
             if self.loops:
                 self.loops[-1]["breaks" if isinstance(s, Break) else "continues"].append(dict(state))
+                self._run_all_defers(dict(state), self.loops[-1].get("defer_depth", len(self.defers)))
             return None
         if isinstance(s, If):
             return self._if(s, state)
@@ -5018,14 +5088,17 @@ class MoveAnalyzer:
         if isinstance(s, Yield):
             self._expr(s.value, state)
         if isinstance(s, Defer):
-            self._stmt(s.stmt, state)  # conservative: move is considered to happen at definition site
+            before = set(state)
+            self._stmt(s.stmt, state)  # conservative: a move is considered to happen at the definition site
+            if self.defers:
+                self.defers[-1].append((s, set(state) - before))
         return state
 
     def _loop(self, s: Stmt, state: MoveState, head, bound: list[str], exits_at_head: bool = True) -> MoveState | None:
         """Runs a loop body to a fixpoint of the head state (see the class docstring)."""
         entry: MoveState = dict(state)
         for _ in range(64):  # the state only grows, by paths of this function; this bound is never reached
-            ctx: dict = {"breaks": [], "continues": []}
+            ctx: dict = {"breaks": [], "continues": [], "defer_depth": len(self.defers)}
             self.loops.append(ctx)
             at_head = dict(entry)
             if head is not None:
@@ -5091,7 +5164,8 @@ class MoveAnalyzer:
         self._expr(s.value, state)
         if path is None:
             return
-        if s.op != "=":
+        if s.op != "=" or _through_index(s.target):
+            # `a[i] = v` writes into `a` (and drops the old element): it does not give a moved `a` a new value
             self._use_place(s.target, state)
             return
         # Cannot assign to field of a moved parent structure.
@@ -5163,6 +5237,7 @@ class MoveAnalyzer:
             state.update(end or {})
         elif isinstance(e, Try):
             self._expr(e.operand, state)  # early return path ends like `return`; does not affect continuing path
+            self._run_all_defers(dict(state))  # ... and that early return runs the defers of the blocks it leaves
 
     def _call_args(self, args: list[Expr], state: MoveState, callee: str, owner: str | None, method: bool) -> None:
         func = self._find_func(callee, owner)

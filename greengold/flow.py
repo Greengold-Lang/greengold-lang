@@ -11,6 +11,7 @@ no longer holds the old referent.
     live.after[id(stmt)]    # names live after `stmt` runs
     live.after_head[id(s)]  # for if/while/for/match: names live after the header (condition, range,
                             # scrutinee) is evaluated, before a branch or the body runs
+    live.block_out[id(stmts)]  # names live where a block ends (for a loop body: at the next iteration)
 """
 from __future__ import annotations
 
@@ -18,8 +19,8 @@ from dataclasses import fields as dc_fields
 
 from .ast_nodes import (
     walk,
-    Assign, Break, Call, Continue, Defer, ExprStmt, For, ForIn, If, Match, Name, Node, Return, Stmt, VarDecl, While,
-    Wrapping, Yield,
+    Assign, Break, Call, Continue, Defer, ExprStmt, FieldAccess, For, ForIn, If, IndexAccess, Match, Name, Node,
+    Return, Stmt, VarDecl, While, Wrapping, Yield,
 )
 
 
@@ -38,10 +39,22 @@ def uses(node) -> frozenset[str]:
     return frozenset(out)
 
 
+def store_uses(target) -> frozenset[str]:
+    """Names read by the target of `a.f = v` / `a[i] = v`: the index expressions, not `a` itself.
+    The store replaces part of `a` and does not look at what `a` held before."""
+    out: frozenset[str] = frozenset()
+    while isinstance(target, (FieldAccess, IndexAccess)):
+        if isinstance(target, IndexAccess):
+            out |= uses(target.index)
+        target = target.obj
+    return out if isinstance(target, Name) else out | uses(target)
+
+
 class Liveness:
     def __init__(self, body: list[Stmt]) -> None:
         self.after: dict[int, frozenset[str]] = {}
         self.after_head: dict[int, frozenset[str]] = {}
+        self.block_out: dict[int, frozenset[str]] = {}  # id(stmts) -> names live where that block ends
         self._loops: list[tuple[frozenset[str], frozenset[str]]] = []  # (after the loop, loop head)
         self.block(body, frozenset())
 
@@ -49,6 +62,7 @@ class Liveness:
         # A deferred statement runs when the block ends, on every path: what it reads stays live throughout.
         deferred = frozenset().union(*(uses(s.stmt) for s in stmts if isinstance(s, Defer)))
         live = out | deferred
+        self.block_out[id(stmts)] = out
         for s in reversed(stmts):
             if isinstance(s, Return):
                 self.after[id(s)] = deferred  # what runs after a `return` is the deferred code
@@ -65,6 +79,8 @@ class Liveness:
         if isinstance(s, Assign):
             if s.op == "=" and isinstance(s.target, Name):
                 return (out - {s.target.name}) | uses(s.value)
+            if s.op == "=" and isinstance(s.target, (FieldAccess, IndexAccess)):
+                return out | store_uses(s.target) | uses(s.value)
             return out | uses(s.target) | uses(s.value)
         if isinstance(s, (ExprStmt, Yield)):
             return out | uses(s.expr if isinstance(s, ExprStmt) else s.value)
