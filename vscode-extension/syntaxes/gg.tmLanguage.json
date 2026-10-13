@@ -28,6 +28,12 @@
       "include": "#feature-declarations"
     },
     {
+      "include": "#attribute-declarations"
+    },
+    {
+      "include": "#attribute-uses"
+    },
+    {
       "include": "#function-declarations"
     },
     {
@@ -382,6 +388,92 @@
             "1": { "name": "keyword.declaration.impl.gg" },
             "2": { "name": "entity.name.type.class.gg" }
           }
+        }
+      ]
+    },
+    "attribute-declarations": {
+      "patterns": [
+        {
+          "comment": "attribute name(param: kind = default, ...) on fn, struct, field",
+          "begin": "^[ ]*(attribute)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "end": "$",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.declaration.attribute.gg"
+            },
+            "2": {
+              "name": "entity.name.function.attribute.gg"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b(on)\\b",
+              "name": "keyword.other.attribute-target.gg"
+            },
+            {
+              "match": "\\b(fn|struct|field)\\b",
+              "name": "storage.type.attribute-target.gg"
+            },
+            {
+              "match": "\\b(str|int|float|bool|ident)\\b",
+              "name": "support.type.attribute-kind.gg"
+            },
+            {
+              "match": "([A-Za-z_][A-Za-z0-9_]*)\\s*(?=:)",
+              "captures": {
+                "1": {
+                  "name": "variable.parameter.attribute.gg"
+                }
+              }
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#constants"
+            }
+          ]
+        }
+      ]
+    },
+    "attribute-uses": {
+      "patterns": [
+        {
+          "comment": "@name or @name(args) on its own line above a fn, struct, or field",
+          "begin": "^[ ]*(@)([A-Za-z_][A-Za-z0-9_]*)",
+          "end": "$",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.annotation.gg"
+            },
+            "2": {
+              "name": "entity.name.function.attribute.gg meta.annotation.gg"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?==(?!=))",
+              "name": "variable.parameter.attribute.gg"
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#constants"
+            }
+          ]
         }
       ]
     },

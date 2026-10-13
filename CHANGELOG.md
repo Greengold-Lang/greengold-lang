@@ -4,6 +4,10 @@ Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0
 
 ## Unreleased
 
+Attributes and VS Code
+- `@name(args)` above a `fn`, an `impl` method, a `struct`, or a field, declared first with `attribute name(param: kind) on fn, struct, field`. The compiler checks each use and gives it no behavior; `gg attrs file.gg` lists the uses as JSON for code generators (RPC stubs, serialization tables). New codes GG0407 and GG0408.
+- VS Code extension: highlighting for `attribute` declarations and `@name(...)` lines, snippets (`attribute`, `attr`, `attrreplicated`), and completion of the declared attributes after `@`.
+
 Thread safety
 - **Fix (soundness):** `std.tasks` kept one scheduler for the whole program, so two threads that each used `async`/`await` corrupted it (a crash in safe code). The first thread to use tasks now owns them, and a call from another thread stops the program with "tasks belong to one thread".
 - **Fix (soundness):** a view taken through a call that returns a reference (`v = g.value().as_str()` with `g` a `Locked` guard) was not tied to its owner, so it could outlive the guard and read memory another thread had freed. It is now tied to `g` (GG0315 / GG0316).
