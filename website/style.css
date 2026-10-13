@@ -1150,6 +1150,17 @@ h1, h2, h3, h4 {
 
 .overview-grid .brow + .brow { margin-top: 0; }
 
+.overview-grid .brow {
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--surface-2);
+  transition: border-color 0.15s ease;
+}
+
+.overview-grid .brow:hover { border-color: var(--line-strong); }
+.overview-grid .brow-head { flex-wrap: wrap; row-gap: 8px; margin-bottom: 12px; }
+
 .toc-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .toc-pills a {
