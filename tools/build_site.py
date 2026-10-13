@@ -20,9 +20,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "website"
 SPEC = ROOT / "docs" / "SPEC.md"
-VERSION = "0.19.2"
+VERSION = "0.20.0"
 DOMAIN = "https://greengoldlang.com"
-UPDATED = "2026-10-12"
+UPDATED = "2026-10-13"
 
 # --------------------------------------------------------------------------
 # Icons (24x24 stroke icons)
