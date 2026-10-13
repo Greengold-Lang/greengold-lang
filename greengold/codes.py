@@ -421,6 +421,10 @@ RULES: dict[str, Rule] = {
         _r("GG0408", "bad-attribute", "other",
            "An `@attribute` does not match its declaration.",
            "The arguments, their kinds, or the item it is written on differ from the `attribute` declaration."),
+        _r("GG0409", "attribute-check", "other",
+           "The body of an `attribute` rejected this use.",
+           "An `attribute` may have a body that runs while compiling, once for each use. The body calls "
+           "`compile_error(message)` when the use is wrong. The message is the attribute author's."),
         _r("GG0499", "unclassified", "other",
            "This diagnostic has no specific code yet.",
            "The message is real, but it has not been given a stable rule. Treat the message text as the explanation."),

@@ -66,3 +66,49 @@ def test_attributes_do_not_change_the_program():
     plain = front_end("fn f():\n    pass\n" + MAIN)[1]
     marked = front_end(DECL + "@net(server)\nfn f():\n    pass\n" + MAIN)[1]
     assert plain == [] and marked == []
+
+
+RANGE = (
+    "attribute range(min: int, max: int) on field:\n"
+    "    if min > max:\n"
+    "        compile_error(\"min is bigger than max\")\n"
+    "    if target_type != \"i32\":\n"
+    "        compile_error(f\"@range is for i32 fields, not {target_type} (field {target_name} of {target_owner})\")\n"
+)
+
+
+def test_attribute_body_accepts_a_good_use():
+    program, diags = front_end(RANGE + "struct S:\n    @range(0, 10)\n    x: i32\n" + MAIN)
+    assert not diags
+    assert export(program)[0]["attrs"][0]["args"] == {"min": 0, "max": 10}
+
+
+def test_attribute_body_reports_compile_error_at_the_use():
+    src = RANGE + "struct S:\n    @range(5, 1)\n    x: i32\n    @range(0, 1)\n    y: f64\n" + MAIN
+    _prog, diags = front_end(src)
+    assert [d.rule for d in diags] == ["attribute-check", "attribute-check"]
+    assert diags[0].message == "min is bigger than max"
+    assert diags[1].message == "@range is for i32 fields, not f64 (field y of S)"
+    assert diags[0].line == 7 and diags[1].line == 9
+
+
+def test_attribute_body_does_not_end_up_in_the_program():
+    program, diags = front_end(RANGE + "struct S:\n    @range(0, 1)\n    x: i32\n" + MAIN)
+    assert not diags
+    assert all(not getattr(d, "attr_handler", False) for d in program.decls)
+
+
+def test_compile_error_outside_an_attribute_is_rejected():
+    assert "only for the body of an `attribute`" in errors("fn f():\n    compile_error(\"x\")\n" + MAIN)[0]
+
+
+def test_attribute_body_is_type_checked():
+    assert errors("attribute a(n: int) on fn:\n    compile_error(n)\n" + MAIN)
+
+
+def test_attribute_body_sees_the_item_it_sits_on():
+    src = ("attribute pure() on fn:\n"
+           "    if target_type != \"\":\n"
+           "        compile_error(f\"{target_name} must not return a value\")\n"
+           "@pure\nfn f() -> i32:\n    return 1\n" + MAIN)
+    assert errors(src) == ["f must not return a value"]

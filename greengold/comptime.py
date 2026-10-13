@@ -87,6 +87,7 @@ class Interp:
         self.const_decls: dict[str, ConstDecl] = {d.name: d for d in program.decls if isinstance(d, ConstDecl)}
         self.memo: dict[str, Any] = {}
         self.steps = 0
+        self.reports: list[str] | None = None  # messages of `compile_error`; None outside an attribute body
 
     # -- public interface -------------------------------------------------
     def const_value(self, name: str) -> Any:
@@ -97,6 +98,15 @@ class Interp:
         v = self.eval(d.value, {})
         self.memo[name] = v
         return v
+
+    def run_attribute(self, handler: FuncDecl, args: list[Any]) -> list[str]:
+        """Runs an attribute's body for one use and returns the `compile_error` messages it produced."""
+        self.reports = []
+        try:
+            self.call(handler, args)
+            return self.reports
+        finally:
+            self.reports = None
 
     def eval_decl(self, d: ConstDecl) -> Any:
         return self.const_value(d.name)
@@ -224,6 +234,9 @@ class Interp:
                 return y.value
             raise ComptimeError("comptime: expression did not produce a value")
         if isinstance(e, Call):
+            if e.callee == "compile_error" and self.reports is not None:
+                self.reports.append(str(self.eval(e.args[0], env)))
+                return None
             if e.ctor_enum is not None or e.callee in ("print", "input", "panic"):
                 raise ComptimeError(f"comptime: '{e.callee}' cannot be used at compile time")
             f = self.funcs.get(e.callee)

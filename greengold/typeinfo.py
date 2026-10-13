@@ -49,7 +49,7 @@ PTR_BUILTINS = ({"addr", "addr_mut", "ptr_cast", "ptr_to_int", "int_to_ptr", "pt
 ATOMIC_ORDERS = ("relaxed", "acquire", "release", "acq_rel", "seq_cst")
 # Integer intrinsics used by the Core library (checked_/saturating_/wrapping_ arithmetic).
 INT_BUILTINS = {"add_overflows", "sub_overflows", "mul_overflows", "max_value", "min_value"}
-BUILTINS = {"print", "eprint", "panic", "input", "target_os", "target_arch"} | PTR_BUILTINS | INT_BUILTINS  # builtin function names (user cannot define)
+BUILTINS = {"print", "eprint", "panic", "compile_error", "input", "target_os", "target_arch"} | PTR_BUILTINS | INT_BUILTINS  # builtin function names (user cannot define)
 BUILTINS |= {"f32x4", "f32x8", "f64x2", "f64x4", "i32x4", "i32x8", "i64x2", "i64x4", "i16x8", "u8x16", "u32x4"}
 # Names reserved by Prelude (greengold/core/core.gg): user cannot define types/functions/variables with these.
 PRELUDE_NAMES = {"Optional", "Result", "Valid", "None", "Ok", "Err", "Box", "List", "Shared", "Arc", "Fn", "string"}

@@ -2,6 +2,10 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
+## Unreleased
+
+- An `attribute` can have a body: `attribute range(min: int, max: int) on field:` followed by `comptime` code that runs once for each use, sees the arguments and `target_kind`, `target_name`, `target_owner`, `target_type`, and calls `compile_error(message)` to reject the use. New code GG0409.
+
 ## 0.20.0
 
 Attributes and VS Code

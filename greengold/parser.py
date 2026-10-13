@@ -888,8 +888,32 @@ class Parser:
                 targets.append(tt.text)
                 if not self._match(","):
                     break
-        self._end_stmt()
-        return self._at(AttrDecl(name.text, params, targets=targets), start)  # type: ignore[return-value]
+        decl = self._at(AttrDecl(name.text, params, targets=targets), start)
+        if self._check(":"):
+            decl.handler = self._attribute_handler(name, params)  # type: ignore[attr-defined]
+            self.lifted.append(decl.handler)  # type: ignore[attr-defined]
+        else:
+            self._end_stmt()
+        return decl  # type: ignore[return-value]
+
+    _ATTR_TYPES = {"str": "str", "int": "i64", "float": "f64", "bool": "bool", "ident": "str"}
+    ATTR_TARGET_PARAMS = ("target_kind", "target_name", "target_owner", "target_type")
+
+    def _attribute_handler(self, name: Token, params: list[AttrParam]) -> FuncDecl:
+        """The body under `attribute name(...) on fn:` becomes `comptime fn __attr_name(...)`. It runs once for each
+        use, with the arguments as variables and `target_*` describing the item the attribute sits on."""
+        fparams = [self._at(Param(p.name, self._at(TypeRef(self._ATTR_TYPES[p.kind]), name)), name) for p in params]
+        fparams += [self._at(Param(t, self._at(TypeRef("str"), name)), name) for t in self.ATTR_TARGET_PARAMS]
+        prev_scopes = self._scopes
+        self._scopes = [{p.name for p in fparams}]
+        try:
+            body = self._block()
+        finally:
+            self._scopes = prev_scopes
+        fd = self._at(FuncDecl(f"__attr_{name.text}", None, fparams, None, body), name)
+        fd.is_comptime = True  # type: ignore[attr-defined]
+        fd.attr_handler = True  # type: ignore[attr-defined]
+        return fd  # type: ignore[return-value]
 
     def _visibility_section(self) -> None:
         """A line that is only `public` or `private` sets visibility for what follows."""
