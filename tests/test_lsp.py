@@ -1026,3 +1026,27 @@ def test_cli_lsp_accepts_stdio_flag(monkeypatch):
     assert rc == 0
     assert called == [True]
 
+
+
+def test_lsp_inlay_hint_infers_lend_for_slice_parameter():
+    """A slice written without a mode becomes `lend` when the body changes an element."""
+    src = (
+        "fn give_total(numbers: []i32) -> i32:\n"
+        "    total = 0\n"
+        "    for number in numbers:\n"
+        "        total += number\n"
+        "    numbers[0] = total\n"
+        "    return total\n"
+        "\n"
+        "fn only_reads(numbers: []i32) -> i32:\n"
+        "    return numbers[0]\n"
+        "\n"
+        "fn main():\n"
+        "    xs: [3]i32 = [1, 2, 3]\n"
+        "    print(give_total(xs), only_reads(xs))\n"
+    )
+    server = DummyServer()
+    hints = _inlay(server, "file:///c:/slice_lend.gg", src)
+    col = src.splitlines()[0].index("[]i32")
+    assert _hint_at(hints, 0, col) == ["lend"]
+    assert _hint_at(hints, 7, src.splitlines()[7].index("[]i32")) == []

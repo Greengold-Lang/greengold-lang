@@ -48,7 +48,7 @@ def test_const_index_negative():
 
 
 def test_assign_to_read_slice_element():
-    src = """fn modify(s: []i32):
+    src = """fn modify(s: read []i32):
     s[0] = 42
 
 fn main():
@@ -121,7 +121,7 @@ def test_pass_read_slice_to_lend_slice():
     src = """fn modify(s: lend []i32):
     s[0] = 10
 
-fn inspect(s: []i32):
+fn inspect(s: read []i32):
     modify(s)
 
 fn main():
@@ -129,6 +129,19 @@ fn main():
 """
     err = error_of(src)
     assert "is a read-only slice" in err
+
+
+def test_slice_parameter_without_mode_is_inferred_lend():
+    src = """fn modify(s: []i32):
+    s[0] = 42
+
+fn inspect(s: []i32):
+    modify(s)
+
+fn main():
+    return
+"""
+    assert messages(src) == []
 
 
 def test_lend_immutable_array_to_lend_slice():

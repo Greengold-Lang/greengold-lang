@@ -79,7 +79,7 @@ def test_heap_slices(monkeypatch):
 
 def test_elements_are_not_moved_out_or_changed_through_read():
     _p, diags = front_end("fn f(names: []string) -> string:\n    x = names[0]\n    return x\n\n"
-                          "fn g(names: []string):\n    names[0] = \"z\"\n\nfn main():\n    pass\n")
+                          "fn g(names: read []string):\n    names[0] = \"z\"\n\nfn main():\n    pass\n")
     msgs = [d.message for d in diags]
     assert any("cannot be moved out" in m for m in msgs)
     assert any("read-only slice" in m for m in msgs)
