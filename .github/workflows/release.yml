@@ -18,11 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `legacy` is the one-file name that `gg update` of 0.21.0 and older downloads (see "Bridge file").
-          - { os: windows-latest,   asset: gg-windows-x64.zip,     built: dist/gg/gg.exe, legacy: gg-windows-x64.exe, legacy_built: dist/onefile/gg.exe }
-          - { os: ubuntu-22.04,     asset: gg-linux-x64.tar.gz,    built: dist/gg/gg,     legacy: gg-linux-x64,       legacy_built: dist/onefile/gg }
-          - { os: ubuntu-22.04-arm, asset: gg-linux-arm64.tar.gz,  built: dist/gg/gg,     legacy: gg-linux-arm64,     legacy_built: dist/onefile/gg }
-          - { os: macos-latest,     asset: gg-macos-arm64.tar.gz,  built: dist/gg/gg,     legacy: gg-macos-arm64,     legacy_built: dist/onefile/gg }
+          - { os: windows-latest,   asset: gg-windows-x64.zip,     built: dist/gg/gg.exe }
+          - { os: ubuntu-22.04,     asset: gg-linux-x64.tar.gz,    built: dist/gg/gg }
+          - { os: ubuntu-22.04-arm, asset: gg-linux-arm64.tar.gz,  built: dist/gg/gg }
+          - { os: macos-latest,     asset: gg-macos-arm64.tar.gz,  built: dist/gg/gg }
           # No Intel Mac build: llvmlite >= 0.50 ships no macosx x86_64 wheel (it would need a source build against LLVM 22).
     steps:
       - uses: actions/checkout@v4
@@ -53,14 +52,6 @@ jobs:
           ${{ matrix.built }} run examples/hello.gg
       - name: Pack the folder
         run: python tools/build_standalone.py --pack "out/${{ matrix.asset }}"
-      - name: Bridge file for older gg update
-        # 0.21.0 and older update by downloading the one-file name. This is the new gg in the old shape; running
-        # `gg update` once more then moves to the archive. Drop this step after a few releases.
-        shell: bash
-        run: |
-          python tools/build_standalone.py --onefile
-          ${{ matrix.legacy_built }} --version
-          cp "${{ matrix.legacy_built }}" "out/${{ matrix.legacy }}"
       - name: Windows installer
         if: runner.os == 'Windows'
         shell: bash
