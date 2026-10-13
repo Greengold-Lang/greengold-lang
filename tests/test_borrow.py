@@ -269,3 +269,14 @@ def test_defer_cannot_read_what_was_moved_before_the_block_ends():
         assert has(messages(prog.format(stmt)), "moved"), stmt
     for stmt in ("    s.append_str(\"x\")", "    s = string.from(\"b\")", '    print("done")'):
         assert messages(prog.format(stmt)) == [], stmt
+
+
+def test_index_assignment_into_moved_array_is_rejected():
+    # `a[i] = v` drops the old element; after `b = a` that element belongs to `b` (found by the safety fuzzer: double free)
+    msgs = messages(with_main('a = [string.from("x")]\nb = a\na[0] = string.from("y")'))
+    assert has(msgs, "was moved")
+
+
+def test_index_assignment_after_reassigning_array_is_fine():
+    msgs = messages(with_main('a = [string.from("x")]\nb = a\na = [string.from("z")]\na[0] = string.from("y")'))
+    assert not has(msgs, "was moved")

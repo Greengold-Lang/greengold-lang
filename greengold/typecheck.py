@@ -4951,6 +4951,14 @@ class _Moved:
 MoveState = dict[str, _Moved]  # moved path ("a" or "a.b") -> where it was consumed
 
 
+def _through_index(e: Expr) -> bool:
+    while isinstance(e, (IndexAccess, FieldAccess)):
+        if isinstance(e, IndexAccess):
+            return True
+        e = e.obj
+    return False
+
+
 def _path_str(e: Expr) -> str | None:
     p = _place_path(e)
     return None if p is None else ".".join(p)
@@ -5154,7 +5162,8 @@ class MoveAnalyzer:
         self._expr(s.value, state)
         if path is None:
             return
-        if s.op != "=":
+        if s.op != "=" or _through_index(s.target):
+            # `a[i] = v` writes into `a` (and drops the old element): it does not give a moved `a` a new value
             self._use_place(s.target, state)
             return
         # Cannot assign to field of a moved parent structure.

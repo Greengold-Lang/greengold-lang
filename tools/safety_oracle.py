@@ -220,6 +220,8 @@ def check_program(src: str, workdir: Path, name: str | None = None, release: boo
         if a[0] == "timeout" or b[0] == "timeout":
             return Verdict("timeout", detail=f"leak={a[0]} poison={b[0]}")
         if a[:2] != a2[:2]:
+            if src.count(".spawn(") > src.count(".join()"):
+                return Verdict("skipped", detail="unjoined threads")
             return Verdict("nondeterministic")
         codes = {"double_free": 99, "heap_overflow": 97, "write_after_free": 98}
         for kind, code in codes.items():
@@ -235,7 +237,12 @@ def check_program(src: str, workdir: Path, name: str | None = None, release: boo
         if (a[0], out_a) != (b[0], out_b):
             return Verdict("mismatch", detail=f"exit {a[0]} vs {b[0]}", stdout_leak=out_a, stdout_poison=out_b)
         # a thread that is still closing down can make the two counts differ: only a count both runs agree on is a leak
-        return Verdict("ok", stdout_leak=out_a, live=min(live_a or 0, live_b or 0))
+        # a panic ends the process without running drops, so only a clean exit can leak
+        clean = a[0] == 0 and b[0] == 0
+        # a thread that is never joined may still be running when `main` returns: its captures are not a leak
+        if src.count(".spawn(") > src.count(".join()"):
+            clean = False
+        return Verdict("ok", stdout_leak=out_a, live=min(live_a or 0, live_b or 0) if clean else 0)
     finally:
         for p in (path, exe, exe.with_suffix(".o")):
             try:

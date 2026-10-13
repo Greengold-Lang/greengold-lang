@@ -10,6 +10,8 @@ Borrow checker
 - `w.name = v` and `xs[i] = v` no longer count as a read of `w` / `xs`.
 - The result of a call to a Greengold function is tied only to the arguments its `return` values can come from, not to every argument: `pick(a, b)` that returns `a` no longer holds on to `b`. A function whose returns cannot be read (an intrinsic) keeps the old rule.
 - `tools/fuzz_views.py` is a soundness fuzzer: it generates random programs with views, loops, `break`/`continue`, `return`, lists, a struct field, `Optional[str]` and calls, runs every branch path in a model, and reports any program the checker accepts that uses a dangling view. On a random batch the false-error rate went from about 23 % to under 0.3 %, and no accepted program dangled in the last 40 000 programs.
+- **Fix (soundness):** `a[i] = v` after `a` was moved (`b = a`) was accepted and dropped the old element twice (double free). It is now a use of a moved value (GG0301).
+- Memory-safety oracle (`tools/safety_oracle.py`, `tools/fuzz_safety.py`, `tools/fuzz_typed.py`): programs are built with a checking `allocator` and run twice (freed memory kept / freed memory poisoned). A difference means a read of freed memory; bad frees, writes after free, heap overflows, and blocks still live at a clean exit are reported too. A 6 000-program typed run found one double free (fixed above) and no use-after-free. Fuzzing finds violations; it does not prove there are none.
 
 ## 0.5.0
 
