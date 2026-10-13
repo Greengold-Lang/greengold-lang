@@ -414,6 +414,13 @@ RULES: dict[str, Rule] = {
            "This operation is only legal in `unsafe:`.",
            "Pointer calls and trusted indexing are explicit. The surrounding `unsafe:` block opts in. "
            "`hot fn` is only a performance hint and does not."),
+        _r("GG0407", "unknown-attribute", "other",
+           "An `@attribute` was used without being declared.",
+           "An attribute has no meaning until `attribute name(params)` declares it. A misspelled name is an "
+           "error, not a silent no-op."),
+        _r("GG0408", "bad-attribute", "other",
+           "An `@attribute` does not match its declaration.",
+           "The arguments, their kinds, or the item it is written on differ from the `attribute` declaration."),
         _r("GG0499", "unclassified", "other",
            "This diagnostic has no specific code yet.",
            "The message is real, but it has not been given a stable rule. Treat the message text as the explanation."),

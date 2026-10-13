@@ -623,6 +623,18 @@ def cmd_check(files: list[str], as_json: bool) -> int:
     return 0
 
 
+def cmd_attrs(files: list[str]) -> int:
+    """Type-checks, then writes the attributed functions, structs, and fields as JSON for generators."""
+    from .attrs import export
+    program, sources, diags, _checker = analyze(files)
+    if any(d.severity == "error" and not d.hidden for d in diags.items):
+        _print_diagnostics(diags.items, sources.get(files[0], ""), files[0], sources)
+        return 1
+    json.dump({"attributes": export(program)}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
 def _choose_fixes(visible: list[Diagnostic], file: str, likely: bool) -> list:
     """One verified fix per diagnostic, with edits only in `file`."""
     chosen = []
@@ -989,6 +1001,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ck = add("check", help="type-check and report diagnostics (no codegen)")
     ck.add_argument("files", nargs="+", help="source file(s)")
     ck.add_argument("--json", action="store_true", help="write diagnostics as JSON to stdout")
+    at = add("attrs", help="list every `@attribute` use with its resolved arguments, as JSON")
+    at.add_argument("files", nargs="+", help="source file(s)")
 
     api_p = add("api", help="list the standard library (signatures and one-line descriptions)")
     api_p.add_argument("--json", action="store_true", help="write the catalog as JSON to stdout")
@@ -1023,6 +1037,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_explain(args.code, args.json)
         if args.command == "check":
             return cmd_check(args.files, args.json)
+        if args.command == "attrs":
+            return cmd_attrs(args.files)
         if args.command == "fix":
             return cmd_fix(args.paths, args.dry_run, args.likely)
         if args.command == "targets":

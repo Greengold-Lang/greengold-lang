@@ -6,7 +6,7 @@ and the parser continues; this allows multiple syntax errors to be reported.
 from __future__ import annotations
 
 from .ast_nodes import (
-    AllocatorDecl, Apply,
+    AllocatorDecl, Apply, Attr, AttrArg, AttrDecl, AttrParam,
     ArrayLit, ArrayRepeatLit, Assign, Binary, Binding, BoolLit, Branch, Break, Call, Cast,
     CharLit, ConstDecl, Continue, EnumDecl, Expr, ExprStmt, ExternFuncDecl, FieldAccess, FieldDecl,
     FieldInit, FloatLit, For, ForIn, FuncDecl, If, IndexAccess, IntLit, Match, MatchArm,
@@ -425,7 +425,7 @@ class Parser:
                 depth = max(0, depth - 1)
             elif depth == 0 and self.prev.kind in ("NEWLINE", "DEDENT"):
                 if k in ("fn", "struct", "enum", "feature", "const", "extern", "import", "comptime",
-                         "public", "private", "hot", "async"):
+                         "public", "private", "hot", "async", "@"):
                     return
                 if k == "NAME" and self.tok.text == "test" and self._peek().kind in (":", "NAME"):
                     return
@@ -443,6 +443,9 @@ class Parser:
                 # A `private` inside the body must not flip this declaration itself.
                 export_here = self._export
                 made: Node | None = None
+                attrs = self._attr_lines()
+                if attrs and self._check("public", "private"):
+                    raise self._error(self.tok, "Put `public` or `private` on its own line above the attributes.")
                 if self._check("struct"):
                     made = self._struct_decl()
                 elif self._check("enum"):
@@ -542,11 +545,19 @@ class Parser:
                                       fixes=[self._replace_word_fix(self.tok, "const", "Write `const` instead of `var`")])
                 elif self.tok.kind == "NAME" and self.tok.text == "test" and self._peek().kind in (":", "NAME"):
                     decls.append(self._test_block())
+                elif self.tok.kind == "NAME" and self.tok.text == "attribute" and self._peek().kind == "NAME":
+                    made = self._attribute_decl()
                 else:
                     raise self._error(
                         self.tok,
                         f"Only `struct`, `enum`, `feature`, `impl`, `fn`, `test`, `const`, `extern`, and `import` can be declared at top-level (found {self._describe(self.tok)}).",
                         "Put code inside a `fn`; program entry point must be `fn main():`.")
+                if attrs:
+                    if isinstance(made, (FuncDecl, StructDecl)):
+                        made.attrs = attrs
+                    else:
+                        self._soft_error(attrs[0], "An attribute goes on a `fn`, a `struct`, or a struct field.",
+                                         "Write the `@name` line directly above one of those.")
                 if made is not None:
                     made.is_pub = export_here
                     decls.append(made)
@@ -771,6 +782,7 @@ class Parser:
                     self._visibility_section()
                     continue
                 is_hot = False
+                mattrs = self._attr_lines()
                 if self._check("async"):
                     raise self._error(self.tok, "A method cannot be `async`.",
                                       "Write an `async fn` outside the `impl` that takes the value as a parameter.")
@@ -781,6 +793,7 @@ class Parser:
                     raise self._error(self.tok, "Only `fn` definitions can be written inside an `impl` block.")
                 fd = self._func_decl(impl=(name.text, params), owner_qualifier=owner_qualifier)
                 fd.is_hot = is_hot
+                fd.attrs = mattrs
                 fd.is_pub = self._export
                 out.append(fd)
             except ParseError:
@@ -789,6 +802,94 @@ class Parser:
                     self._advance()
         self._match("DEDENT")
         return out
+
+    # -- attributes -------------------------------------------------
+    _ATTR_KINDS = ("str", "int", "float", "bool", "ident")
+
+    def _attr_lines(self) -> list[Attr]:
+        """Zero or more `@name` / `@name(args)` lines. Each stands on its own line."""
+        out: list[Attr] = []
+        while self._check("@"):
+            at = self._advance()
+            name = self._expect("NAME", "Expected an attribute name after `@`",
+                                "Write `@name` or `@name(args)`.")
+            args: list[AttrArg] = []
+            if self._match("("):
+                while not self._check(")"):
+                    args.append(self._attr_arg())
+                    if not self._match(","):
+                        break
+                self._expect(")", "Expected `)` after the attribute arguments")
+            out.append(self._at(Attr(name.text, args), at))  # type: ignore[arg-type]
+            self._end_stmt()
+        return out
+
+    def _attr_arg(self) -> AttrArg:
+        """A string, number, `true`/`false`, or a bare name; optionally `key=` in front."""
+        start = self.tok
+        key = None
+        if start.kind == "NAME" and self._peek().kind == "=":
+            key = start.text
+            self._advance()
+            self._advance()
+        t = self.tok
+        neg = False
+        if t.kind == "-" and self._peek().kind in ("INT", "FLOAT"):
+            neg = True
+            self._advance()
+            t = self.tok
+        value: object
+        if t.kind == "INT":
+            kind, value = "int", int(t.text)
+        elif t.kind == "FLOAT":
+            kind, value = "float", float(str(t.text).replace("_", ""))
+        elif t.kind == "STRING":
+            kind, value = "str", t.text
+        elif t.kind in ("true", "false"):
+            kind, value = "bool", t.kind == "true"
+        elif t.kind == "NAME":
+            kind, value = "ident", t.text
+        else:
+            raise self._error(t, f"An attribute argument is a string, a number, `true`/`false`, or a name (found {self._describe(t)}).")
+        self._advance()
+        if neg:
+            value = -value  # type: ignore[operator]
+        return self._at(AttrArg(kind, value, name=key), start)  # type: ignore[return-value]
+
+    def _attribute_decl(self) -> AttrDecl:
+        """`attribute name(p: kind, q: kind = default) on fn, struct, field`."""
+        start = self._advance()  # attribute
+        name = self._expect("NAME", "Expected the attribute name")
+        params: list[AttrParam] = []
+        if self._match("("):
+            while not self._check(")"):
+                pname = self._expect("NAME", "Expected a parameter name")
+                self._expect(":", "Missing parameter kind", "Write `name: str`, `int`, `float`, `bool`, or `ident`.")
+                kt = self._expect("NAME", "Expected the parameter kind")
+                if kt.text not in self._ATTR_KINDS:
+                    raise self._error(kt, f"`{kt.text}` is not an attribute parameter kind.",
+                                      "Use `str`, `int`, `float`, `bool`, or `ident` (a bare name such as `server`).")
+                default = None
+                if self._match("="):
+                    default = self._attr_arg()
+                params.append(self._at(AttrParam(pname.text, kt.text, default=default), pname))  # type: ignore[arg-type]
+                if not self._match(","):
+                    break
+            self._expect(")", "Expected `)` after the attribute parameters")
+        targets: list[str] = []
+        if self.tok.kind == "NAME" and self.tok.text == "on":
+            self._advance()
+            while True:
+                tt = self.tok
+                if tt.kind not in ("fn", "struct") and not (tt.kind == "NAME" and tt.text == "field"):
+                    raise self._error(tt, "An attribute goes on `fn`, `struct`, or `field`.",
+                                      "Write `on fn`, `on struct`, `on field`, or a list such as `on fn, field`.")
+                self._advance()
+                targets.append(tt.text)
+                if not self._match(","):
+                    break
+        self._end_stmt()
+        return self._at(AttrDecl(name.text, params, targets=targets), start)  # type: ignore[return-value]
 
     def _visibility_section(self) -> None:
         """A line that is only `public` or `private` sets visibility for what follows."""
@@ -1024,6 +1125,7 @@ class Parser:
                 if self._check("public", "private"):
                     self._visibility_section()
                     continue
+                fattrs = self._attr_lines()
                 fname = self._expect("NAME", "Expected field name")
                 self._expect(":", "Missing field type", "Write in the form `name: type`, e.g. `health: i32`.")
                 fmode, ftied, fsoa = "", None, False
@@ -1042,6 +1144,7 @@ class Parser:
                 self._end_stmt()
                 fd = self._at(FieldDecl(fname.text, tref), fname)
                 fd.mode, fd.tied_to, fd.is_soa, fd.is_pub = fmode, ftied, fsoa, self._export  # type: ignore[attr-defined]
+                fd.attrs = fattrs  # type: ignore[attr-defined]
                 fields.append(fd)  # type: ignore[arg-type]
             except ParseError:
                 self._sync_stmt()

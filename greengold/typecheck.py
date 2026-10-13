@@ -28,6 +28,7 @@ from .ast_nodes import (
 from .diagnostics import DiagnosticBag, Edit, Fix, Label, Note
 from .closures import ClosureMixin, _at, _replace
 from . import friendly
+from .attrs import check_attributes
 from .generics import GenericsMixin
 from .lexer import tokenize
 from .matchcheck import MatchMixin
@@ -701,6 +702,7 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
         self._infer_ret_origins()
         if self.require_main:
             self._check_main()
+        check_attributes(self.program, self.diags)
         # Bodies checked via work queue: new function instances added during instantiation.
         # A Core function body is checked only when the program uses it (`_check_used_core`).
         self.pending = [i for i in self.funcs.values()

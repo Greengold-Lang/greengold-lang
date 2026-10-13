@@ -1,0 +1,20 @@
+# conformance: SPEC section 4 (Functions), example 5
+# expect-output:
+#   7
+
+attribute replicated(mode: ident, reliable: bool = false) on fn
+attribute notify(callback: str) on field
+
+struct Player:
+    @notify("on_health")
+    health: i32
+
+impl Player:
+    @replicated(server, reliable=true)
+    fn hit(self: lend Self, amount: i32):
+        self.health -= amount
+
+fn main():
+    p = Player{ health: 10 }
+    p.hit(3)
+    print(p.health)
