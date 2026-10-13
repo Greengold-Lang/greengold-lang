@@ -32,6 +32,10 @@
     "onCommand:greengold.bindgenCpp",
     "onCommand:greengold.debugFile"
   ],
+  "homepage": "https://greengoldlang.com/",
+  "bugs": {
+    "url": "https://github.com/Greengold-Lang/greengold-lang/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Greengold-Lang/greengold-lang"

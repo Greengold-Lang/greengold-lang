@@ -1,5 +1,7 @@
 # Greengold Language Support for VS Code
 
+🌐 **[greengoldlang.com](https://greengoldlang.com/)** · [GitHub](https://github.com/Greengold-Lang/greengold-lang) · [Releases](https://github.com/Greengold-Lang/greengold-lang/releases)
+
 This official VS Code extension provides a full, first-class IDE experience for the **Greengold (.gg)** systems programming language.
 
 In addition to syntax highlighting and modern snippets, it provides an interactive **Test Explorer**, **CodeLens** inline actions, **native debugging (DAP)**, **build tasks & problem matchers**, and a rich **LSP (Language Server Protocol)** server with real-time diagnostics, go to definition, find all references, symbol renaming, hover information, inlay hints, code completion, and automatic formatting.
