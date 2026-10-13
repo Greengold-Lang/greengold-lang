@@ -415,20 +415,17 @@ def load_bench() -> list[dict]:
         higher_better = wid == "primes"
         metric = {k: (res[k]["passes"] if higher_better else res[k]["median_ms"]) for k, *_ in LANGS}
         gg = metric["Greengold (Release)"]
+        def judge(best):
+            gap = (best - gg) / best if higher_better else (gg - best) / best
+            return gap, ("faster" if gap < 0 else "within" if gap <= 0.05 else "slower")
+
         others = [metric["C++ (GCC -O3)"], metric["Rust (opt-level=3)"]]
         best = max(others) if higher_better else min(others)
-        if higher_better:
-            gap = (best - gg) / best
-        else:
-            gap = (gg - best) / best
-        if gap < 0:
-            verdict = "faster"
-        elif gap <= 0.05:
-            verdict = "within"
-        else:
-            verdict = "slower"
+        gap, verdict = judge(best)
+        vs = {k: dict(zip(("gap", "verdict"), judge(metric[key])))
+              for k, key in (("cpp", "C++ (GCC -O3)"), ("rust", "Rust (opt-level=3)"))}
         rows.append(dict(id=wid, title=title, desc=desc, res=res, metric=metric, higher=higher_better,
-                         gap=gap, verdict=verdict, best=best))
+                         gap=gap, verdict=verdict, best=best, vs=vs))
     return rows
 
 
@@ -439,14 +436,18 @@ def fmt_ms(v: float) -> str:
 
 
 def verdict_badge(row: dict) -> str:
-    pct = abs(row["gap"]) * 100
-    if row["verdict"] == "faster":
-        if row["higher"]:
-            return f'<span class="badge faster">{pct:.1f}% more passes</span>'
-        return f'<span class="badge faster">{pct:.0f}% faster</span>'
-    if row["verdict"] == "within":
-        return f'<span class="badge within">within {max(pct, 0.1):.1f}%</span>'
-    return f'<span class="badge slower">{pct:.1f}% slower</span>'
+    out = []
+    for key, name in (("cpp", "C++"), ("rust", "Rust")):
+        v = row["vs"][key]
+        pct = abs(v["gap"]) * 100
+        if v["verdict"] == "faster":
+            text = f'{pct:.1f}% more passes' if row["higher"] else (f'{pct:.0f}% faster' if pct >= 10 else f'{pct:.1f}% faster')
+        elif v["verdict"] == "within":
+            text = f'within {max(pct, 0.1):.1f}%'
+        else:
+            text = f'{pct:.1f}% slower'
+        out.append(f'<span class="badge {v["verdict"]}"><span class="vs">vs {name}</span> {text}</span>')
+    return f'<span class="badges">{"".join(out)}</span>'
 
 
 def bars(row: dict) -> str:
@@ -840,12 +841,15 @@ DATE_LONG = "13 October 2026"
 
 
 def build_benchmarks(rows: list[dict]) -> str:
-    faster = [r for r in rows if r["verdict"] == "faster"]
-    within = [r for r in rows if r["verdict"] == "within"]
-    slower = [r for r in rows if r["verdict"] == "slower"]
-
     def names(rs):
-        return ", ".join(f'<a href="#{r["id"]}">{esc(r["title"])}</a>' for r in rs)
+        return ", ".join(f'<a href="#{r["id"]}">{esc(r["title"])}</a>' for r in rs) or "None"
+
+    def summary(key, name):
+        group = lambda v: [r for r in rows if r["vs"][key]["verdict"] == v]
+        return (f'<h3 class="summary-title reveal">Greengold vs. {name}</h3><div class="summary-cards">'
+                f'<div class="summary-card faster reveal"><div class="stat-value">{len(group("faster"))}</div><p><strong>Faster than {name}.</strong> {names(group("faster"))}.</p></div>'
+                f'<div class="summary-card within reveal"><div class="stat-value">{len(group("within"))}</div><p><strong>Within 5% of {name}.</strong> {names(group("within"))}.</p></div>'
+                f'<div class="summary-card slower reveal"><div class="stat-value">{len(group("slower"))}</div><p><strong>More than 5% behind {name}.</strong> {names(group("slower"))}.</p></div></div>')
 
     chips = "".join(f'<span class="chip">{t}</span>' for t in (
         "AMD Ryzen 5 5600X · 6C/12T", "32 GB DDR4-3600", "Windows 11 Pro 26200",
@@ -890,11 +894,8 @@ def build_benchmarks(rows: list[dict]) -> str:
                      f'<div class="chip-row">{chips}</div>') + f"""
     <section class="section tight" style="padding-top:24px">
       <div class="wrap">
-        <div class="summary-cards">
-          <div class="summary-card faster reveal"><div class="stat-value">{len(faster)}</div><p><strong>Faster than both.</strong> {names(faster)}.</p></div>
-          <div class="summary-card within reveal"><div class="stat-value">{len(within)}</div><p><strong>Within 5% of the faster one.</strong> {names(within)}.</p></div>
-          <div class="summary-card slower reveal"><div class="stat-value">{len(slower)}</div><p><strong>More than 5% behind.</strong> {names(slower)}.</p></div>
-        </div>
+        {summary("cpp", "C++")}
+        {summary("rust", "Rust")}
       </div>
     </section>
 
@@ -902,7 +903,7 @@ def build_benchmarks(rows: list[dict]) -> str:
       <div class="wrap">
         <div class="section-head reveal">
           <h2>Every workload at a glance</h2>
-          <p>Each row is scaled to its slowest build. The badge compares Greengold with the faster of C++ and Rust; a gap of 5% or less is treated as noise.</p>
+          <p>Each row is scaled to its slowest build. Each badge compares Greengold with that one language; a gap of 5% or less is treated as noise.</p>
         </div>
         <div class="bench-panel reveal">
           <div class="legend"><span><i class="lg-cpp"></i>C++ · g++ -O3</span><span><i class="lg-rust"></i>Rust · opt-level=3</span><span><i class="lg-gg"></i>Greengold · --release</span></div>
