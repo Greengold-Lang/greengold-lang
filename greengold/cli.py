@@ -466,7 +466,7 @@ def debug_scripts() -> dict[str, Path]:
     """The debugger printers that ship with the compiler."""
     here = Path(__file__).resolve().parent / "debug"
     names = {"gdb": "gdb_printers.py", "lldb": "lldb_formatters.py"}
-    if getattr(sys, "frozen", False):  # a single-file build unpacks into a folder that goes away on exit
+    if getattr(sys, "frozen", False):  # the folder of a standalone build can be replaced by an update
         keep = Path.home() / ".greengold" / "debug"
         keep.mkdir(parents=True, exist_ok=True)
         for name in names.values():
@@ -496,7 +496,7 @@ def cmd_toolchain() -> int:
     init_llvm()
     from . import __version__ as version
     host = native_triple(None)
-    frozen = " (single-file build)" if getattr(sys, "frozen", False) else ""
+    frozen = " (standalone build)" if getattr(sys, "frozen", False) else ""
     print(f"greengold   {version}{frozen}")
     print(f"python      {platform.python_version()}  {sys.executable}")
     print(f"backend     {describe_backend()}  (GG_BACKEND=llvmlite|clang chooses)")

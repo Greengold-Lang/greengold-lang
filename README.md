@@ -42,9 +42,9 @@ Bug reports are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Install
 
-No Python needed. The installers download the single-file `gg` for your platform from the
+No Python needed. The installers download the `gg` archive for your platform from the
 [latest release](https://github.com/Greengold-Lang/greengold-lang/releases/latest), check its SHA-256, and add it to your `PATH`.
-The file includes the compiler, LLVM, and Zig, so `gg build` links programs without a C compiler installed.
+The install is a folder (`gg` and `_internal`) with the compiler, LLVM, and Zig, so `gg build` links programs without a C compiler installed.
 
 **Windows** (PowerShell), or download `gg-setup-windows-x64.exe` from the release page:
 

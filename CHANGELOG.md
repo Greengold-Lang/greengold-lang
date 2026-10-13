@@ -4,6 +4,8 @@ Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0
 
 ## Unreleased
 
+- The standalone `gg` is a folder (`gg` next to `_internal`) instead of one file, so it starts at once. The one-file build unpacked about 150 MB into a temp folder on every run, which took 10 to 25 seconds for `gg --version` on Windows. Release assets are now `gg-windows-x64.zip` and `gg-<os>-<arch>.tar.gz`; the installers and `gg update` handle them. This release also still carries the old one-file names (`gg-windows-x64.exe`, `gg-linux-x64`, ...) so that `gg update` of 0.21.0 and older can fetch it; run `gg update` once more afterwards to move to the folder install.
+
 ## 0.21.0
 
 - New standalone extension **Greengold Themes** (`greengoldlang.greengold-themes`, folder `vscode-themes/`): the Greengold Dark and Greengold Light color themes, installable on their own and published to the VS Code Marketplace and Open VSX with each release. `greengold-vscode` still includes them.

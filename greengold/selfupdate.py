@@ -1,7 +1,8 @@
-"""`gg update`: replaces the installed single-file `gg` with the newest GitHub release.
+"""`gg update`: replaces the installed standalone `gg` with the newest GitHub release.
 
-Release assets are one file per platform (`gg-windows-x64.exe`, `gg-linux-x64`, `gg-linux-arm64`,
-`gg-macos-arm64`, `gg-macos-x64`) and `SHA256SUMS.txt`; `.github/workflows/release.yml` publishes them.
+Release assets are one archive per platform (`gg-windows-x64.zip`, `gg-linux-x64.tar.gz`, `gg-linux-arm64.tar.gz`,
+`gg-macos-arm64.tar.gz`, `gg-macos-x64.tar.gz`) and `SHA256SUMS.txt`; `.github/workflows/release.yml` publishes
+them. An archive holds the program next to its `_internal` folder, with no wrapping folder.
 Only a standalone build (the installers, `tools/build_standalone.py`) can replace itself; a `pip` or source
 install is told how to update with its own tool.
 """
@@ -12,17 +13,21 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 REPO = os.environ.get("GG_REPO", "Greengold-Lang/greengold-lang")
 API = f"https://api.github.com/repos/{REPO}/releases"
 SUMS = "SHA256SUMS.txt"
 TIMEOUT = 30
+ASIDE = ".gg-old"   # where the replaced files wait; Windows cannot delete a running program
 
 
 class UpdateError(Exception):
@@ -36,7 +41,7 @@ def platform_asset() -> str:
     arch = {"x86_64": "x64", "amd64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(machine)
     if system is None or arch is None:
         raise UpdateError(f"no prebuilt gg for {sys.platform}/{machine}; build it from source")
-    return f"gg-{system}-{arch}" + (".exe" if system == "windows" else "")
+    return f"gg-{system}-{arch}" + (".zip" if system == "windows" else ".tar.gz")
 
 
 def parse_version(text: str) -> tuple[tuple[int, ...], int]:
@@ -117,29 +122,74 @@ def installed_binary() -> Path | None:
     return Path(sys.executable).resolve() if getattr(sys, "frozen", False) else None
 
 
-def replace_running(new: Path, target: Path) -> None:
-    """Swap `new` in for `target`, which may be the running program. Windows cannot overwrite or delete a
-    running .exe but can rename it, so the old file moves aside (and is deleted by the next update)."""
-    if sys.platform == "win32":
-        old = target.with_name(target.name + ".old")
-        if old.exists():
-            old.unlink()
-        os.replace(target, old)
-        try:
-            os.replace(new, target)
-        except OSError:
-            os.replace(old, target)
-            raise
+def _files(root: Path) -> list[Path]:
+    """Every non-directory under `root` (a symlink counts as a file), relative to it."""
+    found = []
+    for base, dirs, names in os.walk(root):
+        for name in list(dirs):
+            if (Path(base) / name).is_symlink():
+                dirs.remove(name)
+                names.append(name)
+        found += [(Path(base) / name).relative_to(root) for name in names]
+    return found
+
+
+def extract(archive: Path, dest: Path) -> None:
+    dest.mkdir()
+    if archive.name.endswith(".zip"):
+        with zipfile.ZipFile(archive) as z:
+            z.extractall(dest)
     else:
-        os.chmod(new, 0o755)
-        os.replace(new, target)
+        with tarfile.open(archive) as t:
+            if hasattr(tarfile, "data_filter"):
+                t.extractall(dest, filter="data")
+            else:
+                t.extractall(dest)
+
+
+def replace_running(new: Path, target: Path) -> None:
+    """Swap the program folder `new` in for the one holding `target`, which may be running. Windows cannot
+    overwrite or delete a loaded .exe or .dll but can rename it, so each old file moves aside one by one into
+    `.gg-old` (deleted by the next update). Only names the new folder has are touched, because the install
+    folder may be shared (`/usr/local/bin`). A failure puts everything back."""
+    home = target.parent
+    aside = home / ASIDE
+    shutil.rmtree(aside, ignore_errors=True)
+    ours = {p.parts[0] for p in _files(new)}
+    old = [rel for name in ours if (home / name).exists() for rel in
+           ([Path(name)] if not (home / name).is_dir() or (home / name).is_symlink()
+            else [Path(name) / r for r in _files(home / name)])]
+    moved: list[Path] = []
+    placed: list[Path] = []
+    try:
+        for rel in old:
+            (aside / rel).parent.mkdir(parents=True, exist_ok=True)
+            os.replace(home / rel, aside / rel)
+            moved.append(rel)
+        for rel in _files(new):
+            (home / rel).parent.mkdir(parents=True, exist_ok=True)
+            os.replace(new / rel, home / rel)
+            placed.append(rel)
+    except OSError:
+        for rel in placed:
+            try:
+                (home / rel).unlink()
+            except OSError:
+                pass
+        for rel in moved:
+            (home / rel).parent.mkdir(parents=True, exist_ok=True)
+            os.replace(aside / rel, home / rel)
+        raise
+    if sys.platform != "win32":
+        os.chmod(target, 0o755)
 
 
 def cleanup_old() -> None:
     exe = installed_binary()
     if exe is not None:
+        shutil.rmtree(exe.parent / ASIDE, ignore_errors=True)
         try:
-            exe.with_name(exe.name + ".old").unlink()
+            exe.with_name(exe.name + ".old").unlink()   # left by the single-file builds
         except OSError:
             pass
 
@@ -180,19 +230,27 @@ def run(check_only: bool = False, force: bool = False, tag: str | None = None) -
                               "(or with sudo)")
         print(f"Updating gg {__version__} -> {latest} ({wanted})")
         with tempfile.TemporaryDirectory(dir=target.parent, prefix=".gg-update-") as tmp:
-            new = Path(tmp) / target.name
-            _download(assets[wanted], new, wanted)
+            archive = Path(tmp) / wanted
+            _download(assets[wanted], archive, wanted)
             if SUMS in assets:
                 sums_file = Path(tmp) / SUMS
                 _download(assets[SUMS], sums_file, SUMS)
                 expect = parse_sums(sums_file.read_text(encoding="utf-8")).get(wanted)
-                if expect is None or expect != _sha256(new):
+                if expect is None or expect != _sha256(archive):
                     raise UpdateError("the downloaded file does not match its SHA-256 in SHA256SUMS.txt; "
                                       "nothing was changed")
             else:
                 print("warning: this release has no SHA256SUMS.txt; the download was not verified", file=sys.stderr)
-            os.chmod(new, 0o755)
-            probe = subprocess.run([str(new), "--version"], capture_output=True, text=True, timeout=120)
+            new = Path(tmp) / "new"
+            try:
+                extract(archive, new)
+            except (zipfile.BadZipFile, tarfile.TarError) as err:
+                raise UpdateError(f"cannot unpack {wanted}: {err}") from None
+            fresh = new / target.name
+            if not fresh.is_file():
+                raise UpdateError(f"{wanted} has no `{target.name}`; nothing was changed")
+            os.chmod(fresh, 0o755)
+            probe = subprocess.run([str(fresh), "--version"], capture_output=True, text=True, timeout=120)
             if probe.returncode != 0:
                 raise UpdateError("the downloaded gg does not start on this machine; nothing was changed\n"
                                   + probe.stderr.strip())
