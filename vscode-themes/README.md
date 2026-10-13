@@ -8,6 +8,16 @@ Green color themes for VS Code, with gold accents.
 Both themes work with every language. They also carry full semantic highlighting and
 extra polish for [Greengold](https://greengoldlang.com/) (`.gg`) files.
 
+## Screenshots
+
+**Greengold Dark**
+
+![Greengold Dark](https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/vscode-themes/images/dark.png)
+
+**Greengold Light**
+
+![Greengold Light](https://raw.githubusercontent.com/Greengold-Lang/greengold-lang/main/vscode-themes/images/light.png)
+
 ## Install
 
 Open the Extensions view (`Ctrl+Shift+X`), search for **Greengold Themes**, install, then pick

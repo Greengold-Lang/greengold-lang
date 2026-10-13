@@ -2,7 +2,7 @@
   "name": "greengold-themes",
   "displayName": "Greengold Themes - Green Dark & Light",
   "description": "Green color themes for VS Code: a deep forest-green dark theme and a soft sage light theme with gold accents. Great for any language, tuned for Greengold.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "greengoldlang",
   "icon": "icons/greengold_logo.png",
   "engines": {
