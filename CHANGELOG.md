@@ -4,6 +4,9 @@ Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0
 
 ## Unreleased
 
+## 0.21.0
+
+- New standalone extension **Greengold Themes** (`greengoldlang.greengold-themes`, folder `vscode-themes/`): the Greengold Dark and Greengold Light color themes, installable on their own and published to the VS Code Marketplace and Open VSX with each release. `greengold-vscode` still includes them.
 - An `attribute` can have a body: `attribute range(min: int, max: int) on field:` followed by `comptime` code that runs once for each use, sees the arguments and `target_kind`, `target_name`, `target_owner`, `target_type`, and calls `compile_error(message)` to reject the use. New code GG0409.
 - `docs/STABILITY.md` is rewritten as a stability policy: what is promised before 1.0 and from 1.0, the exceptions (soundness and compiler bugs), deprecation, editions at most every three years, and which tool interfaces are covered.
 - Benchmarks: all workloads are measured again with stable Rust 1.97.1. `particle` now uses a structure of arrays in C++ and Rust as well, so it compares compilers and not memory layouts. `primes` no longer needs a Windows-only timer.

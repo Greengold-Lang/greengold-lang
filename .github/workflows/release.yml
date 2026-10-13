@@ -90,6 +90,14 @@ jobs:
           name: greengold-vscode.vsix
           path: vscode-extension/greengold-vscode.vsix
           if-no-files-found: error
+      - name: Package the themes
+        working-directory: vscode-themes
+        run: npx --yes @vscode/vsce package --no-git-tag-version --out greengold-themes.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: greengold-themes.vsix
+          path: vscode-themes/greengold-themes.vsix
+          if-no-files-found: error
 
   publish:
     name: Publish release
@@ -104,7 +112,7 @@ jobs:
       - name: Checksums
         run: |
           cd out
-          sha256sum gg-* greengold-vscode.vsix > SHA256SUMS.txt
+          sha256sum gg-* greengold-vscode.vsix greengold-themes.vsix > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: Create the release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -136,10 +144,16 @@ jobs:
           node-version: 20
       - uses: actions/download-artifact@v4
         with:
-          name: greengold-vscode.vsix
+          pattern: "*.vsix"
+          merge-multiple: true
       - name: VS Code Marketplace
         if: env.VSCE_PAT != ''
-        run: npx --yes @vscode/vsce publish --packagePath greengold-vscode.vsix
+        run: |
+          npx --yes @vscode/vsce publish --packagePath greengold-vscode.vsix
+          # The themes have their own version; skip it when that version is already published.
+          npx --yes @vscode/vsce publish --packagePath greengold-themes.vsix --skip-duplicate
       - name: Open VSX
         if: env.OVSX_PAT != ''
-        run: npx --yes ovsx publish greengold-vscode.vsix -p "$OVSX_PAT"
+        run: |
+          npx --yes ovsx publish greengold-vscode.vsix -p "$OVSX_PAT"
+          npx --yes ovsx publish greengold-themes.vsix -p "$OVSX_PAT" --skip-duplicate
