@@ -2,8 +2,7 @@ hot fn sieve(limit: usize) -> usize:
     overflow: wrap
     unsafe:
         is_prime = List[u8]()
-        for i in 0..limit:
-            is_prime.push(1)
+        is_prime.resize(limit, 1)
 
         p: usize = 2
         while p * p < limit:

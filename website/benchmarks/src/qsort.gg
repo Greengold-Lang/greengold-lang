@@ -6,39 +6,42 @@ fn lcg(s: u32) -> u32:
     return s * 1664525 + 1013904223
 
 hot fn swap(a: lend List[i32], i: usize, j: usize):
-    tmp = trust a[i]
-    trust a[i] = trust a[j]
-    trust a[j] = tmp
+    unsafe:
+        tmp = trust a[i]
+        trust a[i] = trust a[j]
+        trust a[j] = tmp
 
 hot fn insertion(a: lend List[i32], lo: usize, hi: usize):
     overflow: wrap
-    if hi < lo + 2:
-        return
-    i: usize = lo + 1
-    while i < hi:
-        j: usize = i
-        while j > lo:
-            if trust a[j] < trust a[j - 1]:
-                swap(a, j, j - 1)
-                j -= 1
-            else:
-                break
-        i += 1
+    unsafe:
+        if hi < lo + 2:
+            return
+        i: usize = lo + 1
+        while i < hi:
+            j: usize = i
+            while j > lo:
+                if trust a[j] < trust a[j - 1]:
+                    swap(a, j, j - 1)
+                    j -= 1
+                else:
+                    break
+            i += 1
 
 hot fn partition(a: lend List[i32], lo: usize, hi: usize) -> usize:
     overflow: wrap
-    mid = lo + (hi - lo) / 2
-    swap(a, mid, hi - 1)
-    pivot = trust a[hi - 1]
-    store: usize = lo
-    j: usize = lo
-    while j < hi - 1:
-        if trust a[j] < pivot:
-            swap(a, store, j)
-            store += 1
-        j += 1
-    swap(a, store, hi - 1)
-    return store
+    unsafe:
+        mid = lo + (hi - lo) / 2
+        swap(a, mid, hi - 1)
+        pivot = trust a[hi - 1]
+        store: usize = lo
+        j: usize = lo
+        while j < hi - 1:
+            if trust a[j] < pivot:
+                swap(a, store, j)
+                store += 1
+            j += 1
+        swap(a, store, hi - 1)
+        return store
 
 fn qsort(a: lend List[i32]):
     n = a.len

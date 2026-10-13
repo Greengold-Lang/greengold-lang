@@ -1,14 +1,8 @@
-extern "windows.h" fn QueryPerformanceCounter(out: *mut i64) -> i32
-extern "windows.h" fn QueryPerformanceFrequency(out: *mut i64) -> i32
+import std.time
 extern "stdio.h" fn printf(fmt: str, ...) -> i32
 
 fn now_sec() -> f64:
-    count: i64 = 0
-    freq: i64 = 0
-    unsafe:
-        QueryPerformanceCounter(addr_mut(count))
-        QueryPerformanceFrequency(addr_mut(freq))
-    return f64(count) / f64(freq)
+    return f64(time.monotonic_nanos()) / 1000000000.0
 
 struct PrimeSieve:
     sieve_size: usize
@@ -17,46 +11,48 @@ struct PrimeSieve:
 impl PrimeSieve:
     hot fn run_sieve(self: lend PrimeSieve):
         overflow: wrap
-        factor: usize = 3
-        q: usize = 1000
+        unsafe:
+            factor: usize = 3
+            q: usize = 1000
 
-        while factor <= q:
-            num: usize = factor
-            while num <= q:
+            while factor <= q:
+                num: usize = factor
+                while num <= q:
+                    idx: usize = num / 2
+                    w: usize = idx >> 6
+                    b: usize = idx & 63
+                    mask: u64 = u64(1) << b
+                    if (trust self.words[w] & mask) != 0:
+                        factor = num
+                        break
+                    num += 2
+
+                k: usize = factor * factor
+                step: usize = factor * 2
+                while k < self.sieve_size:
+                    kidx: usize = k / 2
+                    kw: usize = kidx >> 6
+                    kb: usize = kidx & 63
+                    kmask: u64 = ~(u64(1) << kb)
+                    trust self.words[kw] = trust self.words[kw] & kmask
+                    k += step
+
+                factor += 2
+
+    hot fn count_primes(self: lend PrimeSieve) -> usize:
+        overflow: wrap
+        unsafe:
+            count: usize = 1
+            num: usize = 3
+            while num < self.sieve_size:
                 idx: usize = num / 2
                 w: usize = idx >> 6
                 b: usize = idx & 63
                 mask: u64 = u64(1) << b
                 if (trust self.words[w] & mask) != 0:
-                    factor = num
-                    break
+                    count += 1
                 num += 2
-
-            k: usize = factor * factor
-            step: usize = factor * 2
-            while k < self.sieve_size:
-                kidx: usize = k / 2
-                kw: usize = kidx >> 6
-                kb: usize = kidx & 63
-                kmask: u64 = ~(u64(1) << kb)
-                trust self.words[kw] = trust self.words[kw] & kmask
-                k += step
-
-            factor += 2
-
-    hot fn count_primes(self: lend PrimeSieve) -> usize:
-        overflow: wrap
-        count: usize = 1
-        num: usize = 3
-        while num < self.sieve_size:
-            idx: usize = num / 2
-            w: usize = idx >> 6
-            b: usize = idx & 63
-            mask: u64 = u64(1) << b
-            if (trust self.words[w] & mask) != 0:
-                count += 1
-            num += 2
-        return count
+            return count
 
     fn validate_results(self: lend PrimeSieve) -> bool:
         if self.sieve_size == 1000000:

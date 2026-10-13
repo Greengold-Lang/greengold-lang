@@ -1,6 +1,6 @@
 # Pancake flips over all permutations of 0..9.
 # The pass is repeated four times. Prints the summed checksum, then the maximum flip count.
-# Indexes are trusted. The flip counts fit in i32, so wrapping matches the checked sum.
+# Indexes are bounds-checked, as in Rust. The flip counts fit in i32, so wrapping matches the checked sum.
 
 hot fn fannkuch():
     overflow: wrap
@@ -9,7 +9,7 @@ hot fn fannkuch():
     perm1: [12]i32 = [0; 12]
     count: [12]i32 = [0; 12]
     for i in 0..10:
-        trust perm1[i] = i32(i)
+        perm1[i] = i32(i)
     max_flips: i32 = 0
     checksum: i32 = 0
     nperm: i32 = 0
@@ -17,24 +17,24 @@ hot fn fannkuch():
     r: i32 = n
     while true:
         while r != 1:
-            trust count[r - 1] = r
+            count[r - 1] = r
             r -= 1
-        if trust perm1[0] != 0:
+        if perm1[0] != 0:
             for i in 0..10:
-                trust perm[i] = trust perm1[i]
+                perm[i] = perm1[i]
             flips: i32 = 0
-            k: i32 = trust perm[0]
+            k: i32 = perm[0]
             while k != 0:
                 a: i32 = 0
                 b: i32 = k
                 while a < b:
-                    tmp = trust perm[a]
-                    trust perm[a] = trust perm[b]
-                    trust perm[b] = tmp
+                    tmp = perm[a]
+                    perm[a] = perm[b]
+                    perm[b] = tmp
                     a += 1
                     b -= 1
                 flips += 1
-                k = trust perm[0]
+                k = perm[0]
             if flips > max_flips:
                 max_flips = flips
             if nperm % 2 == 0:
@@ -51,19 +51,19 @@ hot fn fannkuch():
                     print(max_flips)
                     return
                 for i in 0..10:
-                    trust perm1[i] = i32(i)
+                    perm1[i] = i32(i)
                 r = n
                 nperm = 0
                 restarted = true
                 break
-            p0 = trust perm1[0]
+            p0 = perm1[0]
             i: i32 = 0
             while i < r:
-                trust perm1[i] = trust perm1[i + 1]
+                perm1[i] = perm1[i + 1]
                 i += 1
-            trust perm1[r] = p0
-            trust count[r] = trust count[r] - 1
-            if trust count[r] > 0:
+            perm1[r] = p0
+            count[r] = count[r] - 1
+            if count[r] > 0:
                 advanced = true
             else:
                 r += 1

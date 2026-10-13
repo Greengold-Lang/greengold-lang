@@ -293,6 +293,74 @@ fn main():
     ok(tmp_path, src, ["1001", "999", "7", "3", "c"])
 
 
+def test_list_resize_and_truncate(tmp_path):
+    src = """
+struct P:
+    x: i32
+    y: i32
+
+fn main():
+    bytes = List[u8]()
+    bytes.resize(1000, 7)
+    n = 0
+    for b in bytes:
+        n += b
+    print(bytes.len, n)
+    bytes.resize(3, 9)
+    bytes.resize(5, 2)
+    print(bytes.len, bytes[0], bytes[2], bytes[3], bytes[4])
+    bytes.resize(0, 1)
+    print(bytes.len)
+    xs = List[i64]()
+    xs.push(5)
+    xs.resize(4, -1)
+    print(xs.len, xs[0], xs[3])
+    ps = List[P]()
+    ps.resize(2, P{ x: 1, y: 2 })
+    print(ps.len, ps[1].y)
+    flags = List[bool]()
+    flags.resize(3, true)
+    print(flags.len, flags[2])
+    names = List[string]()
+    names.push("a".to_string())
+    names.push("b".to_string())
+    names.push("c".to_string())
+    names.truncate(10)
+    print(names.len)
+    names.truncate(1)
+    print(names.len, names[0])
+    names.truncate(0)
+    print(names.len)
+    big = List[u8]()
+    big.resize(8000000, 1)
+    big[7999999] = 0
+    print(big.len, big[0], big[7999999])
+"""
+    ok(tmp_path, src, "1000 7000 5 7 7 2 2 0 4 5 -1 2 2 3 true 3 1 a 0 8000000 1 0".split())
+
+
+def test_list_resize_needs_copied_elements(tmp_path):
+    src = """
+fn main():
+    names = List[string]()
+    names.resize(2, "a".to_string())
+    print(names.len)
+"""
+    r = run(tmp_path, src)
+    assert r.returncode != 0 and "moved" in r.stderr, r.stderr
+
+
+def test_list_resize_needs_mutable_list(tmp_path):
+    src = """
+fn main():
+    fixed xs = List[i32]()
+    xs.resize(3, 0)
+    print(xs.len)
+"""
+    r = run(tmp_path, src)
+    assert r.returncode != 0 and "fixed" in r.stderr, r.stderr
+
+
 def test_list_reserve_too_large_fails(tmp_path):
     src = """
 fn main():

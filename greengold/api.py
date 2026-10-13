@@ -227,7 +227,7 @@ def _builtins() -> list[dict]:
         ("eprint", "fn eprint(...)", "Like print, but write to the standard error stream."),
         ("panic", "fn panic(message: str)", "Stop the program with a message: a `str` or `string`, such as an f-string."),
         ("input", "fn input(prompt: str) -> str", "Read a line. The prompt is optional: `input()` or `input(\"prompt\")`."),
-        ("List", "struct List[T]", "Owned growable array. `List[T]()` is empty. `.len` is the length. `push`, `pop`, `clear`, `swap`, `swap_remove`, `remove` and `insert` need a list that is not `fixed`. `get` returns `ref T`. Copied elements also have `map`, `filter`, `fold`, `any`, `all`, `count`, `find`, `position`, `contains`, `index_of`, `sum`, `min`, `max`, `first`, `last`, `is_empty`, `reverse`, `extend`, `sort`, and `sort_by`."),
+        ("List", "struct List[T]", "Owned growable array. `List[T]()` is empty. `.len` is the length. `push`, `pop`, `clear`, `reserve`, `resize`, `truncate`, `swap`, `swap_remove`, `remove` and `insert` need a list that is not `fixed`. `get` returns `ref T`. Copied elements also have `map`, `filter`, `fold`, `any`, `all`, `count`, `find`, `position`, `contains`, `index_of`, `sum`, `min`, `max`, `first`, `last`, `is_empty`, `reverse`, `extend`, `sort`, and `sort_by`."),
         ("Box", "struct Box[T]", "Owned heap slot. `Box[T](value)` stores one value. Read and write it as `.value`."),
         ("Fn", "type Fn(A) -> R", "Owned closure value: returned, stored, called as `f(x)`. `.clone()` shares it. A lambda written where a `Fn` is expected owns its captures."),
         ("Shared", "struct Shared[T]", "Reference-counted heap value. `Shared[T](value)`; `.clone()` adds an owner; `.value` is read-only. Not for sharing between threads."),

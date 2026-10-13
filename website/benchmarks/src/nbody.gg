@@ -11,30 +11,31 @@ fn zeros(n: usize) -> List[f64]:
 
 hot fn advance(x: exclusive lend List[f64], y: exclusive lend List[f64], z: exclusive lend List[f64], vx: exclusive lend List[f64], vy: exclusive lend List[f64], vz: exclusive lend List[f64], mass: exclusive lend List[f64], n: usize):
     overflow: wrap
-    i: usize = 0
-    while i < n:
-        j: usize = i + 1
-        while j < n:
-            dx = trust x[i] - trust x[j]
-            dy = trust y[i] - trust y[j]
-            dz = trust z[i] - trust z[j]
-            dist2 = dx * dx + dy * dy + dz * dz + 0.05
-            inv = 1.0 / math.sqrt(dist2)
-            scale = inv * inv * inv * 0.01
-            mi = trust mass[i]
-            mj = trust mass[j]
-            trust vx[i] = trust vx[i] - dx * mj * scale
-            trust vy[i] = trust vy[i] - dy * mj * scale
-            trust vz[i] = trust vz[i] - dz * mj * scale
-            trust vx[j] = trust vx[j] + dx * mi * scale
-            trust vy[j] = trust vy[j] + dy * mi * scale
-            trust vz[j] = trust vz[j] + dz * mi * scale
-            j += 1
-        i += 1
-    for k in 0..n:
-        trust x[k] = trust x[k] + trust vx[k] * 0.01
-        trust y[k] = trust y[k] + trust vy[k] * 0.01
-        trust z[k] = trust z[k] + trust vz[k] * 0.01
+    unsafe:
+        i: usize = 0
+        while i < n:
+            j: usize = i + 1
+            while j < n:
+                dx = trust x[i] - trust x[j]
+                dy = trust y[i] - trust y[j]
+                dz = trust z[i] - trust z[j]
+                dist2 = dx * dx + dy * dy + dz * dz + 0.05
+                inv = 1.0 / math.sqrt(dist2)
+                scale = inv * inv * inv * 0.01
+                mi = trust mass[i]
+                mj = trust mass[j]
+                trust vx[i] = trust vx[i] - dx * mj * scale
+                trust vy[i] = trust vy[i] - dy * mj * scale
+                trust vz[i] = trust vz[i] - dz * mj * scale
+                trust vx[j] = trust vx[j] + dx * mi * scale
+                trust vy[j] = trust vy[j] + dy * mi * scale
+                trust vz[j] = trust vz[j] + dz * mi * scale
+                j += 1
+            i += 1
+        for k in 0..n:
+            trust x[k] = trust x[k] + trust vx[k] * 0.01
+            trust y[k] = trust y[k] + trust vy[k] * 0.01
+            trust z[k] = trust z[k] + trust vz[k] * 0.01
 
 fn main():
     n: usize = 768

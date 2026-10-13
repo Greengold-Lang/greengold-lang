@@ -3,14 +3,15 @@
 
 hot fn multiply(a: exclusive lend List[f64], b: exclusive lend List[f64], c: exclusive lend List[f64], n: usize):
     overflow: wrap
-    for i in 0..n:
-        for k in 0..n:
-            aik = trust a[i * n + k]
-            j: usize = 0
-            while j < n:
-                idx = i * n + j
-                trust c[idx] = trust c[idx] + aik * trust b[k * n + j]
-                j += 1
+    unsafe:
+        for i in 0..n:
+            for k in 0..n:
+                aik = trust a[i * n + k]
+                j: usize = 0
+                while j < n:
+                    idx = i * n + j
+                    trust c[idx] = trust c[idx] + aik * trust b[k * n + j]
+                    j += 1
 
 fn main():
     n: usize = 1216

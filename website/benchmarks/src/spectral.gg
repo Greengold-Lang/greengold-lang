@@ -5,15 +5,16 @@ import std.math
 
 hot fn apply(out: exclusive lend List[f64], v: exclusive lend List[f64], n: usize):
     overflow: wrap
-    for i in 0..n:
-        sum: f64 = 0.0
-        j: usize = 0
-        while j < n:
-            ij = i + j
-            den = ij * (ij + 1) / 2 + i + 1
-            sum += (1.0 / f64(den)) * trust v[j]
-            j += 1
-        trust out[i] = sum
+    unsafe:
+        for i in 0..n:
+            sum: f64 = 0.0
+            j: usize = 0
+            while j < n:
+                ij = i + j
+                den = ij * (ij + 1) / 2 + i + 1
+                sum += (1.0 / f64(den)) * trust v[j]
+                j += 1
+            trust out[i] = sum
 
 fn main():
     n: usize = 1600

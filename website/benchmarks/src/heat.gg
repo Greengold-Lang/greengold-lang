@@ -3,15 +3,16 @@
 
 hot fn jacobi(cur: exclusive lend List[f64], nxt: exclusive lend List[f64], n: usize):
     overflow: wrap
-    last = n - 1
-    for i in 1..last:
-        for j in 1..last:
-            idx = i * n + j
-            up = (i - 1) * n + j
-            down = (i + 1) * n + j
-            left = i * n + (j - 1)
-            right = i * n + (j + 1)
-            trust nxt[idx] = 0.25 * (trust cur[up] + trust cur[down] + trust cur[left] + trust cur[right])
+    unsafe:
+        last = n - 1
+        for i in 1..last:
+            for j in 1..last:
+                idx = i * n + j
+                up = (i - 1) * n + j
+                down = (i + 1) * n + j
+                left = i * n + (j - 1)
+                right = i * n + (j + 1)
+                trust nxt[idx] = 0.25 * (trust cur[up] + trust cur[down] + trust cur[left] + trust cur[right])
 
 fn main():
     n: usize = 1024

@@ -1265,6 +1265,14 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
                 p.mode = self.inferred.get(_param_key(p, d), "read")
                 p.mode_inferred = True  # type: ignore[attr-defined]
                 p.mode_key = _param_key(p, d)  # type: ignore[attr-defined]
+            elif p.mode == "" and is_slice_type(ty):
+                # A slice written without a mode stays a read-only view until the body changes an
+                # element; then it is `lend` (never `consume`: a slice cannot be moved).
+                p.mode_key = _param_key(p, d)  # type: ignore[attr-defined]
+                p.mode_slice = True  # type: ignore[attr-defined]
+                if self.inferred.get(p.mode_key) == "lend":
+                    p.mode = "lend"
+                    p.mode_inferred = True  # type: ignore[attr-defined]
             if p.mode == "consume":
                 if is_slice_type(ty):
                     self._err(p, "Slice cannot be moved.", "Slices are not copied and cannot be moved.")
@@ -1523,7 +1531,12 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
         Returns True when it was recorded; check_program then re-checks with the stronger mode."""
         param = root.origin
         key = getattr(param, "mode_key", None)
-        if not isinstance(param, Param) or not getattr(param, "mode_inferred", False) or key is None:
+        if not isinstance(param, Param) or key is None:
+            return False
+        if getattr(param, "mode_slice", False):
+            if mode != "lend":
+                return False
+        elif not getattr(param, "mode_inferred", False):
             return False
         if _MODE_RANK[mode] > _MODE_RANK.get(self.mode_upgrades.get(key, "read"), 0):
             self.mode_upgrades[key] = mode
@@ -2303,6 +2316,8 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             self._note_change(root)
             return True
         if root.kind == "read" and self._infer_mode(root, "lend"):
+            return True
+        if root.kind == "val" and is_slice_type(root.ty) and self._infer_mode(root, "lend"):
             return True
         if self._infer_loop_lend(root):
             return True
@@ -3868,6 +3883,8 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             "pop": [],
             "clear": [],
             "reserve": [ParamInfo("n", "usize", "val", None)],
+            "truncate": [ParamInfo("n", "usize", "val", None)],
+            "resize": [ParamInfo("n", "usize", "val", None), ParamInfo("x", inner, "val", None)],
             "get": [ParamInfo("i", "usize", "val", None)],
             "swap": [ParamInfo("i", "usize", "val", None), ParamInfo("j", "usize", "val", None)],
             "swap_remove": [ParamInfo("i", "usize", "val", None)],
@@ -3883,6 +3900,12 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             self._err(e, f"Type `{ot}` has no method named `{m}`.",
                       f"`{ot}` methods: {', '.join(list(sigs) + sorted(LIST_HELPERS))} (use `.len` for length).",
                       fixes=self._member_fix(e, m, list(sigs) + sorted(LIST_HELPERS) + ["len"]))
+            self._eval_args_quietly(e.args)
+            return ERR
+        if m == "resize" and self._moves(inner):
+            self._err(e, f"`resize` fills with copies of one value; `{inner}` is moved, not copied.",
+                      f"Grow the list with `push` in a loop, or keep copyable values (numbers, `str`, plain structs) in it.",
+                      rule="list-helper-moved", details={"method": m, "element": inner})
             self._eval_args_quietly(e.args)
             return ERR
         e.owner = ot

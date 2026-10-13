@@ -60,7 +60,7 @@ When `docs/SPEC.md` changes, run the script again. When the compiler output chan
 
 - `index.html`, `why.html`, `spec.html`, `benchmarks.html`, `diagnostics.html`, `roadmap.html`, `about.html` — generated
 - `spec.md` — a copy of `docs/SPEC.md`
-- `benchmarks/data.json` — the 9 October 2026 report, seventeen workloads; `benchmarks/src/` holds the sources
+- `benchmarks/data.json` — the 13 October 2026 report, eighteen workloads; `benchmarks/src/` holds the sources
 - `diagnostics/` — the GG0301 example and its `gg check` output
 - `style.css`, `app.js` — shared by every page (dark and light theme, code tabs, spec contents)
 - `llms.txt`, `robots.txt`, `sitemap.xml`, `_headers`

@@ -1666,8 +1666,10 @@ class LLVMGen:
             ft = ir.FunctionType(VOID, [vt.as_pointer(), it])
         elif op == "pop":
             ft = ir.FunctionType(self.llty(f"Optional[{inner}]"), [vt.as_pointer()])
-        elif op == "reserve":
+        elif op in ("reserve", "truncate"):
             ft = ir.FunctionType(VOID, [vt.as_pointer(), I64])
+        elif op == "resize":
+            ft = ir.FunctionType(VOID, [vt.as_pointer(), I64, it])
         elif op == "push_str":
             ft = ir.FunctionType(VOID, [vt.as_pointer(), self.llty("str")])
         else:
@@ -1735,6 +1737,35 @@ class LLVMGen:
                 b.store(ncap, f_cap)
                 b.branch(done)
                 self.at(done)
+                b.ret_void()
+            elif op == "truncate":  # keep the first `n` elements; a longer `n` changes nothing
+                ln = b.load(f_len)
+                ln.set_metadata("range", self.range_meta_i64_pos())
+                keep = b.select(b.icmp_unsigned("<", ln, fn.args[1]), ln, fn.args[1])
+                if self.nd(inner):
+                    p = b.load(f_ptr)
+                    self.loop_n(b.sub(ln, keep), lambda i: b.call(
+                        self.drop_fn(inner), [b.load(b.gep(p, [b.add(keep, i)], inbounds=True))]))
+                b.store(keep, f_len)
+                b.ret_void()
+            elif op == "resize":  # length `n`: cut the tail, or append copies of `x`
+                ln = b.load(f_len)
+                ln.set_metadata("range", self.range_meta_i64_pos())
+                grow, done = self.new_block("grow"), self.new_block("done")
+                b.cbranch(b.icmp_unsigned(">", fn.args[1], ln), grow, done)
+                self.at(done)
+                b.store(fn.args[1], f_len)  # shorter or equal: elements are copies, nothing to drop
+                b.ret_void()
+                self.at(grow)
+                extra = b.sub(fn.args[1], ln)
+                b.call(self.vec_fn(ty, "reserve"), [v, extra])
+                dst = b.gep(b.load(f_ptr), [ln], inbounds=True)
+                if isinstance(it, ir.IntType) and it.width == 8:
+                    b.call(self.c_fn("memset", I8P, [I8P, I32, I64]),
+                           [b.bitcast(dst, I8P), b.zext(fn.args[2], I32), extra])
+                else:
+                    self.loop_n(extra, lambda i: b.store(fn.args[2], b.gep(dst, [i], inbounds=True)))
+                b.store(fn.args[1], f_len)
                 b.ret_void()
             elif op == "push_str":  # `List[u8]`: the bytes of a `str`, copied at once
                 text = fn.args[1]

@@ -1,26 +1,27 @@
-#[derive(Clone, Copy)]
-struct Particle {
-    x: f32,
-    y: f32,
-    vx: f32,
-    vy: f32,
-}
+// Structure of arrays: one Vec per field, the layout `soa Array[Particle, N]` gives Greengold.
+// The loops use zip so the compiler needs no bounds checks.
+const N: usize = 20000;
 
 fn update(steps: usize) -> f32 {
-    let mut ps = vec![Particle { x: 0.0, y: 0.0, vx: 1.0, vy: 2.0 }; 20000];
-    for i in 0..20000 {
-        ps[i].x = (i as f32) * 0.1;
-        ps[i].y = (i as f32) * 0.2;
+    let mut x = vec![0.0f32; N];
+    let mut y = vec![0.0f32; N];
+    let vx = vec![1.0f32; N];
+    let vy = vec![2.0f32; N];
+    for i in 0..N {
+        x[i] = (i as f32) * 0.1;
+        y[i] = (i as f32) * 0.2;
     }
     for _ in 0..steps {
-        for i in 0..20000 {
-            ps[i].x += ps[i].vx;
-            ps[i].y += ps[i].vy;
+        for (a, b) in x.iter_mut().zip(vx.iter()) {
+            *a += *b;
+        }
+        for (a, b) in y.iter_mut().zip(vy.iter()) {
+            *a += *b;
         }
     }
     let mut total = 0.0f32;
-    for i in 0..20000 {
-        total += ps[i].x;
+    for a in x.iter() {
+        total += *a;
     }
     total
 }
