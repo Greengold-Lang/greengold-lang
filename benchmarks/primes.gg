@@ -1,14 +1,8 @@
-extern "windows.h" fn QueryPerformanceCounter(out: *mut i64) -> i32
-extern "windows.h" fn QueryPerformanceFrequency(out: *mut i64) -> i32
+import std.time
 extern "stdio.h" fn printf(fmt: str, ...) -> i32
 
 fn now_sec() -> f64:
-    count: i64 = 0
-    freq: i64 = 0
-    unsafe:
-        QueryPerformanceCounter(addr_mut(count))
-        QueryPerformanceFrequency(addr_mut(freq))
-    return f64(count) / f64(freq)
+    return f64(time.monotonic_nanos()) / 1000000000.0
 
 struct PrimeSieve:
     sieve_size: usize

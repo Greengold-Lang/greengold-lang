@@ -1,488 +1,488 @@
 {
-  "timestamp": "20261009_154949",
-  "date": "October 09, 2026 - 15:49:49",
-  "source": "benchmarks/reports/benchmark_20261009_154949/benchmark_data.json",
+  "timestamp": "20261013_115800",
+  "date": "October 13, 2026 - 11:58:00",
+  "source": "benchmarks/reports/latest/benchmark_data.json",
   "omitted": [
     "Greengold (Release --unchecked)"
   ],
   "results": {
     "fib": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.451208399997995,
+        "compile_time_s": 0.7706455999996251,
         "binary_size_kb": 63.9609375,
-        "median_ms": 260.458100001415,
-        "mean_ms": 269.7632999996131,
-        "peak_mem_mb": 4.6640625,
+        "median_ms": 288.511999999173,
+        "mean_ms": 284.2101799993543,
+        "peak_mem_mb": 5.30859375,
         "output": "165580141"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.25775659999999334,
-        "binary_size_kb": 137.0,
-        "median_ms": 387.7017999984673,
-        "mean_ms": 412.68033999949694,
-        "peak_mem_mb": 4.19140625,
+        "compile_time_s": 1.0713152999996964,
+        "binary_size_kb": 133.0,
+        "median_ms": 388.2754999995086,
+        "mean_ms": 406.5934600002947,
+        "peak_mem_mb": 4.62109375,
         "output": "165580141"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3281919000000926,
-        "binary_size_kb": 58.2421875,
-        "median_ms": 42.27069999978994,
-        "mean_ms": 44.12882000033278,
-        "peak_mem_mb": 4.0703125,
+        "compile_time_s": 0.9357772999992449,
+        "binary_size_kb": 58.3359375,
+        "median_ms": 30.190899999070098,
+        "mean_ms": 35.46925999944506,
+        "peak_mem_mb": 4.51171875,
         "output": "165580141"
       }
     },
     "collatz": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.4020292999994126,
+        "compile_time_s": 0.48675530000036815,
         "binary_size_kb": 59.3779296875,
-        "median_ms": 479.48279999764054,
-        "mean_ms": 492.3131999988982,
-        "peak_mem_mb": 4.62890625,
+        "median_ms": 477.2436999992351,
+        "mean_ms": 490.2888599997823,
+        "peak_mem_mb": 5.28125,
         "output": "3732423\n596"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.16731919999801903,
-        "binary_size_kb": 128.0,
-        "median_ms": 432.79830000028596,
-        "mean_ms": 448.71100000018487,
-        "peak_mem_mb": 4.16796875,
+        "compile_time_s": 0.1825566000006802,
+        "binary_size_kb": 123.5,
+        "median_ms": 422.7374999991298,
+        "mean_ms": 443.5258799996518,
+        "peak_mem_mb": 4.58984375,
         "output": "3732423\n596"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3344217999983812,
-        "binary_size_kb": 58.2138671875,
-        "median_ms": 447.8172999988601,
-        "mean_ms": 451.18789999978617,
-        "peak_mem_mb": 4.0703125,
+        "compile_time_s": 0.9062305000006745,
+        "binary_size_kb": 58.318359375,
+        "median_ms": 422.71749999963504,
+        "mean_ms": 422.0809399997961,
+        "peak_mem_mb": 4.51171875,
         "output": "3732423\n596"
       }
     },
     "fannkuch": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.42766520000077435,
+        "compile_time_s": 0.46793869999964954,
         "binary_size_kb": 59.7548828125,
-        "median_ms": 450.8882999980415,
-        "mean_ms": 457.81652000005124,
-        "peak_mem_mb": 4.625,
+        "median_ms": 446.8338999995467,
+        "mean_ms": 452.1708399995987,
+        "peak_mem_mb": 5.2890625,
         "output": "292784\n38"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.19761099999959697,
-        "binary_size_kb": 128.5,
-        "median_ms": 387.174600000435,
-        "mean_ms": 408.369120000134,
-        "peak_mem_mb": 4.17578125,
+        "compile_time_s": 0.21436270000049262,
+        "binary_size_kb": 124.5,
+        "median_ms": 385.90040000053705,
+        "mean_ms": 416.33554000036384,
+        "peak_mem_mb": 4.60546875,
         "output": "292784\n38"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3731450000013865,
-        "binary_size_kb": 59.3857421875,
-        "median_ms": 481.04740000053425,
-        "mean_ms": 491.14077999984147,
-        "peak_mem_mb": 4.0703125,
+        "compile_time_s": 1.0138336999989406,
+        "binary_size_kb": 60.052734375,
+        "median_ms": 381.2299000001076,
+        "mean_ms": 394.01918000003207,
+        "peak_mem_mb": 4.5078125,
         "output": "292784\n38"
       }
     },
     "mandel": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.405710300001374,
+        "compile_time_s": 0.5044211999993422,
         "binary_size_kb": 59.7001953125,
-        "median_ms": 322.52130000051693,
-        "mean_ms": 327.25611999994726,
-        "peak_mem_mb": 4.62890625,
+        "median_ms": 322.1237999987352,
+        "mean_ms": 328.95315999958257,
+        "peak_mem_mb": 5.28125,
         "output": "1632341"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.16748619999998482,
-        "binary_size_kb": 127.5,
-        "median_ms": 326.18229999934556,
-        "mean_ms": 356.4661600001273,
-        "peak_mem_mb": 4.171875,
+        "compile_time_s": 0.19228719999955501,
+        "binary_size_kb": 124.0,
+        "median_ms": 326.1870000005729,
+        "mean_ms": 360.28174000020954,
+        "peak_mem_mb": 4.58984375,
         "output": "1632341"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.34900679999918793,
-        "binary_size_kb": 59.44140625,
-        "median_ms": 332.68110000062734,
-        "mean_ms": 334.97326000069734,
-        "peak_mem_mb": 4.0703125,
+        "compile_time_s": 0.8878784999997151,
+        "binary_size_kb": 59.5458984375,
+        "median_ms": 323.8829000001715,
+        "mean_ms": 329.74474000038754,
+        "peak_mem_mb": 4.51171875,
         "output": "1632341"
       }
     },
     "nbody": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.554712399996788,
+        "compile_time_s": 0.7030436999993981,
         "binary_size_kb": 65.341796875,
-        "median_ms": 257.50049999987823,
-        "mean_ms": 265.11743999944883,
-        "peak_mem_mb": 4.66015625,
+        "median_ms": 256.7269999999553,
+        "mean_ms": 263.43311999989965,
+        "peak_mem_mb": 5.33984375,
         "output": "-51022\n15923\n45852"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.22243929999967804,
-        "binary_size_kb": 132.5,
-        "median_ms": 251.31099999998696,
-        "mean_ms": 258.3078800002113,
-        "peak_mem_mb": 4.203125,
+        "compile_time_s": 0.23003820000121777,
+        "binary_size_kb": 128.0,
+        "median_ms": 250.9238999991794,
+        "mean_ms": 254.83515999949304,
+        "peak_mem_mb": 4.63671875,
         "output": "-51022\n15923\n45852"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.4629376999982924,
-        "binary_size_kb": 62.15234375,
-        "median_ms": 287.30240000004414,
-        "mean_ms": 279.73131999970064,
-        "peak_mem_mb": 4.11328125,
+        "compile_time_s": 0.9488611000015226,
+        "binary_size_kb": 62.587890625,
+        "median_ms": 264.0117000009923,
+        "mean_ms": 268.62768000028154,
+        "peak_mem_mb": 4.5859375,
         "output": "-51022\n15923\n45852"
       }
     },
     "spectral": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.5376041999988956,
+        "compile_time_s": 0.5521826000003784,
         "binary_size_kb": 62.1240234375,
-        "median_ms": 221.0607999986678,
-        "mean_ms": 226.21350000044913,
-        "peak_mem_mb": 4.66015625,
+        "median_ms": 219.6284999990894,
+        "mean_ms": 227.1619599996484,
+        "peak_mem_mb": 5.3203125,
         "output": "1122277722"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.26380219999919063,
-        "binary_size_kb": 129.0,
-        "median_ms": 211.7257999998401,
-        "mean_ms": 243.3439399996132,
-        "peak_mem_mb": 4.18359375,
+        "compile_time_s": 0.20118170000023383,
+        "binary_size_kb": 124.5,
+        "median_ms": 214.48810000038065,
+        "mean_ms": 241.1234200004401,
+        "peak_mem_mb": 4.59375,
         "output": "1122277722"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.6676683000005141,
-        "binary_size_kb": 60.81640625,
-        "median_ms": 216.50939999744878,
-        "mean_ms": 223.44274000060977,
-        "peak_mem_mb": 4.08984375,
+        "compile_time_s": 0.909902699999293,
+        "binary_size_kb": 60.4208984375,
+        "median_ms": 209.27499999925203,
+        "mean_ms": 213.8440399994579,
+        "peak_mem_mb": 4.5234375,
         "output": "1122277722"
       }
     },
     "matmul": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.5484605000019656,
+        "compile_time_s": 0.5097044000012829,
         "binary_size_kb": 63.2119140625,
-        "median_ms": 427.0710999990115,
-        "mean_ms": 406.1978399993677,
-        "peak_mem_mb": 38.01171875,
+        "median_ms": 299.2844000000332,
+        "mean_ms": 306.5861799997947,
+        "peak_mem_mb": 38.91796875,
         "output": "86306145685\n58018\n58672"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.21699149999767542,
-        "binary_size_kb": 130.0,
-        "median_ms": 411.6647999981069,
-        "mean_ms": 480.17797999928007,
-        "peak_mem_mb": 37.58203125,
+        "compile_time_s": 0.21679709999989427,
+        "binary_size_kb": 125.5,
+        "median_ms": 307.67779999951017,
+        "mean_ms": 343.4867199994187,
+        "peak_mem_mb": 38.02734375,
         "output": "86306145685\n58018\n58672"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3705566999997245,
-        "binary_size_kb": 60.68359375,
-        "median_ms": 338.0350000006729,
-        "mean_ms": 348.2993199999328,
-        "peak_mem_mb": 39.65625,
+        "compile_time_s": 0.9028790000011213,
+        "binary_size_kb": 60.7880859375,
+        "median_ms": 309.90079999901354,
+        "mean_ms": 309.9459399996704,
+        "peak_mem_mb": 39.5859375,
         "output": "86306145685\n58018\n58672"
       }
     },
     "heat": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.5076432999994722,
+        "compile_time_s": 0.5214813999991748,
         "binary_size_kb": 62.185546875,
-        "median_ms": 135.8351999988372,
-        "mean_ms": 144.34457999886945,
-        "peak_mem_mb": 20.1640625,
+        "median_ms": 131.80690000081086,
+        "mean_ms": 138.12985999975353,
+        "peak_mem_mb": 21.07421875,
         "output": "9259564379"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.2210930000001099,
-        "binary_size_kb": 130.5,
-        "median_ms": 136.49599999916973,
-        "mean_ms": 192.26291999948444,
-        "peak_mem_mb": 19.73046875,
+        "compile_time_s": 0.2308711999994557,
+        "binary_size_kb": 126.0,
+        "median_ms": 131.34089999948628,
+        "mean_ms": 202.11664000016754,
+        "peak_mem_mb": 20.1796875,
         "output": "9259564379"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.4068169000020134,
-        "binary_size_kb": 60.68359375,
-        "median_ms": 139.25980000203708,
-        "mean_ms": 168.85636000006343,
-        "peak_mem_mb": 20.69140625,
+        "compile_time_s": 0.8953025000009802,
+        "binary_size_kb": 60.7880859375,
+        "median_ms": 131.72100000156206,
+        "mean_ms": 134.67076000015368,
+        "peak_mem_mb": 21.125,
         "output": "9259564379"
       }
     },
     "monte": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.448703399997612,
+        "compile_time_s": 0.459899100000257,
         "binary_size_kb": 59.2763671875,
-        "median_ms": 425.7203999986814,
-        "mean_ms": 432.04679999980726,
-        "peak_mem_mb": 4.62890625,
+        "median_ms": 420.9582000003138,
+        "mean_ms": 426.0381600000983,
+        "peak_mem_mb": 5.28515625,
         "output": "94241925"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.16679170000134036,
-        "binary_size_kb": 128.0,
-        "median_ms": 389.5425999980944,
-        "mean_ms": 395.5171599991445,
-        "peak_mem_mb": 4.171875,
+        "compile_time_s": 0.1731749000009586,
+        "binary_size_kb": 124.0,
+        "median_ms": 393.1996999999683,
+        "mean_ms": 394.8329399998329,
+        "peak_mem_mb": 4.59375,
         "output": "94241925"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3240379999988363,
-        "binary_size_kb": 58.2138671875,
-        "median_ms": 393.0894000004628,
-        "mean_ms": 405.4675600003975,
-        "peak_mem_mb": 4.06640625,
+        "compile_time_s": 0.8766380999986723,
+        "binary_size_kb": 58.318359375,
+        "median_ms": 425.4990000008547,
+        "mean_ms": 429.99956000057864,
+        "peak_mem_mb": 4.50390625,
         "output": "94241925"
       }
     },
     "fnv": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.5115952999985893,
+        "compile_time_s": 0.48283640000045125,
         "binary_size_kb": 61.4560546875,
-        "median_ms": 301.572500000475,
-        "mean_ms": 307.16015999933006,
-        "peak_mem_mb": 11.78515625,
+        "median_ms": 300.0207000004593,
+        "mean_ms": 305.8710199995403,
+        "peak_mem_mb": 12.7109375,
         "output": "16483032082770582304"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.19804970000041067,
-        "binary_size_kb": 128.0,
-        "median_ms": 346.49500000159605,
-        "mean_ms": 359.3708200009132,
-        "peak_mem_mb": 11.3515625,
+        "compile_time_s": 0.19745920000059414,
+        "binary_size_kb": 124.0,
+        "median_ms": 297.4381000003632,
+        "mean_ms": 326.29673999981605,
+        "peak_mem_mb": 11.796875,
         "output": "16483032082770582304"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3385184999970079,
-        "binary_size_kb": 59.6474609375,
-        "median_ms": 301.6100999993796,
-        "mean_ms": 308.21715999918524,
-        "peak_mem_mb": 12.65625,
+        "compile_time_s": 0.8870059000000765,
+        "binary_size_kb": 59.751953125,
+        "median_ms": 299.8280000010709,
+        "mean_ms": 303.0347400002938,
+        "peak_mem_mb": 13.09765625,
         "output": "16483032082770582304"
       }
     },
     "qsort": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.5308928999984346,
+        "compile_time_s": 0.5651777999992191,
         "binary_size_kb": 63.755859375,
-        "median_ms": 563.8625999999931,
-        "mean_ms": 574.6992000000319,
-        "peak_mem_mb": 34.6796875,
+        "median_ms": 539.1388999996707,
+        "mean_ms": 544.7343400006503,
+        "peak_mem_mb": 35.6328125,
         "output": "14\n1073845253\n2147483383\n8590112052113664\n0"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.23671290000129375,
-        "binary_size_kb": 130.5,
-        "median_ms": 512.5480999995489,
-        "mean_ms": 546.0530599986669,
-        "peak_mem_mb": 34.23828125,
+        "compile_time_s": 0.24603690000003553,
+        "binary_size_kb": 126.0,
+        "median_ms": 490.89590000039607,
+        "mean_ms": 527.5694600004499,
+        "peak_mem_mb": 34.68359375,
         "output": "14\n1073845253\n2147483383\n8590112052113664\n0"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.4086199999983364,
-        "binary_size_kb": 60.6767578125,
-        "median_ms": 452.75760000004084,
-        "mean_ms": 447.54805999982636,
-        "peak_mem_mb": 36.640625,
+        "compile_time_s": 0.9519608999999036,
+        "binary_size_kb": 60.78125,
+        "median_ms": 466.9603000002098,
+        "mean_ms": 471.29750000021886,
+        "peak_mem_mb": 37.05859375,
         "output": "14\n1073845253\n2147483383\n8590112052113664\n0"
       }
     },
     "dijkstra": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.48492000000260305,
+        "compile_time_s": 0.5205411999995704,
         "binary_size_kb": 61.9638671875,
-        "median_ms": 191.72149999940302,
-        "mean_ms": 197.86843999972916,
-        "peak_mem_mb": 4.6484375,
+        "median_ms": 192.17989999924612,
+        "mean_ms": 196.9186800000898,
+        "peak_mem_mb": 5.30859375,
         "output": "251696"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.259331099998235,
-        "binary_size_kb": 129.0,
-        "median_ms": 175.20470000090427,
-        "mean_ms": 210.85968000043067,
-        "peak_mem_mb": 4.1953125,
+        "compile_time_s": 0.21070420000069134,
+        "binary_size_kb": 124.5,
+        "median_ms": 165.09469999982684,
+        "mean_ms": 201.4326999997138,
+        "peak_mem_mb": 4.609375,
         "output": "251696"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.41843949999747565,
-        "binary_size_kb": 60.1767578125,
-        "median_ms": 165.85099999792874,
-        "mean_ms": 169.09465999997337,
-        "peak_mem_mb": 4.0703125,
+        "compile_time_s": 0.9228987999995297,
+        "binary_size_kb": 60.8173828125,
+        "median_ms": 169.7624000007636,
+        "mean_ms": 175.73761999956332,
+        "peak_mem_mb": 4.515625,
         "output": "251696"
       }
     },
     "sieve": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.5188851999992039,
+        "compile_time_s": 0.4913388000004488,
         "binary_size_kb": 61.55859375,
-        "median_ms": 18.071700000291457,
-        "mean_ms": 25.672279999707825,
-        "peak_mem_mb": 11.73828125,
+        "median_ms": 18.09060000050522,
+        "mean_ms": 24.363280000397936,
+        "peak_mem_mb": 12.64453125,
         "output": "539777"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.18882440000015777,
-        "binary_size_kb": 128.0,
-        "median_ms": 17.242200003238395,
-        "mean_ms": 76.62376000080258,
-        "peak_mem_mb": 11.31640625,
+        "compile_time_s": 0.19629999999961,
+        "binary_size_kb": 124.0,
+        "median_ms": 17.987500001254375,
+        "mean_ms": 77.67251999975997,
+        "peak_mem_mb": 11.765625,
         "output": "539777"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3452285999992455,
-        "binary_size_kb": 59.6474609375,
-        "median_ms": 21.531500002311077,
-        "mean_ms": 27.847740000288468,
-        "peak_mem_mb": 12.65234375,
+        "compile_time_s": 0.9123902000010276,
+        "binary_size_kb": 59.751953125,
+        "median_ms": 24.791399999230634,
+        "mean_ms": 28.609259999575443,
+        "peak_mem_mb": 13.08203125,
         "output": "539777"
       }
     },
     "primes": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.6352991000021575,
+        "compile_time_s": 0.4573766000012256,
         "binary_size_kb": 94.3291015625,
-        "median_ms": 20082.125200002338,
-        "mean_ms": 20082.125200002338,
-        "peak_mem_mb": 4.609375,
-        "output": "Passes: 29365, Time: 20.000745, Avg: 0.000681, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_cpp;29365;20.000745;1;algorithm=base,faithful=yes,bits=1",
-        "passes": 29365,
-        "passes_per_sec": 1462.24563922132,
+        "median_ms": 20042.055599999003,
+        "mean_ms": 20042.055599999003,
+        "peak_mem_mb": 5.3828125,
+        "output": "Passes: 31415, Time: 20.000093, Avg: 0.000637, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_cpp;31415;20.000093;1;algorithm=base,faithful=yes,bits=1",
+        "passes": 31415,
+        "passes_per_sec": 1567.4539891008767,
         "valid": "1",
-        "drag_race_tag": "davepl_cpp;29365;20.000745;1;algorithm=base,faithful=yes,bits=1"
+        "drag_race_tag": "davepl_cpp;31415;20.000093;1;algorithm=base,faithful=yes,bits=1"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.21269990000291727,
-        "binary_size_kb": 155.0,
-        "median_ms": 20051.567300000897,
-        "mean_ms": 20051.567300000897,
-        "peak_mem_mb": 4.171875,
-        "output": "Passes: 31641, Time: 20.000400, Avg: 0.000632, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_rust;31641;20.000400;1;algorithm=base,faithful=yes,bits=1",
-        "passes": 31641,
-        "passes_per_sec": 1577.981388018411,
+        "compile_time_s": 0.2209579999998823,
+        "binary_size_kb": 153.5,
+        "median_ms": 20048.19580000003,
+        "mean_ms": 20048.19580000003,
+        "peak_mem_mb": 4.68359375,
+        "output": "Passes: 34533, Time: 20.000091, Avg: 0.000579, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_rust;34533;20.000091;1;algorithm=base,faithful=yes,bits=1",
+        "passes": 34533,
+        "passes_per_sec": 1722.4991388003077,
         "valid": "1",
-        "drag_race_tag": "davepl_rust;31641;20.000400;1;algorithm=base,faithful=yes,bits=1"
+        "drag_race_tag": "davepl_rust;34533;20.000091;1;algorithm=base,faithful=yes,bits=1"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.39306390000274405,
-        "binary_size_kb": 60.5732421875,
-        "median_ms": 20029.968599999847,
-        "mean_ms": 20029.968599999847,
-        "peak_mem_mb": 4.43359375,
-        "output": "Passes: 32240, Time: 20.000311, Avg: 0.000620, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_gg;32240;20.000311;1;algorithm=base,faithful=yes,bits=1",
-        "passes": 32240,
-        "passes_per_sec": 1609.5881448361454,
+        "compile_time_s": 0.9404243999997561,
+        "binary_size_kb": 60.677734375,
+        "median_ms": 20029.233000001113,
+        "mean_ms": 20029.233000001113,
+        "peak_mem_mb": 4.9296875,
+        "output": "Passes: 34460, Time: 20.000497, Avg: 0.000580, Limit: 1000000, Count1: 78498, Count2: 78498, Valid: 1\n\ndavepl_gg;34460;20.000497;1;algorithm=base,faithful=yes,bits=1",
+        "passes": 34460,
+        "passes_per_sec": 1720.485252730251,
         "valid": "1",
-        "drag_race_tag": "davepl_gg;32240;20.000311;1;algorithm=base,faithful=yes,bits=1"
+        "drag_race_tag": "davepl_gg;34460;20.000497;1;algorithm=base,faithful=yes,bits=1"
       }
     },
     "vector": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.43352059999961057,
+        "compile_time_s": 0.5018043000000034,
         "binary_size_kb": 61.466796875,
-        "median_ms": 83.22819999739295,
-        "mean_ms": 89.01363999902969,
-        "peak_mem_mb": 261.109375,
+        "median_ms": 94.02399999999034,
+        "mean_ms": 108.24292000033893,
+        "peak_mem_mb": 261.91796875,
         "output": "20000000\n199999990000000"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.20160690000193426,
-        "binary_size_kb": 128.5,
-        "median_ms": 84.29249999971944,
-        "mean_ms": 90.54297999973642,
-        "peak_mem_mb": 260.71484375,
+        "compile_time_s": 0.20510439999998198,
+        "binary_size_kb": 124.5,
+        "median_ms": 92.1782000004896,
+        "mean_ms": 99.69328000079258,
+        "peak_mem_mb": 261.16015625,
         "output": "20000000\n199999990000000"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.3496844000001147,
-        "binary_size_kb": 59.6474609375,
-        "median_ms": 80.35780000136583,
-        "mean_ms": 83.24378000033903,
-        "peak_mem_mb": 260.6484375,
+        "compile_time_s": 0.8737697999986267,
+        "binary_size_kb": 59.751953125,
+        "median_ms": 81.4340999986598,
+        "mean_ms": 84.90853999974206,
+        "peak_mem_mb": 261.11328125,
         "output": "20000000\n199999990000000"
       }
     },
     "trees": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 1.1309590999990178,
+        "compile_time_s": 1.012402000000293,
         "binary_size_kb": 110.6025390625,
-        "median_ms": 487.6049000013154,
-        "mean_ms": 525.5926999998337,
-        "peak_mem_mb": 8.2265625,
+        "median_ms": 513.2374000004347,
+        "mean_ms": 509.2500000002474,
+        "peak_mem_mb": 9.14453125,
         "output": "5242880"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.17941309999878285,
-        "binary_size_kb": 129.0,
-        "median_ms": 484.0310999970825,
-        "mean_ms": 515.880979999929,
-        "peak_mem_mb": 7.76171875,
+        "compile_time_s": 0.1868372000008094,
+        "binary_size_kb": 124.0,
+        "median_ms": 488.8695000008738,
+        "mean_ms": 515.8876200002851,
+        "peak_mem_mb": 8.23828125,
         "output": "5242880"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.36882089999926393,
-        "binary_size_kb": 60.568359375,
-        "median_ms": 493.15349999960745,
-        "mean_ms": 512.2698799998034,
-        "peak_mem_mb": 7.6953125,
+        "compile_time_s": 0.889045800000531,
+        "binary_size_kb": 60.6728515625,
+        "median_ms": 480.52780000034545,
+        "mean_ms": 482.3428399999102,
+        "peak_mem_mb": 8.1640625,
         "output": "5242880"
       }
     },
     "particle": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 0.4493813000008231,
+        "compile_time_s": 0.4838198999987071,
         "binary_size_kb": 60.5,
-        "median_ms": 19.6390999990399,
-        "mean_ms": 25.863959999696817,
-        "peak_mem_mb": 4.96875,
+        "median_ms": 19.959800001743133,
+        "mean_ms": 26.524000000063097,
+        "peak_mem_mb": 5.6328125,
         "output": "5.99982e+07"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.18850359999851207,
-        "binary_size_kb": 150.0,
-        "median_ms": 19.814399998722365,
-        "mean_ms": 66.71488000065438,
-        "peak_mem_mb": 4.46484375,
+        "compile_time_s": 0.2037385000003269,
+        "binary_size_kb": 145.0,
+        "median_ms": 19.692899999427027,
+        "mean_ms": 67.32359999987239,
+        "peak_mem_mb": 4.7265625,
         "output": "59998190"
       },
       "Greengold (Release)": {
-        "compile_time_s": 2.1080268000005162,
-        "binary_size_kb": 58.884765625,
-        "median_ms": 12.245499998243758,
-        "mean_ms": 16.657660000782926,
-        "peak_mem_mb": 4.40625,
-        "output": "5.9999e+07"
+        "compile_time_s": 7.473920000000362,
+        "binary_size_kb": 58.9892578125,
+        "median_ms": 13.073000000076718,
+        "mean_ms": 17.503099999885308,
+        "peak_mem_mb": 4.84765625,
+        "output": "5.99982e+07"
       }
     },
     "gpumatmul": {
       "C++ (GCC -O3)": {
-        "compile_time_s": 1.3078170000007958,
+        "compile_time_s": 2.7055815999992774,
         "binary_size_kb": 97.794921875,
-        "median_ms": 473.27339999901596,
-        "mean_ms": 486.25566666548065,
-        "peak_mem_mb": 214.7421875,
+        "median_ms": 464.6837999989657,
+        "mean_ms": 499.89631999960693,
+        "peak_mem_mb": 214.46875,
         "output": "294743112\n4035566\n127"
       },
       "Rust (opt-level=3)": {
-        "compile_time_s": 0.23314020000543678,
-        "binary_size_kb": 136.0,
-        "median_ms": 463.06560000084573,
-        "mean_ms": 464.66900000167595,
-        "peak_mem_mb": 214.48828125,
+        "compile_time_s": 0.245080800001233,
+        "binary_size_kb": 132.0,
+        "median_ms": 448.6887000002753,
+        "mean_ms": 462.63505999995687,
+        "peak_mem_mb": 214.296875,
         "output": "294743112\n4035566\n127"
       },
       "Greengold (Release)": {
-        "compile_time_s": 0.7144962000020314,
+        "compile_time_s": 0.9465806000007433,
         "binary_size_kb": 62.78125,
-        "median_ms": 474.11619999911636,
-        "mean_ms": 473.8378111101661,
-        "peak_mem_mb": 214.328125,
+        "median_ms": 447.65019999977085,
+        "mean_ms": 451.13014000016847,
+        "peak_mem_mb": 214.41796875,
         "output": "294743112\n4035566\n127"
       }
     }

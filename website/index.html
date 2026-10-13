@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=faf6592397">
+  <link rel="stylesheet" href="style.css?v=504f74df30">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -137,7 +137,7 @@
     <section class="section tight">
       <div class="wrap">
         <div class="stats reveal">
-          <div class="stat"><div class="stat-value">7<small> / 18</small></div><div class="stat-label">workloads where Greengold beat both C++ and Rust</div></div>
+          <div class="stat"><div class="stat-value">9<small> / 18</small></div><div class="stat-label">workloads where Greengold beat both C++ and Rust</div></div>
           <div class="stat"><div class="stat-value">15<small> / 18</small></div><div class="stat-label">ahead, or within 5% of the faster of the two</div></div>
           <div class="stat"><div class="stat-value">3</div><div class="stat-label">ownership words: <code>read</code>, <code>lend</code>, <code>consume</code></div></div>
         </div>
@@ -233,7 +233,7 @@
           <div>
             <span class="kicker">Performance</span>
             <h3>Checks stay on in release builds</h3>
-            <p>18 workloads against <code>g++ -O3</code> and <code>rustc -C opt-level=3</code>, measured on 9 October 2026. Greengold's <code>--release</code> keeps bounds checks and integer overflow traps on.</p>
+            <p>18 workloads against <code>g++ -O3</code> and <code>rustc -C opt-level=3</code>, measured on 13 October 2026. Greengold's <code>--release</code> keeps bounds checks and integer overflow traps on.</p>
             <ul class="checks">
               <li>Median of five runs; peak memory, compile time, and binary size too.</li>
               <li>Every program prints a checked result, so the work is not optimized away.</li>
@@ -243,7 +243,7 @@
           </div>
           <div class="bench-panel">
             <div class="legend"><span><i class="lg-cpp"></i>C++</span><span><i class="lg-rust"></i>Rust</span><span><i class="lg-gg"></i>Greengold</span><span style="margin-left:auto">shorter is faster</span></div>
-            <div class="brow"><div class="brow-head"><a href="benchmarks.html#mandel">Mandelbrot <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 3.2%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:96.9%"></span></span><span class="bar-val">322.5 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.0%"></span></span><span class="bar-val">326.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">332.7 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#matmul">Matmul <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">18% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">427.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:96.4%"></span></span><span class="bar-val">411.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:79.2%"></span></span><span class="bar-val">338.0 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#qsort">Quicksort <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">12% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">563.9 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:90.9%"></span></span><span class="bar-val">512.5 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:80.3%"></span></span><span class="bar-val">452.8 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#trees">Trees <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 1.9%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.9%"></span></span><span class="bar-val">487.6 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:98.2%"></span></span><span class="bar-val">484.0 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">493.2 ms</span></div></div></div>
+            <div class="brow"><div class="brow-head"><a href="benchmarks.html#mandel">Mandelbrot <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 0.5%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:98.8%"></span></span><span class="bar-val">322.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">326.2 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:99.3%"></span></span><span class="bar-val">323.9 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#matmul">Matmul <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge within">within 3.5%</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:96.6%"></span></span><span class="bar-val">299.3 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:99.3%"></span></span><span class="bar-val">307.7 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">309.9 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#qsort">Quicksort <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">5% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">539.1 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:91.1%"></span></span><span class="bar-val">490.9 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:86.6%"></span></span><span class="bar-val">467.0 ms</span></div></div></div><div class="brow"><div class="brow-head"><a href="benchmarks.html#trees">Trees <span class="t-dim" style="font-weight:400;color:var(--muted);font-size:.82rem">· median</span></a><span class="badge faster">2% faster</span></div><div class="bars"><div class="bar cpp"><span>C++</span><span class="bar-track"><span class="bar-fill" style="--w:100.0%"></span></span><span class="bar-val">513.2 ms</span></div><div class="bar rust"><span>Rust</span><span class="bar-track"><span class="bar-fill" style="--w:95.3%"></span></span><span class="bar-val">488.9 ms</span></div><div class="bar gg"><span>Greengold</span><span class="bar-track"><span class="bar-fill" style="--w:93.6%"></span></span><span class="bar-val">480.5 ms</span></div></div></div>
           </div>
         </div>
       </div>
@@ -334,6 +334,6 @@
       </div>
     </div>
   </footer>
-  <script src="app.js?v=faf6592397"></script>
+  <script src="app.js?v=504f74df30"></script>
 </body>
 </html>
