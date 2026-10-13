@@ -27,7 +27,7 @@ fn main():
 
 ## Status
 
-Greengold is **pre-1.0 and experimental** (version 0.19.x). The language, the standard library, and the diagnostics can still change between minor versions; [`docs/STABILITY.md`](docs/STABILITY.md) describes editions and the API lock check. Do not use it for anything that must be correct yet.
+Greengold is **pre-1.0 and experimental** (version 0.20.x). The language, the standard library, and the diagnostics can still change between minor versions; [`docs/STABILITY.md`](docs/STABILITY.md) describes editions and the API lock check. Do not use it for anything that must be correct yet.
 
 Known limits:
 

@@ -2,7 +2,7 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
-## Unreleased
+## 0.20.0
 
 Attributes and VS Code
 - `@name(args)` above a `fn`, an `impl` method, a `struct`, or a field, declared first with `attribute name(param: kind) on fn, struct, field`. The compiler checks each use and gives it no behavior; `gg attrs file.gg` lists the uses as JSON for code generators (RPC stubs, serialization tables). New codes GG0407 and GG0408.
