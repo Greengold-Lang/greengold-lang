@@ -35,7 +35,7 @@ This series has 11 chapters that build on each other. Following them in order is
 |---|---|---|
 | [**01. Basics and Types**](01_Basics_and_Types.md) | Variables, numeric types, expressions | `fn main()`, variables (`=`), `fixed`, primitive types, numbers, and language rules |
 | [**02. Control Flow and Loops**](02_Control_Flow.md) | Conditions, range loops, iterators | `if/elif/else`, inline `if-then-else`, `while`, exclusive/inclusive ranges, indexed loops, `break`/`continue` |
-| [**03. Functions, Methods, and Lambdas**](03_Functions_Methods_and_Lambdas.md) | Function signatures, `impl`, lambdas | Functions, `impl` method blocks, static methods, function pointers `fn(...) -> T`, anonymous lambdas `=>` |
+| [**03. Functions, Methods, and Lambdas**](03_Functions_Methods_and_Lambdas.md) | Function signatures, `impl`, lambdas | Functions, `impl` method blocks, static methods, function pointers `fn(...) -> T`, anonymous lambdas `=>`, attributes `@name` |
 | [**04. Ownership, Modes, and Memory**](04_Ownership_Modes_and_Memory.md) | `read`, `lend`, `consume`, `defer` | Greengold's memory backbone: parameter modes, Copy vs Move types, automatic `drop`, `defer` cleanup |
 | [**05. Data Structures and Tuples**](05_Data_Structures_and_Tuples.md) | Struct, enum, tuple, destructuring | `struct`, algebraic `enum`, tuples `(A, B)`, destructuring assignment `a, b = t`, fixed arrays `[N]T`, slices `[]T` |
 | [**06. Pattern Matching**](06_Pattern_Matching.md) | `match`, `if let`, `while let` | `match` statements and expressions, algebraic enum matching, scalar ranges, wildcard `_`, `if let` and `while let` |

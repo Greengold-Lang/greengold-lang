@@ -1,0 +1,27 @@
+attribute replicated(mode: ident, reliable: bool = false) on fn
+attribute replicated_using(notify: str) on field
+attribute deprecated(note: str = "") on fn, struct
+
+struct Player:
+    @replicated_using("on_health")
+    health: i32
+    name: str
+
+@deprecated("use Player instead")
+struct OldPlayer:
+    hp: i32
+
+impl Player:
+    @replicated(server, reliable=true)
+    fn take_damage(self: lend Self, amount: i32):
+        self.health -= amount
+
+@replicated(multicast)
+fn play_sound(id: i32):
+    print(id)
+
+fn main():
+    p = Player{ health: 10, name: "a" }
+    p.take_damage(3)
+    play_sound(1)
+    print(p.health)

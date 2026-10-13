@@ -118,6 +118,8 @@ Bands: `GG01xx` syntax, `GG02xx` names and types, `GG03xx` ownership and referen
 | `GG0403` | `read-failed` | other | A source file could not be read. |
 | `GG0404` | `compiler-internal` | other | The compiler hit an internal error. |
 | `GG0406` | `unsafe-required` | effect | This operation is only legal in `unsafe:`. |
+| `GG0407` | `unknown-attribute` | other | An `@attribute` was used without being declared. |
+| `GG0408` | `bad-attribute` | other | An `@attribute` does not match its declaration. |
 | `GG0499` | `unclassified` | other | This diagnostic has no specific code yet. |
 
 ## Details
