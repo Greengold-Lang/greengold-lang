@@ -8,6 +8,32 @@ In addition to syntax highlighting and modern snippets, it provides an interacti
 
 ---
 
+## About Greengold
+
+**Greengold** is an indentation-sensitive, memory-safe systems programming language. It aims at C++/Rust speed with a gentle learning curve:
+
+- **Simple syntax.** Python-like blocks, no braces or semicolons, no lifetime annotations.
+- **Memory safety at compile time.** Ownership and borrowing are checked by the compiler. The parameter mode (`read`, `lend`, `exclusive`, `consume`) is written once, on the signature, and often inferred.
+- **Native code through LLVM.** `.gg` files compile to LLVM IR, then to machine code. Debug and release builds, cross-compiling with `--target`, and a C FFI are included.
+- **Modern features.** Structural interfaces (`feature`), generics, `comptime`, `defer`, `match`, closures, threads and async, `Optional` / `Result` instead of null and exceptions.
+- **Batteries included.** A standard library (collections, strings, JSON, files, threads, sockets), a test runner (`gg test`), a formatter (`gg fmt`) and a language server (`gg lsp`) ship with the compiler.
+
+```gg
+fn sum(a: []i32) -> i32:
+    total = 0
+    for x in a:
+        total += x
+    return total
+
+fn main():
+    nums = [10, 20, 30, 40]
+    print("Total:", sum(nums))
+```
+
+Greengold is **pre-1.0 and experimental**: the language and library can still change between versions. See the [project page](https://github.com/Greengold-Lang/greengold-lang) and [greengoldlang.com](https://greengoldlang.com/) for the spec, tutorial and install instructions.
+
+---
+
 ## 🚀 Key Features
 
 ### 1. Language Server Protocol (LSP) Support
@@ -202,6 +228,7 @@ You can customize the following options via VS Code settings (`Ctrl+,` -> `green
 The extension is plain JavaScript with no native code, so it runs on **Windows, macOS and Linux** (x64 and ARM) and needs **VS Code 1.91 or newer**.
 
 - The `gg` compiler is a separate install and must be present on each machine. The extension looks for it in the `greengold.path` setting, then on `PATH`, then in the installer's folder (`~/.greengold/bin/gg` on macOS and Linux, `%LOCALAPPDATA%\Greengold\bin\gg.exe` on Windows).
+- Ready-made `gg` builds exist for Windows x64, Linux (x64, arm64) and macOS on Apple Silicon. There is no Intel Mac build; on an Intel Mac, install from source (`pip install -e .`) and set `greengold.path`.
 - Native debugging needs a debugger extension: CodeLLDB (`vadimcn.vscode-lldb`, preferred) or C/C++ (`ms-vscode.cpptools`, which uses the Visual Studio debugger on Windows, `lldb` on macOS and `gdb` on Linux). Set `greengold.debug.debugger` to choose. On macOS, install the Xcode Command Line Tools.
 
 ---
