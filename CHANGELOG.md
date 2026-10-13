@@ -2,7 +2,7 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
-## Unreleased
+## 0.19.2
 
 Borrow checker
 - **Fix (soundness):** a view made in a branch of an `if` or `match` for a variable of the enclosing scope (`v = s.as_str()` when `v` held a literal) was forgotten after the branch, so `s.clear()` or a reassignment followed by a use of `v` was accepted, and so was a borrow carried to the next loop iteration behind an `if`. Both are now rejected (GG0316).
