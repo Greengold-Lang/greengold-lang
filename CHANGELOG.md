@@ -7,6 +7,7 @@ Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0
 Thread safety
 - **Fix (soundness):** `std.tasks` kept one scheduler for the whole program, so two threads that each used `async`/`await` corrupted it (a crash in safe code). The first thread to use tasks now owns them, and a call from another thread stops the program with "tasks belong to one thread".
 - **Fix (soundness):** a view taken through a call that returns a reference (`v = g.value().as_str()` with `g` a `Locked` guard) was not tied to its owner, so it could outlive the guard and read memory another thread had freed. It is now tied to `g` (GG0315 / GG0316).
+- `std.net` started the Windows socket library with a plain flag: a second thread could use sockets before the first had finished `WSAStartup`. One thread now starts it and the others wait.
 - `tools/fuzz_threads.py` runs programs whose threads overlap (`Arc[Locked[T]]`, `Queue`, atomics, read-only `Arc`) under the memory oracle; `tools/send_matrix.py` checks the rule for what may cross a thread against a hand-written table (152 cases, no hole, no false error).
 
 ## 0.19.2
