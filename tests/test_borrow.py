@@ -280,3 +280,39 @@ def test_index_assignment_into_moved_array_is_rejected():
 def test_index_assignment_after_reassigning_array_is_fine():
     msgs = messages(with_main('a = [string.from("x")]\nb = a\na = [string.from("z")]\na[0] = string.from("y")'))
     assert not has(msgs, "was moved")
+
+
+def _errors_with_imports(src: str) -> list[str]:
+    from greengold.cli import analyze
+    _p, _s, diags, _c = analyze([], initial_source=src, initial_filename="<test>.gg")
+    return [d.message for d in diags.items if getattr(d, "severity", "error") == "error"]
+
+
+GUARD_VIEW = """
+import std.thread { Locked }
+fn main():
+    m = Locked[string].new(string.from("a"))
+    v = ""
+    if true:
+        g = m.lock()
+        v = g.value().as_str()
+    m.set(string.from("bbbbbbbbbbbbbbbbbbbb"))
+    print(v)
+"""
+
+
+def test_view_taken_through_a_reference_call_is_tied_to_its_owner():
+    # `g.value().as_str()` points into the guarded value: it cannot outlive `g` (found by the thread checks: read of freed memory)
+    assert has(_errors_with_imports(GUARD_VIEW), "does not live long enough")
+
+
+def test_view_through_a_reference_call_is_fine_inside_the_guard_scope():
+    src = """
+import std.thread { Locked }
+fn main():
+    m = Locked[string].new(string.from("a"))
+    g = m.lock()
+    v = g.value().as_str()
+    print(v)
+"""
+    assert _errors_with_imports(src) == []

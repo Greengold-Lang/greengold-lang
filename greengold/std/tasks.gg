@@ -24,6 +24,7 @@ import std.time
 private
 extern "stdlib.h" fn malloc(size: usize) -> *mut u8
 extern "stdlib.h" fn free(ptr: *u8)
+extern "pthread.h" fn pthread_self() -> u64
 weak extern "windows.h" fn ConvertThreadToFiber(param: *u8) -> *mut u8
 weak extern "windows.h" fn CreateFiber(stack: usize, start: fn(*u8), param: *u8) -> *mut u8
 weak extern "windows.h" fn SwitchToFiber(fiber: *u8)
@@ -56,6 +57,7 @@ struct _Rec:
     writable: bool
 
 static STARTED: bool = false
+static OWNER: i64 = 0       # the thread that uses tasks (claimed by the first call); no other thread may
 static CURRENT: u64 = 0     # the running task
 static MAIN: u64 = 0        # the record of the program itself
 static SCHED: u64 = 0       # the scheduler's context (a fiber or a ucontext buffer)
@@ -81,7 +83,19 @@ fn _new_rec() -> u64:
             bnext: 0, wake_at: -1, fd: -1, writable: false }
         return p
 
+# The scheduler is one set of globals for the whole program, so only one thread may use tasks. The first thread
+# to call claims it (one atomic step); a call from any other thread stops the program instead of corrupting it.
+fn _claim():
+    unsafe:
+        me = i64(pthread_self())
+        if me == 0:
+            me = 1
+        seen = atomic_cas[i64](addr_mut(OWNER), 0, me, "seq_cst")
+        if seen != 0 and seen != me:
+            panic("std.tasks: tasks belong to one thread; another thread already uses them")
+
 fn _start():
+    _claim()
     unsafe:
         if STARTED:
             return
@@ -317,12 +331,14 @@ public
 impl Task[T]:
     # True when the task has finished.
     fn is_done(self: read Self) -> bool:
+        _claim()
         unsafe:
             return self.rec == 0 or _r(self.rec)[0].state == _DONE
 
     fn drop(self: lend Self):
         unsafe:
             if self.rec != 0:
+                _claim()
                 _wait_done(self.rec)
                 unsafe:
                     old = ptr_read[T](_r(self.rec)[0].result)

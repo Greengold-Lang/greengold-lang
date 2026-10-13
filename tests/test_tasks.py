@@ -221,3 +221,31 @@ fn main():
     assert r.returncode == 0, r.stderr
     assert "LEAK" not in r.stderr
     assert r.stdout.splitlines() == ["hi x", "hi y"]
+
+
+def test_tasks_from_a_second_thread_stop_the_program():
+    # the scheduler is global: two threads using it used to corrupt it (segfault found by the thread-race checks)
+    r = run_built(r"""
+import std.thread { Thread }
+import std.tasks
+
+async fn work(n: i32) -> i32:
+    tasks.yield_now()
+    return n * 2
+
+fn run():
+    for i in 0..200:
+        a = work(i)
+        x = await a
+        if x != i * 2:
+            panic("bad")
+
+fn main():
+    run()
+    t = Thread.spawn(fn() => run())
+    t.join()
+    print("done")
+""")
+    assert r.returncode != 0
+    assert "tasks belong to one thread" in r.stderr
+    assert "done" not in r.stdout

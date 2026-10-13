@@ -521,7 +521,11 @@ class BorrowChecker:
             cty = getattr(child, "ty", None)
             root = self._root_name(child) if isinstance(child, (Name, FieldAccess, IndexAccess)) else None
             through = self._slice_base(child)
-            if through is not None:  # `names[0].as_str()` of a `[]string`: points where `names` points
+            tie = getattr(child, "tie_root", None) if isinstance(child, (Call, MethodCall)) else None
+            if tie and getattr(child, "view_ptr", False):
+                # `g.value().as_str()`: the call returns a reference into `g`, so the view points where `g` does
+                out.append((tie, "lend" if getattr(child, "view_lend", False) else "read", child))
+            elif through is not None:  # `names[0].as_str()` of a `[]string`: points where `names` points
                 out.extend(self._view_sources(through, holders))
             elif root and isinstance(e, SliceExpr) and child is e.obj and isinstance(cty, str) and is_array_type(cty):
                 out.append((root, "read", child))  # `xs[1..3]` of an array: points into `xs`'s own memory
