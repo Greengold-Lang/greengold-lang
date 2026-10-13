@@ -1,0 +1,230 @@
+import std.thread
+import std.collections
+
+static GG_LIVE: i64 = 0
+
+struct Rec:
+    id: i32
+    w: i32
+
+struct Pl:
+    name: string
+    items: List[i32]
+    k: i32
+
+impl Pl:
+    fn total(self: read Self) -> i32:
+        t = self.k
+        for x in self.items:
+            t += x
+        return t
+
+    fn bump(self: lend Self):
+        self.k += 1
+        self.items.push(self.k)
+
+    fn rename(self: lend Self, s: str):
+        self.name.append_str(s)
+
+    fn label(self: read Self) -> str:
+        return self.name.as_str()
+
+    fn head(self: read Self) -> ref string:
+        return self.name
+
+enum Ev:
+    Num(i32)
+    Txt(string)
+    Both(string, List[i32])
+    Nothing
+
+struct Tok:
+    id: i32
+
+impl Tok:
+    fn drop(self: lend Self):
+        unsafe:
+            GG_LIVE -= 1
+
+fn new_tok(id: i32) -> Tok:
+    unsafe:
+        GG_LIVE += 1
+    return Tok{ id: id }
+
+struct Hold:
+    t: Tok
+    s: string
+
+struct Vw:
+    v: str
+
+struct Sl:
+    s: []i32
+
+struct Slot:
+    who: read Pl tied to self
+
+feature Speak:
+    fn speak(self: read Self) -> i32
+    fn twice(self: read Self) -> i32:
+        return self.speak() * 2
+
+struct Dog:
+    name: string
+
+impl Dog:
+    fn speak(self: read Self) -> i32:
+        return i32(self.name.len)
+
+struct Cat:
+    n: i32
+
+impl Cat:
+    fn speak(self: read Self) -> i32:
+        return self.n
+
+fn mk_li(n: i32) -> List[i32]:
+    xs = List[i32]()
+    for i in 0..n:
+        xs.push(i + 1)
+    return xs
+
+fn mk_ls(n: i32) -> List[string]:
+    xs = List[string]()
+    for i in 0..n:
+        xs.push(string.from("e") + i)
+    return xs
+
+fn mk_p(n: i32) -> Pl:
+    return Pl{ name: string.from("p"), items: mk_li(n), k: n }
+
+fn gg_flip(k: i32) -> bool:
+    return k % 2 == 0
+
+fn gg_sink[T](x: consume T):
+    pass
+
+fn gg_peek[T](x: read T):
+    pass
+
+fn gg_touch[T](x: lend T):
+    pass
+
+fn gg_noop_len(s: string):
+    pass
+
+fn p_read(p: read Pl) -> i32:
+    return p.total()
+
+fn p_lend(p: lend Pl):
+    p.bump()
+
+fn p_consume(p: consume Pl) -> i32:
+    return p.total()
+
+fn pick_p(a: read Pl, b: read Pl) -> ref Pl tied to b:
+    return b
+
+fn sum_sl(s: []i32) -> i32:
+    total = 0
+    for x in s:
+        total += x
+    return total
+
+fn count_strs(xs: []string) -> usize:
+    return xs.len
+
+fn make_adder(k: i32) -> Fn(i32) -> i32:
+    return fn(x: i32) -> i32 => x + k
+
+fn make_len(s: string) -> Fn() -> usize:
+    return fn() -> usize => s.len
+
+fn apply_fn(f: fn(i32) -> i32, n: i32) -> i32:
+    return f(n)
+
+fn show_p(p: read Pl):
+    print(p.name, p.total())
+
+fn show_e(e: read Ev):
+    match e:
+        Num(a):
+            print(a)
+        Txt(a):
+            print(a)
+        Both(a, b):
+            print(a, b.len)
+        Nothing:
+            print("nothing")
+
+fn report():
+    unsafe:
+        print("GG_LIVE", GG_LIVE)
+
+struct Bag:
+    items: List[i32]
+
+impl Bag:
+    fn add(self: read Self, other: read Bag) -> Bag:
+        r = Bag{ items: self.items.clone() }
+        r.items.extend(other.items)
+        return r
+
+struct Stack[T]:
+    items: List[T]
+
+impl Stack[T]:
+    fn push(self: lend Self, x: T):
+        self.items.push(x)
+
+    fn pop(self: lend Self) -> Optional[T]:
+        return self.items.pop()
+
+    fn peek(self: read Self) -> ref T:
+        return self.items[0]
+
+    fn size(self: read Self) -> usize:
+        return self.items.len
+
+fn stack_new[T]() -> Stack[T]:
+    return Stack[T]{ items: List[T]() }
+
+struct Counter:
+    cur: i32
+    end: i32
+
+impl Counter:
+    fn next(self: lend Self) -> Optional[i32]:
+        if self.cur >= self.end:
+            return None
+        v = self.cur
+        self.cur += 1
+        return Valid(v)
+
+fn parse_pos(s: read string) -> Result[i32, string]:
+    if s.len == 0:
+        return Err(string.from("empty"))
+    return Ok(i32(s.len))
+
+fn try_chain(a: read string, b: consume string, c: consume List[string]) -> Result[i32, string]:
+    n = parse_pos(a)?
+    local = string.from("tmp")
+    m = parse_pos(b)?
+    tail = c.len
+    return Ok(n + m + i32(local.len) + i32(tail))
+
+fn first_of(xs: read List[string]) -> ref string:
+    return xs[0]
+
+fn longer(a: read string, b: read string) -> ref string tied to b:
+    return b
+
+fn gg_inc(a: read Arc[thread.AtomicI64]):
+    a.value.fetch_and_add(1)
+
+fn gg_push_locked(a: read Arc[thread.Locked[List[i32]]]):
+    g = a.value.lock()
+    g.value().push(1)
+
+fn gg_send(q: read Arc[thread.Queue[string]], s: read string):
+    q.value.send(s.clone())
