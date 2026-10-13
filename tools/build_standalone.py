@@ -11,9 +11,6 @@ The folder holds Python, llvmlite (with LLVM), the compiler, the Core library, t
 debugger printers. When the `ziglang` package is installed it is bundled too, and `gg build` links with
 its `zig cc` where no gcc or clang is found, so the folder alone builds programs for every target.
 
-`--onefile` builds `dist/onefile/gg` (`gg.exe`) instead: only for the bridge release asset that `gg update` of
-0.21.0 and older looks for (see release.yml).
-
 It is a folder, not one file, on purpose: a PyInstaller one-file build unpacks itself into a temp folder on
 every start, which took 10 to 25 seconds on Windows (every extracted file is scanned by the antivirus).
 """
