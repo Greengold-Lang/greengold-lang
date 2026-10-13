@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=faf6592397">
+  <link rel="stylesheet" href="style.css?v=504f74df30">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -154,7 +154,7 @@
 <span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
     <span class="tok-fn">print</span>(<span class="tok-fn">add</span>(<span class="tok-num">2</span>, <span class="tok-num">3</span>))</code></pre></figure>
 <h3 id="attributes">Attributes<a class="anchor" href="#attributes" aria-label="Link to this section">#</a></h3>
-<p>An attribute is a line <code>@name</code> or <code>@name(args)</code> directly above a <code>fn</code>, a method in an <code>impl</code>, a <code>struct</code>, or a struct field. The compiler gives an attribute no meaning of its own. It checks the use and records it, and a tool or a code generator acts on it: network stubs, serialization tables, editor metadata.</p>
+<p>An attribute is a line <code>@name</code> or <code>@name(args)</code> directly above a <code>fn</code>, a method in an <code>impl</code>, a <code>struct</code>, or a struct field. The compiler checks the use and records it, and a tool or a code generator acts on it: network stubs, serialization tables, editor metadata. An attribute can also say what it requires, in code: see the body below.</p>
 <p>An attribute must be declared first, so a misspelled one is an error. <code>attribute name(param: kind, ...)</code> lists the parameters. A kind is <code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>, or <code>ident</code> (a bare name such as <code>server</code>). <code>= value</code> makes a parameter optional. <code>on fn, struct, field</code> limits where the attribute may go; without it, anywhere. Arguments are positional or <code>key=value</code>, and are literals or bare names, never expressions. An attribute may be written once per item.</p>
 <figure class="code bare"><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button><pre><code>attribute <span class="tok-fn">replicated</span>(mode: ident, reliable: <span class="tok-type">bool</span> <span class="tok-op">=</span> <span class="tok-num">false</span>) on <span class="tok-kw">fn</span>
 attribute <span class="tok-fn">notify</span>(callback: <span class="tok-type">str</span>) on field
@@ -172,6 +172,20 @@ attribute <span class="tok-fn">notify</span>(callback: <span class="tok-type">st
     p <span class="tok-op">=</span> <span class="tok-type">Player</span>{ health: <span class="tok-num">10</span> }
     p.<span class="tok-fn">hit</span>(<span class="tok-num">3</span>)
     <span class="tok-fn">print</span>(p.health)</code></pre></figure>
+<p>A declaration may end in <code>:</code> and a body. The body is <code>comptime</code> code that runs while compiling, once for each use. It sees the arguments as variables (an <code>ident</code> is a <code>str</code>, an <code>int</code> an <code>i64</code>, a <code>float</code> an <code>f64</code>) and four <code>str</code> values about the item: <code>target_kind</code> (<code>fn</code>, <code>struct</code>, or <code>field</code>), <code>target_name</code>, <code>target_owner</code> (the struct of a method or field, else empty), and <code>target_type</code> (the result type of a function or the type of a field, else empty). <code>compile_error(message)</code> rejects the use: the error points at the <code>@name</code> line and carries the message. <code>compile_error</code> is only for this body, and the body follows the rules of <code>comptime fn</code> (no I/O, no heap).</p>
+<figure class="code bare"><button type="button" class="copy" aria-label="Copy code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="label">Copy</span></button><pre><code>attribute <span class="tok-fn">range</span>(min: <span class="tok-type">int</span>, max: <span class="tok-type">int</span>) on field:
+    <span class="tok-kw">if</span> min &gt; max:
+        <span class="tok-fn">compile_error</span>(<span class="tok-str">"min is bigger than max"</span>)
+    <span class="tok-kw">if</span> target_type <span class="tok-op">!=</span> <span class="tok-str">"i32"</span>:
+        <span class="tok-fn">compile_error</span>(<span class="tok-str">f"@range is for i32 fields, not {target_type}"</span>)
+
+<span class="tok-kw">struct</span> <span class="tok-type">Slider</span>:
+    @<span class="tok-fn">range</span>(<span class="tok-num">0</span>, <span class="tok-num">100</span>)
+    volume: <span class="tok-type">i32</span>
+
+<span class="tok-kw">fn</span> <span class="tok-fn">main</span>():
+    s <span class="tok-op">=</span> <span class="tok-type">Slider</span>{ volume: <span class="tok-num">50</span> }
+    <span class="tok-fn">print</span>(s.volume)</code></pre></figure>
 <p><code>gg attrs file.gg</code> type-checks the program and writes every attributed item as JSON: its kind, name, owner, file and line, parameter types and modes, and each attribute with its arguments resolved to parameter names and defaults filled in.</p>
 <h2 id="5-copy-and-move"><span class="num">5.</span>Copy and move<a class="anchor" href="#5-copy-and-move" aria-label="Link to this section">#</a></h2>
 <p>Numbers, <code>bool</code>, <code>str</code>, raw pointers, and structs and enums that do not contain <code>Box</code>, <code>List</code>, <code>string</code>, a <code>std.thread</code> handle, or a type with <code>drop</code> (section 7) are copied. Copying a struct copies its fields. <code>consume</code> on a number, <code>bool</code>, or array of numbers is an error.</p>
@@ -833,6 +847,6 @@ packed <span class="tok-kw">struct</span> <span class="tok-type">Header</span>:
       </div>
     </div>
   </footer>
-  <script src="app.js?v=faf6592397"></script>
+  <script src="app.js?v=504f74df30"></script>
 </body>
 </html>

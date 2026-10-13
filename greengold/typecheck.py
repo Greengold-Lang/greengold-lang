@@ -28,7 +28,7 @@ from .ast_nodes import (
 from .diagnostics import DiagnosticBag, Edit, Fix, Label, Note
 from .closures import ClosureMixin, _at, _replace
 from . import friendly
-from .attrs import check_attributes
+from .attrs import check_attributes, run_handlers as run_attribute_handlers
 from .generics import GenericsMixin
 from .lexer import tokenize
 from .matchcheck import MatchMixin
@@ -3315,6 +3315,8 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             return self._print(e)
         if e.callee == "panic":
             return self._panic(e)
+        if e.callee == "compile_error":
+            return self._compile_error(e)
         if e.callee == "input":
             return self._input(e)
         if e.callee in ("target_os", "target_arch") and self._lookup(e.callee) is None:
@@ -3981,6 +3983,16 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             return ERR
         _replace(e, new)
         return self._expr(e)
+
+    def _compile_error(self, e: Call) -> str:
+        """`compile_error("message")`: only in the body of an `attribute`; reports an error at the attribute's use."""
+        types = [int_base(self._expr_any(a)) for a in e.args]
+        if self.cur is None or not getattr(self.cur.decl, "attr_handler", False):
+            self._err(e, "`compile_error` is only for the body of an `attribute`.",
+                      "Write `attribute name(...) on fn:` and put the check under it.")
+        elif len(types) != 1 or types[0] not in (ERR, "str", "string"):
+            self._err(e, "`compile_error` takes one `str` message.", 'Write `compile_error("what is wrong")`.')
+        return VOID
 
     def _panic(self, e: Call) -> str:
         """`panic("message")` / `panic(f"bad {x}")`: takes one `str` or `string`, returns void."""
@@ -5499,6 +5511,9 @@ def check_program(program: Program, diags: DiagnosticBag, filename: str = "<sour
     _mark_auto_fixed(program, checker.var_changes)
     if len(diags.items) == before:
         _eval_comptime(program, diags, checker)
+    if len(diags.items) == before:
+        run_attribute_handlers(program, diags)
+    program.decls[:] = [d for d in program.decls if not getattr(d, "attr_handler", False)]
     if len(diags.items) == before:
         MoveAnalyzer(program, diags).run()
     if len(diags.items) == before:

@@ -593,6 +593,7 @@ class AttrDecl(Node):
     name: str
     params: list[AttrParam] = field(default_factory=list)
     targets: list[str] = field(default_factory=list, kw_only=True)
+    handler: Optional[object] = field(default=None, kw_only=True)  # the body, as a `comptime fn __attr_name`
 
 
 @dataclass(eq=False)

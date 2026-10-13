@@ -1,0 +1,17 @@
+# conformance: SPEC section 4 (Functions), example 6
+# expect-output:
+#   50
+
+attribute range(min: int, max: int) on field:
+    if min > max:
+        compile_error("min is bigger than max")
+    if target_type != "i32":
+        compile_error(f"@range is for i32 fields, not {target_type}")
+
+struct Slider:
+    @range(0, 100)
+    volume: i32
+
+fn main():
+    s = Slider{ volume: 50 }
+    print(s.volume)

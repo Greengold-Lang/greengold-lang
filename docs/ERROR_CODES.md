@@ -120,6 +120,7 @@ Bands: `GG01xx` syntax, `GG02xx` names and types, `GG03xx` ownership and referen
 | `GG0406` | `unsafe-required` | effect | This operation is only legal in `unsafe:`. |
 | `GG0407` | `unknown-attribute` | other | An `@attribute` was used without being declared. |
 | `GG0408` | `bad-attribute` | other | An `@attribute` does not match its declaration. |
+| `GG0409` | `attribute-check` | other | The body of an `attribute` rejected this use. |
 | `GG0499` | `unclassified` | other | This diagnostic has no specific code yet. |
 
 ## Details

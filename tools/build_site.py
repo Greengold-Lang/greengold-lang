@@ -833,7 +833,7 @@ fn main():
     return layout("why", "why.html", "Why", "Why Greengold is shaped the way it is: one spelling for each construct, three ownership words, inferred mutability, and diagnostics that carry a checked fix.", body)
 
 
-DATE_LONG = "9 October 2026"
+DATE_LONG = "13 October 2026"
 
 
 def build_benchmarks(rows: list[dict]) -> str:
@@ -846,7 +846,7 @@ def build_benchmarks(rows: list[dict]) -> str:
 
     chips = "".join(f'<span class="chip">{t}</span>' for t in (
         "AMD Ryzen 5 5600X · 6C/12T", "32 GB DDR4-3600", "Windows 11 Pro 26200",
-        "g++ 15.2.0", "rustc 1.99.0-nightly", "llvmlite 0.42.0"))
+        "g++ 15.2.0", "rustc 1.97.1 (stable)", "llvmlite 0.42.0"))
 
     overview = "".join(brow(r, "") for r in rows)
     pills = "".join(f'<a href="#{r["id"]}">{esc(r["title"])}</a>' for r in rows)
@@ -931,7 +931,7 @@ def build_benchmarks(rows: list[dict]) -> str:
             <li>Raw numbers, including every printed output, are in <a href="benchmarks/data.json">benchmarks/data.json</a>.</li>
           </ul></div>
           <div class="panel reveal"><h3>{ICONS["cpu"]} Builds and machine</h3><ul class="list">
-            <li><code>g++ -O3</code> (15.2.0), <code>rustc -C opt-level=3</code> (1.99.0-nightly, 2026-08-10), <code>gg build --release</code> with Python 3.11.5 and llvmlite 0.42.0.</li>
+            <li><code>g++ -O3</code> (15.2.0), <code>rustc -C opt-level=3</code> (1.97.1 stable, 2026-07-14), <code>gg build --release</code> with Python 3.11.5 and llvmlite 0.42.0.</li>
             <li>AMD Ryzen 5 5600X, 6 cores and 12 threads, 32 GB DDR4-3600, Windows 11 Pro build 26200.</li>
             <li>Greengold sources use <code>hot fn</code>, <code>trust</code>, and <code>overflow: wrap</code> where the workload notes say so.</li>
           </ul></div>

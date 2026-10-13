@@ -141,6 +141,39 @@ def check_attributes(program, diags: DiagnosticBag) -> None:
                 attr.resolved = values  # type: ignore[attr-defined]
 
 
+def run_handlers(program, diags: DiagnosticBag) -> None:
+    """Runs the body of each `attribute ...:` for every use that checked. The body sees the arguments by name and
+    `target_kind` (`fn`, `struct`, `field`), `target_name`, `target_owner`, and `target_type` (the result of a
+    function, the type of a field). Each `compile_error(message)` becomes an error at the `@name` line."""
+    from .comptime import ComptimeError, Interp
+
+    declared = _declarations(program.decls, None)
+    if not any(d.handler is not None for d in declared.values()):
+        return
+    interp = Interp(program)
+    for kind, node, owner, _slug in _targets(program):
+        if isinstance(node, FuncDecl):
+            ty = node.ret.name if node.ret else ""
+        elif isinstance(node, FieldDecl):
+            ty = node.type_ref.name
+        else:
+            ty = ""
+        for attr in getattr(node, "attrs", ()):
+            decl = declared.get(attr.name)
+            values = getattr(attr, "resolved", None)
+            if decl is None or decl.handler is None or values is None:
+                continue
+            args = [values[p.name] for p in decl.params] + [kind, node.name, owner or "", ty]
+            try:
+                messages = interp.run_attribute(decl.handler, args)
+            except ComptimeError as err:
+                messages = [f"The body of `attribute {attr.name}` could not run: {err}"]
+            except RecursionError:
+                messages = [f"The body of `attribute {attr.name}` recurses too deeply."]
+            for message in messages:
+                diags.error(message, attr.line, attr.col, attr.length, filename=attr.filename, rule="attribute-check")
+
+
 def export(program) -> list[dict]:
     """Every attributed item with its resolved arguments, for `gg attrs`. Skips uses that did not check."""
     declared = _declarations(program.decls, None)

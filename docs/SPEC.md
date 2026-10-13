@@ -137,7 +137,7 @@ fn main():
 
 ### Attributes
 
-An attribute is a line `@name` or `@name(args)` directly above a `fn`, a method in an `impl`, a `struct`, or a struct field. The compiler gives an attribute no meaning of its own. It checks the use and records it, and a tool or a code generator acts on it: network stubs, serialization tables, editor metadata.
+An attribute is a line `@name` or `@name(args)` directly above a `fn`, a method in an `impl`, a `struct`, or a struct field. The compiler checks the use and records it, and a tool or a code generator acts on it: network stubs, serialization tables, editor metadata. An attribute can also say what it requires, in code: see the body below.
 
 An attribute must be declared first, so a misspelled one is an error. `attribute name(param: kind, ...)` lists the parameters. A kind is `str`, `int`, `float`, `bool`, or `ident` (a bare name such as `server`). `= value` makes a parameter optional. `on fn, struct, field` limits where the attribute may go; without it, anywhere. Arguments are positional or `key=value`, and are literals or bare names, never expressions. An attribute may be written once per item.
 
@@ -158,6 +158,24 @@ fn main():
     p = Player{ health: 10 }
     p.hit(3)
     print(p.health)
+```
+
+A declaration may end in `:` and a body. The body is `comptime` code that runs while compiling, once for each use. It sees the arguments as variables (an `ident` is a `str`, an `int` an `i64`, a `float` an `f64`) and four `str` values about the item: `target_kind` (`fn`, `struct`, or `field`), `target_name`, `target_owner` (the struct of a method or field, else empty), and `target_type` (the result type of a function or the type of a field, else empty). `compile_error(message)` rejects the use: the error points at the `@name` line and carries the message. `compile_error` is only for this body, and the body follows the rules of `comptime fn` (no I/O, no heap).
+
+```gg
+attribute range(min: int, max: int) on field:
+    if min > max:
+        compile_error("min is bigger than max")
+    if target_type != "i32":
+        compile_error(f"@range is for i32 fields, not {target_type}")
+
+struct Slider:
+    @range(0, 100)
+    volume: i32
+
+fn main():
+    s = Slider{ volume: 50 }
+    print(s.volume)
 ```
 
 `gg attrs file.gg` type-checks the program and writes every attributed item as JSON: its kind, name, owner, file and line, parameter types and modes, and each attribute with its arguments resolved to parameter names and defaults filled in.
