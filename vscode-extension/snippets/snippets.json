@@ -787,6 +787,31 @@
       "    return ${2:a} + ${4:b}"
     ],
     "description": "overflow: wrap between the result type and the body colon"
+  },
+  "Attribute Declaration": {
+    "prefix": "attribute",
+    "body": [
+      "attribute ${1:name}(${2:mode}: ${3|ident,str,int,float,bool|}) on ${4|fn,struct,field,fn\\, field|}"
+    ],
+    "description": "Declares an @attribute: its parameters (kind: str, int, float, bool, ident) and where it may go"
+  },
+  "Attribute Use": {
+    "prefix": "attr",
+    "body": [
+      "@${1:name}(${2:args})"
+    ],
+    "description": "An attribute line above a fn, struct, or field (declare it first with `attribute`)"
+  },
+  "Replicated Function": {
+    "prefix": "attrreplicated",
+    "body": [
+      "attribute replicated(mode: ident, reliable: bool = false) on fn",
+      "",
+      "@replicated(${1|server,client,multicast|}, reliable=${2|true,false|})",
+      "fn ${3:name}(${4:params}):",
+      "    ${0:pass}"
+    ],
+    "description": "An Unreal-style replicated function: declare the attribute, then mark a function"
   }
 }
 

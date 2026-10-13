@@ -1866,6 +1866,25 @@ class LanguageServer:
         if re.search(r'\b\d+(?:\.\d*)?$', prefix_line):
             return {"isIncomplete": False, "items": []}
 
+        # 2b. `@` at the start of a line: the attributes declared in the program
+        if re.match(r"\s*@\w*$", prefix_line):
+            from .ast_nodes import AttrDecl
+            for d in (analysis.program.decls if analysis and analysis.program else ()):
+                if not isinstance(d, AttrDecl):
+                    continue
+                sig = ", ".join(f"{p.name}: {p.kind}" + (" = ..." if p.default is not None else "")
+                                for p in d.params)
+                on = f" on {', '.join(d.targets)}" if d.targets else ""
+                required = [p for p in d.params if p.default is None]
+                add_item({
+                    "label": d.name,
+                    "kind": CompletionItemKind.Property,
+                    "detail": f"attribute {d.name}({sig}){on}",
+                    "insertText": f"{d.name}($0)" if required else d.name,
+                    "insertTextFormat": InsertTextFormat.Snippet,
+                })
+            return {"isIncomplete": False, "items": items}
+
         # 3. Member / method completion after dot (.)
         if prefix_line.endswith("."):
             receiver_match = re.search(r'([A-Za-z_][A-Za-z0-9_]*)\.$', prefix_line)

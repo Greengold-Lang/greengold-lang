@@ -195,6 +195,31 @@ fn main():
     assert value_or_panic_item["insertTextFormat"] == 2
 
 
+def test_lsp_completes_declared_attributes_after_at():
+    server = DummyServer()
+    uri = "file:///c:/test.gg"
+    code = """attribute replicated(mode: ident, reliable: bool = false) on fn
+attribute tag on struct
+@rep
+fn f():
+    pass
+
+fn main():
+    pass
+"""
+    server.m_textDocument_didOpen({"textDocument": {"uri": uri, "text": code}})
+    comp = server.m_textDocument_completion({
+        "textDocument": {"uri": uri},
+        "position": {"line": 2, "character": 4},
+    })
+    items = {item["label"]: item for item in comp["items"]}
+    assert set(items) == {"replicated", "tag"}
+    assert items["replicated"]["insertText"] == "replicated($0)"
+    assert items["tag"]["insertText"] == "tag"
+    assert items["replicated"]["detail"] == (
+        "attribute replicated(mode: ident, reliable: bool = ...) on fn")
+
+
 def test_lsp_formatting():
     server = DummyServer()
     uri = "file:///c:/test.gg"

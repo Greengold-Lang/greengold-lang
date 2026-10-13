@@ -53,6 +53,9 @@ The extension automatically launches the Greengold LSP server (`gg lsp`) in the 
   - Safely renames functions, local variables, parameters, and types with live preview across the workspace.
 - **🌐 Workspace Symbol Search (`Ctrl+T`):**
   - Quickly search and jump to any declared struct, enum, function, or constant across the entire workspace.
+- **🏷️ Attribute Completion:**
+  - Typing `@` at the start of a line suggests every `attribute` declared in the program, with its parameters and where it may go.
+  - An unknown or wrongly used `@attribute` is an error in the Problems panel, with a "did you mean" hint.
 - **💡 Hover Information:**
   - Full signatures when hovering over functions (`fn add(a: i32, b: i32) -> i32`).
   - Fields, signatures, and types when hovering over Structs and Features.
@@ -165,6 +168,7 @@ Buttons are provided in the top-right editor title bar and the right-click conte
   - `enum` declarations: `enum Color:`, `enum Result[T, E]:`
   - `fn`, `hot fn`, and `comptime fn`. Methods live in `impl Type:`, not `fn Type.method`
   - `static NAME: T = expr` and `allocator alloc, resize, free`
+  - Attributes: `attribute name(param: kind) on fn, struct, field` declares one, and `@name(args)` above a `fn`, struct, or field uses it. Completion after `@` lists the attributes declared in the program.
 - **Standard library concurrency** (`import std.thread`):
   - `thread.Thread.spawn`, `thread.Thread.spawn_with_param`
   - `thread.Channel.new()`, `.send()`, `.recv()`, `.close()`
