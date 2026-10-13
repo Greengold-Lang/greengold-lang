@@ -26,17 +26,22 @@ extern "unistd.h" fn close(fd: i32) -> i32
 weak extern "winsock2.h" fn closesocket(s: i64) -> i32
 weak extern "winsock2.h" fn WSAStartup(version: u16, data: *mut u8) -> i32
 
-static NET_READY: bool = false
+static NET_STATE: i64 = 0      # 0 not started, 1 being started by a thread, 2 ready
 static WSA_DATA: [512]u8 = [0; 512]
 
-# Windows needs its socket library started once.
+# Windows needs its socket library started once. Threads may call this at the same time: one starts it, the others
+# wait until it is ready.
 fn _start():
     unsafe:
-        if NET_READY:
+        if atomic_load[i64](addr_mut(NET_STATE), "acquire") == 2:
             return
-        NET_READY = true
-        if target_os() == "windows":
-            WSAStartup(u16(514), ptr_cast[*mut u8](addr_mut(WSA_DATA)))
+        if atomic_cas[i64](addr_mut(NET_STATE), 0, 1, "seq_cst") == 0:
+            if target_os() == "windows":
+                WSAStartup(u16(514), ptr_cast[*mut u8](addr_mut(WSA_DATA)))
+            atomic_store[i64](addr_mut(NET_STATE), 2, "release")
+            return
+        while atomic_load[i64](addr_mut(NET_STATE), "acquire") != 2:
+            pass
 
 fn _close(fd: i64):
     unsafe:
