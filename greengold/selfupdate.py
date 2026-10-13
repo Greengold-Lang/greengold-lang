@@ -28,6 +28,7 @@ API = f"https://api.github.com/repos/{REPO}/releases"
 SUMS = "SHA256SUMS.txt"
 TIMEOUT = 30
 ASIDE = ".gg-old"   # where the replaced files wait; Windows cannot delete a running program
+STAGED = ".gg-staged"   # the new folder waiting for this gg to exit (Windows keeps some files open while it runs)
 
 
 class UpdateError(Exception):
@@ -184,6 +185,23 @@ def replace_running(new: Path, target: Path) -> None:
         os.chmod(target, 0o755)
 
 
+def finish_after_exit(new: Path, target: Path) -> None:
+    """Windows only. A running gg keeps files like `_internal\\base_library.zip` open, so they cannot even be renamed.
+    Park the new folder in `.gg-staged` and start a hidden PowerShell that waits for this process to exit, then
+    moves the folder over the install (robocopy retries files an antivirus scan still holds)."""
+    home = target.parent
+    staged = home / STAGED
+    shutil.rmtree(staged, ignore_errors=True)
+    os.replace(new, staged)
+    script = (f'$p = {os.getpid()}; while (Get-Process -Id $p -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}; '
+              f'Remove-Item -LiteralPath "{home}\\_internal" -Recurse -Force -ErrorAction SilentlyContinue; '
+              f'robocopy "{staged}" "{home}" /E /MOVE /IS /IT /R:30 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; '
+              f'Remove-Item -LiteralPath "{staged}" -Recurse -Force -ErrorAction SilentlyContinue')
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW   # DETACHED_PROCESS + CREATE_NO_WINDOW fails
+    subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script],
+                     creationflags=flags, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def cleanup_old() -> None:
     exe = installed_binary()
     if exe is not None:
@@ -254,7 +272,14 @@ def run(check_only: bool = False, force: bool = False, tag: str | None = None) -
             if probe.returncode != 0:
                 raise UpdateError("the downloaded gg does not start on this machine; nothing was changed\n"
                                   + probe.stderr.strip())
-            replace_running(new, target)
+            try:
+                replace_running(new, target)
+            except PermissionError as err:
+                if sys.platform != "win32" or getattr(err, "winerror", None) not in (5, 32):
+                    raise
+                finish_after_exit(new, target)
+                print(f"gg {latest} will be in place a few seconds after this command exits ({target}).")
+                return 0
         print(f"gg {latest} is installed at {target}")
         return 0
     except UpdateError as err:
@@ -262,4 +287,7 @@ def run(check_only: bool = False, force: bool = False, tag: str | None = None) -
         return 1
     except (subprocess.SubprocessError, OSError) as err:
         print(f"Error: update failed: {err}", file=sys.stderr)
+        if getattr(err, "winerror", None) in (5, 32):   # access denied / sharing violation: a file is in use
+            print("Another program is using gg's files. Close VS Code (the Greengold extension runs gg), other "
+                  "terminals and editors that run gg, then run `gg update` again. Nothing was changed.", file=sys.stderr)
         return 1
