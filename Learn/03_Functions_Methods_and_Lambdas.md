@@ -219,7 +219,75 @@ fn main():
 
 ---
 
-## 5. Practice: A Mathematical Filter and Transformer
+## 5. Attributes: Labels on Functions, Structs, and Fields
+
+An **attribute** is a label line, `@name` or `@name(args)`, written directly above a `fn`, a method inside `impl`, a `struct`, or a struct field. The compiler gives an attribute no behavior of its own: it checks the label and records it, and a tool or code generator reads it. This is how you mark things like "this function is called over the network" or "this field is saved to disk" without adding a keyword to the language.
+
+Unlike decorators in some other languages, an attribute does **not** wrap or change the function at run time. It is information only.
+
+### 5.1 Declare First, Then Use
+
+An attribute must be declared before it is used, so a misspelled name is an error and not a silent no-op:
+
+```text
+attribute name(param: kind, param: kind = default) on fn, struct, field
+```
+
+* A `kind` is `str`, `int`, `float`, `bool`, or `ident` (a bare name such as `server`).
+* `= value` makes a parameter optional.
+* `on fn, struct, field` limits where the attribute may be written. Leave it out to allow it anywhere.
+* Arguments are positional or `key=value`, and are literals or bare names, never expressions.
+* The same attribute may be written only once on an item.
+
+### 5.2 A Small Example
+
+```gg
+attribute replicated(mode: ident, reliable: bool = false) on fn
+attribute notify(callback: str) on field
+
+struct Player:
+    @notify("on_health")
+    health: i32
+
+impl Player:
+    @replicated(server, reliable=true)
+    fn hit(self: lend Self, amount: i32):
+        self.health -= amount
+
+fn main():
+    p = Player{ health: 10 }
+    p.hit(3)
+    print(p.health)
+```
+
+Output:
+```text
+7
+```
+
+The program runs exactly as if the attribute lines were not there. A mistake is caught at compile time:
+
+```text
+Error: Unknown attribute `@replcated`.
+  = help: Did you mean `@replicated`?
+```
+
+### 5.3 Reading Attributes from a Tool
+
+`gg attrs file.gg` type-checks the program and prints every labeled function, struct, and field as JSON: its name, owner, file and line, parameter types and modes, and each attribute with its arguments filled in (defaults included):
+
+```json
+{ "kind": "fn", "name": "hit", "owner": "Player",
+  "attrs": [{ "name": "replicated", "args": { "mode": "server", "reliable": true } }],
+  "params": [{ "name": "self", "type": "Player", "mode": "lend" },
+             { "name": "amount", "type": "i32", "mode": "" }] }
+```
+
+A script can read this list and generate code from it: network stubs, a save-game table, an editor property list. A game engine written in Greengold would build its `replicated` support this way.
+
+---
+
+## 6. Practice: A Mathematical Filter and Transformer
 
 Let's design a functional example that brings together what we have learned:
 
@@ -270,6 +338,7 @@ In this chapter you learned:
 * Static functions that take no `self` (`Vector2.zero()`).
 * Function pointers `fn(...) -> Ret` and type aliases.
 * Zero-cost lambdas `fn(x) => expr` and closures that capture outer variables.
+* Attributes `@name(args)`: declared labels on functions, structs, and fields that tools read with `gg attrs`.
 
 ### Try It Yourself:
 1. Define a struct named `Circle` (`radius: f64`). In an `impl Circle:` block, write both an `area()` method and a static `unit()` constructor (a circle with radius 1.0).

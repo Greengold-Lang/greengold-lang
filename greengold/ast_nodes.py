@@ -461,6 +461,7 @@ class FieldDecl(Node):
     tied_to: Optional[str] = field(default=None, kw_only=True)  # `tied to self` for reference field
     is_soa: bool = field(default=False, kw_only=True)
     is_pub: bool = field(default=False, kw_only=True)
+    attrs: list = field(default_factory=list, kw_only=True)  # `@name(...)` lines above the field
 
 
 @dataclass(eq=False)
@@ -474,6 +475,7 @@ class StructDecl(Node):
     is_union: bool = field(default=False, kw_only=True)  # `union`: the fields share one place in memory
     packed: bool = field(default=False, kw_only=True)    # `packed struct`: no padding between fields
     align: int = field(default=0, kw_only=True)          # `align(16) struct`: at least this alignment
+    attrs: list = field(default_factory=list, kw_only=True)  # `@name(...)` lines above the struct
 
 
 @dataclass(eq=False)
@@ -525,6 +527,7 @@ class FuncDecl(Node):
     is_comptime: bool = field(default=False, kw_only=True)
     overflow_mode: Optional[str] = field(default=None, kw_only=True)
     is_hot: bool = field(default=False, kw_only=True)
+    attrs: list = field(default_factory=list, kw_only=True)  # `@name(...)` lines above the function
     # `test` / `test name:` lowered to a function. `gg run` does not call it.
     is_test: bool = field(default=False, kw_only=True)
     test_label: str = field(default="", kw_only=True)
@@ -559,6 +562,37 @@ class ConstDecl(Node):
     is_pub: bool = field(default=False, kw_only=True)
     # `static NAME: T = value`: one mutable global; reading or writing it needs `unsafe:`.
     is_static: bool = field(default=False, kw_only=True)
+
+
+@dataclass(eq=False)
+class AttrArg(Node):
+    """One argument of `@name(...)`. `kind`: str | int | float | bool | ident. `name` is set for `key=value`."""
+    kind: str
+    value: object
+    name: Optional[str] = field(default=None, kw_only=True)
+
+
+@dataclass(eq=False)
+class Attr(Node):
+    """`@name` or `@name(args)` above a function, struct, or field."""
+    name: str
+    args: list[AttrArg] = field(default_factory=list)
+
+
+@dataclass(eq=False)
+class AttrParam(Node):
+    name: str
+    kind: str                                  # str | int | float | bool | ident
+    default: Optional[AttrArg] = field(default=None, kw_only=True)
+
+
+@dataclass(eq=False)
+class AttrDecl(Node):
+    """`attribute name(p: kind, ...) on fn, struct, field`: declares an attribute so `@name(...)` is accepted.
+    `targets` empty means it may go anywhere."""
+    name: str
+    params: list[AttrParam] = field(default_factory=list)
+    targets: list[str] = field(default_factory=list, kw_only=True)
 
 
 @dataclass(eq=False)

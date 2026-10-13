@@ -192,6 +192,7 @@ For advanced developers and system architects, Greengold can export the compilat
 * **`gg emit-ll file.gg`:** Dumps the LLVM IR intermediate representation as text.
 * **`gg emit-bc file.gg`:** Produces an LLVM Bitcode (.bc) file.
 * **`gg ast file.gg`:** Inspects the syntax tree (AST) hierarchically.
+* **`gg attrs file.gg`:** Lists every `@attribute` use (functions, structs, fields) as JSON, for code generators. See [Chapter 03, section 5](03_Functions_Methods_and_Lambdas.md).
 
 ---
 
