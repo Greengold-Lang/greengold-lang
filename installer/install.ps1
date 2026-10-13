@@ -10,7 +10,7 @@ $installDir = if ($env:GG_INSTALL_DIR) { $env:GG_INSTALL_DIR } else { Join-Path 
 
 $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 if ($arch -ne 'AMD64') { throw "Unsupported CPU $arch (only 64-bit x86 Windows builds exist)." }
-$asset = 'gg-windows-x64.exe'
+$asset = 'gg-windows-x64.zip'
 
 if ($env:GG_VERSION) { $base = "https://github.com/$repo/releases/download/v$($env:GG_VERSION.TrimStart('v'))" }
 else { $base = "https://github.com/$repo/releases/latest/download" }
@@ -36,14 +36,21 @@ try {
         Write-Warning 'No SHA256SUMS.txt for this release; skipping verification.'
     }
 
+    $new = Join-Path $tmp 'new'
+    Expand-Archive -Path (Join-Path $tmp $asset) -DestinationPath $new -Force
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
     $dest = Join-Path $installDir 'gg.exe'
+    $internal = Join-Path $installDir '_internal'
     if (Test-Path $dest) {   # a running gg.exe cannot be overwritten, but it can be renamed
         $old = "$dest.old"
         if (Test-Path $old) { Remove-Item $old -Force -ErrorAction SilentlyContinue }
         Move-Item $dest $old -Force
     }
-    Move-Item (Join-Path $tmp $asset) $dest -Force
+    if (Test-Path $internal) {
+        try { Remove-Item $internal -Recurse -Force }
+        catch { throw "Cannot replace $internal: close every running gg and try again." }
+    }
+    Move-Item (Join-Path $new '*') $installDir -Force
     $ver = & $dest --version | Select-Object -First 1
     Write-Host "Installed $ver to $dest"
 } finally {

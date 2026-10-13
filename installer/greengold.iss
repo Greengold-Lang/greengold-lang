@@ -1,11 +1,11 @@
 ; Inno Setup script: builds gg-setup-windows-x64.exe (see .github/workflows/release.yml).
-;   iscc /DAppVersion=0.3.3 /DGgExe=..\dist\gg.exe installer\greengold.iss
-; Installs for the current user (no admin rights, so `gg update` can replace gg.exe) and adds the folder to PATH.
+;   iscc /DAppVersion=0.3.3 /DGgDir=..\dist\gg installer\greengold.iss
+; Installs for the current user (no admin rights, so `gg update` can replace the files) and adds the folder to PATH.
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
-#ifndef GgExe
-  #define GgExe "..\dist\gg.exe"
+#ifndef GgDir
+  #define GgDir "..\dist\gg"
 #endif
 
 [Setup]
@@ -29,7 +29,10 @@ UninstallDisplayName=Greengold {#AppVersion}
 LicenseFile=..\LICENSE
 
 [Files]
-Source: "{#GgExe}"; DestDir: "{app}"; DestName: "gg.exe"; Flags: ignoreversion
+Source: "{#GgDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\_internal"
 
 [Code]
 const

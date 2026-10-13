@@ -21,11 +21,11 @@ def test_bad_version_is_an_error():
 
 
 @pytest.mark.parametrize("plat,machine,name", [
-    ("win32", "AMD64", "gg-windows-x64.exe"),
-    ("linux", "x86_64", "gg-linux-x64"),
-    ("linux", "aarch64", "gg-linux-arm64"),
-    ("darwin", "arm64", "gg-macos-arm64"),
-    ("darwin", "x86_64", "gg-macos-x64"),
+    ("win32", "AMD64", "gg-windows-x64.zip"),
+    ("linux", "x86_64", "gg-linux-x64.tar.gz"),
+    ("linux", "aarch64", "gg-linux-arm64.tar.gz"),
+    ("darwin", "arm64", "gg-macos-arm64.tar.gz"),
+    ("darwin", "x86_64", "gg-macos-x64.tar.gz"),
 ])
 def test_asset_names(monkeypatch, plat, machine, name):
     monkeypatch.setattr(sys, "platform", plat)
@@ -44,23 +44,64 @@ def test_parse_sums():
     assert selfupdate.parse_sums(text) == {"gg-linux-x64": "ab12", "gg-windows-x64.exe": "cd34"}
 
 
-def test_replace_running_swaps_the_file(tmp_path):
-    target = tmp_path / "gg"
-    target.write_bytes(b"old")
+def _tree(root, files):
+    for rel, data in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_bytes(data)
+
+
+def test_replace_running_swaps_the_folder(tmp_path):
+    home = tmp_path / "home"
     new = tmp_path / "new"
-    new.write_bytes(b"new")
-    selfupdate.replace_running(new, target)
-    assert target.read_bytes() == b"new"
-    assert not new.exists()
-    if sys.platform == "win32":
-        assert (tmp_path / "gg.old").read_bytes() == b"old"
-        selfupdate.replace_running(_file(tmp_path / "newer", b"newer"), target)  # an old .old is replaced
-        assert target.read_bytes() == b"newer"
+    _tree(home, {"gg": b"old", "_internal/a.dll": b"a1", "_internal/gone.dll": b"x", "other-tool": b"keep"})
+    _tree(new, {"gg": b"new", "_internal/a.dll": b"a2", "_internal/sub/b.dll": b"b2"})
+    selfupdate.replace_running(new, home / "gg")
+    assert (home / "gg").read_bytes() == b"new"
+    assert (home / "_internal/a.dll").read_bytes() == b"a2"
+    assert (home / "_internal/sub/b.dll").read_bytes() == b"b2"
+    assert not (home / "_internal/gone.dll").exists()
+    assert (home / "other-tool").read_bytes() == b"keep"
+    assert (home / selfupdate.ASIDE / "gg").read_bytes() == b"old"
+    _tree(tmp_path / "newer", {"gg": b"newer"})
+    selfupdate.replace_running(tmp_path / "newer", home / "gg")   # an earlier .gg-old is cleared
+    assert (home / "gg").read_bytes() == b"newer"
 
 
-def _file(path, data):
-    path.write_bytes(data)
-    return path
+def test_replace_running_puts_everything_back_on_failure(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    new = tmp_path / "new"
+    _tree(home, {"gg": b"old", "_internal/a.dll": b"a1"})
+    _tree(new, {"gg": b"new", "_internal/a.dll": b"a2"})
+    real = selfupdate.os.replace
+    calls = []
+
+    def flaky(src, dst):
+        calls.append(src)
+        if str(src).startswith(str(new)) and len(calls) > 3:
+            raise OSError("locked")
+        real(src, dst)
+
+    monkeypatch.setattr(selfupdate.os, "replace", flaky)
+    with pytest.raises(OSError):
+        selfupdate.replace_running(new, home / "gg")
+    monkeypatch.undo()
+    assert (home / "gg").read_bytes() == b"old"
+    assert (home / "_internal/a.dll").read_bytes() == b"a1"
+
+
+@pytest.mark.parametrize("name", ["x.zip", "x.tar.gz"])
+def test_extract_reads_both_archive_kinds(tmp_path, name):
+    src = tmp_path / "src"
+    _tree(src, {"gg": b"g", "_internal/a": b"a"})
+    import shutil
+    archive = tmp_path / name
+    if name.endswith(".zip"):
+        shutil.make_archive(str(tmp_path / "x"), "zip", src)
+    else:
+        shutil.make_archive(str(tmp_path / "x"), "gztar", src)
+    out = tmp_path / "out"
+    selfupdate.extract(archive, out)
+    assert (out / "gg").read_bytes() == b"g" and (out / "_internal/a").read_bytes() == b"a"
 
 
 def test_not_standalone_is_told_how_to_update(monkeypatch, capsys):

@@ -1,13 +1,18 @@
-"""Builds `dist/gg` (`dist/gg.exe` on Windows): the compiler as one file that needs no Python installed.
+"""Builds `dist/gg/` (`gg.exe` on Windows, `gg` elsewhere, next to an `_internal` folder): the compiler as a
+folder that needs no Python installed.
 
     pip install pyinstaller          # or: pip install -e .[standalone]
-    pip install ziglang              # optional: then the file also links with no C compiler installed
+    pip install ziglang              # optional: then the folder also links with no C compiler installed
     python tools/build_standalone.py
-    dist/gg run examples/hello.gg
+    dist/gg/gg run examples/hello.gg
+    python tools/build_standalone.py --pack out/gg-linux-x64.tar.gz   # the release archive (.zip on Windows)
 
-The file holds Python, llvmlite (with LLVM), the compiler, the Core library, the standard library, and the
+The folder holds Python, llvmlite (with LLVM), the compiler, the Core library, the standard library, and the
 debugger printers. When the `ziglang` package is installed it is bundled too, and `gg build` links with
-its `zig cc` where no gcc or clang is found, so the file alone builds programs for every target.
+its `zig cc` where no gcc or clang is found, so the folder alone builds programs for every target.
+
+It is a folder, not one file, on purpose: a PyInstaller one-file build unpacks itself into a temp folder on
+every start, which took 10 to 25 seconds on Windows (every extracted file is scanned by the antivirus).
 """
 from __future__ import annotations
 
@@ -15,6 +20,8 @@ import importlib.util
 import os
 import subprocess
 import sys
+import tarfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +37,7 @@ def main() -> int:
     entry.write_text("import sys\nfrom greengold.cli import main\n\nsys.exit(main())\n", encoding="utf-8")
     sep = os.pathsep
     data = [f"{ROOT / 'greengold' / sub}{sep}greengold/{sub}" for sub in ("core", "std", "debug")]
-    cmd = [sys.executable, "-m", "PyInstaller", "--onefile", "--noconfirm", "--clean", "--name", "gg",
+    cmd = [sys.executable, "-m", "PyInstaller", "--onedir", "--noconfirm", "--clean", "--name", "gg",
            "--distpath", str(ROOT / "dist"), "--workpath", str(build / "work"), "--specpath", str(build),
            "--paths", str(ROOT), "--collect-all", "llvmlite", "--collect-submodules", "greengold"]
     for d in data:
@@ -44,10 +51,29 @@ def main() -> int:
     res = subprocess.run(cmd, cwd=ROOT)
     if res.returncode != 0:
         return res.returncode
-    exe = ROOT / "dist" / ("gg.exe" if sys.platform == "win32" else "gg")
-    print(f"built {exe} ({exe.stat().st_size / 1e6:.1f} MB)")
+    exe = ROOT / "dist" / "gg" / ("gg.exe" if sys.platform == "win32" else "gg")
+    print(f"built {exe}")
     return 0
 
 
+def pack(archive: Path) -> None:
+    """Archive the contents of `dist/gg/` (no wrapping folder): `.zip` on Windows, `.tar.gz` elsewhere."""
+    src = ROOT / "dist" / "gg"
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    if archive.name.endswith(".zip"):
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+            for path in sorted(src.rglob("*")):
+                if path.is_file():
+                    z.write(path, path.relative_to(src).as_posix())
+    else:
+        with tarfile.open(archive, "w:gz") as t:
+            for path in sorted(src.iterdir()):
+                t.add(path, arcname=path.name)
+    print(f"packed {archive} ({archive.stat().st_size / 1e6:.1f} MB)")
+
+
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--pack":
+        pack(Path(sys.argv[2]))
+        sys.exit(0)
     sys.exit(main())

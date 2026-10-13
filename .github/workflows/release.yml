@@ -1,7 +1,7 @@
 name: Release
 
 # Push a tag `vX.Y.Z` (the version is taken from the tag, nothing to edit) to build the standalone `gg` for every platform
-# and publish them as a GitHub release. `gg update` and installer/install.* download these files.
+# and publish them as a GitHub release. `gg update` and installer/install.* download these archives.
 on:
   push:
     tags: ["v*"]
@@ -18,10 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest,   asset: gg-windows-x64.exe, built: dist/gg.exe }
-          - { os: ubuntu-22.04,     asset: gg-linux-x64,       built: dist/gg }
-          - { os: ubuntu-22.04-arm, asset: gg-linux-arm64,     built: dist/gg }
-          - { os: macos-latest,     asset: gg-macos-arm64,     built: dist/gg }
+          - { os: windows-latest,   asset: gg-windows-x64.zip,     built: dist/gg/gg.exe }
+          - { os: ubuntu-22.04,     asset: gg-linux-x64.tar.gz,    built: dist/gg/gg }
+          - { os: ubuntu-22.04-arm, asset: gg-linux-arm64.tar.gz,  built: dist/gg/gg }
+          - { os: macos-latest,     asset: gg-macos-arm64.tar.gz,  built: dist/gg/gg }
           # No Intel Mac build: llvmlite >= 0.50 ships no macosx x86_64 wheel (it would need a source build against LLVM 22).
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[standalone,toolchain]"
-      - name: Build the single-file gg
+      - name: Build the standalone gg folder
         run: python tools/build_standalone.py
       - name: Smoke test
         shell: bash
@@ -50,18 +50,15 @@ jobs:
           ${{ matrix.built }} --version
           ${{ matrix.built }} toolchain
           ${{ matrix.built }} run examples/hello.gg
-      - name: Name the file
-        shell: bash
-        run: |
-          mkdir -p out
-          cp "${{ matrix.built }}" "out/${{ matrix.asset }}"
+      - name: Pack the folder
+        run: python tools/build_standalone.py --pack "out/${{ matrix.asset }}"
       - name: Windows installer
         if: runner.os == 'Windows'
         shell: bash
         run: |
           choco install innosetup -y --no-progress
           v=$(python -c "import greengold; print(greengold.__version__)")
-          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "//DAppVersion=$v" "//DGgExe=..\dist\gg.exe" installer/greengold.iss
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "//DAppVersion=$v" "//DGgDir=..\dist\gg" installer/greengold.iss
           cp dist/gg-setup-windows-x64.exe out/
       - uses: actions/upload-artifact@v4
         with:

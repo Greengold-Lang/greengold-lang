@@ -27,7 +27,7 @@ fi
 if [ "$os" = macos ] && [ "$arch" = x64 ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = 1 ]; then
   arch=arm64
 fi
-asset="gg-$os-$arch"
+asset="gg-$os-$arch.tar.gz"
 
 if [ -n "${GG_VERSION:-}" ]; then
   base="https://github.com/$REPO/releases/download/v${GG_VERSION#v}"
@@ -59,9 +59,11 @@ else
 fi
 
 mkdir -p "$INSTALL_DIR"
-chmod +x "$tmp/$asset"
-"$tmp/$asset" --version >/dev/null 2>&1 || die "the downloaded gg does not run on this machine"
-mv -f "$tmp/$asset" "$INSTALL_DIR/gg"
+mkdir "$tmp/new"
+tar -xzf "$tmp/$asset" -C "$tmp/new" || die "cannot unpack $asset"
+"$tmp/new/gg" --version >/dev/null 2>&1 || die "the downloaded gg does not run on this machine"
+rm -rf "$INSTALL_DIR/_internal" "$INSTALL_DIR/.gg-old"
+cp -Rp "$tmp/new/." "$INSTALL_DIR/"
 say "Installed $("$INSTALL_DIR/gg" --version | head -n 1) to $INSTALL_DIR/gg"
 
 case ":$PATH:" in
