@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "website"
 SPEC = ROOT / "docs" / "SPEC.md"
-VERSION = "0.21.4"
+VERSION = "0.21.5"
 DOMAIN = "https://greengoldlang.com"
 UPDATED = "2026-10-13"
 

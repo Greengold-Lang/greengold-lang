@@ -2,6 +2,16 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
+## 0.21.5
+
+- The body of an `attribute` can call `str` methods at compile time: `len()`, `is_empty()`, `starts_with(p)`, `ends_with(p)`, and `contains(p)`. Any other method now says it cannot be called at compile time instead of "unsupported expression".
+- `print(...)` works in an `attribute` body. It is shown as a note (`GG0410 attribute-print`) at the `@name` line, never fails the build, and appears in `gg check --json` as a `note`.
+- `docs/API.md` is the standard library reference, generated from the library source by `tools/build_api_docs.py` (a test keeps it current). It also covers what the catalog cannot: attributes (what the body can read, the `gg attrs` JSON), the compiler intrinsics, and the JSON output of each command.
+
+## 0.21.4
+
+- `gg update` no longer leaves `gg` broken when a file is in use: the rollback restores every file, and the Windows finish step keeps the old `_internal` until the copy has succeeded. It also prints each step (verifying, unpacking, checking, installing) instead of going silent.
+
 ## 0.21.3
 
 - The language server completes `import`: type `import ` for the standard library, dependencies and local files, `import std.` for the modules inside `std`, or `import "` for file paths. It reads only the folder you have typed so far.
