@@ -38,6 +38,7 @@ def render() -> str:
     ]
     for name in modules:
         out.append(f"- [{TITLES.get(name, name)}](#{_anchor(TITLES.get(name, name))}) ({len(modules[name])})")
+    out.append("- [Not in the catalog](#not-in-the-catalog): attributes, intrinsics, JSON output formats")
     for name, syms in modules.items():
         out += ["", f"## {TITLES.get(name, name)}", ""]
         for kind in KINDS:
@@ -52,7 +53,8 @@ def render() -> str:
                 if s["description"]:
                     out.append(s["description"])
                 out.append("")
-    return "\n".join(out).rstrip() + "\n"
+    extra = (ROOT / "docs" / "api_extra.md").read_text(encoding="utf-8").strip()
+    return "\n".join(out).rstrip() + "\n\n" + extra + "\n"
 
 
 def _anchor(title: str) -> str:
