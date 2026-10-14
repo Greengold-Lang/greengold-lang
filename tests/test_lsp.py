@@ -195,6 +195,29 @@ fn main():
     assert value_or_panic_item["insertTextFormat"] == 2
 
 
+def test_lsp_completes_importable_modules():
+    server = DummyServer()
+    uri = "file:///c:/test.gg"
+
+    def complete(line: str):
+        server.m_textDocument_didOpen({"textDocument": {"uri": uri, "text": line + "\n"}})
+        return server.m_textDocument_completion({
+            "textDocument": {"uri": uri},
+            "position": {"line": 0, "character": len(line)},
+        })["items"]
+
+    labels = [i["label"] for i in complete("import ")]
+    assert "std" in labels
+
+    items = complete("import std.")
+    assert {"math", "io", "collections"} <= {i["label"] for i in items}
+    assert complete("import std.ma")[0]["textEdit"]["newText"] == "math"
+    assert complete("import std.ma")[0]["textEdit"]["range"]["start"]["character"] == len("import std.")
+
+    assert "math.gg" in [i["label"] for i in complete('import "std/')]
+    assert not any(i["label"] == "math" for i in complete("x = 1"))
+
+
 def test_lsp_completes_declared_attributes_after_at():
     server = DummyServer()
     uri = "file:///c:/test.gg"

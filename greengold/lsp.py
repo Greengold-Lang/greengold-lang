@@ -247,6 +247,71 @@ def uri_to_path(uri: str) -> Path:
     return Path(path_str)
 
 
+def _import_completions(cur_file: Path, line: int, end_col: int,
+                        str_prefix: Optional[str], name_prefix: str) -> list[dict[str, Any]]:
+    """Completion items for `import ...`: only the directory named by what is already typed is read."""
+    from .cli import DEP_ROOTS, STD_DIR
+
+    quoted = str_prefix is not None
+    sep = "/" if quoted else "."
+    head, _, partial = (str_prefix if quoted else name_prefix).rpartition(sep)
+    segs = head.split(sep) if head else []
+    here = cur_file.parent
+
+    # (directory to list, label for it when it is a virtual top-level folder)
+    dirs: list[tuple[Path, str]] = []
+    if not segs:
+        dirs.append((here, "local file"))
+    else:
+        first, rest = segs[0], segs[1:]
+        if first == "std":
+            dirs.append((STD_DIR.joinpath(*rest), "standard library"))
+        elif first in DEP_ROOTS:
+            dirs.append((Path(DEP_ROOTS[first]).joinpath(*rest), f"dependency {first}"))
+        dirs.append((here.joinpath(*segs), "local file"))
+
+    entries: list[tuple[str, bool, str]] = []  # (name, is_folder, origin)
+    if not segs:
+        entries += [("std", True, "standard library")] + [(d, True, f"dependency {d}") for d in DEP_ROOTS]
+    for d, origin in dirs:
+        try:
+            with os.scandir(d) as it:
+                for e in it:
+                    if e.name.startswith((".", "_")):
+                        continue
+                    if e.is_dir():
+                        entries.append((e.name, True, origin))
+                    elif e.name.endswith(".gg"):
+                        if Path(e.path).resolve() == cur_file.resolve():
+                            continue
+                        entries.append((e.name if quoted else e.name[:-3], False, origin))
+        except OSError:
+            continue
+
+    items: list[dict[str, Any]] = []
+    seen: set[tuple[str, bool]] = set()
+    for name, is_folder, origin in sorted(entries, key=lambda t: (not t[1], t[0])):
+        if (name, is_folder) in seen or not name.lower().startswith(partial.lower()):
+            continue
+        if not quoted and not name.isidentifier():
+            continue
+        seen.add((name, is_folder))
+        text = name + sep if is_folder else name
+        item: dict[str, Any] = {
+            "label": name,
+            "kind": CompletionItemKind.Folder if is_folder else CompletionItemKind.Module,
+            "detail": origin,
+            "filterText": name,
+            "textEdit": {"range": {"start": {"line": line, "character": end_col - len(partial)},
+                                   "end": {"line": line, "character": end_col}},
+                         "newText": text},
+        }
+        if is_folder:  # keep going: show the folder's contents right away
+            item["command"] = {"title": "Suggest", "command": "editor.action.triggerSuggest"}
+        items.append(item)
+    return items
+
+
 def path_to_uri(path: Path | str) -> str:
     """Converts Path object to standard file:// URI."""
     p = Path(path).resolve()
@@ -1005,7 +1070,7 @@ class LanguageServer:
                 "documentSymbolProvider": True,
                 "completionProvider": {
                     "resolveProvider": False,
-                    "triggerCharacters": ["."],
+                    "triggerCharacters": [".", " ", '"'],
                 },
                 "documentFormattingProvider": True,
                 "signatureHelpProvider": {
@@ -1836,6 +1901,16 @@ class LanguageServer:
             if lbl not in seen_labels:
                 seen_labels.add(lbl)
                 items.append(item)
+
+        # 0. `import <module>` / `import "<file>"`: every module that can be imported from here
+        imp = re.match(r'^(\s*import\s+)(?:"([^"]*)|([A-Za-z_][A-Za-z0-9_.]*)?)$', prefix_line)
+        if imp:
+            return {"isIncomplete": False,
+                    "items": _import_completions(uri_to_path(uri), line_0, char_0,
+                                                 imp.group(2), imp.group(3) or "")}
+        trigger = (params.get("context") or {}).get("triggerCharacter")
+        if trigger in (" ", '"'):  # only registered for `import`; elsewhere stay silent as before
+            return {"isIncomplete": False, "items": []}
 
         # 1. Check if inside comment (#) or string literal ('...', "...")
         in_str = False
