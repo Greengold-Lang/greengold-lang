@@ -172,14 +172,18 @@ def replace_running(new: Path, target: Path) -> None:
             os.replace(new / rel, home / rel)
             placed.append(rel)
     except OSError:
+        # Undo as much as possible; one stuck file must not stop the rest from being restored.
         for rel in placed:
             try:
                 (home / rel).unlink()
             except OSError:
                 pass
         for rel in moved:
-            (home / rel).parent.mkdir(parents=True, exist_ok=True)
-            os.replace(aside / rel, home / rel)
+            try:
+                (home / rel).parent.mkdir(parents=True, exist_ok=True)
+                os.replace(aside / rel, home / rel)
+            except OSError:
+                pass
         raise
     if sys.platform != "win32":
         os.chmod(target, 0o755)
@@ -193,9 +197,17 @@ def finish_after_exit(new: Path, target: Path) -> None:
     staged = home / STAGED
     shutil.rmtree(staged, ignore_errors=True)
     os.replace(new, staged)
+    backup = home / ASIDE
+    # Keep the old install until the copy has succeeded: a failed robocopy (exit code >= 8) restores it, so `gg`
+    # is never left without its `_internal` folder.
     script = (f'$p = {os.getpid()}; while (Get-Process -Id $p -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}; '
-              f'Remove-Item -LiteralPath "{home}\\_internal" -Recurse -Force -ErrorAction SilentlyContinue; '
+              f'Remove-Item -LiteralPath "{backup}" -Recurse -Force -ErrorAction SilentlyContinue; '
+              f'New-Item -ItemType Directory -Force -Path "{backup}" | Out-Null; '
+              f'Move-Item -LiteralPath "{home}\\_internal" -Destination "{backup}\\_internal" -Force -ErrorAction SilentlyContinue; '
               f'robocopy "{staged}" "{home}" /E /MOVE /IS /IT /R:30 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; '
+              f'if ($LASTEXITCODE -ge 8) {{ '
+              f'Remove-Item -LiteralPath "{home}\\_internal" -Recurse -Force -ErrorAction SilentlyContinue; '
+              f'Move-Item -LiteralPath "{backup}\\_internal" -Destination "{home}\\_internal" -Force -ErrorAction SilentlyContinue }}; '
               f'Remove-Item -LiteralPath "{staged}" -Recurse -Force -ErrorAction SilentlyContinue')
     flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW   # DETACHED_PROCESS + CREATE_NO_WINDOW fails
     subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script],
@@ -251,6 +263,7 @@ def run(check_only: bool = False, force: bool = False, tag: str | None = None) -
             archive = Path(tmp) / wanted
             _download(assets[wanted], archive, wanted)
             if SUMS in assets:
+                print("Verifying...", flush=True)
                 sums_file = Path(tmp) / SUMS
                 _download(assets[SUMS], sums_file, SUMS)
                 expect = parse_sums(sums_file.read_text(encoding="utf-8")).get(wanted)
@@ -260,6 +273,7 @@ def run(check_only: bool = False, force: bool = False, tag: str | None = None) -
             else:
                 print("warning: this release has no SHA256SUMS.txt; the download was not verified", file=sys.stderr)
             new = Path(tmp) / "new"
+            print("Unpacking...", flush=True)
             try:
                 extract(archive, new)
             except (zipfile.BadZipFile, tarfile.TarError) as err:
@@ -268,10 +282,12 @@ def run(check_only: bool = False, force: bool = False, tag: str | None = None) -
             if not fresh.is_file():
                 raise UpdateError(f"{wanted} has no `{target.name}`; nothing was changed")
             os.chmod(fresh, 0o755)
+            print("Checking that the new gg starts (the first start can take a while)...", flush=True)
             probe = subprocess.run([str(fresh), "--version"], capture_output=True, text=True, timeout=120)
             if probe.returncode != 0:
                 raise UpdateError("the downloaded gg does not start on this machine; nothing was changed\n"
                                   + probe.stderr.strip())
+            print("Installing...", flush=True)
             try:
                 replace_running(new, target)
             except PermissionError as err:
