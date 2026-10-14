@@ -329,8 +329,8 @@ def render(diag: Diagnostic, source: str, filename: str, sources: dict[str, str]
     lines = src.splitlines()
     extra = [lb.line for lb in diag.labels] + [n.line for n in diag.notes]
     width = len(str(max([diag.line, *extra]) or 1))
-    kind = "Warning" if diag.severity == "warning" else "Error"
-    kind_paint = style.bold_yellow if diag.severity == "warning" else style.bold_red
+    kind = {"warning": "Warning", "note": "Note"}.get(diag.severity, "Error")
+    kind_paint = style.bold_red if diag.severity == "error" else style.bold_blue if diag.severity == "note" else style.bold_yellow
     out = [f"{kind_paint(kind + ':')} {diag.message}",
            f"{' ' * width}{style.bold_blue('-->')} {target}:{diag.line}:{diag.col}  "
            f"{style.bold_red(diag.code)} {style.dim(diag.rule)}"]
@@ -367,7 +367,7 @@ def render_all(diags: list[Diagnostic], source: str, filename: str, sources: dic
     style = Style(color)
     visible = _dedupe(prepare(diags))
     body = "\n\n".join(render(d, source, filename, sources, color=color) for d in visible)
-    n = len(visible)
+    n = sum(1 for d in visible if d.severity == "error") or len(visible)
     summary = "1 error found." if n == 1 else f"{n} errors found."
     hidden = sum(1 for d in diags if d.cascade)
     tail = f" {hidden} hidden as cascades." if hidden else ""

@@ -43,6 +43,13 @@ def _print_diagnostics(diags: list[Diagnostic], source: str, filename: str,
     print(render_all(diags, source, filename, sources=sources, color=_COLOR), file=sys.stderr)
 
 
+def _print_notes(diags: list[Diagnostic], sources: dict[str, str], primary: str) -> None:
+    """The notes a successful check leaves (`print` in an attribute body): one line each, on stderr."""
+    for d in prepare(diags):
+        if d.severity == "note":
+            print(f"note: {d.message}  ({d.filename or primary}:{d.line})", file=sys.stderr)
+
+
 STD_DIR = Path(__file__).parent / "std"
 DEP_ROOTS: dict[str, Path] = {}  # gg.toml dependencies: name -> import root directory
 DEBUG_INFO = False  # `-g`: emit DWARF debug information
@@ -336,6 +343,7 @@ def _frontend(files: list[str] | str) -> tuple[Program, str] | None:
     if diags.has_errors():
         _print_diagnostics(diags.items, sources.get(primary_file, ""), primary_file, sources)
         return None
+    _print_notes(diags.items, sources, primary_file)
     return program, primary_file
 
 
@@ -619,6 +627,7 @@ def cmd_check(files: list[str], as_json: bool) -> int:
         if likely:
             print(f"`gg fix --likely {primary}` also applies {likely} suggested fix(es).", file=sys.stderr)
         return 1
+    _print_notes(diags.items, sources, primary)
     print("ok")
     return 0
 
@@ -630,6 +639,7 @@ def cmd_attrs(files: list[str]) -> int:
     if any(d.severity == "error" and not d.hidden for d in diags.items):
         _print_diagnostics(diags.items, sources.get(files[0], ""), files[0], sources)
         return 1
+    _print_notes(diags.items, sources, files[0])
     json.dump({"attributes": export(program)}, sys.stdout, indent=2)
     sys.stdout.write("\n")
     return 0

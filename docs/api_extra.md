@@ -33,11 +33,17 @@ The body is `comptime` code that runs while compiling, once for each use. It see
 | `target_owner` | `str` | the struct of a method or field; empty for a free function or a struct |
 | `target_type` | `str` | the result type of a function, or the type of a field; empty for a struct and for a function with no result |
 
+The parameters and the four `target_*` values are all the body can name. In the body `name`, `kind`, `owner`, or `type` alone are undefined (GG0203): write `target_name`, `target_kind`, `target_owner`, `target_type`. The body cannot print; it can only accept the use or reject it.
+
+Inside the body, `str` values (the arguments and `target_*`) have `len()`, `is_empty()`, `starts_with(p)`, `ends_with(p)`, and `contains(p)`; `==` compares them. Other methods and slices are not available at compile time.
+
 It can call `compile_error(message)` to reject the use; the error points at the `@name` line. It follows the rules of `comptime fn`: no I/O, no heap.
 
 The body does **not** see: the fields of the struct it is on, the parameters of the function it is on, the function body, other attributes on the same item, or other items in the program. To act on those, read `gg attrs` from a tool.
 
 #### What `gg attrs file.gg` writes
+
+This is the output of a command-line tool, for programs that read it. The keys below are JSON keys, not variables: an attribute body cannot use them (there it is `target_name`, not `name`).
 
 `{"attributes": [item, ...]}`, one item per attributed `fn`, `struct`, or field:
 

@@ -21,6 +21,14 @@ BITS = {"i8": 8, "i16": 16, "i32": 32, "i64": 64, "isize": 64, "u8": 8, "u16": 1
 SIGNED = {"i8", "i16", "i32", "i64", "isize"}
 FLOATS = {"f32", "f64"}
 STEP_LIMIT = 20_000_000
+# `str` methods usable at compile time: name -> (argument count, implementation)
+_STR_METHODS = {
+    "len": (0, lambda s: len(s.encode("utf-8"))),
+    "is_empty": (0, lambda s: s == ""),
+    "starts_with": (1, lambda s, p: s.startswith(p)),
+    "ends_with": (1, lambda s, p: s.endswith(p)),
+    "contains": (1, lambda s, p: p in s),
+}
 
 
 class ComptimeError(Exception):
@@ -87,7 +95,7 @@ class Interp:
         self.const_decls: dict[str, ConstDecl] = {d.name: d for d in program.decls if isinstance(d, ConstDecl)}
         self.memo: dict[str, Any] = {}
         self.steps = 0
-        self.reports: list[str] | None = None  # messages of `compile_error`; None outside an attribute body
+        self.reports: list[tuple[str, str]] | None = None  # ("error" | "note", text) from `compile_error` and `print`; None outside an attribute body
 
     # -- public interface -------------------------------------------------
     def const_value(self, name: str) -> Any:
@@ -99,8 +107,9 @@ class Interp:
         self.memo[name] = v
         return v
 
-    def run_attribute(self, handler: FuncDecl, args: list[Any]) -> list[str]:
-        """Runs an attribute's body for one use and returns the `compile_error` messages it produced."""
+    def run_attribute(self, handler: FuncDecl, args: list[Any]) -> list[tuple[str, str]]:
+        """Runs an attribute's body for one use and returns what it reported: `("error", text)` for each
+        `compile_error` and `("note", text)` for each `print`."""
         self.reports = []
         try:
             self.call(handler, args)
@@ -233,9 +242,21 @@ class Interp:
             except _Yield as y:
                 return y.value
             raise ComptimeError("comptime: expression did not produce a value")
+        if isinstance(e, MethodCall):
+            recv = self.eval(e.obj, env)
+            if isinstance(recv, str) and e.method in _STR_METHODS:
+                args = [self.eval(a, env) for a in e.args]
+                if len(args) != _STR_METHODS[e.method][0] or not all(isinstance(a, str) for a in args):
+                    raise ComptimeError(f"comptime: wrong arguments for str.{e.method}")
+                return _STR_METHODS[e.method][1](recv, *args)
+            raise ComptimeError(f"comptime: the method '{e.method}' cannot be called at compile time")
         if isinstance(e, Call):
             if e.callee == "compile_error" and self.reports is not None:
-                self.reports.append(str(self.eval(e.args[0], env)))
+                self.reports.append(("error", str(self.eval(e.args[0], env))))
+                return None
+            if e.callee == "print" and self.reports is not None:
+                parts = [self.eval(a, env) for a in e.args]
+                self.reports.append(("note", " ".join(str(p).lower() if isinstance(p, bool) else str(p) for p in parts)))
                 return None
             if e.ctor_enum is not None or e.callee in ("print", "input", "panic"):
                 raise ComptimeError(f"comptime: '{e.callee}' cannot be used at compile time")

@@ -112,3 +112,22 @@ def test_attribute_body_sees_the_item_it_sits_on():
            "        compile_error(f\"{target_name} must not return a value\")\n"
            "@pure\nfn f() -> i32:\n    return 1\n" + MAIN)
     assert errors(src) == ["f must not return a value"]
+
+
+def test_attribute_body_can_use_str_methods_on_the_target_name():
+    src = (
+        "attribute no_test_prefix() on fn:\n"
+        "    if target_name.starts_with(\"test\"):\n"
+        "        compile_error(\"no test prefix\")\n"
+        "\n@no_test_prefix\nfn test_a():\n    pass\n"
+        "\n@no_test_prefix\nfn other():\n    pass\n" + MAIN
+    )
+    assert errors(src) == ["no test prefix"]
+
+
+def test_print_in_attribute_body_is_a_note_not_an_error():
+    src = ("attribute shout() on fn:\n    print(\"saw\", target_name)\n\n@shout\nfn f():\n    pass\n" + MAIN)
+    program, diags = front_end(src)
+    notes = [d for d in diags if d.severity == "note"]
+    assert [d.message for d in notes] == ["saw f"] and notes[0].code == "GG0410"
+    assert not [d for d in diags if d.severity == "error"]

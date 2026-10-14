@@ -167,11 +167,15 @@ def run_handlers(program, diags: DiagnosticBag) -> None:
             try:
                 messages = interp.run_attribute(decl.handler, args)
             except ComptimeError as err:
-                messages = [f"The body of `attribute {attr.name}` could not run: {err}"]
+                messages = [("error", f"The body of `attribute {attr.name}` could not run: {err}")]
             except RecursionError:
-                messages = [f"The body of `attribute {attr.name}` recurses too deeply."]
-            for message in messages:
-                diags.error(message, attr.line, attr.col, attr.length, filename=attr.filename, rule="attribute-check")
+                messages = [("error", f"The body of `attribute {attr.name}` recurses too deeply.")]
+            for kind_, message in messages:
+                if kind_ == "note":   # `print` in the body: shown, but it does not fail the build
+                    diags.error(message, attr.line, attr.col, attr.length, filename=attr.filename,
+                                rule="attribute-print").severity = "note"
+                else:
+                    diags.error(message, attr.line, attr.col, attr.length, filename=attr.filename, rule="attribute-check")
 
 
 def export(program) -> list[dict]:
