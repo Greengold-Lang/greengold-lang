@@ -2,6 +2,8 @@
 
 > **The normative language reference is [`docs/SPEC.md`](docs/SPEC.md).** When this file and the spec disagree, the spec wins.
 >
+> **The standard library API reference is [`docs/API.md`](docs/API.md)** (generated from the library source; `gg api` prints the same).
+>
 > 📖 **Tutorial:** a step-by-step guide that teaches Greengold from scratch is in the [Learn/ series](Learn/Introduction.md).
 >
 > 💬 **Community:** questions, feedback and chat happen on [Discord](https://discord.gg/sp65habzne).
