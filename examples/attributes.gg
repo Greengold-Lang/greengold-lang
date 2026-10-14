@@ -1,27 +1,82 @@
+# Attributes: `@name(args)` above a fn, a method, a struct, or a field.
+#
+# The compiler checks every use against its declaration and gives it no meaning of its own.
+# A tool reads the result: run `gg attrs examples/attributes.gg` to get every attributed item as JSON.
+
+# ---- Declarations ----------------------------------------------------------------------------------
+# Kinds: str, int, float, bool, ident (a bare name such as `server`). `= value` makes a parameter optional.
+# `on ...` limits where the attribute may go; without it, anywhere.
+
 attribute replicated(mode: ident, reliable: bool = false) on fn
 attribute replicated_using(notify: str) on field
 attribute deprecated(note: str = "") on fn, struct
+attribute tooltip(text: str)                     # no `on`: fn, struct and field are all fine
+attribute editable(category: str = "General", step: float = 1.0) on field
+attribute rpc_id(id: int) on fn
 
+# A body makes the attribute check itself. It runs at compile time, once per use, and sees the arguments
+# by name plus target_kind, target_name, target_owner and target_type.
+attribute range(min: int, max: int) on field:
+    if min > max:
+        compile_error("min is bigger than max")
+    if target_type != "i32":
+        compile_error(f"@range is for i32 fields, not {target_type}")
+
+attribute max_length(limit: int) on field:
+    if limit <= 0:
+        compile_error(f"@max_length needs a positive limit, got {limit}")
+    if target_type != "str":
+        compile_error(f"@max_length is for str fields, not {target_type}")
+
+# ---- Uses on structs and fields ---------------------------------------------------------------------
+
+@tooltip("A player in the world")
 struct Player:
     @replicated_using("on_health")
+    @range(0, 100)
+    @tooltip("Hit points")
     health: i32
+
+    @max_length(16)
     name: str
+
+    # Positional and key=value arguments mix; omitted ones take their defaults.
+    @editable("Movement", step=0.5)
+    speed: f32
+
+    @editable
+    jump_height: f32
 
 @deprecated("use Player instead")
 struct OldPlayer:
     hp: i32
 
+# ---- Uses on methods and functions ------------------------------------------------------------------
+
 impl Player:
+    # Named arguments in any order.
     @replicated(server, reliable=true)
+    @rpc_id(1)
     fn take_damage(self: lend Self, amount: i32):
         self.health -= amount
 
+    @replicated(mode=client)
+    @rpc_id(2)
+    fn heal(self: lend Self, amount: i32):
+        self.health += amount
+
 @replicated(multicast)
+@rpc_id(3)
 fn play_sound(id: i32):
     print(id)
 
+@deprecated
+fn legacy_spawn() -> Player:
+    return Player{ health: 100, name: "legacy", speed: 1.0, jump_height: 2.0 }
+
 fn main():
-    p = Player{ health: 10, name: "a" }
-    p.take_damage(3)
+    p = Player{ health: 100, name: "a", speed: 4.5, jump_height: 1.2 }
+    p.take_damage(30)
+    p.heal(10)
     play_sound(1)
     print(p.health)
