@@ -3,6 +3,8 @@
 > **The normative language reference is [`docs/SPEC.md`](docs/SPEC.md).** When this file and the spec disagree, the spec wins.
 >
 > 📖 **Tutorial:** a step-by-step guide that teaches Greengold from scratch is in the [Learn/ series](Learn/Introduction.md).
+>
+> 💬 **Community:** questions, feedback and chat happen on [Discord](https://discord.gg/sp65habzne).
 
 **Greengold** is an indentation-sensitive, memory-safe systems programming language. It aims at C++/Rust speed with a gentle learning curve: ownership and borrowing are checked at compile time without lifetime annotations, and the parameter mode is written once, on the signature.
 
@@ -252,7 +254,7 @@ End-to-end tests need `gcc` or `clang` on `PATH` for linking. The frozen self-ho
 
 ## Support
 
-Greengold is a one-person project and stays free and open source. If you want to help pay for development time, Linux and macOS testing, and hosting, you can support it on [Patreon](https://www.patreon.com/greengoldlang). Bug reports, feedback and code contributions help just as much, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Greengold is a one-person project and stays free and open source. If you want to help pay for development time, Linux and macOS testing, and hosting, you can support it on [Patreon](https://www.patreon.com/greengoldlang). Bug reports, feedback and code contributions help just as much, see [CONTRIBUTING.md](CONTRIBUTING.md). Come chat on [Discord](https://discord.gg/sp65habzne).
 
 ## License
 
