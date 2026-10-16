@@ -1,0 +1,23 @@
+id = "greengold"
+name = "Greengold"
+description = "Greengold (.gg) language support: syntax highlighting, outline, snippets and the `gg lsp` language server."
+version = "0.1.0"
+schema_version = 1
+authors = ["Greengold Lang"]
+repository = "https://github.com/Greengold-Lang/greengold-lang"
+
+snippets = ["./snippets/greengold.json"]
+
+[language_servers.greengold-lsp]
+name = "Greengold Language Server"
+languages = ["Greengold"]
+
+[language_servers.greengold-lsp.language_ids]
+"Greengold" = "gg"
+
+# The grammar lives in the `tree-sitter-gg` folder of the main repository.
+# For local development replace `repository` with a file:// URL of a git checkout and
+# `rev` with a commit that contains `tree-sitter-gg` (see README.md).
+[grammars.gg]
+repository = "file:///C:/greengold/tree-sitter-gg"
+rev = "f6a9b38d5a81b5a78ad9b0d8a0002f52e8545081"

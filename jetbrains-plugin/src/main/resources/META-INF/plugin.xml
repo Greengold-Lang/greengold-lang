@@ -1,0 +1,85 @@
+<idea-plugin>
+    <id>com.greengoldlang.greengold</id>
+    <name>Greengold Language Support</name>
+    <vendor url="https://greengoldlang.com/">Greengold Lang</vendor>
+
+    <description><![CDATA[
+        Greengold (<code>.gg</code>) support for JetBrains IDEs: syntax highlighting, snippets,
+        language server (<code>gg lsp</code>) diagnostics, hover, completion, rename and formatting,
+        and Tools &gt; Greengold actions for run, build, check, fix, fmt, test, doc, bindgen and more.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
+    <!-- Language server integration needs the LSP API (all IDEs since 2025.1). -->
+    <depends optional="true" config-file="greengold-lsp.xml">com.intellij.modules.lsp</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <themeProvider id="GreengoldDark" path="/themes/greengold_dark.theme.json"/>
+        <themeProvider id="GreengoldLight" path="/themes/greengold_light.theme.json"/>
+        <bundledColorScheme path="/themes/GreengoldDark.xml"/>
+        <bundledColorScheme path="/themes/GreengoldLight.xml"/>
+        <textmate.bundleProvider implementation="com.greengoldlang.greengold.GreengoldTextMateBundleProvider"/>
+        <fileIconProvider implementation="com.greengoldlang.greengold.GreengoldFileIconProvider"/>
+        <applicationService serviceImplementation="com.greengoldlang.greengold.GreengoldSettings"/>
+        <applicationConfigurable parentId="language"
+                                 instance="com.greengoldlang.greengold.GreengoldConfigurable"
+                                 id="com.greengoldlang.greengold.settings"
+                                 displayName="Greengold"/>
+        <notificationGroup id="Greengold" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="Greengold.Menu" text="Greengold" popup="true" icon="/icons/greengold.png">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+
+            <action id="Greengold.Run" class="com.greengoldlang.greengold.actions.RunAction"
+                    text="Run File (gg run)" icon="AllIcons.Actions.Execute">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift G"/>
+            </action>
+            <action id="Greengold.RunRelease" class="com.greengoldlang.greengold.actions.RunReleaseAction"
+                    text="Run File, Release (gg run --release)" icon="AllIcons.Actions.Lightning"/>
+            <action id="Greengold.Build" class="com.greengoldlang.greengold.actions.BuildAction"
+                    text="Build Binary (gg build)"/>
+            <action id="Greengold.BuildRelease" class="com.greengoldlang.greengold.actions.BuildReleaseAction"
+                    text="Build Binary, Release (gg build --release)"/>
+            <separator/>
+            <action id="Greengold.Check" class="com.greengoldlang.greengold.actions.CheckAction"
+                    text="Check File (gg check)"/>
+            <action id="Greengold.Fix" class="com.greengoldlang.greengold.actions.FixAction"
+                    text="Apply Safe Fixes (gg fix)"/>
+            <action id="Greengold.Explain" class="com.greengoldlang.greengold.actions.ExplainAction"
+                    text="Explain Diagnostic (gg explain)"/>
+            <action id="Greengold.Format" class="com.greengoldlang.greengold.actions.FormatAction"
+                    text="Format File (gg fmt)"/>
+            <separator/>
+            <action id="Greengold.Test" class="com.greengoldlang.greengold.actions.TestAction"
+                    text="Run Tests (gg test)" icon="AllIcons.RunConfigurations.TestState.Run"/>
+            <action id="Greengold.TestFile" class="com.greengoldlang.greengold.actions.TestFileAction"
+                    text="Run Tests in File"/>
+            <action id="Greengold.Doc" class="com.greengoldlang.greengold.actions.DocAction"
+                    text="Generate Documentation (gg doc)"/>
+            <separator/>
+            <action id="Greengold.NewProject" class="com.greengoldlang.greengold.actions.NewProjectAction"
+                    text="Create New Project (gg new)"/>
+            <action id="Greengold.Bindgen" class="com.greengoldlang.greengold.actions.BindgenAction"
+                    text="Generate C Bindings (gg bindgen)"/>
+            <action id="Greengold.BindgenCpp" class="com.greengoldlang.greengold.actions.BindgenCppAction"
+                    text="Generate C++ Bindings (gg bindgen --cpp)"/>
+            <separator/>
+            <action id="Greengold.ApiLock" class="com.greengoldlang.greengold.actions.ApiLockAction"
+                    text="Write API Lock (gg api --lock)"/>
+            <action id="Greengold.ApiCheck" class="com.greengoldlang.greengold.actions.ApiCheckAction"
+                    text="Check API Lock (gg api --check)"/>
+            <action id="Greengold.Targets" class="com.greengoldlang.greengold.actions.TargetsAction"
+                    text="List Targets (gg targets)"/>
+            <action id="Greengold.EmitLL" class="com.greengoldlang.greengold.actions.EmitLlvmAction"
+                    text="Emit LLVM IR (gg emit-ll)"/>
+            <action id="Greengold.EmitBC" class="com.greengoldlang.greengold.actions.EmitBitcodeAction"
+                    text="Emit LLVM Bitcode (gg emit-bc)"/>
+            <action id="Greengold.Ast" class="com.greengoldlang.greengold.actions.AstAction"
+                    text="View AST (gg ast)"/>
+        </group>
+    </actions>
+</idea-plugin>

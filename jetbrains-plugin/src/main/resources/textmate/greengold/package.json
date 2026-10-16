@@ -1,0 +1,32 @@
+{
+  "name": "greengold",
+  "displayName": "Greengold",
+  "version": "0.1.0",
+  "contributes": {
+    "languages": [
+      {
+        "id": "gg",
+        "aliases": ["Greengold", "greengold", "gg"],
+        "extensions": [".gg"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/greengold.png",
+          "dark": "./icons/greengold.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gg",
+        "scopeName": "source.gg",
+        "path": "./syntaxes/gg.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "gg",
+        "path": "./snippets/snippets.json"
+      }
+    ]
+  }
+}

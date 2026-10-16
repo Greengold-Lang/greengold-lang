@@ -1,0 +1,85 @@
+[
+  {
+    "label": "gg run",
+    "command": "gg",
+    "args": ["run", "--color", "never", "$ZED_FILE"],
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "gg run --release",
+    "command": "gg",
+    "args": ["run", "--release", "--color", "never", "$ZED_FILE"],
+    "reveal": "always"
+  },
+  {
+    "label": "gg build",
+    "command": "gg",
+    "args": ["build", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg build --release",
+    "command": "gg",
+    "args": ["build", "--release", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg check",
+    "command": "gg",
+    "args": ["check", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg fix",
+    "command": "gg",
+    "args": ["fix", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg fmt",
+    "command": "gg",
+    "args": ["fmt"]
+  },
+  {
+    "label": "gg test",
+    "command": "gg",
+    "args": ["test", "--color", "never"]
+  },
+  {
+    "label": "gg test (current file)",
+    "command": "gg",
+    "args": ["test", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg doc",
+    "command": "gg",
+    "args": ["doc", "$ZED_FILE"]
+  },
+  {
+    "label": "gg emit-ll",
+    "command": "gg",
+    "args": ["emit-ll", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg ast",
+    "command": "gg",
+    "args": ["ast", "--color", "never", "$ZED_FILE"]
+  },
+  {
+    "label": "gg api --lock",
+    "command": "gg",
+    "args": ["api", "--lock"]
+  },
+  {
+    "label": "gg api --check",
+    "command": "gg",
+    "args": ["api", "--check"]
+  },
+  {
+    "label": "gg targets",
+    "command": "gg",
+    "args": ["targets"]
+  },
+  {
+    "label": "gg explain",
+    "command": "gg",
+    "args": ["explain", "${ZED_CUSTOM_code:GG0301}"]
+  }
+]

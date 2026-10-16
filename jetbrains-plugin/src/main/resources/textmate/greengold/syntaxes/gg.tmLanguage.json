@@ -1,0 +1,1052 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Greengold",
+  "scopeName": "source.gg",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#invalid-comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#characters"
+    },
+    {
+      "include": "#invalid-syntax"
+    },
+    {
+      "include": "#impl-declarations"
+    },
+    {
+      "include": "#type-alias-declarations"
+    },
+    {
+      "include": "#feature-declarations"
+    },
+    {
+      "include": "#attribute-declarations"
+    },
+    {
+      "include": "#attribute-uses"
+    },
+    {
+      "include": "#function-declarations"
+    },
+    {
+      "include": "#struct-declarations"
+    },
+    {
+      "include": "#enum-declarations"
+    },
+    {
+      "include": "#import-declarations"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#mode-keywords"
+    },
+    {
+      "include": "#prelude-types"
+    },
+    {
+      "include": "#prelude-constructors"
+    },
+    {
+      "include": "#storage-types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#self-expression"
+    },
+    {
+      "include": "#wildcard"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#function-calls"
+    },
+    {
+      "include": "#property-access"
+    },
+    {
+      "include": "#type-identifiers"
+    },
+    {
+      "include": "#variables"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.gg",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "invalid-comments": {
+      "patterns": [
+        {
+          "name": "invalid.illegal.comment.gg",
+          "match": "//.*$",
+          "comment": "# is the comment character. // is rejected."
+        }
+      ]
+    },
+    "invalid-syntax": {
+      "patterns": [
+        {
+          "name": "invalid.illegal.tab.gg",
+          "match": "\\t"
+        },
+        {
+          "name": "invalid.illegal.else-if.gg",
+          "match": "\\belse\\s+if\\b"
+        },
+        {
+          "name": "invalid.illegal.operator.gg",
+          "match": "&&|\\|\\||\\+\\+|--"
+        },
+        {
+          "name": "invalid.illegal.operator.gg",
+          "match": "!(?!=)"
+        },
+        {
+          "name": "invalid.illegal.semicolon.gg",
+          "match": ";"
+        },
+        {
+          "name": "invalid.illegal.keyword.gg",
+          "match": "\\b(?:var|def|func|function)\\b"
+        },
+        {
+          "name": "invalid.illegal.binding.gg",
+          "match": "\\blet\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=(?!=)"
+        },
+        {
+          "name": "invalid.illegal.method.gg",
+          "match": "\\bfn\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*\\[[^\\]]+\\])?\\s*\\.[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "invalid.illegal.impl-for.gg",
+          "match": "\\bimpl\\s+[A-Za-z_][A-Za-z0-9_.]*(?:\\s*\\[[^\\]]+\\])?\\s+for\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.block.format.gg",
+          "begin": "([f$])(\"\"\")",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.string.format.gg"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.gg"
+            }
+          },
+          "end": "\"\"\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.gg"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.gg",
+              "match": "(\\{\\{|\\}\\})"
+            },
+            {
+              "name": "meta.template.expression.gg meta.embedded.line.gg meta.interpolation.gg",
+              "begin": "\\{",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.definition.template-expression.begin.gg punctuation.section.embedded.begin.gg"
+                }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.definition.template-expression.end.gg punctuation.section.embedded.end.gg"
+                }
+              },
+              "contentName": "source.gg",
+              "patterns": [
+                {
+                  "name": "meta.bracket.curly.gg",
+                  "begin": "\\{",
+                  "beginCaptures": {
+                    "0": {
+                      "name": "punctuation.section.scope.begin.gg"
+                    }
+                  },
+                  "end": "\\}",
+                  "endCaptures": {
+                    "0": {
+                      "name": "punctuation.section.scope.end.gg"
+                    }
+                  },
+                  "patterns": [
+                    {
+                      "include": "$self"
+                    }
+                  ]
+                },
+                {
+                  "include": "$self"
+                }
+              ]
+            },
+            {
+              "name": "constant.character.escape.gg",
+              "match": "\\\\([ntr\\\\'\"])"
+            },
+            {
+              "name": "invalid.illegal.escape.gg",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.block.gg",
+          "begin": "\"\"\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.gg"
+            }
+          },
+          "end": "\"\"\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.gg"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.gg",
+              "match": "\\\\([ntr\\\\'\"])"
+            },
+            {
+              "name": "invalid.illegal.escape.gg",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.format.gg",
+          "begin": "([f$])(\")",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.string.format.gg"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.gg"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.gg"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.gg",
+              "match": "(\\{\\{|\\}\\})"
+            },
+            {
+              "name": "meta.template.expression.gg meta.embedded.line.gg meta.interpolation.gg",
+              "begin": "\\{",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.definition.template-expression.begin.gg punctuation.section.embedded.begin.gg"
+                }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.definition.template-expression.end.gg punctuation.section.embedded.end.gg"
+                }
+              },
+              "contentName": "source.gg",
+              "patterns": [
+                {
+                  "name": "meta.bracket.curly.gg",
+                  "begin": "\\{",
+                  "beginCaptures": {
+                    "0": {
+                      "name": "punctuation.section.scope.begin.gg"
+                    }
+                  },
+                  "end": "\\}",
+                  "endCaptures": {
+                    "0": {
+                      "name": "punctuation.section.scope.end.gg"
+                    }
+                  },
+                  "patterns": [
+                    {
+                      "include": "$self"
+                    }
+                  ]
+                },
+                {
+                  "include": "$self"
+                }
+              ]
+            },
+            {
+              "name": "constant.character.escape.gg",
+              "match": "\\\\([ntr\\\\'\"])"
+            },
+            {
+              "name": "invalid.illegal.escape.gg",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.gg",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.gg",
+              "match": "\\\\([ntr\\\\'\"])"
+            },
+            {
+              "name": "invalid.illegal.escape.gg",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "characters": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.char.gg",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.gg",
+              "match": "\\\\([ntr\\\\\"'0])"
+            },
+            {
+              "name": "invalid.illegal.escape.gg",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "impl-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(impl)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.impl.gg" },
+            "2": { "name": "entity.name.namespace.gg" },
+            "3": { "name": "entity.name.type.class.gg" },
+            "4": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(impl)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.impl.gg" },
+            "2": { "name": "entity.name.namespace.gg" },
+            "3": { "name": "entity.name.type.class.gg" }
+          }
+        },
+        {
+          "match": "\\b(impl)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.impl.gg" },
+            "2": { "name": "entity.name.type.class.gg" },
+            "3": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(impl)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.impl.gg" },
+            "2": { "name": "entity.name.type.class.gg" }
+          }
+        }
+      ]
+    },
+    "attribute-declarations": {
+      "patterns": [
+        {
+          "comment": "attribute name(param: kind = default, ...) on fn, struct, field",
+          "begin": "^[ ]*(attribute)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "end": "$",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.declaration.attribute.gg"
+            },
+            "2": {
+              "name": "entity.name.function.attribute.gg"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b(on)\\b",
+              "name": "keyword.other.attribute-target.gg"
+            },
+            {
+              "match": "\\b(fn|struct|field)\\b",
+              "name": "storage.type.attribute-target.gg"
+            },
+            {
+              "match": "\\b(str|int|float|bool|ident)\\b",
+              "name": "support.type.attribute-kind.gg"
+            },
+            {
+              "match": "([A-Za-z_][A-Za-z0-9_]*)\\s*(?=:)",
+              "captures": {
+                "1": {
+                  "name": "variable.parameter.attribute.gg"
+                }
+              }
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#constants"
+            }
+          ]
+        }
+      ]
+    },
+    "attribute-uses": {
+      "patterns": [
+        {
+          "comment": "@name or @name(args) on its own line above a fn, struct, or field",
+          "begin": "^[ ]*(@)([A-Za-z_][A-Za-z0-9_]*)",
+          "end": "$",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.annotation.gg"
+            },
+            "2": {
+              "name": "entity.name.function.attribute.gg meta.annotation.gg"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?==(?!=))",
+              "name": "variable.parameter.attribute.gg"
+            },
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#constants"
+            }
+          ]
+        }
+      ]
+    },
+    "type-alias-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(type)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*=",
+          "captures": {
+            "1": { "name": "keyword.declaration.type.gg" },
+            "2": { "name": "entity.name.type.alias.gg" },
+            "3": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(type)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=",
+          "captures": {
+            "1": { "name": "keyword.declaration.type.gg" },
+            "2": { "name": "entity.name.type.alias.gg" }
+          }
+        }
+      ]
+    },
+    "feature-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(feature)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.feature.gg" },
+            "2": { "name": "entity.name.type.interface.gg" },
+            "3": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(feature)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.feature.gg" },
+            "2": { "name": "entity.name.type.interface.gg" }
+          }
+        }
+      ]
+    },
+    "function-declarations": {
+      "patterns": [
+        {
+          "match": "\\b((?:(?:weak\\s+)?extern(?:\\s+\"[^\"]*\")?|comptime|hot|async)\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*\\(",
+          "captures": {
+            "1": { "name": "keyword.other.gg storage.modifier.gg" },
+            "2": { "name": "keyword.declaration.function.gg" },
+            "3": { "name": "entity.name.function.gg" },
+            "4": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b((?:(?:weak\\s+)?extern(?:\\s+\"[^\"]*\")?|comptime|hot|async)\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
+          "captures": {
+            "1": { "name": "keyword.other.gg storage.modifier.gg" },
+            "2": { "name": "keyword.declaration.function.gg" },
+            "3": { "name": "entity.name.function.gg" }
+          }
+        },
+        {
+          "match": "\\b(fn)\\s*\\(",
+          "captures": {
+            "1": { "name": "keyword.declaration.function.gg" }
+          }
+        }
+      ]
+    },
+    "struct-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(union)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.union.gg" },
+            "2": { "name": "entity.name.type.struct.gg" }
+          }
+        },
+        {
+          "match": "\\b(packed)\\s+(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\[([^\\]]+)\\])?\\s*:",
+          "captures": {
+            "1": { "name": "storage.modifier.packed.gg" },
+            "2": { "name": "keyword.declaration.struct.gg" },
+            "3": { "name": "entity.name.type.struct.gg" },
+            "4": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(align)\\s*\\(\\s*(\\d+)\\s*\\)\\s+(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\[([^\\]]+)\\])?\\s*:",
+          "captures": {
+            "1": { "name": "storage.modifier.align.gg" },
+            "2": { "name": "constant.numeric.integer.gg" },
+            "3": { "name": "keyword.declaration.struct.gg" },
+            "4": { "name": "entity.name.type.struct.gg" },
+            "5": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(extern\\s+)?(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*:",
+          "captures": {
+            "1": { "name": "keyword.other.extern.gg" },
+            "2": { "name": "keyword.declaration.struct.gg" },
+            "3": { "name": "entity.name.type.struct.gg" },
+            "4": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(extern\\s+)?(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "keyword.other.extern.gg" },
+            "2": { "name": "keyword.declaration.struct.gg" },
+            "3": { "name": "entity.name.type.struct.gg" }
+          }
+        }
+      ]
+    },
+    "enum-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(enum)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\[([^\\]]+)\\]\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.enum.gg" },
+            "2": { "name": "entity.name.type.enum.gg" },
+            "3": { "name": "entity.name.type.parameter.gg" }
+          }
+        },
+        {
+          "match": "\\b(enum)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:",
+          "captures": {
+            "1": { "name": "keyword.declaration.enum.gg" },
+            "2": { "name": "entity.name.type.enum.gg" }
+          }
+        }
+      ]
+    },
+    "import-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_.]*)\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.control.import.gg" },
+            "2": { "name": "entity.name.namespace.gg" },
+            "3": { "name": "keyword.operator.cast.gg" },
+            "4": { "name": "entity.name.namespace.gg" }
+          }
+        },
+        {
+          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_.]*|\"[^\"]+\")\\s*(\\{)([^}]*)(\\})",
+          "captures": {
+            "1": { "name": "keyword.control.import.gg" },
+            "2": { "name": "entity.name.namespace.gg" },
+            "3": { "name": "punctuation.definition.import.begin.gg" },
+            "4": { "name": "entity.name.function.gg" },
+            "5": { "name": "punctuation.definition.import.end.gg" }
+          }
+        },
+        {
+          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_.]*|\"[^\"]+\")",
+          "captures": {
+            "1": { "name": "keyword.control.import.gg" },
+            "2": { "name": "entity.name.namespace.gg" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.flow.return.gg keyword.control.return.gg",
+          "match": "\\b(return)\\b"
+        },
+        {
+          "name": "keyword.control.flow.break.gg",
+          "match": "\\b(break|continue|pass)\\b"
+        },
+        {
+          "name": "keyword.control.flow.defer.gg keyword.control.defer.gg",
+          "match": "\\b(defer)\\b"
+        },
+        {
+          "match": "\\b(overflow)\\s*:\\s*(wrap|trap)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.overflow.gg keyword.control.gg" },
+            "2": { "name": "constant.language.overflow-mode.gg" }
+          }
+        },
+        {
+          "name": "keyword.control.wrapping.gg keyword.control.gg",
+          "match": "\\bwrapping\\b(?=\\s*:)"
+        },
+        {
+          "name": "keyword.control.conditional.gg keyword.control.gg",
+          "match": "\\b(if|elif|else|then)\\b"
+        },
+        {
+          "name": "keyword.control.let.gg keyword.other.let.gg",
+          "match": "(?<=\\b(?:if|while)\\s)let\\b"
+        },
+        {
+          "name": "keyword.control.loop.gg keyword.control.gg",
+          "match": "\\b(while|for|in)\\b"
+        },
+        {
+          "name": "keyword.control.loop.step.gg keyword.control.gg",
+          "match": "\\bstep\\b(?=\\s+-?(?:\\d|[A-Za-z_(]))"
+        },
+        {
+          "name": "keyword.control.match.gg keyword.control.gg",
+          "match": "\\b(match)\\b"
+        },
+        {
+          "name": "keyword.control.import.gg keyword.control.gg",
+          "match": "\\b(import)\\b"
+        },
+        {
+          "name": "keyword.declaration.test.gg",
+          "match": "^[ ]*(test)\\b"
+        },
+        {
+          "name": "keyword.other.hot.gg storage.modifier.hot.gg",
+          "match": "\\bhot\\b"
+        },
+        {
+          "name": "keyword.other.trust.gg",
+          "match": "\\btrust\\b"
+        },
+        {
+          "name": "keyword.control.require.gg",
+          "match": "^[ ]*require\\b"
+        },
+        {
+          "name": "keyword.operator.logical.gg",
+          "match": "\\b(and|or|not)\\b"
+        },
+        {
+          "name": "storage.modifier.gg",
+          "match": "\\b(fixed|const)\\b"
+        },
+        {
+          "name": "keyword.declaration.allocator.gg",
+          "match": "^[ ]*allocator\\b"
+        },
+        {
+          "name": "keyword.other.extern.gg",
+          "match": "\\bweak\\b(?=\\s+extern\\b)"
+        },
+        {
+          "name": "keyword.other.extern.gg",
+          "match": "\\bextern\\b"
+        },
+        {
+          "name": "keyword.declaration.impl.gg",
+          "match": "\\bimpl\\b"
+        },
+        {
+          "name": "keyword.declaration.function.gg",
+          "match": "\\bfn\\b"
+        },
+        {
+          "name": "keyword.declaration.struct.gg",
+          "match": "\\bstruct\\b"
+        },
+        {
+          "name": "keyword.declaration.enum.gg",
+          "match": "\\benum\\b"
+        },
+        {
+          "name": "keyword.declaration.feature.gg",
+          "match": "\\bfeature\\b"
+        },
+        {
+          "name": "keyword.other.public.gg storage.modifier.public.gg",
+          "match": "\\b(public|private)\\b"
+        },
+        {
+          "name": "keyword.other.unsafe.gg storage.modifier.unsafe.gg",
+          "match": "\\bunsafe\\b"
+        },
+        {
+          "name": "keyword.other.comptime.gg storage.modifier.comptime.gg",
+          "match": "\\bcomptime\\b"
+        },
+        {
+          "name": "keyword.other.async.gg storage.modifier.async.gg",
+          "match": "\\basync\\b"
+        },
+        {
+          "name": "keyword.control.await.gg",
+          "match": "\\bawait\\b"
+        },
+        {
+          "name": "keyword.other.copy.gg",
+          "match": "\\bcopy\\b"
+        },
+        {
+          "name": "keyword.other.soa.gg storage.modifier.soa.gg",
+          "match": "\\bsoa\\b"
+        },
+        {
+          "name": "keyword.other.exclusive.gg storage.modifier.exclusive.gg",
+          "match": "\\bexclusive\\b"
+        },
+        {
+          "match": "\\b(tied)\\s+(to)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.tied.gg" },
+            "2": { "name": "keyword.other.tied.gg" }
+          }
+        },
+        {
+          "name": "keyword.other.ref.gg storage.modifier.ref.gg",
+          "match": "(?<=->\\s*)ref\\b"
+        },
+        {
+          "name": "storage.modifier.mut.gg",
+          "match": "(?<=\\*)mut\\b"
+        },
+        {
+          "name": "keyword.other.dyn.gg storage.modifier.dyn.gg",
+          "match": "\\bdyn\\b(?=\\s+[A-Za-z_])"
+        },
+        {
+          "name": "support.function.builtin.gg",
+          "match": "\\basm\\b(?=\\s*[\\[(])"
+        },
+        {
+          "match": "\\b(as)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?=#|$)",
+          "captures": {
+            "1": { "name": "keyword.operator.word.gg" },
+            "2": { "name": "entity.name.namespace.gg" }
+          }
+        }
+      ]
+    },
+    "mode-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.mode.gg storage.modifier.mode.gg",
+          "match": "\\b(consume|lend|read)\\b"
+        },
+        {
+          "name": "keyword.other.mode.gg storage.modifier.mode.gg",
+          "match": "(?<=:)\\s*send\\b"
+        }
+      ]
+    },
+    "prelude-types": {
+      "patterns": [
+        {
+          "name": "support.type.prelude.gg entity.name.type.enum.gg",
+          "match": "\\b(Optional|Result|Box|List|Shared|Arc|Fn|string|Tuple2|Tuple3|Tuple4|Tuple5|Tuple6)\\b"
+        }
+      ]
+    },
+    "prelude-constructors": {
+      "patterns": [
+        {
+          "name": "support.constant.constructor.gg entity.name.type.enum.variant.gg",
+          "match": "\\b(Valid|None|Ok|Err)\\b"
+        }
+      ]
+    },
+    "storage-types": {
+      "patterns": [
+        {
+          "name": "support.type.simd.gg entity.name.type.primitive.gg",
+          "match": "\\b(f32x4|f32x8|f64x2|f64x4|i32x4|i32x8|i64x2|i64x4|i16x8|u8x16|u32x4)\\b"
+        },
+        {
+          "name": "support.type.bound.gg entity.name.type.gg",
+          "match": "\\b(Num|Int|Float|Ord|Eq|Copy|Key)\\b"
+        },
+        {
+          "name": "entity.name.type.primitive.gg support.type.primitive.gg",
+          "match": "(?<=\\*)void\\b"
+        },
+        {
+          "name": "entity.name.type.primitive.gg support.type.primitive.gg",
+          "match": "\\b(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize|f32|f64|int|uint|float|double|bool|str|Self)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.gg",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.null.pointer.gg constant.language.null.gg",
+          "match": "\\bnull\\b"
+        }
+      ]
+    },
+    "wildcard": {
+      "patterns": [
+        {
+          "name": "variable.language.wildcard.gg constant.language.wildcard.gg",
+          "match": "\\b_\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.gg",
+          "match": "\\b0[xX][0-9a-fA-F][0-9a-fA-F_]*\\b"
+        },
+        {
+          "name": "constant.numeric.binary.gg",
+          "match": "\\b0[bB][01][01_]*\\b"
+        },
+        {
+          "name": "constant.numeric.float.gg",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*\\b"
+        },
+        {
+          "name": "constant.numeric.integer.gg",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.fat.gg",
+          "match": "=>"
+        },
+        {
+          "name": "keyword.operator.try.gg",
+          "match": "\\?"
+        },
+        {
+          "name": "keyword.operator.ellipsis.gg",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.range.inclusive.gg",
+          "match": "\\.\\.="
+        },
+        {
+          "name": "keyword.operator.range.exclusive.gg",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.arrow.gg",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.assignment.compound.gg",
+          "match": "(<<=|>>=)"
+        },
+        {
+          "name": "keyword.operator.assignment.compound.gg",
+          "match": "(\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=)"
+        },
+        {
+          "name": "keyword.operator.comparison.gg",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.assignment.gg",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.bitwise.shift.gg",
+          "match": "(<<|>>)"
+        },
+        {
+          "name": "keyword.operator.bitwise.gg",
+          "match": "(&|\\||\\^|~)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.overflow.gg",
+          "match": "\\b(wrapping_add|wrapping_sub|wrapping_mul|saturating_add|saturating_sub|saturating_mul|checked_add|checked_sub|checked_mul)\\b(?!\\s*[\\[(])"
+        },
+        {
+          "name": "keyword.operator.arithmetic.gg",
+          "match": "(\\+|-|\\*|/|%)"
+        }
+      ]
+    },
+    "function-calls": {
+      "patterns": [
+        {
+          "match": "\\b(print|eprint|panic|input|addr|addr_mut|ptr_offset|ptr_to_int|int_to_ptr|cstr_to_string|string_to_cstr|str_from_raw|ptr_read|ptr_write|volatile_read|volatile_write|atomic_load|atomic_store|atomic_add|atomic_sub|atomic_and|atomic_or|atomic_xor|atomic_swap|atomic_cas|fence|size_of|align_of|add_overflows|sub_overflows|mul_overflows|max_value|min_value|target_os|target_arch|hash|wrapping_add|wrapping_sub|wrapping_mul|saturating_add|saturating_sub|saturating_mul|checked_add|checked_sub|checked_mul)\\s*(?=[\\(\\[])",
+          "captures": {
+            "1": { "name": "support.function.builtin.gg" }
+          }
+        },
+        {
+          "match": "\\b(ptr_cast)\\s*(?=[\\(\\[])",
+          "captures": {
+            "1": { "name": "support.function.builtin.gg" }
+          }
+        },
+        {
+          "match": "\\.(value_or_panic|value_or|has_value|is_none|is_ok|is_err|append_str|append_byte|append_u64|append_i64|append_bool|append|as_str|push|pop|clear|swap|swap_remove|remove|insert|get|drop|to_string|clone|len|splat|load|store|lane|with_lane|sum|sqrt)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "support.function.prelude.gg" }
+          }
+        },
+        {
+          "match": "\\.(len)\\b",
+          "captures": {
+            "1": { "name": "support.variable.property.gg" }
+          }
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*\\[[^\\]]+\\]\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.gg" }
+          }
+        },
+        {
+          "match": "\\.([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.method.gg" }
+          }
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.gg" }
+          }
+        }
+      ]
+    },
+    "self-expression": {
+      "patterns": [
+        {
+          "name": "variable.language.self.gg variable.language.this.gg",
+          "match": "\\bself\\b"
+        }
+      ]
+    },
+    "property-access": {
+      "patterns": [
+        {
+          "match": "\\.([A-Za-z_][A-Za-z0-9_]*)\\b(?!\\s*[\\(\\[])",
+          "captures": {
+            "1": { "name": "variable.other.property.gg" }
+          }
+        }
+      ]
+    },
+    "type-identifiers": {
+      "patterns": [
+        {
+          "name": "entity.name.type.gg",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "match": "\\b(fixed|const|static)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "storage.modifier.gg" },
+            "2": { "name": "variable.other.declaration.gg" }
+          }
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=:)(?!:)",
+          "captures": {
+            "1": { "name": "variable.other.property.gg entity.other.attribute-name.gg" }
+          }
+        },
+        {
+          "name": "variable.other.gg",
+          "match": "\\b[a-z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

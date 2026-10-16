@@ -1,0 +1,72 @@
+{
+  "name": "Greengold Dark",
+  "dark": true,
+  "author": "Greengold Lang",
+  "editorScheme": "/themes/GreengoldDark.xml",
+  "ui": {
+    "*": {
+      "background": "#0b100d",
+      "foreground": "#d9e3db",
+      "borderColor": "#1f2c25",
+      "focusColor": "#3fd08a",
+      "selectionBackground": "#1f3a2c",
+      "selectionForeground": "#e9f0ea"
+    },
+    "Editor": {
+      "background": "#0b100d",
+      "foreground": "#d9e3db",
+      "shortcutForeground": "#f2c443"
+    },
+    "EditorTabs": {
+      "background": "#0d1310",
+      "underlinedTabBackground": "#0b100d",
+      "underlineColor": "#f2c443",
+      "underlineHeight": 2
+    },
+    "ToolWindow": {
+      "Header": {
+        "background": "#0d1310",
+        "borderColor": "#1f2c25"
+      },
+      "HeaderTab": {
+        "selectedBackground": "#0b100d",
+        "underlineColor": "#f2c443"
+      }
+    },
+    "Tree": {
+      "background": "#0d1310",
+      "selectionBackground": "#1f3a2c",
+      "selectionForeground": "#e9f0ea"
+    },
+    "List": {
+      "background": "#0d1310",
+      "selectionBackground": "#1f3a2c",
+      "selectionForeground": "#e9f0ea"
+    },
+    "Popup": {
+      "Header": {
+        "activeBackground": "#101813"
+      }
+    },
+    "Button": {
+      "startBackground": "#1f9d63",
+      "endBackground": "#1f9d63",
+      "startBorderColor": "#3fd08a",
+      "endBorderColor": "#3fd08a",
+      "focusedBorderColor": "#3fd08a",
+      "default": {
+        "startBackground": "#1f9d63",
+        "endBackground": "#1f9d63",
+        "foreground": "#ffffff"
+      }
+    },
+    "ScrollBar": {
+      "thumbColor": "#2c3d3466",
+      "hoverThumbColor": "#34463b99"
+    },
+    "StatusBar": {
+      "background": "#090d0b",
+      "borderColor": "#1f2c25"
+    }
+  }
+}

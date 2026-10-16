@@ -1,0 +1,31 @@
+{
+  "$schema": "https://zed.dev/schema/icon_themes/v0.3.0.json",
+  "name": "Greengold",
+  "author": "Greengold Lang",
+  "themes": [
+    {
+      "name": "Greengold Dark",
+      "appearance": "dark",
+      "file_suffixes": {
+        "gg": "greengold"
+      },
+      "file_icons": {
+        "greengold": {
+          "path": "./icons/greengold.svg"
+        }
+      }
+    },
+    {
+      "name": "Greengold Light",
+      "appearance": "light",
+      "file_suffixes": {
+        "gg": "greengold"
+      },
+      "file_icons": {
+        "greengold": {
+          "path": "./icons/greengold.svg"
+        }
+      }
+    }
+  ]
+}

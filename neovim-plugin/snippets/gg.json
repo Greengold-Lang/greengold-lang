@@ -1,0 +1,817 @@
+{
+  "Main Function": {
+    "prefix": "fnmain",
+    "body": [
+      "fn main():",
+      "    ${1:print(\"Hello, Greengold!\")}"
+    ],
+    "description": "Greengold main entry function"
+  },
+  "Function Declaration": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:params}) -> ${3:i32}:",
+      "    ${0:return 0}"
+    ],
+    "description": "Function declaration"
+  },
+  "Generic Function Declaration": {
+    "prefix": "fng",
+    "body": [
+      "fn ${1:name}[${2:T}](${3:a}: ${2:T}, ${4:b}: ${2:T}) -> ${2:T}:",
+      "    ${0:return ${3:a}}"
+    ],
+    "description": "Generic function declaration"
+  },
+  "Function Returning View": {
+    "prefix": "fnref",
+    "body": [
+      "fn ${1:name}(${2:item}: read ${3:Type}) -> ref ${4:Field}:",
+      "    ${0:return item.field}"
+    ],
+    "description": "Function returning a borrowed read-only view (ref)"
+  },
+  "Implementation Block": {
+    "prefix": "impl",
+    "body": [
+      "impl ${1:Type}:",
+      "    fn ${2:method}(self: lend Self):",
+      "        ${0:pass}"
+    ],
+    "description": "Struct method implementation block (impl Type:)"
+  },
+  "Generic Implementation Block": {
+    "prefix": "implg",
+    "body": [
+      "impl ${1:Type}[${2:T}]:",
+      "    fn ${3:method}(self: lend Self):",
+      "        ${0:pass}"
+    ],
+    "description": "Generic struct implementation block (impl Type[T]:)"
+  },
+  "Method Declaration in Impl": {
+    "prefix": "fnm",
+    "body": [
+      "fn ${1:method}(self: lend Self${2:, param: i32}):",
+      "    ${0:pass}"
+    ],
+    "description": "Method declaration inside an impl block"
+  },
+  "Comptime Function Declaration": {
+    "prefix": "comptimefn",
+    "body": [
+      "comptime fn ${1:name}(${2:n}: ${3:i32}) -> ${3:i32}:",
+      "    ${0:return n * n}"
+    ],
+    "description": "Comptime evaluated function"
+  },
+  "Function Returning Result": {
+    "prefix": "fnres",
+    "body": [
+      "fn ${1:name}(${2:params}) -> Result[${3:i32}, ${4:str}]:",
+      "    ${0:return Ok(0)}"
+    ],
+    "description": "Function returning Result[T, E]"
+  },
+  "Function Returning Optional": {
+    "prefix": "fnopt",
+    "body": [
+      "fn ${1:name}(${2:params}) -> Optional[${3:i32}]:",
+      "    ${0:return Valid(0)}"
+    ],
+    "description": "Function returning Optional[T]"
+  },
+  "Feature Declaration": {
+    "prefix": "feature",
+    "body": [
+      "feature ${1:Name}:",
+      "    fn ${2:method}(self: Self) -> ${3:f64}"
+    ],
+    "description": "Feature declaration with method signature"
+  },
+  "Generic Feature Declaration": {
+    "prefix": "featureg",
+    "body": [
+      "feature ${1:Name}[${2:T}]:",
+      "    fn ${3:method}(self: Self, val: ${2:T}) -> ${4:bool}"
+    ],
+    "description": "Generic feature declaration"
+  },
+  "Struct Declaration": {
+    "prefix": "struct",
+    "body": [
+      "struct ${1:Name}:",
+      "    ${2:field}: ${3:i32}"
+    ],
+    "description": "Struct declaration"
+  },
+  "Generic Struct Declaration": {
+    "prefix": "structg",
+    "body": [
+      "struct ${1:Name}[${2:T}]:",
+      "    ${3:field}: ${2:T}"
+    ],
+    "description": "Generic struct declaration"
+  },
+  "Struct of Arrays (SoA)": {
+    "prefix": "soa",
+    "body": [
+      "${1:items} = soa Array[${2:Type}, ${3:1024}]"
+    ],
+    "description": "Struct of Arrays layout (SIMD auto-vectorization friendly)"
+  },
+  "Enum Declaration": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Name}:",
+      "    ${2:Variant1}(${3:f32})",
+      "    ${4:Variant2}"
+    ],
+    "description": "Enum declaration with payload/unit variants"
+  },
+  "Generic Enum Declaration": {
+    "prefix": "enumg",
+    "body": [
+      "enum ${1:Name}[${2:T}]:",
+      "    ${3:Valid}(${2:T})",
+      "    ${4:None}"
+    ],
+    "description": "Generic enum declaration"
+  },
+  "Match Statement": {
+    "prefix": "match",
+    "body": [
+      "match ${1:expr}:",
+      "    ${2:pattern}:",
+      "        ${3:pass}",
+      "    _:",
+      "        ${0:pass}"
+    ],
+    "description": "Match statement"
+  },
+  "Match Scalar Statement": {
+    "prefix": "matchscalar",
+    "body": [
+      "match ${1:expr}:",
+      "    ${2:1}:",
+      "        ${3:pass}",
+      "    ${4:2 | 3}:",
+      "        ${5:pass}",
+      "    ${6:4..=9}:",
+      "        ${7:pass}",
+      "    _:",
+      "        ${0:pass}"
+    ],
+    "description": "Match statement over integers, chars, bools or strings"
+  },
+  "Match Expression": {
+    "prefix": "matchexpr",
+    "body": [
+      "match ${1:expr}:",
+      "    ${2:pattern} => ${3:val}",
+      "    _ => ${0:default}"
+    ],
+    "description": "Inline match expression with fat arrow =>"
+  },
+  "Match Consume Statement": {
+    "prefix": "matchconsume",
+    "body": [
+      "match consume ${1:expr}:",
+      "    ${2:Variant}(${3:val}):",
+      "        ${0:pass}"
+    ],
+    "description": "Match that moves the value"
+  },
+  "Match Lend Statement": {
+    "prefix": "matchlend",
+    "body": [
+      "match lend ${1:expr}:",
+      "    ${2:Variant}(${3:val}):",
+      "        ${0:pass}"
+    ],
+    "description": "Match statement (lend mode)"
+  },
+  "Defer Statement": {
+    "prefix": "defer",
+    "body": [
+      "defer ${0:cleanup()}"
+    ],
+    "description": "Deferred execution at end of scope (LIFO cleanup)"
+  },
+  "Unsafe Block": {
+    "prefix": "unsafe",
+    "body": [
+      "unsafe:",
+      "    ${0:pass}"
+    ],
+    "description": "Unsafe code block for raw pointer operations"
+  },
+  "Overflow Wrap": {
+    "prefix": "overflow",
+    "body": [
+      "overflow: wrap"
+    ],
+    "description": "Integer overflow mode: two's-complement wrap for the rest of the function"
+  },
+  "Overflow Trap": {
+    "prefix": "overflowtrap",
+    "body": [
+      "overflow: trap"
+    ],
+    "description": "Integer overflow mode: trap on overflow for the rest of the function"
+  },
+  "Function with Overflow Wrap": {
+    "prefix": "fnoverflow",
+    "body": [
+      "fn ${1:name}(${2:a}: ${3:i32}, ${4:b}: ${3:i32}) -> ${3:i32}:",
+      "    overflow: wrap",
+      "    return ${2:a} + ${4:b}"
+    ],
+    "description": "Function whose + - * wrap on integer overflow"
+  },
+  "Wrapping Block": {
+    "prefix": "wrapping",
+    "body": [
+      "wrapping:",
+      "    ${0:res = a + b}"
+    ],
+    "description": "Scoped block where + - * wrap on integer overflow"
+  },
+  "Wrapping Add": {
+    "prefix": "wadd",
+    "body": [
+      "${1:a} wrapping_add ${2:b}"
+    ],
+    "description": "Wrapping integer addition (infix)"
+  },
+  "Saturating Add": {
+    "prefix": "sadd",
+    "body": [
+      "${1:a} saturating_add ${2:b}"
+    ],
+    "description": "Saturating integer addition (infix)"
+  },
+  "Checked Add": {
+    "prefix": "cadd",
+    "body": [
+      "${1:a} checked_add ${2:b}"
+    ],
+    "description": "Checked integer addition; result is Optional (infix)"
+  },
+  "For Range Count": {
+    "prefix": "forinrange",
+    "body": [
+      "for ${1:i} in range(${2:n}):",
+      "    ${0:print(${1:i})}"
+    ],
+    "description": "Count loop: for i in range(n) is the same as for i in n"
+  },
+  "For Loop Exclusive": {
+    "prefix": "for",
+    "body": [
+      "for ${1:i} in 0..${2:n}:",
+      "    ${0:print(${1:i})}"
+    ],
+    "description": "For loop (exclusive range 0..n)"
+  },
+  "For Loop Inclusive": {
+    "prefix": "forrange",
+    "body": [
+      "for ${1:i} in 0..=${2:n}:",
+      "    ${0:print(${1:i})}"
+    ],
+    "description": "For loop (inclusive range 0..=n)"
+  },
+  "For Loop Exclusive with Step": {
+    "prefix": "forstep",
+    "body": [
+      "for ${1:i} in ${2:0}..${3:n} step ${4:2}:",
+      "    ${0:print(${1:i})}"
+    ],
+    "description": "For loop with step stride (exclusive range)"
+  },
+  "For Loop Inclusive with Step": {
+    "prefix": "forrangestep",
+    "body": [
+      "for ${1:i} in ${2:0}..=${3:n} step ${4:2}:",
+      "    ${0:print(${1:i})}"
+    ],
+    "description": "For loop with step stride (inclusive range)"
+  },
+  "For Count Loop": {
+    "prefix": "forcount",
+    "body": [
+      "for ${1:i} in ${2:n}:",
+      "    ${0:print(${1:i})}"
+    ],
+    "description": "For loop over integer count (0..n)"
+  },
+  "For In Collection": {
+    "prefix": "forin",
+    "body": [
+      "for ${1:x} in ${2:array}:",
+      "    ${0:print(${1:x})}"
+    ],
+    "description": "For-in loop iterating over collection"
+  },
+  "For In with Index": {
+    "prefix": "foridx",
+    "body": [
+      "for ${1:k}, ${2:x} in ${3:array}:",
+      "    ${0:print(${1:k}, ${2:x})}"
+    ],
+    "description": "For-in loop with index (k: usize, x: element)"
+  },
+  "For In Changing Elements": {
+    "prefix": "forchange",
+    "body": [
+      "for ${1:x} in ${2:array}:",
+      "    ${0:${1:x} += 1}"
+    ],
+    "description": "For-in loop that changes each element (the loop variable lends it)"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition}:",
+      "    ${0}"
+    ],
+    "description": "While loop"
+  },
+  "If Statement": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition}:",
+      "    ${0}"
+    ],
+    "description": "If statement"
+  },
+  "If Else Statement": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition}:",
+      "    ${2}",
+      "else:",
+      "    ${0}"
+    ],
+    "description": "If-else statement"
+  },
+  "If Expression (Inline)": {
+    "prefix": "ifexpr",
+    "body": [
+      "if ${1:condition} then ${2:then_val} else ${3:else_val}"
+    ],
+    "description": "Inline conditional if-then-else expression"
+  },
+  "Variable Declaration": {
+    "prefix": "vartype",
+    "body": [
+      "${1:name}: ${2:type} = ${3:value}"
+    ],
+    "description": "Variable declaration with a type"
+  },
+  "Variable Short Definition": {
+    "prefix": "vardef",
+    "body": [
+      "${1:name} = ${2:value}"
+    ],
+    "description": "Variable short definition (=), can be changed later"
+  },
+  "Fixed Variable Definition": {
+    "prefix": "fixed",
+    "body": [
+      "fixed ${1:name} = ${2:value}"
+    ],
+    "description": "Variable that can never change (fixed)"
+  },
+  "Const Declaration": {
+    "prefix": "const",
+    "body": [
+      "const ${1:NAME}: ${2:type} = ${3:value}"
+    ],
+    "description": "Global constant declaration with type"
+  },
+  "Const Short Definition": {
+    "prefix": "constdef",
+    "body": [
+      "const ${1:NAME} = ${2:value}"
+    ],
+    "description": "Global constant short definition (const)"
+  },
+  "Extern Struct Declaration": {
+    "prefix": "externstruct",
+    "body": [
+      "extern struct ${1:Name}:",
+      "    ${2:field}: ${3:i32}"
+    ],
+    "description": "C-layout struct declaration (extern struct)"
+  },
+  "Extern Function Declaration": {
+    "prefix": "extern",
+    "body": [
+      "extern \"${1:header.h}\" fn ${2:name}(${3:params}) -> ${4:type}"
+    ],
+    "description": "Extern C function declaration"
+  },
+  "Extern Variadic Function Declaration": {
+    "prefix": "externvar",
+    "body": [
+      "extern \"${1:stdio.h}\" fn ${2:printf}(${3:fmt}: *u8, ...) -> ${4:i32}"
+    ],
+    "description": "Extern C variadic function declaration (...)"
+  },
+  "Raw Pointer Cast": {
+    "prefix": "ptrcast",
+    "body": [
+      "ptr_cast[*${1:T}](${2:ptr})"
+    ],
+    "description": "Cast raw pointer type (unsafe)"
+  },
+  "Array Repeat Literal": {
+    "prefix": "arrrepeat",
+    "body": [
+      "[${1:0}; ${2:100}]"
+    ],
+    "description": "Array repeat literal [val; count]"
+  },
+  "Import Standard Module": {
+    "prefix": "import",
+    "body": [
+      "import std.${1:math}"
+    ],
+    "description": "Import a standard module (binds the last segment)"
+  },
+  "Import With Alias": {
+    "prefix": "importas",
+    "body": [
+      "import std.${1:math} as ${2:m}"
+    ],
+    "description": "Import a module under another name"
+  },
+  "Selective Import": {
+    "prefix": "importsel",
+    "body": [
+      "import std.${1:math} { ${2:sqrt} }"
+    ],
+    "description": "Import public names without a qualifier"
+  },
+  "Import File": {
+    "prefix": "importfile",
+    "body": [
+      "import \"${1:types.gg}\""
+    ],
+    "description": "Import a .gg file beside this one"
+  },
+  "Public Section": {
+    "prefix": "public",
+    "body": [
+      "public",
+      "fn ${1:name}(${2:}) -> ${3:i32}:",
+      "    ${0:return 0}"
+    ],
+    "description": "public line: declarations below are visible to other modules"
+  },
+  "Private Section": {
+    "prefix": "private",
+    "body": [
+      "private",
+      "fn ${1:name}(${2:}):",
+      "    ${0:pass}"
+    ],
+    "description": "private line: declarations below stay in this file"
+  },
+  "Box Allocation": {
+    "prefix": "box",
+    "body": [
+      "${1:b} = Box.new(${2:value})"
+    ],
+    "description": "Heap-allocated Box value"
+  },
+  "List Allocation": {
+    "prefix": "list",
+    "body": [
+      "${1:l} = List[${2:i32}]()"
+    ],
+    "description": "Heap-allocated dynamic List"
+  },
+  "Print Statement": {
+    "prefix": "print",
+    "body": [
+      "print(${0})"
+    ],
+    "description": "Print statement"
+  },
+  "Panic Statement": {
+    "prefix": "panic",
+    "body": [
+      "panic(\"${1:error message}\")"
+    ],
+    "description": "Panic terminator with message"
+  },
+  "Pass Statement": {
+    "prefix": "pass",
+    "body": [
+      "pass"
+    ],
+    "description": "Empty pass statement"
+  },
+  "Type Alias": {
+    "prefix": "type",
+    "body": [
+      "type ${1:Name} = ${2:type}"
+    ],
+    "description": "Type alias declaration (type Name = Type)"
+  },
+  "If Let Statement": {
+    "prefix": "iflet",
+    "body": [
+      "if let ${1:pattern} = ${2:expr}:",
+      "    ${0:pass}"
+    ],
+    "description": "If-let pattern matching statement"
+  },
+  "If Let Else Statement": {
+    "prefix": "ifletelse",
+    "body": [
+      "if let ${1:pattern} = ${2:expr}:",
+      "    ${3:pass}",
+      "else:",
+      "    ${0:pass}"
+    ],
+    "description": "If-let pattern matching statement with else"
+  },
+  "While Let Statement": {
+    "prefix": "whilelet",
+    "body": [
+      "while let ${1:pattern} = ${2:expr}:",
+      "    ${0:pass}"
+    ],
+    "description": "While-let loop pattern matching statement"
+  },
+  "Tuple Destructuring": {
+    "prefix": "destruct",
+    "body": [
+      "${1:a}, ${2:b} = ${3:expr}"
+    ],
+    "description": "Tuple destructuring assignment (a, b = expr)"
+  },
+  "Fixed Tuple Destructuring": {
+    "prefix": "destructfixed",
+    "body": [
+      "fixed ${1:a}, ${2:b} = ${3:expr}"
+    ],
+    "description": "Tuple destructuring whose names never change (fixed a, b = expr)"
+  },
+  "Lambda Expression": {
+    "prefix": "lambda",
+    "body": [
+      "fn(${1:x}: ${2:i32}) -> ${3:i32} => ${0:${1:x}}"
+    ],
+    "description": "Anonymous lambda function (fn(params) -> ret => expr)"
+  },
+  "Function Pointer Type": {
+    "prefix": "fnty",
+    "body": [
+      "fn(${1:i32}) -> ${2:bool}"
+    ],
+    "description": "Function pointer type (fn(T) -> Ret)"
+  },
+  "Tuple Type": {
+    "prefix": "tuple",
+    "body": [
+      "(${1:i32}, ${2:string})"
+    ],
+    "description": "Tuple type (Tuple2..Tuple6)"
+  },
+  "Try Operator": {
+    "prefix": "try",
+    "body": [
+      "${1:call()}?"
+    ],
+    "description": "Try operator ? error propagation"
+  },
+  "Raw Pointer Type (Mutable)": {
+    "prefix": "ptrmut",
+    "body": [
+      "*mut ${1:T}"
+    ],
+    "description": "Mutable raw pointer type (*mut T)"
+  },
+  "Raw Pointer Type (Const)": {
+    "prefix": "ptr",
+    "body": [
+      "*${1:T}"
+    ],
+    "description": "Read-only raw pointer type (*T)"
+  },
+  "Test Block": {
+    "prefix": "test",
+    "body": [
+      "test ${1:name}:",
+      "    require ${0:true}"
+    ],
+    "description": "Named test block (gg test runs it; fn main does not)"
+  },
+  "Require": {
+    "prefix": "require",
+    "body": [
+      "require ${0:cond}"
+    ],
+    "description": "Stop the test or program when the condition is false"
+  },
+  "Hot Function": {
+    "prefix": "hotfn",
+    "body": [
+      "hot fn ${1:name}(${2:}):",
+      "    ${0:pass}"
+    ],
+    "description": "Function marked hot for the optimizer"
+  },
+  "Trusted Index": {
+    "prefix": "trust",
+    "body": [
+      "unsafe:",
+      "    trust ${1:items}[${0:i}]"
+    ],
+    "description": "Unchecked index inside unsafe (legal only there)"
+  },
+  "Spawn Thread": {
+    "prefix": "thread",
+    "body": [
+      "import std.thread",
+      "t = thread.Thread.spawn(${1:worker_fn})",
+      "t.join()"
+    ],
+    "description": "Spawn and join a thread from std.thread"
+  },
+  "Spawn Thread With Param": {
+    "prefix": "threadp",
+    "body": [
+      "import std.thread",
+      "t = thread.Thread.spawn_with_param(${1:worker_fn}, ${2:arg})",
+      "t.join()"
+    ],
+    "description": "Spawn a thread with an i64 argument"
+  },
+  "Channel Communication": {
+    "prefix": "channel",
+    "body": [
+      "import std.thread",
+      "${1:ch} = thread.Channel.new()",
+      "${1:ch}.send(${2:value})",
+      "if let Valid(val) = ${1:ch}.recv():",
+      "    ${0:print(val)}"
+    ],
+    "description": "Channel from std.thread"
+  },
+  "Mutex Protection": {
+    "prefix": "mutex",
+    "body": [
+      "import std.thread",
+      "${1:mtx} = thread.Mutex.new()",
+      "${1:mtx}.lock()",
+      "defer ${1:mtx}.unlock()",
+      "${0:pass}"
+    ],
+    "description": "Mutex from std.thread"
+  },
+  "Atomic Integer": {
+    "prefix": "atomic",
+    "body": [
+      "import std.thread",
+      "${1:counter} = thread.AtomicI64.new(${2:0})",
+      "${1:counter}.fetch_and_add(1)"
+    ],
+    "description": "AtomicI64 from std.thread"
+  },
+  "Union": {
+    "prefix": "union",
+    "body": [
+      "union ${1:Name}:",
+      "    ${2:field}: ${3:u32}"
+    ],
+    "description": "Untagged union; field access is inside unsafe"
+  },
+  "Packed Struct": {
+    "prefix": "packed",
+    "body": [
+      "packed struct ${1:Name}:",
+      "    ${2:field}: ${3:u8}"
+    ],
+    "description": "Struct with no padding between fields"
+  },
+  "Aligned Struct": {
+    "prefix": "align",
+    "body": [
+      "align(${1:64}) struct ${2:Name}:",
+      "    ${3:field}: ${4:i64}"
+    ],
+    "description": "Struct with alignment N, a power of two up to 64"
+  },
+  "Static": {
+    "prefix": "static",
+    "body": [
+      "static ${1:NAME}: ${2:i64} = ${3:0}"
+    ],
+    "description": "One global variable; every read and write is inside unsafe"
+  },
+  "Allocator": {
+    "prefix": "allocator",
+    "body": [
+      "allocator ${1:alloc}, ${2:resize}, ${3:free}"
+    ],
+    "description": "Program-wide heap: alloc, resize, and free"
+  },
+  "Dyn List": {
+    "prefix": "dyn",
+    "body": [
+      "${1:items} = List[dyn ${2:Feature}]()"
+    ],
+    "description": "List of owned values that satisfy a feature"
+  },
+  "Send Parameter": {
+    "prefix": "send",
+    "body": [
+      "fn ${1:name}(${2:value}: send ${3:T}):",
+      "    ${0:pass}"
+    ],
+    "description": "Parameter handed to another thread"
+  },
+  "Weak Extern": {
+    "prefix": "weakextern",
+    "body": [
+      "weak extern \"${1:lib.h}\" fn ${2:name}(${3:}) -> ${4:i32}"
+    ],
+    "description": "C function that may be missing; it is null there"
+  },
+  "Extern With Alias": {
+    "prefix": "externas",
+    "body": [
+      "extern \"${1:math.h}\" fn ${2:sqrt}(${3:x}: f64) -> f64 as ${4:c_sqrt}"
+    ],
+    "description": "Extern that keeps the C symbol and a Greengold name"
+  },
+  "Inline Asm": {
+    "prefix": "asm",
+    "body": [
+      "unsafe:",
+      "    ${1:n} = asm[${2:u32}](\"${3:template}\", \"${4:=r,r}\", ${5:arg})"
+    ],
+    "description": "Inline machine code inside unsafe"
+  },
+  "Bounded Integer": {
+    "prefix": "intin",
+    "body": [
+      "${1:n}: int in ${2:0}..${3:256} = ${4:0}"
+    ],
+    "description": "Bounded integer; int here means i64 and hi is exclusive"
+  },
+  "Arc": {
+    "prefix": "arc",
+    "body": [
+      "${1:shared} = Arc[${2:T}](${3:value})"
+    ],
+    "description": "Heap value with an atomic owner count"
+  },
+  "Shared": {
+    "prefix": "shared",
+    "body": [
+      "${1:shared} = Shared[${2:T}](${3:value})"
+    ],
+    "description": "Heap value with several owners; the count is not atomic"
+  },
+  "Overflow On Signature": {
+    "prefix": "fnoverflowsig",
+    "body": [
+      "fn ${1:name}(${2:a}: ${3:u8}, ${4:b}: ${3:u8}) -> ${3:u8} overflow: wrap:",
+      "    return ${2:a} + ${4:b}"
+    ],
+    "description": "overflow: wrap between the result type and the body colon"
+  },
+  "Attribute Declaration": {
+    "prefix": "attribute",
+    "body": [
+      "attribute ${1:name}(${2:mode}: ${3|ident,str,int,float,bool|}) on ${4|fn,struct,field,fn\\, field|}"
+    ],
+    "description": "Declares an @attribute: its parameters (kind: str, int, float, bool, ident) and where it may go"
+  },
+  "Attribute Use": {
+    "prefix": "attr",
+    "body": [
+      "@${1:name}(${2:args})"
+    ],
+    "description": "An attribute line above a fn, struct, or field (declare it first with `attribute`)"
+  },
+  "Replicated Function": {
+    "prefix": "attrreplicated",
+    "body": [
+      "attribute replicated(mode: ident, reliable: bool = false) on fn",
+      "",
+      "@replicated(${1|server,client,multicast|}, reliable=${2|true,false|})",
+      "fn ${3:name}(${4:params}):",
+      "    ${0:pass}"
+    ],
+    "description": "An Unreal-style replicated function: declare the attribute, then mark a function"
+  }
+}
+
