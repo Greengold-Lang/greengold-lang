@@ -111,3 +111,23 @@ def test_unclosed_brace():
 def test_unterminated_string():
     _, errs = lex('x = "abc\n')
     assert any("String" in e.message for e in errs)
+
+
+def test_block_comment_multiline_and_nested():
+    src = "fn f():\n    #[ first\n    #[ nested ]#\n    still comment\n    ]#\n    return\n"
+    toks, errs = lex(src)
+    assert not errs
+    assert kinds(src).count("INDENT") == 1
+    assert [t.text for t in toks if t.kind == "NAME"] == ["f"]
+
+
+def test_block_comment_inline():
+    src = "x = #[ one ]# 5\n"
+    toks, errs = lex(src)
+    assert not errs
+    assert [t.kind for t in toks if t.kind in ("INT", "NAME")] == ["NAME", "INT"]
+
+
+def test_block_comment_unterminated():
+    _, errs = lex("x = 1\n#[ never closed\ny = 2\n")
+    assert any("Unterminated block comment" in e.message for e in errs)

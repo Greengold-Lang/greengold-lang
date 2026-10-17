@@ -64,6 +64,27 @@ class Lexer:
         # Open brackets: (character, line, col)
         self.brackets: list[tuple[str, int, int]] = []
         self.multiline_str: dict | None = None
+        # Open `#[ ... ]#` block comment: nesting depth and where the outermost one started.
+        self.block_depth = 0
+        self.block_start = (1, 1)
+
+    # -- block comments ------------------------------------------
+    def _skip_block_comment(self, line: str, i: int, lineno: int) -> int:
+        """Scan a block comment body from `i`; return the index after the closing `]#`, or len(line)
+        when it stays open (`self.block_depth` stays above 0)."""
+        n = len(line)
+        while i < n:
+            if line[i:i + 2] == "#[":
+                self.block_depth += 1
+                i += 2
+            elif line[i:i + 2] == "]#":
+                self.block_depth -= 1
+                i += 2
+                if self.block_depth == 0:
+                    return i
+            else:
+                i += 1
+        return n
 
     # -- helpers -------------------------------------------------
     def _emit(self, kind: str, text: str, line: int, col: int, length: int | None = None) -> None:
@@ -83,6 +104,9 @@ class Lexer:
             self._error("Unterminated multiline string literal.",
                         self.multiline_str["start_line"], self.multiline_str["start_col"],
                         hint='Add closing `"""`.')
+        if self.block_depth > 0:
+            self._error("Unterminated block comment.", *self.block_start, 2,
+                        hint="Add closing `]#`.")
         for ch, line, col in self.brackets:
             self._error(f"`{ch}` opened but never closed.", line, col,
                         hint="Add the matching closing bracket.")
@@ -122,6 +146,15 @@ class Lexer:
                 return  # Still inside multiline string
             emitted += 1
 
+        if self.block_depth > 0:
+            i = self._skip_block_comment(line, 0, lineno)
+            if self.block_depth > 0:
+                return  # Still inside block comment
+            if line[i:].strip(" \t") == "" or line[i:].lstrip(" \t").startswith("#"):
+                return
+            if not self.brackets and self.multiline_str is None:
+                self._handle_indent(len(line) - len(line.lstrip(" ")), lineno)
+
         if not self.brackets and self.multiline_str is None and i == 0:
             # Line leading indentation
             width = 0
@@ -142,9 +175,17 @@ class Lexer:
                 else:
                     width += 1
                 i += 1
-            if i >= n or line[i] == "#":
+            if line[i:i + 2] == "#[":
+                self.block_start = (lineno, i + 1)
+                i = self._skip_block_comment(line, i, lineno)
+                rest = line[i:].lstrip(" \t")
+                if self.block_depth > 0 or rest == "" or rest.startswith("#"):
+                    return  # comment only
+                self._handle_indent(width, lineno)
+            elif i >= n or line[i] == "#":
                 return  # empty line or comment only
-            self._handle_indent(width, lineno)
+            else:
+                self._handle_indent(width, lineno)
 
         while i < n:
             c = line[i]
@@ -155,6 +196,11 @@ class Lexer:
                 self._error("Tab characters are not allowed.", lineno, col,
                             hint=f"Use {INDENT_WIDTH} spaces for indentation and spacing.")
                 i += 1
+            elif c == "#" and line[i + 1:i + 2] == "[":
+                self.block_start = (lineno, col)
+                i = self._skip_block_comment(line, i, lineno)
+                if self.block_depth > 0:
+                    break  # block comment continues on the next lines
             elif c == "#":
                 break
             elif c == "/" and line[i + 1:i + 2] == "/":

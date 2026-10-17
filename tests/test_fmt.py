@@ -97,3 +97,9 @@ def test_else_after_a_nested_if_keeps_its_own_if():
            "        elif c == 2:\n            if x > 1:\n                return 1\n        else:\n            return 2\n"
            "    return 0\n\n# a top-level comment\nfn g():\n    pass\n")
     assert format_source(src) == src
+
+
+def test_block_comment_kept_verbatim():
+    src = "fn f():\n    #[ a\n  odd   spacing\n    ]#\n    return\n"
+    assert format_source(src) == src
+    assert format_source(format_source(src)) == src

@@ -2,6 +2,10 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
+## Unreleased
+
+- Block comments: `#[ ... ]#` spans several lines or sits inside a line, and nests (`#[ a #[ b ]# c ]#`). An unclosed one reports `Unterminated block comment.` `gg fmt` leaves the inside of a block comment untouched. The VS Code grammar and the playground highlighter know the new form.
+
 ## 0.21.5
 
 - The body of an `attribute` can call `str` methods at compile time: `len()`, `is_empty()`, `starts_with(p)`, `ends_with(p)`, and `contains(p)`. Any other method now says it cannot be called at compile time instead of "unsupported expression".

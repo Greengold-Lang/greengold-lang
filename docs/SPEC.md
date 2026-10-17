@@ -8,7 +8,7 @@ There is one way to write each construct. A call does not repeat the parameter m
 
 A file is a sequence of top-level declarations: `struct`, `enum`, `feature`, `impl`, `fn`, `test`, `const`, `extern`, `import`, `type`, `comptime fn`, and `hot fn`. Other statements live inside a function. An executable has `fn main():` with no parameters and no result.
 
-Indentation is four spaces. A tab is a syntax error. A block opens with `:` and the next line indents by exactly four. A comment starts with `#` and runs to the end of the line. One statement per line.
+Indentation is four spaces. A tab is a syntax error. A block opens with `:` and the next line indents by exactly four. A comment starts with `#` and runs to the end of the line. A block comment starts with `#[` and ends with the matching `]#`; it can span lines, sits inside a line, and nests. One statement per line.
 
 ```gg
 # The entry point. print writes its arguments and a newline.

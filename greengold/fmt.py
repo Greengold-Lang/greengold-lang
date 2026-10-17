@@ -33,10 +33,21 @@ class Layout:
         self.pending: str | None = None
         self.depth = 0
         self.in_multi = False
+        self.block = 0  # nesting depth of an open `#[ ... ]#` block comment
         self.cont = 0
 
     def feed(self, line: str) -> Decision:
         line = line.rstrip("\r")
+        if self.block:
+            end, self.block = _close_block(line, 0, self.block)
+            if end is None:
+                return Decision(None, line, 0, 0, False)
+            info = _scan(line[end:], 0)
+            self.depth = info.depth
+            self.block = info.block
+            if info.opens:
+                self.pending = info.word or "block"
+            return Decision(None, line, 0, 0, False)
         if self.in_multi:
             end = _close_multi(line, 0)
             if end is None:
@@ -58,6 +69,7 @@ class Layout:
         info = _scan(body, self.depth)
         if info.enter_multi:
             self.in_multi = True
+        self.block = info.block
         self.depth = info.depth
 
         indent, unambiguous = self._place(info.word, info.comment, depth_before, visual)
@@ -141,6 +153,25 @@ class _Scan:
     opens: bool
     comment: bool
     enter_multi: bool
+    block: int = 0
+
+
+def _close_block(line: str, start: int, depth: int) -> tuple[int | None, int]:
+    """Scan `line` from `start` inside a block comment of nesting `depth`. Return the index after
+    the closing `]#` (None if it stays open) and the depth at the end."""
+    j = start
+    while j < len(line):
+        if line[j:j + 2] == "#[":
+            depth += 1
+            j += 2
+        elif line[j:j + 2] == "]#":
+            depth -= 1
+            j += 2
+            if depth == 0:
+                return j, 0
+        else:
+            j += 1
+    return None, depth
 
 
 def _lead(line: str) -> tuple[int, int]:
@@ -203,8 +234,15 @@ def _scan(body: str, depth: int) -> _Scan:
     last = ""
     comment = body.startswith("#")
     enter_multi = False
+    block = 0
     while i < n:
         c = body[i]
+        if c == "#" and body[i + 1:i + 2] == "[":
+            end, block = _close_block(body, i + 2, 1)
+            if end is None:
+                break
+            i = end
+            continue
         if c == "#":
             break
         if c in " \t":
@@ -262,4 +300,6 @@ def _scan(body: str, depth: int) -> _Scan:
         seen_word = True
         i += 1
     opens = depth == 0 and not enter_multi and last == ":"
-    return _Scan(depth, word, opens, comment, enter_multi)
+    if comment and seen_word:
+        comment = False  # `#[ note ]# code()` is a code line
+    return _Scan(depth, word, opens, comment, enter_multi, block)

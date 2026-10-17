@@ -92,8 +92,28 @@
     "comments": {
       "patterns": [
         {
+          "name": "comment.block.gg",
+          "begin": "#\\[",
+          "end": "\\]#",
+          "patterns": [
+            {
+              "include": "#block-comment-nested"
+            }
+          ]
+        },
+        {
           "name": "comment.line.number-sign.gg",
           "match": "#.*$"
+        }
+      ]
+    },
+    "block-comment-nested": {
+      "name": "comment.block.gg",
+      "begin": "#\\[",
+      "end": "\\]#",
+      "patterns": [
+        {
+          "include": "#block-comment-nested"
         }
       ]
     },

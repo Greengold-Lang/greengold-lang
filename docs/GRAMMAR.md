@@ -10,6 +10,7 @@ This document defines the syntax and grammar rules of the Greengold (v2) compile
 newline         = "\n" | "\r\n" ;
 whitespace      = " " ;  (* Tab characters are disallowed *)
 comment         = "#" , { all_characters - newline } ;
+block_comment   = "#[" , { block_comment | all_characters } , "]#" ;  (* nests; may span lines *)
 
 letter          = "a" ... "z" | "A" ... "Z" | "_" ;
 digit           = "0" ... "9" ;

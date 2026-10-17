@@ -8,7 +8,7 @@
     "as tied to private public overflow wrapping ref mut self var");
   var CONSTANTS = set("true false null");
   var TYPES = set("i8 i16 i32 i64 isize u8 u16 u32 u64 usize f32 f64 bool str string int uint float double void");
-  var TOKEN = /(#.*$)|([f$]?"(?:\\.|[^"\\])*"?)|('(?:\\.|[^'\\])*')|(\b(?:0x[0-9a-fA-F_]+|0b[01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)\b)|([A-Za-z_][A-Za-z0-9_]*)|(=>|->|\.\.=|\.\.|[+\-*\/%]=|==|!=|<=|>=|=)/g;
+  var TOKEN = /(#\[[\s\S]*?\]#|#.*$)|([f$]?"(?:\\.|[^"\\])*"?)|('(?:\\.|[^'\\])*')|(\b(?:0x[0-9a-fA-F_]+|0b[01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)\b)|([A-Za-z_][A-Za-z0-9_]*)|(=>|->|\.\.=|\.\.|[+\-*\/%]=|==|!=|<=|>=|=)/g;
 
   function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function span(cls, text) { return '<span class="' + cls + '">' + esc(text) + "</span>"; }
