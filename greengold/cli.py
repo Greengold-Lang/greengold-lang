@@ -824,6 +824,7 @@ def cmd_build(files: list[str] | str, output: str | None, release: bool = False,
     src = Path(primary_file)
     exe_path = Path(output) if output else src.with_suffix(_exe_suffix())
     from .tools import cache_key
+    from .llvm_driver import cpu_key
     native_key = ""
     if NATIVE is not None:  # a changed C/C++ source makes a new program
         import hashlib
@@ -832,7 +833,7 @@ def cmd_build(files: list[str] | str, output: str | None, release: bool = False,
             h.update(path.read_bytes() + repr(flags).encode())
         native_key = h.hexdigest()
     key = cache_key(dump_ast(program), [str(release), str(unchecked), str(target), str(no_std), str(links),
-                                        primary_file, _exe_suffix(), "recur-inline-2", f"g={DEBUG_INFO}", native_key])
+                                        primary_file, _exe_suffix(), "recur-inline-2", f"g={DEBUG_INFO}", native_key, cpu_key()])
     cached = Path(".gg-cache") / f"{key}{_exe_suffix()}"
     if cached.is_file() and target is None and not no_std:
         exe_path.parent.mkdir(parents=True, exist_ok=True)
@@ -922,6 +923,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     b.add_argument("files", nargs="*", help="source file(s) (default: gg.toml main)")
     b.add_argument("-o", "--output", help="output file (default: next to source)")
     b.add_argument("--release", action="store_true", help="optimize (LLVM -O3); bounds checks remain enabled")
+    b.add_argument("--cpu", metavar="NAME", help="code for this CPU: `native` or a LLVM name (haswell, znver3, apple-m1); default: any CPU of the target")
+    b.add_argument("--features", metavar="LIST", help="CPU features, e.g. +avx2,+fma,-avx512f (added to --cpu)")
     b.add_argument("--unchecked", action="store_true", help="UNSAFE: remove array/slice/string bounds checks")
     b.add_argument("--link", action="append", default=[], help="link C library (passed as -l)")
     b.add_argument("-L", "--link-path", action="append", default=[], help="library search path (passed as -L)")
@@ -935,6 +938,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     r.add_argument("-e", "--eval", metavar="CODE",
                    help="run a snippet instead of a file: the body of `main` (a last bare expression is printed)")
     r.add_argument("--release", action="store_true", help="optimize (LLVM -O3); bounds checks remain enabled")
+    r.add_argument("--cpu", metavar="NAME", help="code for this CPU: `native` or a LLVM name (haswell, znver3, apple-m1); default: any CPU of the target")
+    r.add_argument("--features", metavar="LIST", help="CPU features, e.g. +avx2,+fma,-avx512f (added to --cpu)")
     r.add_argument("--unchecked", action="store_true", help="UNSAFE: remove array/slice/string bounds checks")
     r.add_argument("--link", action="append", default=[], help="link C library (passed as -l)")
     r.add_argument("-L", "--link-path", action="append", default=[], help="library search path (passed as -L)")
@@ -947,6 +952,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ll.add_argument("files", nargs="+", help="source file(s)")
     ll.add_argument("-o", "--output", help="output .ll file (default: next to source)")
     ll.add_argument("--release", action="store_true", help="emit in release mode and print optimized IR")
+    ll.add_argument("--cpu", metavar="NAME", help="code for this CPU: `native` or a LLVM name (haswell, znver3, apple-m1); default: any CPU of the target")
+    ll.add_argument("--features", metavar="LIST", help="CPU features, e.g. +avx2,+fma,-avx512f (added to --cpu)")
     ll.add_argument("--unchecked", action="store_true", help="UNSAFE: remove bounds checks")
     ll.add_argument("--target", help="target triple or `bare-metal`")
     ll.add_argument("--no-std", action="store_true", help="compile without libc/OS")
@@ -956,6 +963,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     bc.add_argument("files", nargs="+", help="source file(s)")
     bc.add_argument("-o", "--output", help="output file (default: .bc next to source)")
     bc.add_argument("--release", action="store_true", help="optimize")
+    bc.add_argument("--cpu", metavar="NAME", help="code for this CPU: `native` or a LLVM name (haswell, znver3, apple-m1); default: any CPU of the target")
+    bc.add_argument("--features", metavar="LIST", help="CPU features, e.g. +avx2,+fma,-avx512f (added to --cpu)")
     bc.add_argument("--unchecked", action="store_true", help="UNSAFE: remove bounds checks")
     bc.add_argument("--target", help="target triple or `bare-metal`")
     bc.add_argument("--no-std", action="store_true", help="compile without libc/OS")
@@ -1153,6 +1162,9 @@ def main(argv: list[str] | None = None) -> int:
             out = args.output or str(Path(args.files[0]).with_suffix(".bc"))
             return cmd_emit_llvm(args.files, args.release, args.unchecked, out, args.release, args.target,
                                  args.no_std)
+        if getattr(args, "cpu", None) or getattr(args, "features", None) or os.environ.get("GG_CPU"):
+            from .llvm_driver import set_cpu
+            set_cpu(args.cpu, args.features)
         if args.command in ("build", "run"):
             args.link = args.link + [f"-L{d}" for d in args.link_path] + args.link_file
         if args.command == "build":

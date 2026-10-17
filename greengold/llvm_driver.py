@@ -77,13 +77,59 @@ def parse_module(ir_text: str, triple: str | None = None) -> Any:
     return mod
 
 
+_CPU: dict[str, str] = {"cpu": "", "features": ""}
+
+
+def set_cpu(cpu: str | None = None, features: str | None = None) -> None:
+    """Picks the machine the code is made for: `cpu` is a LLVM CPU name (`haswell`, `znver3`, `apple-m1`) or
+    `native` (the CPU running the compiler); `features` is a list like `+avx2,+fma,-avx512f`.
+    Without it the code runs on any CPU of the target (x86-64 baseline: SSE2, no AVX/FMA)."""
+    _CPU["cpu"] = (cpu or os.environ.get("GG_CPU", "")).strip()
+    _CPU["features"] = (features or os.environ.get("GG_FEATURES", "")).strip()
+
+
+def _cpu_spec() -> tuple[str, str]:
+    cpu, feats = _CPU["cpu"], _CPU["features"]
+    if not cpu and not feats:  # not set by the command line: the environment may still ask
+        cpu, feats = os.environ.get("GG_CPU", "").strip(), os.environ.get("GG_FEATURES", "").strip()
+    return cpu, feats
+
+
+def cpu_key() -> str:
+    """Identifies the chosen CPU for the build cache; `native` includes the host CPU name."""
+    cpu, feats = _cpu_spec()
+    return f"cpu={host_cpu_name() if cpu == 'native' else cpu};features={feats}"
+
+
+def host_cpu_name() -> str:
+    import llvmlite.binding as llvm
+    from .codegen_llvm import init_llvm
+    init_llvm()
+    return llvm.get_host_cpu_name()
+
+
+def cpu_options(triple: str) -> tuple[str, str]:
+    """(cpu name, feature string) for LLVM; `native` expands to the host CPU and the features it has."""
+    cpu, feats = _cpu_spec()
+    if cpu == "native":
+        import llvmlite.binding as llvm
+        from .codegen_llvm import init_llvm
+        init_llvm()
+        cpu = llvm.get_host_cpu_name()
+        host = llvm.get_host_cpu_features().flatten()
+        feats = ",".join(x for x in (host, feats) if x)
+    return cpu, feats
+
+
 def target_machine(triple: str, release: bool) -> Any:
     import llvmlite.binding as llvm
     from .codegen_llvm import init_llvm
     init_llvm()
     target = llvm.Target.from_triple(triple)
     reloc = "default" if "windows" in triple else "pic"
-    return target.create_target_machine(opt=3 if release else 0, reloc=reloc, codemodel="default")
+    cpu, feats = cpu_options(triple)
+    return target.create_target_machine(cpu=cpu, features=feats, opt=3 if release else 0, reloc=reloc,
+                                        codemodel="default")
 
 
 def optimize(mod: Any, tm: Any, release: bool) -> None:

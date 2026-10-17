@@ -99,6 +99,7 @@ gg update                                            # update gg to the newest r
 | Flag (`build`, `run`) | Meaning |
 |---|---|
 | `--release` | LLVM `-O3`. Bounds, overflow, division and shift checks stay on. |
+| `--cpu <name\|native>`, `--features <list>` | Code for that CPU (`native`, `haswell`, `x86-64-v3`, `apple-m1`; features like `+avx2,+fma`). The result runs only on CPUs that have them. Default: any CPU of the target. |
 | `--unchecked` | UNSAFE: removes array/slice/string bounds checks. |
 | `-o <name>` | Output file (`build`). |
 | `--link <lib>`, `-L <dir>`, `--link-file <file>` | Linker inputs, see [FFI](#calling-c-and-rust-ffi). |

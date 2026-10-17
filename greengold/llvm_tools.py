@@ -55,6 +55,18 @@ def describe() -> str:
     return f"{' '.join(cmd)} (LLVM {major})"
 
 
+def _cpu_flags(triple: str) -> list[str]:
+    """`--cpu` / `--features` as clang options (`-Xclang -target-cpu ...` works for IR input on every target)."""
+    from .llvm_driver import cpu_options
+    cpu, feats = cpu_options(triple)
+    out: list[str] = []
+    if cpu:
+        out += ["-Xclang", "-target-cpu", "-Xclang", cpu]
+    for f in filter(None, (x.strip() for x in feats.split(","))):
+        out += ["-Xclang", "-target-feature", "-Xclang", f]
+    return out
+
+
 def _run(ir_text: str, triple: str, release: bool, flags: list[str], suffix: str) -> bytes:
     found = find()
     if found is None:
@@ -64,7 +76,7 @@ def _run(ir_text: str, triple: str, release: bool, flags: list[str], suffix: str
         src, out = Path(tmp) / "program.ll", Path(tmp) / f"program{suffix}"
         src.write_text(ir_text, encoding="utf-8")
         args = [*cmd, "-target", triple, "-O3" if release else "-O0", "-Wno-override-module",
-                *flags, "-x", "ir", str(src), "-o", str(out)]
+                *_cpu_flags(triple), *flags, "-x", "ir", str(src), "-o", str(out)]
         res = subprocess.run(args, capture_output=True, text=True)
         if res.returncode != 0:
             raise ToolError(f"generated LLVM IR is invalid (compiler error):\n{res.stderr.strip()}")
