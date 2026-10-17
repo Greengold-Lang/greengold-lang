@@ -135,3 +135,21 @@ def test_cpu_changes_the_machine_code():
             llvm_driver.set_cpu(None)
     assert "ymm" not in asm[None]
     assert "vpmaddwd" in asm["x86-64-v3"] and "ymm" in asm["x86-64-v3"]
+
+
+def test_shifts_reinterpret_and_conversion():
+    res = run_built("""fn main():
+    v = u8x16.splat(0xA7)
+    lo = (v & u8x16.splat(0x0F)) - u8x16.splat(8)
+    hi = v.shr(4) - u8x16.splat(8)
+    print(lo.as_i8().lane(0), hi.as_i8().lane(0), i8x16.splat(-16).shr(2).lane(1), i32x4.splat(3).shl(4).lane(0))
+    print(u8x32.splat(255).as_i8().lane(31), i32x4(1, -2, 3, 4).to_f32(), i32x8.splat(7).to_f32().lane(7))
+""")
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.splitlines() == ["-1 2 -4 48", "-1 [1, -2, 3, 4] 7"]
+
+
+def test_shift_amount_out_of_range_panics():
+    res = run_built("fn main():\n    k: usize = 8\n    print(u8x16.splat(1).shl(k))\n")
+    assert res.returncode != 0
+    assert "shift amount out of range" in res.stderr

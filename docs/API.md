@@ -25,6 +25,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.sort](#stdsort) (3)
 - [std.string](#stdstring) (25)
 - [std.tasks](#stdtasks) (9)
+- [std.tensor](#stdtensor) (33)
 - [std.thread](#stdthread) (49)
 - [std.time](#stdtime) (22)
 - [std.tls](#stdtls) (5)
@@ -2312,6 +2313,167 @@ Waits until socket `fd` has data to read (or a connection to accept, or is close
 fn wait_writable(fd: i64)
 ```
 Waits until socket `fd` can take more data.
+
+
+## std.tensor
+
+### struct
+
+```
+struct BlockQ8 { d: u16, qs: [32]i8 }
+```
+One block of `q8_0`: 34 bytes.
+
+```
+struct BlockQ4 { d: u16, qs: [16]u8 }
+```
+One block of `q4_0`: 18 bytes.
+
+```
+struct Q8Vec { blocks: List[BlockQ8], len: usize }
+```
+A vector of f32 quantized to `q8_0`, the form in which an activation meets a quantized matrix.
+
+```
+struct Tensor { shape: List[usize], data: List[f32] }
+```
+
+```
+struct Q4Matrix { rows: usize, cols: usize, blocks: List[BlockQ4] }
+```
+A matrix of `q4_0` blocks: `rows` rows of `cols` weights, each row `cols / 32` blocks.
+
+```
+struct Q8Matrix { rows: usize, cols: usize, blocks: List[BlockQ8] }
+```
+A matrix of `q8_0` blocks (8 bits per weight).
+
+### const
+
+```
+const BLOCK: usize
+```
+
+### fn
+
+```
+fn f32_bits(x: f32) -> u32
+```
+16-bit floats are stored as `u16`;
+
+```
+fn f32_from_bits(b: u32) -> f32
+```
+
+```
+fn f16_to_f32(h: u16) -> f32
+```
+
+```
+fn f16_scale(h: u16) -> f32
+```
+The same without branches, for the scales of blocks in the matrix kernels: right for every finite value (the exponent field is moved and the result scaled by 2^112);
+
+```
+fn f32_to_f16(x: f32) -> u16
+```
+
+```
+fn quantize_q8(x: []f32) -> Q8Vec
+```
+
+```
+fn Q8Vec.dequantize(self: read Q8Vec) -> List[f32]
+```
+
+```
+fn Tensor.new(dims: []usize) -> Tensor
+```
+
+```
+fn Tensor.from_list(dims: []usize, values: consume List[f32]) -> Tensor
+```
+A tensor with these dimensions that takes ownership of `values` (their number must be the product).
+
+```
+fn Tensor.rank(self: read Tensor) -> usize
+```
+The number of dimensions.
+
+```
+fn Tensor.dim(self: read Tensor, i: usize) -> usize
+```
+The size of dimension `i`.
+
+```
+fn Tensor.len(self: read Tensor) -> usize
+```
+The number of values.
+
+```
+fn Tensor.rows(self: read Tensor) -> usize
+```
+Rows of a matrix: the product of all dimensions but the last.
+
+```
+fn Tensor.cols(self: read Tensor) -> usize
+```
+Columns of a matrix: the last dimension.
+
+```
+fn Tensor.values(self: read Tensor) -> []f32
+```
+All values as a view, in row-major order.
+
+```
+fn Tensor.row(self: read Tensor, r: usize) -> []f32
+```
+Row `r` as a view (`cols()` values).
+
+```
+fn Tensor.at(self: read Tensor, r: usize, c: usize) -> f32
+```
+Element `[r][c]` of a matrix.
+
+```
+fn Tensor.set(self: lend Tensor, r: usize, c: usize, v: f32)
+```
+
+```
+fn Tensor.reshape(self: lend Tensor, dims: []usize)
+```
+Gives the same values other dimensions (the product must not change).
+
+```
+fn Q4Matrix.quantize(t: read Tensor) -> Q4Matrix
+```
+
+```
+fn Q4Matrix.dequantize_row(self: read Q4Matrix, r: usize) -> List[f32]
+```
+Row `r` as f32.
+
+```
+fn Q4Matrix.matvec(self: read Q4Matrix, x: read Q8Vec, y: lend []f32)
+```
+y = W x for a `q8_0` vector of `cols` values;
+
+```
+fn Q4Matrix.matvec_parallel(self: read Q4Matrix, pool: lend Pool, x: read Q8Vec, y: lend []f32)
+```
+The same, with the rows shared between the threads of `pool`.
+
+```
+fn Q8Matrix.quantize(t: read Tensor) -> Q8Matrix
+```
+
+```
+fn Q8Matrix.matvec(self: read Q8Matrix, x: read Q8Vec, y: lend []f32)
+```
+
+```
+fn Q8Matrix.matvec_parallel(self: read Q8Matrix, pool: lend Pool, x: read Q8Vec, y: lend []f32)
+```
 
 
 ## std.thread

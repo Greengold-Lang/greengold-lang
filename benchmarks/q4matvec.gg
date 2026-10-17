@@ -1,0 +1,56 @@
+# Quantized matrix-vector products with std.tensor, the way an LLM layer runs one token: a 4096 x 4096 weight
+# matrix in q4_0 (and q8_0) blocks times a q8_0 activation vector, serial and on all CPUs. It prints the
+# time per product and how many gigabytes of weights are read per second. Build with `--cpu native`.
+import std.tensor
+import std.parallel
+import std.time
+
+const ROWS: usize = 4096
+const COLS: usize = 4096
+const PASSES: usize = 200
+
+fn main():
+    t = tensor.Tensor.new([ROWS, COLS])
+    state: u64 = 12345
+    for r in 0..ROWS:
+        for c in 0..COLS:
+            overflow: wrap
+            state = state * 6364136223846793005 + 1442695040888963407
+            t.set(r, c, f32(i64((state >> 33) % 2001) - 1000) / 1000.0)
+    x = List[f32]()
+    for c in 0..COLS:
+        x.push(f32((c * 37) % 101) / 50.0 - 1.0)
+    xq = tensor.quantize_q8(x[..])
+    q4 = tensor.Q4Matrix.quantize(t)
+    q8 = tensor.Q8Matrix.quantize(t)
+    y = List[f32]()
+    for r in 0..ROWS:
+        y.push(0.0)
+    pool = parallel.Pool.new(0)
+    q4_bytes = f64(ROWS * (COLS / 32) * 18)
+    q8_bytes = f64(ROWS * (COLS / 32) * 34)
+
+    start = time.Instant.now()
+    for p in 0..PASSES:
+        q4.matvec(xq, y[..])
+    s4 = start.elapsed_secs()
+    print("q4_0 serial   ", s4 / f64(PASSES) * 1000.0, "ms/product", q4_bytes * f64(PASSES) / s4 / 1e9, "GB/s")
+
+    start = time.Instant.now()
+    for p in 0..PASSES:
+        q4.matvec_parallel(pool, xq, y[..])
+    p4 = start.elapsed_secs()
+    print("q4_0 parallel ", p4 / f64(PASSES) * 1000.0, "ms/product", q4_bytes * f64(PASSES) / p4 / 1e9, "GB/s", pool.size(), "threads")
+
+    start = time.Instant.now()
+    for p in 0..PASSES:
+        q8.matvec(xq, y[..])
+    s8 = start.elapsed_secs()
+    print("q8_0 serial   ", s8 / f64(PASSES) * 1000.0, "ms/product", q8_bytes * f64(PASSES) / s8 / 1e9, "GB/s")
+
+    start = time.Instant.now()
+    for p in 0..PASSES:
+        q8.matvec_parallel(pool, xq, y[..])
+    p8 = start.elapsed_secs()
+    print("q8_0 parallel ", p8 / f64(PASSES) * 1000.0, "ms/product", q8_bytes * f64(PASSES) / p8 / 1e9, "GB/s")
+    print(y[0])

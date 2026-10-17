@@ -1,0 +1,387 @@
+# std.tensor: f32 tensors and the block-quantized weights of LLM inference (q8_0, q4_0).
+#
+#     import std.tensor
+#
+#     w = tensor.Tensor.new([4096, 4096])        # rows x columns, row-major
+#     q = tensor.Q4Matrix.quantize(w)            # 4.5 bits per weight
+#     xq = tensor.quantize_q8(x)                 # the activation vector, 8 bits per value
+#     q.matvec(xq, y)                            # y = W x
+#
+# The block formats are those of ggml/llama.cpp so GGUF files can be read as they are: a block holds 32
+# values and one scale stored as a 16-bit float. `q8_0` is 34 bytes (scale, 32 x i8: value = scale * q).
+# `q4_0` is 18 bytes (scale, 16 bytes of two 4-bit numbers: value = scale * (q - 8); byte j holds element j in
+# the low nibble and element j + 16 in the high nibble). A row of a matrix is a whole number of blocks.
+
+import std.parallel
+
+private
+extern "math.h" fn floorf(x: f32) -> f32
+
+public
+const BLOCK: usize = 32
+
+# 16-bit floats are stored as `u16`; these two convert from and to `f32` (round to nearest even).
+fn f32_bits(x: f32) -> u32:
+    unsafe:
+        p = ptr_cast[*u32](addr(x))
+        return p[0]
+
+fn f32_from_bits(b: u32) -> f32:
+    unsafe:
+        p = ptr_cast[*f32](addr(b))
+        return p[0]
+
+fn f16_to_f32(h: u16) -> f32:
+    sign = u32(h >> 15) << 31
+    exp = u32((h >> 10) & 0x1F)
+    man = u32(h & 0x3FF)
+    bits: u32 = 0
+    if exp == 0:
+        if man == 0:
+            bits = sign
+        else:
+            e: u32 = 113
+            m = man
+            while (m & 0x400) == 0:
+                m = m << 1
+                e -= 1
+            bits = sign | (e << 23) | (u32(m & 0x3FF) << 13)
+    elif exp == 31:
+        bits = sign | 0x7F800000 | (man << 13)
+    else:
+        bits = sign | ((exp + 112) << 23) | (man << 13)
+    return f32_from_bits(bits)
+
+# The same without branches, for the scales of blocks in the matrix kernels: right for every finite value
+# (the exponent field is moved and the result scaled by 2^112); an infinity or NaN comes out as a large number.
+fn f16_scale(h: u16) -> f32:
+    bits = (u32(h & 0x8000) << 16) | (u32(h & 0x7FFF) << 13)
+    return f32_from_bits(bits) * 5.192296858534828e33
+
+fn f32_to_f16(x: f32) -> u16:
+    b = f32_bits(x)
+    sign = u16((b >> 16) & 0x8000)
+    exp = i32((b >> 23) & 0xFF) - 127 + 15
+    man = u32(b & 0x7FFFFF)
+    if ((b >> 23) & 0xFF) == 255:  # infinity or NaN
+        if man == 0:
+            return sign | 0x7C00
+        return sign | 0x7E00
+    if exp >= 31:
+        return sign | 0x7C00
+    if exp <= 0:
+        if exp < -10:
+            return sign
+        m = u32(man | 0x800000)
+        shift = u32(14 - exp)
+        half = u32(1) << (shift - 1)
+        r = m >> shift
+        rem = u32(m & ((u32(1) << shift) - 1))
+        if rem > half or (rem == half and (r & 1) == 1):
+            r += 1
+        return sign | u16(r)
+    r = u32(sign) | (u32(exp) << 10) | (man >> 13)
+    rem = u32(man & 0x1FFF)
+    if rem > 0x1000 or (rem == 0x1000 and (r & 1) == 1):
+        r += 1  # may carry into the exponent, which is the right answer
+    return u16(r)
+
+# One block of `q8_0`: 34 bytes.
+struct BlockQ8:
+    d: u16
+    qs: [32]i8
+
+# One block of `q4_0`: 18 bytes.
+struct BlockQ4:
+    d: u16
+    qs: [16]u8
+
+fn _round(x: f32) -> i32:
+    return i32(floorf(x + 0.5))
+
+# A vector of f32 quantized to `q8_0`, the form in which an activation meets a quantized matrix.
+struct Q8Vec:
+    blocks: List[BlockQ8]
+    len: usize
+
+fn quantize_q8(x: []f32) -> Q8Vec:
+    if x.len % BLOCK != 0:
+        panic("quantize_q8: the length must be a multiple of 32")
+    out = Q8Vec{ blocks: List[BlockQ8](), len: x.len }
+    n = x.len / BLOCK
+    out.blocks.reserve(n)
+    for b in 0..n:
+        base = b * BLOCK
+        amax: f32 = 0.0
+        for j in 0..BLOCK:
+            v = x[base + j]
+            if v < 0.0:
+                v = 0.0 - v
+            if v > amax:
+                amax = v
+        d = amax / 127.0
+        id: f32 = 0.0
+        if d != 0.0:
+            id = 1.0 / d
+        qs: [32]i8 = [0; 32]
+        for j in 0..BLOCK:
+            qs[j] = i8(_round(x[base + j] * id))
+        out.blocks.push(BlockQ8{ d: f32_to_f16(d), qs: qs })
+    return out
+
+impl Q8Vec:
+    # Back to f32 (for tests and debugging).
+    public
+    fn dequantize(self: read Q8Vec) -> List[f32]:
+        out = List[f32]()
+        for b in 0..self.blocks.len():
+            d = f16_to_f32(self.blocks[b].d)
+            for j in 0..BLOCK:
+                out.push(d * f32(self.blocks[b].qs[j]))
+        return out
+
+# -- Tensor: f32 values in row-major order ----------------------------------------------------------
+
+public
+struct Tensor:
+    shape: List[usize]
+    data: List[f32]
+
+impl Tensor:
+    # A tensor of zeros with the given dimensions, e.g. `Tensor.new([4096, 4096])`.
+    public
+    fn new(dims: []usize) -> Tensor:
+        shape = List[usize]()
+        total: usize = 1
+        for i in 0..dims.len:
+            shape.push(dims[i])
+            total *= dims[i]
+        data = List[f32]()
+        data.reserve(total)
+        for i in 0..total:
+            data.push(0.0)
+        return Tensor{ shape: shape, data: data }
+
+    # A tensor with these dimensions that takes ownership of `values` (their number must be the product).
+    fn from_list(dims: []usize, values: consume List[f32]) -> Tensor:
+        shape = List[usize]()
+        total: usize = 1
+        for i in 0..dims.len:
+            shape.push(dims[i])
+            total *= dims[i]
+        if values.len() != total:
+            panic("Tensor.from_list: the number of values is not the product of the dimensions")
+        return Tensor{ shape: shape, data: values }
+
+    # The number of dimensions.
+    fn rank(self: read Tensor) -> usize:
+        return self.shape.len()
+
+    # The size of dimension `i`.
+    fn dim(self: read Tensor, i: usize) -> usize:
+        return self.shape[i]
+
+    # The number of values.
+    fn len(self: read Tensor) -> usize:
+        return self.data.len()
+
+    # Rows of a matrix: the product of all dimensions but the last.
+    fn rows(self: read Tensor) -> usize:
+        return self.data.len() / self.shape[self.shape.len() - 1]
+
+    # Columns of a matrix: the last dimension.
+    fn cols(self: read Tensor) -> usize:
+        return self.shape[self.shape.len() - 1]
+
+    # All values as a view, in row-major order.
+    fn values(self: read Tensor) -> []f32:
+        return self.data[..]
+
+    # Row `r` as a view (`cols()` values).
+    fn row(self: read Tensor, r: usize) -> []f32:
+        c = self.cols()
+        return self.data[r * c..(r + 1) * c]
+
+    # Element `[r][c]` of a matrix.
+    fn at(self: read Tensor, r: usize, c: usize) -> f32:
+        return self.data[r * self.cols() + c]
+
+    fn set(self: lend Tensor, r: usize, c: usize, v: f32):
+        self.data[r * self.cols() + c] = v
+
+    # Gives the same values other dimensions (the product must not change).
+    fn reshape(self: lend Tensor, dims: []usize):
+        total: usize = 1
+        for i in 0..dims.len:
+            total *= dims[i]
+        if total != self.data.len():
+            panic("Tensor.reshape: the number of values would change")
+        self.shape.clear()
+        for i in 0..dims.len:
+            self.shape.push(dims[i])
+
+# -- q8_0 and q4_0 matrices ---------------------------------------------------------------------------
+
+private
+fn _quantize_block_q4(x: []f32, base: usize) -> BlockQ4:
+    amax: f32 = 0.0
+    biggest: f32 = 0.0
+    for j in 0..BLOCK:
+        v = x[base + j]
+        a = v
+        if a < 0.0:
+            a = 0.0 - a
+        if a > amax:
+            amax = a
+            biggest = v
+    d = biggest / -8.0
+    id: f32 = 0.0
+    if d != 0.0:
+        id = 1.0 / d
+    qs: [16]u8 = [0; 16]
+    for j in 0..16:
+        lo = _round(x[base + j] * id + 8.0)
+        hi = _round(x[base + 16 + j] * id + 8.0)
+        if lo > 15:
+            lo = 15
+        if hi > 15:
+            hi = 15
+        if lo < 0:
+            lo = 0
+        if hi < 0:
+            hi = 0
+        qs[j] = u8(lo) | (u8(hi) << 4)
+    return BlockQ4{ d: f32_to_f16(d), qs: qs }
+
+# The dot product of one row of `q4_0` weights with a `q8_0` vector, `nb` blocks each.
+fn _row_dot_q4(w: []BlockQ4, wbase: usize, x: []BlockQ8, nb: usize) -> f32:
+    facc = f32x4.splat(0.0)
+    for b in 0..nb:
+        packed = u8x16.load(w[wbase + b].qs[..], 0)
+        lo = ((packed & u8x16.splat(0x0F)) - u8x16.splat(8)).as_i8()
+        hi = (packed.shr(4) - u8x16.splat(8)).as_i8()
+        xs = x[b].qs[..]
+        isum = i32x4.splat(0).dot_i8(lo, i8x16.load(xs, 0)).dot_i8(hi, i8x16.load(xs, 16))
+        facc = isum.to_f32().fma(f32x4.splat(f16_scale(w[wbase + b].d) * f16_scale(x[b].d)), facc)
+    return facc.sum()
+
+fn _row_dot_q8(w: []BlockQ8, wbase: usize, x: []BlockQ8, nb: usize) -> f32:
+    facc = f32x4.splat(0.0)
+    for b in 0..nb:
+        ws = w[wbase + b].qs[..]
+        xs = x[b].qs[..]
+        isum = i32x4.splat(0).dot_i8(i8x16.load(ws, 0), i8x16.load(xs, 0)).dot_i8(i8x16.load(ws, 16), i8x16.load(xs, 16))
+        facc = isum.to_f32().fma(f32x4.splat(f16_scale(w[wbase + b].d) * f16_scale(x[b].d)), facc)
+    return facc.sum()
+
+struct _JobQ4:
+    w: []BlockQ4
+    x: []BlockQ8
+    y: *mut f32
+    nb: usize
+
+struct _JobQ8:
+    w: []BlockQ8
+    x: []BlockQ8
+    y: *mut f32
+    nb: usize
+
+fn _rows_q4(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_JobQ4](ctx)
+        for r in start..end:
+            job[0].y[r] = _row_dot_q4(job[0].w, r * job[0].nb, job[0].x, job[0].nb)
+
+fn _rows_q8(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_JobQ8](ctx)
+        for r in start..end:
+            job[0].y[r] = _row_dot_q8(job[0].w, r * job[0].nb, job[0].x, job[0].nb)
+
+public
+# A matrix of `q4_0` blocks: `rows` rows of `cols` weights, each row `cols / 32` blocks.
+struct Q4Matrix:
+    rows: usize
+    cols: usize
+    blocks: List[BlockQ4]
+
+impl Q4Matrix:
+    # Quantizes an f32 matrix (its columns must be a multiple of 32).
+    public
+    fn quantize(t: read Tensor) -> Q4Matrix:
+        rows = t.rows()
+        cols = t.cols()
+        if cols % BLOCK != 0:
+            panic("Q4Matrix.quantize: the columns must be a multiple of 32")
+        m = Q4Matrix{ rows: rows, cols: cols, blocks: List[BlockQ4]() }
+        m.blocks.reserve(rows * (cols / BLOCK))
+        v = t.values()
+        for b in 0..rows * (cols / BLOCK):
+            m.blocks.push(_quantize_block_q4(v, b * BLOCK))
+        return m
+
+    # Row `r` as f32.
+    fn dequantize_row(self: read Q4Matrix, r: usize) -> List[f32]:
+        out = List[f32]()
+        nb = self.cols / BLOCK
+        for b in 0..nb:
+            blk = self.blocks[r * nb + b]
+            d = f16_to_f32(blk.d)
+            for j in 0..16:
+                out.push(d * f32(i32(blk.qs[j] & 0x0F) - 8))
+            for j in 0..16:
+                out.push(d * f32(i32(blk.qs[j] >> 4) - 8))
+        return out
+
+    # y = W x for a `q8_0` vector of `cols` values; `y` has `rows` values.
+    fn matvec(self: read Q4Matrix, x: read Q8Vec, y: lend []f32):
+        nb = self.cols / BLOCK
+        if x.len != self.cols or y.len != self.rows:
+            panic("Q4Matrix.matvec: the sizes do not match")
+        for r in 0..self.rows:
+            y[r] = _row_dot_q4(self.blocks[..], r * nb, x.blocks[..], nb)
+
+    # The same, with the rows shared between the threads of `pool`.
+    fn matvec_parallel(self: read Q4Matrix, pool: lend parallel.Pool, x: read Q8Vec, y: lend []f32):
+        nb = self.cols / BLOCK
+        if x.len != self.cols or y.len != self.rows:
+            panic("Q4Matrix.matvec_parallel: the sizes do not match")
+        unsafe:
+            job = _JobQ4{ w: self.blocks[..], x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
+            pool.for_range(self.rows, _rows_q4, ptr_cast[*u8](addr(job)))
+
+public
+# A matrix of `q8_0` blocks (8 bits per weight).
+struct Q8Matrix:
+    rows: usize
+    cols: usize
+    blocks: List[BlockQ8]
+
+impl Q8Matrix:
+    public
+    fn quantize(t: read Tensor) -> Q8Matrix:
+        rows = t.rows()
+        cols = t.cols()
+        if cols % BLOCK != 0:
+            panic("Q8Matrix.quantize: the columns must be a multiple of 32")
+        m = Q8Matrix{ rows: rows, cols: cols, blocks: List[BlockQ8]() }
+        for r in 0..rows:
+            q = quantize_q8(t.row(r))
+            for b in 0..q.blocks.len():
+                m.blocks.push(q.blocks[b])
+        return m
+
+    fn matvec(self: read Q8Matrix, x: read Q8Vec, y: lend []f32):
+        nb = self.cols / BLOCK
+        if x.len != self.cols or y.len != self.rows:
+            panic("Q8Matrix.matvec: the sizes do not match")
+        for r in 0..self.rows:
+            y[r] = _row_dot_q8(self.blocks[..], r * nb, x.blocks[..], nb)
+
+    fn matvec_parallel(self: read Q8Matrix, pool: lend parallel.Pool, x: read Q8Vec, y: lend []f32):
+        nb = self.cols / BLOCK
+        if x.len != self.cols or y.len != self.rows:
+            panic("Q8Matrix.matvec_parallel: the sizes do not match")
+        unsafe:
+            job = _JobQ8{ w: self.blocks[..], x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
+            pool.for_range(self.rows, _rows_q8, ptr_cast[*u8](addr(job)))

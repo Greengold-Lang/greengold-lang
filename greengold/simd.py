@@ -13,6 +13,10 @@
     acc = acc.dot_i8(x, w)               # i32x4 += 4-lane dot products of i8x16 x, w   (i32x8 with i8x32)
     acc = acc.dot_u8i8(x, w)             # the same with an unsigned left operand (u8x16 / u8x32)
 
+    v.shr(k) / v.shl(k)                  # shift every integer lane (arithmetic for signed lanes); k < lane bits
+    v.to_f32()                           # i32x4 -> f32x4, i32x8 -> f32x8 (exact below 2^24)
+    v.as_i8() / v.as_u8()                # the same bits as 8-bit vector of the other signedness
+
 `acc.dot_i8(x, w)`: with `n` lanes in `acc`, lane `j` of the result is `acc[j]` plus the products of elements
 `2j`, `2j+1`, `2n+2j` and `2n+2j+1`, computed in 32 bits (the shape of the x86 `pmaddwd` instruction). Only the sum of all
 lanes (`sum()`) is a dot product of the whole vectors. This is the inner step of a quantized (int8) matrix-vector product.
@@ -30,6 +34,14 @@ SIMD_TYPES: dict[str, tuple[str, int]] = {
 }
 
 _DOT = {"i32x4": ("i8x16", "u8x16"), "i32x8": ("i8x32", "u8x32")}
+
+
+# Same bits, other signedness: `u8x16.as_i8()` is an `i8x16`.
+_SIGN_FLIP = {"u8x16": ("as_i8", "i8x16"), "u8x32": ("as_i8", "i8x32"),
+              "i8x16": ("as_u8", "u8x16"), "i8x32": ("as_u8", "u8x32")}
+
+
+_TO_F32 = {"i32x4": "f32x4", "i32x8": "f32x8"}
 
 
 def is_simd(ty: object) -> bool:
@@ -111,6 +123,13 @@ class SimdCheckMixin:
         if _is_float(ty):
             table["sqrt"] = ([], ty)
             table["fma"] = ([ParamInfo("b", ty, "val", None), ParamInfo("c", ty, "val", None)], ty)
+        if not _is_float(ty):
+            table["shr"] = ([ParamInfo("k", "usize", "val", None)], ty)
+            table["shl"] = ([ParamInfo("k", "usize", "val", None)], ty)
+        if ty in _TO_F32:
+            table["to_f32"] = ([], _TO_F32[ty])
+        if ty in _SIGN_FLIP:
+            table[_SIGN_FLIP[ty][0]] = ([], _SIGN_FLIP[ty][1])
         if ty in _DOT:
             signed, unsigned = _DOT[ty]
             table["dot_i8"] = ([ParamInfo("x", signed, "val", None), ParamInfo("w", signed, "val", None)], ty)
@@ -137,6 +156,14 @@ def arith(cg, op: str, ty: str, l, r):
     if _is_float(ty):
         return {"+": b.fadd, "-": b.fsub, "*": b.fmul, "/": b.fdiv}[op](l, r)
     return {"+": b.add, "-": b.sub, "*": b.mul, "&": b.and_, "|": b.or_, "^": b.xor}[op](l, r)
+
+
+def _splat_value(cg, vec_ty, x):
+    b = cg.b
+    v = ir.Constant(vec_ty, ir.Undefined)
+    for i in range(vec_ty.count):
+        v = b.insert_element(v, x, ir.Constant(ir.IntType(32), i))
+    return v
 
 
 def _splat(cg, ty: str, x):
@@ -219,6 +246,19 @@ def call(cg, e):
         else:
             less = b.icmp_signed("<", v, w)
         return b.select(less, v, w) if kind == "min" else b.select(less, w, v)
+    if kind == "to_f32":
+        return b.sitofp(v, llty(cg, _TO_F32[ty]))
+    if kind in ("as_i8", "as_u8"):
+        return b.bitcast(v, llty(cg, _SIGN_FLIP[ty][1]))
+    if kind in ("shr", "shl"):
+        bits = elem_lt.width
+        k = cg.to_i64(cg.expr(e.args[0]), e.args[0].ty)
+        cg.fail_if(b.icmp_unsigned(">=", k, ir.Constant(ir.IntType(64), bits)),
+                   lambda: cg.panic_call(f"shift amount out of range (0..{bits})", e.line, e.col))
+        amount = _splat_value(cg, lt, b.trunc(k, elem_lt) if bits < 64 else k)
+        if kind == "shl":
+            return b.shl(v, amount)
+        return b.lshr(v, amount) if lane_type(ty).startswith("u") else b.ashr(v, amount)
     if kind == "fma":
         f = "f32" if lane_type(ty) == "f32" else "f64"
         name = f"llvm.fma.v{n}{f}"
