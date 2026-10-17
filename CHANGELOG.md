@@ -2,7 +2,13 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
-## Unreleased
+## 0.22.0
+
+- `std.http` speaks **https**: `http.get("https://...")` checks the server's certificate against the system's trusted roots and the host name, so an expired, self-signed, or wrong-host certificate is an error. TLS is the system's SChannel on Windows and OpenSSL (`libssl`) on Linux and macOS; the linker adds `-lssl -lcrypto` only to programs that use it, and a Windows program is linked with `-lsecur32`. New `std.tls` (client only).
+- **Time limits.** `TcpStream.set_timeout(ms)` and `UdpSocket.set_timeout(ms)` limit every later send and receive (`Err("timed out")`, tested with `net.is_timeout(e)`; the stream stays usable). `TcpStream.connect_timeout`, `connect_tls`, `TcpListener.accept_timeout`. `http.get_timeout(url, ms)` and `http.fetch(method, url, body, opts)` with `http.options()` (`timeout_ms`, 30 seconds by default, `max_redirects`, `max_body`, `header(name, value)`). `http.serve` now drops a client that is silent for 10 seconds (`http.serve_with` sets the time).
+- The http client follows redirects, reads `Transfer-Encoding: chunked` bodies and bodies sent with `Content-Length`, and sends `User-Agent`. Host names are looked up (`std.net` used to take only IPv4 digits and `localhost`).
+- **Networking for game servers.** `net.Poller` waits for many sockets at once (`wait(ms)` returns the ready ones), with `TcpListener.try_accept`, `TcpStream.try_receive`, `send_some`, `readable`, `UdpSocket.receive_from_try`, `reply`, `set_broadcast`, `set_buffers`, `peer_addr`, `set_nodelay` (TCP sockets now start with `TCP_NODELAY` on), and non-blocking mode. Messages: `send_frame` / `receive_frame` and the new `std.packet` (`ByteWriter`, `ByteReader`, `FrameBuffer`). A write to a closed connection is an `Err` on Linux and macOS, not SIGPIPE, and Windows no longer reports an earlier ICMP "port unreachable" as a receive error on a UDP socket.
+- New `std.sock` (`wait`, `poll_many`) shared by `std.net` and `std.tls`.
 
 - Block comments: `#[ ... ]#` spans several lines or sits inside a line, and nests (`#[ a #[ b ]# c ]#`). An unclosed one reports `Unterminated block comment.` `gg fmt` leaves the inside of a block comment untouched. The VS Code grammar and the playground highlighter know the new form.
 

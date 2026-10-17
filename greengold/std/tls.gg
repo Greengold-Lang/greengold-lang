@@ -1,0 +1,527 @@
+# std.tls: TLS (the "S" in https) on top of a connected socket, for clients.
+#
+# `std.net` uses this for `TcpStream.connect_tls`; most programs never call it directly. The connection checks the
+# server's certificate against the machine's trusted roots and against the host name, so a connection that is
+# answered by someone else fails with an error instead of being quietly accepted.
+#
+#   Windows       the system's TLS (SChannel); nothing to install.
+#   Linux, macOS  OpenSSL 1.1.1 or 3 (libssl). The linker is given `-lssl -lcrypto` when a program uses TLS;
+#                 install `libssl-dev` (Debian, Ubuntu), `openssl-devel` (Fedora), or `brew install openssl` (macOS).
+#
+# A TLS connection is a number (a handle); `handshake` makes one from a connected socket, `write` and `receive` use it, and
+# `close` ends it (before the socket itself is closed). Times are in milliseconds; a negative time waits for ever.
+import std.sock
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn calloc(n: usize, size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+extern "string.h" fn memcpy(dst: *mut u8, src: *u8, n: usize) -> *mut u8
+extern "string.h" fn memmove(dst: *mut u8, src: *u8, n: usize) -> *mut u8
+extern "sys/socket.h" fn recv(s: i64, buf: *mut u8, len: i64, flags: i32) -> i32
+extern "sys/socket.h" fn send(s: i64, buf: *u8, len: i64, flags: i32) -> i32
+extern "sys/socket.h" fn setsockopt(s: i64, level: i32, name: i32, value: *u8, len: i32) -> i32
+
+# SChannel (Windows)
+weak extern "sspi.h" fn AcquireCredentialsHandleA(principal: *u8, package: *u8, usage: u32, logon: *u8, auth: *u8, getkey: *u8, arg: *u8, cred: *mut u8, expiry: *mut u8) -> i32
+weak extern "sspi.h" fn InitializeSecurityContextA(cred: *mut u8, ctx: *mut u8, target: *u8, flags: u32, r1: u32, drep: u32, input: *mut u8, r2: u32, newctx: *mut u8, output: *mut u8, attrs: *mut u8, expiry: *mut u8) -> i32
+weak extern "sspi.h" fn EncryptMessage(ctx: *mut u8, qop: u32, desc: *mut u8, seq: u32) -> i32
+weak extern "sspi.h" fn DecryptMessage(ctx: *mut u8, desc: *mut u8, seq: u32, qop: *mut u8) -> i32
+weak extern "sspi.h" fn QueryContextAttributesA(ctx: *mut u8, attr: u32, buf: *mut u8) -> i32
+weak extern "sspi.h" fn FreeContextBuffer(p: *mut u8) -> i32
+weak extern "sspi.h" fn DeleteSecurityContext(ctx: *mut u8) -> i32
+weak extern "sspi.h" fn FreeCredentialsHandle(cred: *mut u8) -> i32
+
+# OpenSSL (Linux, macOS)
+extern "openssl/ssl.h" fn TLS_client_method() -> *u8
+extern "openssl/ssl.h" fn SSL_CTX_new(method: *u8) -> *mut u8
+extern "openssl/ssl.h" fn SSL_CTX_free(ctx: *mut u8)
+extern "openssl/ssl.h" fn SSL_CTX_set_default_verify_paths(ctx: *mut u8) -> i32
+extern "openssl/ssl.h" fn SSL_CTX_set_verify(ctx: *mut u8, mode: i32, cb: *u8)
+extern "openssl/ssl.h" fn SSL_new(ctx: *mut u8) -> *mut u8
+extern "openssl/ssl.h" fn SSL_free(ssl: *mut u8)
+extern "openssl/ssl.h" fn SSL_set_fd(ssl: *mut u8, fd: i32) -> i32
+extern "openssl/ssl.h" fn SSL_ctrl(ssl: *mut u8, cmd: i32, larg: i64, parg: *u8) -> i64
+extern "openssl/ssl.h" fn SSL_set1_host(ssl: *mut u8, host: *u8) -> i32
+extern "openssl/ssl.h" fn SSL_connect(ssl: *mut u8) -> i32
+extern "openssl/ssl.h" fn SSL_read(ssl: *mut u8, buf: *mut u8, n: i32) -> i32
+extern "openssl/ssl.h" fn SSL_write(ssl: *mut u8, buf: *u8, n: i32) -> i32
+extern "openssl/ssl.h" fn SSL_pending(ssl: *u8) -> i32
+extern "openssl/ssl.h" fn SSL_shutdown(ssl: *mut u8) -> i32
+extern "openssl/ssl.h" fn SSL_get_error(ssl: *u8, ret: i32) -> i32
+extern "openssl/ssl.h" fn SSL_get_verify_result(ssl: *u8) -> i64
+
+const SEC_I_CONTINUE_NEEDED: i32 = 590610
+const SEC_I_CONTEXT_EXPIRED: i32 = 590615
+const SEC_E_INCOMPLETE_MESSAGE: i32 = -2146893032
+
+struct _Tls:
+    fd: i64
+    ready: bool          # the handshake finished (so the context must be deleted)
+    eof: bool
+    cred: *mut u8        # SChannel: CredHandle, CtxtHandle
+    ctx: *mut u8
+    hdr: u32
+    trl: u32
+    maxmsg: u32
+    inbuf: *mut u8       # ciphertext received and not yet decrypted
+    in_len: usize
+    in_cap: usize
+    plain: *mut u8       # decrypted bytes not yet given out
+    plain_len: usize
+    plain_pos: usize
+    ssl: *mut u8         # OpenSSL: SSL, SSL_CTX
+    sslctx: *mut u8
+
+fn _t(h: i64) -> *mut _Tls:
+    unsafe:
+        return int_to_ptr[*mut _Tls](usize(h))
+
+public
+# Starts TLS on connected socket `fd` and checks the server's certificate for `host`. Returns the handle of the
+# secured connection.
+fn handshake(fd: i64, host: str, timeout: i64) -> Result[i64, string]:
+    unsafe:
+        t = ptr_cast[*mut _Tls](calloc(1, size_of[_Tls]()))
+        t[0].fd = fd
+        t[0].in_cap = 0
+        r: Result[bool, string] = Ok(true)
+        if target_os() == "windows":
+            r = _win_handshake(t, host, timeout)
+        else:
+            r = _ssl_handshake(t, host, timeout)
+        match consume r:
+            Ok(_ok):
+                return Ok(i64(ptr_to_int(t)))
+            Err(e):
+                _release(t)
+                return Err(e)
+
+# Sends all of `data` over the secured connection.
+fn write(h: i64, data: str, timeout: i64) -> Result[usize, string]:
+    t = _t(h)
+    if target_os() == "windows":
+        return _win_write(t, data, timeout)
+    else:
+        return _ssl_write(t, data, timeout)
+
+# Receives at most `max` bytes. An empty string means the other side closed the connection.
+fn receive(h: i64, max: usize, timeout: i64) -> Result[string, string]:
+    t = _t(h)
+    if target_os() == "windows":
+        return _win_read(t, max, timeout)
+    else:
+        return _ssl_read(t, max, timeout)
+
+# True when bytes were already decrypted and wait to be read: the socket is not readable then, but `receive` does not wait.
+fn pending(h: i64) -> bool:
+    unsafe:
+        t = _t(h)
+        if t[0].plain_len > t[0].plain_pos:
+            return true
+        if target_os() == "windows":
+            return false
+        else:
+            return t[0].ssl != null and SSL_pending(t[0].ssl) > 0
+
+# Ends the secured connection and frees it. The socket stays open.
+fn close(h: i64):
+    unsafe:
+        _release(_t(h))
+
+private
+
+fn _release(t: *mut _Tls):
+    unsafe:
+        if target_os() == "windows":
+            if t[0].ready:
+                DeleteSecurityContext(t[0].ctx)
+            if t[0].cred != null:
+                FreeCredentialsHandle(t[0].cred)
+        else:
+            if t[0].ssl != null:
+                if t[0].ready and not t[0].eof:
+                    SSL_shutdown(t[0].ssl)
+                SSL_free(t[0].ssl)
+            if t[0].sslctx != null:
+                SSL_CTX_free(t[0].sslctx)
+        if t[0].cred != null:
+            free(t[0].cred)
+        if t[0].ctx != null:
+            free(t[0].ctx)
+        if t[0].inbuf != null:
+            free(t[0].inbuf)
+        if t[0].plain != null:
+            free(t[0].plain)
+        free(ptr_cast[*u8](t))
+
+fn _hex(n: i32) -> string:
+    out = string.from("0x")
+    digits = "0123456789ABCDEF"
+    shift: i32 = 28
+    while shift >= 0:
+        out.append_byte(digits[usize((n >> shift) & 15)])
+        shift -= 4
+    return out
+
+fn _w32(p: *mut u8, off: i64, v: u32):
+    unsafe:
+        ptr_cast[*mut u32](ptr_offset(p, off))[0] = v
+
+fn _r32(p: *u8, off: i64) -> u32:
+    unsafe:
+        return ptr_cast[*u32](ptr_offset(p, off))[0]
+
+fn _wptr(p: *mut u8, off: i64, v: *u8):
+    unsafe:
+        ptr_cast[*mut *u8](ptr_offset(p, off))[0] = v
+
+fn _rptr(p: *u8, off: i64) -> *mut u8:
+    unsafe:
+        return ptr_cast[*mut *mut u8](ptr_offset(p, off))[0]
+
+# Sends `len` bytes from `p` on the socket, waiting at most `timeout` ms for each part.
+fn _send_all(fd: i64, p: *u8, len: usize, timeout: i64) -> Result[bool, string]:
+    sent: usize = 0
+    while sent < len:
+        if timeout >= 0 and sock.wait(fd, true, timeout) == 0:
+            return Err("timed out")
+        unsafe:
+            n = send(fd, ptr_offset(p, i64(sent)), i64(len - sent), 0)
+            if n <= 0:
+                return Err("send() failed")
+            sent += usize(n)
+    return Ok(true)
+
+# Reads more ciphertext into `inbuf`. Ok(0) means the socket was closed.
+fn _fill(t: *mut _Tls, timeout: i64) -> Result[usize, string]:
+    unsafe:
+        if t[0].in_cap - t[0].in_len < 16384:
+            cap = t[0].in_len + 32768
+            nb = malloc(cap)
+            if t[0].in_len > 0:
+                memcpy(nb, t[0].inbuf, t[0].in_len)
+            if t[0].inbuf != null:
+                free(t[0].inbuf)
+            t[0].inbuf = nb
+            t[0].in_cap = cap
+        if timeout >= 0 and sock.wait(t[0].fd, false, timeout) == 0:
+            return Err("timed out")
+        n = recv(t[0].fd, ptr_offset(t[0].inbuf, i64(t[0].in_len)), i64(t[0].in_cap - t[0].in_len), 0)
+        if n < 0:
+            return Err("recv() failed")
+        t[0].in_len += usize(n)
+        return Ok(usize(n))
+
+# --- SChannel ---------------------------------------------------------------------------------------------------
+
+# A SecBuffer is 16 bytes: size (u32), type (u32), pointer. SecBuffer types: 0 empty, 1 data, 2 token, 5 extra,
+# 6 stream trailer, 7 stream header.
+fn _sb(bufs: *mut u8, i: i64, size: u32, kind: u32, p: *u8):
+    _w32(bufs, i * 16, size)
+    _w32(bufs, i * 16 + 4, kind)
+    _wptr(bufs, i * 16 + 8, p)
+
+# A SecBufferDesc is 16 bytes: version 0, buffer count, pointer to the buffers.
+fn _desc(d: *mut u8, count: u32, bufs: *u8):
+    _w32(d, 0, 0)
+    _w32(d, 4, count)
+    _wptr(d, 8, bufs)
+
+fn _win_name(st: i32) -> str:
+    match st:
+        -2146893019: return " (the certificate chain is not trusted)"
+        -2146893016: return " (the certificate has expired)"
+        -2146893022: return " (the certificate is for another host name)"
+        -2146762481: return " (the certificate is for another host name)"
+        -2146893048: return " (the server sent something that is not valid TLS)"
+        -2146893007: return " (no TLS version or cipher in common with the server)"
+        _: return ""
+
+fn _win_handshake(t: *mut _Tls, host: str, timeout: i64) -> Result[bool, string]:
+    unsafe:
+        t[0].cred = calloc(1, 16)
+        t[0].ctx = calloc(1, 16)
+        scratch = calloc(1, 320)
+        sizes = ptr_offset(scratch, 256)
+        pkg = string_to_cstr("Microsoft Unified Security Protocol Provider")      # a literal: ends in NUL, not freed
+        st = AcquireCredentialsHandleA(null, pkg, 2, null, null, null, null, t[0].cred, ptr_offset(scratch, 304))
+        if st != 0:
+            free(scratch)
+            return Err(f"TLS: cannot get credentials ({_hex(st)})")
+        target = sock.cstr(host)
+        flags: u32 = 49436      # sequence + replay detection, confidentiality, allocate memory, extended error, stream
+        inb = scratch
+        outb = ptr_offset(scratch, 64)
+        indesc = ptr_offset(scratch, 128)
+        outdesc = ptr_offset(scratch, 160)
+        attrs = ptr_offset(scratch, 192)
+        expiry = ptr_offset(scratch, 208)
+        first = true
+        while true:
+            _sb(outb, 0, 0, 2, null)
+            _desc(outdesc, 1, outb)
+            if first:
+                st = InitializeSecurityContextA(t[0].cred, null, target, flags, 0, 0, null, 0, t[0].ctx, outdesc, attrs, expiry)
+                first = false
+            else:
+                _sb(inb, 0, u32(t[0].in_len), 2, t[0].inbuf)
+                _sb(inb, 1, 0, 0, null)
+                _desc(indesc, 2, inb)
+                st = InitializeSecurityContextA(t[0].cred, t[0].ctx, target, flags, 0, 0, indesc, 0, t[0].ctx, outdesc, attrs, expiry)
+            if st == 0 or st == SEC_I_CONTINUE_NEEDED:
+                t[0].ready = true      # the context exists now
+            outsz = _r32(outb, 0)
+            outp = _rptr(outb, 8)
+            if outsz > 0 and outp != null:
+                sent = _send_all(t[0].fd, outp, usize(outsz), timeout)
+                FreeContextBuffer(outp)
+                match consume sent:
+                    Err(e):
+                        free(target)
+                        free(scratch)
+                        return Err(e)
+                    Ok(_o): pass
+            if st == 0 or st == SEC_I_CONTINUE_NEEDED:
+                # An EXTRA buffer says how many bytes at the end of the input were not part of the handshake.
+                extra: usize = 0
+                if _r32(inb, 20) == 5:
+                    extra = usize(_r32(inb, 16))
+                if extra > 0:
+                    memmove(t[0].inbuf, ptr_offset(t[0].inbuf, i64(t[0].in_len - extra)), extra)
+                    t[0].in_len = extra
+                elif st == 0 or t[0].in_len > 0:
+                    t[0].in_len = 0
+                if st == 0:
+                    break
+                if t[0].in_len > 0:
+                    continue
+            elif st != SEC_E_INCOMPLETE_MESSAGE:
+                free(target)
+                free(scratch)
+                return Err(f"TLS handshake with {host} failed: {_hex(st)}{_win_name(st)}")
+            match consume _fill(t, timeout):
+                Err(e):
+                    free(target)
+                    free(scratch)
+                    return Err(e)
+                Ok(n):
+                    if n == 0:
+                        free(target)
+                        free(scratch)
+                        return Err("TLS handshake: the server closed the connection")
+        free(target)
+        qs = QueryContextAttributesA(t[0].ctx, 4, sizes)
+        if qs != 0:
+            free(scratch)
+            return Err(f"TLS: cannot read the stream sizes ({_hex(qs)})")
+        t[0].hdr = _r32(sizes, 0)
+        t[0].trl = _r32(sizes, 4)
+        t[0].maxmsg = _r32(sizes, 8)
+        free(scratch)
+        return Ok(true)
+
+fn _win_write(t: *mut _Tls, data: str, timeout: i64) -> Result[usize, string]:
+    unsafe:
+        hdr = usize(t[0].hdr)
+        trl = usize(t[0].trl)
+        maxm = usize(t[0].maxmsg)
+        msg = malloc(hdr + maxm + trl)
+        sb = calloc(1, 96)
+        total: usize = 0
+        while total < data.len:
+            chunk = data.len - total
+            if chunk > maxm:
+                chunk = maxm
+            part = data[total..]
+            memcpy(ptr_offset(msg, i64(hdr)), addr(part), chunk)
+            _sb(sb, 0, t[0].hdr, 7, msg)
+            _sb(sb, 1, u32(chunk), 1, ptr_offset(msg, i64(hdr)))
+            _sb(sb, 2, t[0].trl, 6, ptr_offset(msg, i64(hdr + chunk)))
+            _sb(sb, 3, 0, 0, null)
+            _desc(ptr_offset(sb, 64), 4, sb)
+            st = EncryptMessage(t[0].ctx, 0, ptr_offset(sb, 64), 0)
+            if st != 0:
+                free(msg)
+                free(sb)
+                return Err(f"TLS: encrypt failed ({_hex(st)})")
+            n = usize(_r32(sb, 0)) + usize(_r32(sb, 16)) + usize(_r32(sb, 32))
+            match consume _send_all(t[0].fd, msg, n, timeout):
+                Err(e):
+                    free(msg)
+                    free(sb)
+                    return Err(e)
+                Ok(_o): pass
+            total += chunk
+        free(msg)
+        free(sb)
+        return Ok(total)
+
+fn _win_read(t: *mut _Tls, max: usize, timeout: i64) -> Result[string, string]:
+    out = string.new()
+    unsafe:
+        if t[0].eof:
+            return Ok(out)
+        sb = calloc(1, 96)
+        while true:
+            if t[0].plain_len > t[0].plain_pos:
+                n = t[0].plain_len - t[0].plain_pos
+                if n > max:
+                    n = max
+                out.append_str(str_from_raw(ptr_offset(t[0].plain, i64(t[0].plain_pos)), n))
+                t[0].plain_pos += n
+                free(sb)
+                return Ok(out)
+            if t[0].in_len > 0:
+                _sb(sb, 0, u32(t[0].in_len), 1, t[0].inbuf)
+                _sb(sb, 1, 0, 0, null)
+                _sb(sb, 2, 0, 0, null)
+                _sb(sb, 3, 0, 0, null)
+                _desc(ptr_offset(sb, 64), 4, sb)
+                st = DecryptMessage(t[0].ctx, ptr_offset(sb, 64), 0, null)
+                if st == 0:
+                    got: usize = 0
+                    gotp: *mut u8 = null
+                    extra: usize = 0
+                    for i in 0..4:
+                        kind = _r32(sb, i * 16 + 4)
+                        if kind == 1:
+                            got = usize(_r32(sb, i * 16))
+                            gotp = _rptr(sb, i * 16 + 8)
+                        elif kind == 5:
+                            extra = usize(_r32(sb, i * 16))
+                    if t[0].plain != null:
+                        free(t[0].plain)
+                        t[0].plain = null
+                    t[0].plain_len = got
+                    t[0].plain_pos = 0
+                    if got > 0:
+                        t[0].plain = malloc(got)
+                        memcpy(t[0].plain, gotp, got)
+                    if extra > 0:
+                        memmove(t[0].inbuf, ptr_offset(t[0].inbuf, i64(t[0].in_len - extra)), extra)
+                    t[0].in_len = extra
+                    continue
+                if st == SEC_I_CONTEXT_EXPIRED:
+                    t[0].eof = true
+                    free(sb)
+                    return Ok(out)
+                if st != SEC_E_INCOMPLETE_MESSAGE:
+                    free(sb)
+                    return Err(f"TLS: decrypt failed ({_hex(st)})")
+            match consume _fill(t, timeout):
+                Err(e):
+                    free(sb)
+                    return Err(e)
+                Ok(n):
+                    if n == 0:
+                        t[0].eof = true
+                        free(sb)
+                        return Ok(out)
+        free(sb)
+    return Ok(out)
+
+# --- OpenSSL ----------------------------------------------------------------------------------------------------
+
+# Makes the kernel give up a blocking send or receive on `fd` after `ms` milliseconds (0: never).
+fn _os_timeout(fd: i64, ms: i64):
+    unsafe:
+        tv = calloc(1, 16)
+        ptr_cast[*mut i64](tv)[0] = ms / 1000
+        ptr_cast[*mut i64](ptr_offset(tv, 8))[0] = (ms % 1000) * 1000
+        if target_os() == "macos":
+            setsockopt(fd, 65535, 4102, tv, 16)
+            setsockopt(fd, 65535, 4101, tv, 16)
+        else:
+            setsockopt(fd, 1, 20, tv, 16)
+            setsockopt(fd, 1, 21, tv, 16)
+        free(tv)
+
+fn _ssl_verify_name(code: i64) -> str:
+    match code:
+        10: return ": it has expired"
+        62: return ": it is for another host name"
+        18: return ": it is self-signed"
+        19: return ": the chain ends in an untrusted root"
+        20: return ": the issuer is not trusted"
+        21: return ": the chain is incomplete"
+        _: return ""
+
+fn _ssl_handshake(t: *mut _Tls, host: str, timeout: i64) -> Result[bool, string]:
+    if target_os() == "windows":
+        return Err("TLS: not available here")
+    else:
+        unsafe:
+            t[0].sslctx = SSL_CTX_new(TLS_client_method())
+            if t[0].sslctx == null:
+                return Err("TLS: cannot create an OpenSSL context")
+            SSL_CTX_set_default_verify_paths(t[0].sslctx)
+            SSL_CTX_set_verify(t[0].sslctx, 1, null)
+            t[0].ssl = SSL_new(t[0].sslctx)
+            if t[0].ssl == null:
+                return Err("TLS: cannot create an OpenSSL connection")
+            SSL_set_fd(t[0].ssl, i32(t[0].fd))
+            name = sock.cstr(host)
+            SSL_ctrl(t[0].ssl, 55, 0, name)       # SNI: tell the server which host we want
+            SSL_set1_host(t[0].ssl, name)         # and check the certificate is for it
+            if timeout > 0:
+                _os_timeout(t[0].fd, timeout)
+            rc = SSL_connect(t[0].ssl)
+            if timeout > 0:
+                _os_timeout(t[0].fd, 0)
+            free(name)
+            if rc != 1:
+                verify = SSL_get_verify_result(t[0].ssl)
+                if verify != 0:
+                    return Err(f"TLS handshake with {host} failed: the certificate was not accepted{_ssl_verify_name(verify)} (OpenSSL verify code {verify})")
+                return Err(f"TLS handshake with {host} failed (OpenSSL error {SSL_get_error(t[0].ssl, rc)})")
+            t[0].ready = true
+            return Ok(true)
+
+
+fn _ssl_write(t: *mut _Tls, data: str, timeout: i64) -> Result[usize, string]:
+    if target_os() == "windows":
+        return Err("TLS: not available here")
+    else:
+        total: usize = 0
+        while total < data.len:
+            unsafe:
+                if timeout >= 0 and sock.wait(t[0].fd, true, timeout) == 0:
+                    return Err("timed out")
+                part = data[total..]
+                chunk = part.len
+                if chunk > 16384:
+                    chunk = 16384
+                n = SSL_write(t[0].ssl, addr(part), i32(chunk))
+                if n <= 0:
+                    return Err("TLS: write failed")
+                total += usize(n)
+        return Ok(total)
+
+
+fn _ssl_read(t: *mut _Tls, max: usize, timeout: i64) -> Result[string, string]:
+    if target_os() == "windows":
+        return Err("TLS: not available here")
+    else:
+        out = string.new()
+        unsafe:
+            if t[0].eof:
+                return Ok(out)
+            if timeout >= 0 and SSL_pending(t[0].ssl) == 0 and sock.wait(t[0].fd, false, timeout) == 0:
+                return Err("timed out")
+            want = max
+            if want > 16384:
+                want = 16384
+            buf = malloc(want)
+            n = SSL_read(t[0].ssl, buf, i32(want))
+            if n > 0:
+                out.append_str(str_from_raw(buf, usize(n)))
+                free(buf)
+                return Ok(out)
+            free(buf)
+            err = SSL_get_error(t[0].ssl, n)
+            if err == 6 or err == 5 or n == 0:
+                t[0].eof = true
+                return Ok(out)
+            return Err(f"TLS: read failed (OpenSSL error {err})")
+        return Ok(out)

@@ -10,20 +10,23 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [Core prelude (always in scope)](#core-prelude-always-in-scope) (69)
 - [std.collections](#stdcollections) (101)
 - [std.fs](#stdfs) (12)
-- [std.http](#stdhttp) (19)
+- [std.http](#stdhttp) (26)
 - [std.intern](#stdintern) (5)
 - [std.io](#stdio) (11)
 - [std.json](#stdjson) (23)
 - [std.math](#stdmath) (22)
-- [std.net](#stdnet) (21)
+- [std.net](#stdnet) (59)
+- [std.packet](#stdpacket) (44)
 - [std.process](#stdprocess) (6)
 - [std.rand](#stdrand) (10)
 - [std.regex](#stdregex) (13)
+- [std.sock](#stdsock) (8)
 - [std.sort](#stdsort) (3)
 - [std.string](#stdstring) (25)
 - [std.tasks](#stdtasks) (9)
 - [std.thread](#stdthread) (49)
 - [std.time](#stdtime) (22)
+- [std.tls](#stdtls) (5)
 - [Not in the catalog](#not-in-the-catalog): attributes, intrinsics, JSON output formats
 
 ## Compiler builtins
@@ -1001,6 +1004,11 @@ struct Request { method: string, path: string, query: string, version: string, h
 struct Response { status: i32, headers: List[Header], body: string }
 ```
 
+```
+struct Options { timeout_ms: i64, max_redirects: i32, max_body: usize, headers: List[Header] }
+```
+How `fetch` behaves.
+
 ### feature
 
 ```
@@ -1059,14 +1067,43 @@ fn serve[H: Handler](listener: read TcpListener, app: read H, limit: i64)
 Answers requests on `listener` one at a time with `app.handle`, closing each connection after its response.
 
 ```
+fn serve_with[H: Handler](listener: read TcpListener, app: read H, limit: i64, timeout_ms: i64)
+```
+Like `serve`, with the time (in milliseconds, negative: none) a client may take for each read or write.
+
+```
+fn options() -> Options
+```
+
+```
+fn Options.header(self: lend Options, name: str, value: str)
+```
+Adds a request header, replacing one with the same name.
+
+```
 fn get(url: str) -> Result[Response, string]
 ```
-Sends a GET to an `http://host:port/path` URL and reads the whole response.
+Sends a GET to an `http://host:port/path` or `https://` URL and reads the whole response.
+
+```
+fn get_timeout(url: str, timeout_ms: i64) -> Result[Response, string]
+```
+Like `get`, giving up after `timeout_ms` milliseconds of waiting at any step (`Err("timed out")`).
 
 ```
 fn request(method: str, url: str, body: str) -> Result[Response, string]
 ```
 Sends a request with a body (empty for none) and reads the whole response.
+
+```
+fn fetch(method: str, url: str, body: str, opts: read Options) -> Result[Response, string]
+```
+Sends a request and reads the response, following redirects.
+
+```
+fn decode_chunked(raw: str) -> Result[Optional[string], string]
+```
+Decodes a `Transfer-Encoding: chunked` body.
 
 ```
 fn parse_response(raw: str) -> Result[Response, string]
@@ -1391,12 +1428,27 @@ struct TcpListener { fd: i64 }
 A TCP socket listening for connections.
 
 ```
-struct TcpStream { fd: i64 }
+struct TcpStream { fd: i64, timeout: i64, tlsh: i64 }
 ```
-One TCP connection.
+One TCP connection (secured with TLS when made by `connect_tls`).
 
 ```
-struct UdpSocket { fd: i64 }
+struct Addr { host: string, port: u16 }
+```
+An address: a dotted IPv4 host and a port.
+
+```
+struct PollEvent { handle: i64, readable: bool, writable: bool, error: bool }
+```
+What `Poller.wait` says about one socket that is ready.
+
+```
+struct Poller { fds: List[i64], want: List[i32] }
+```
+Many sockets, waited for together: add each with the `handle()` it gave, then `wait` says which are ready.
+
+```
+struct UdpSocket { fd: i64, timeout: i64 }
 ```
 A UDP socket: sends and receives single datagrams, without a connection.
 
@@ -1408,6 +1460,11 @@ One datagram received, and who sent it.
 ### fn
 
 ```
+fn is_timeout(error: str) -> bool
+```
+True when `error` (the text of an `Err`) says a time limit ran out.
+
+```
 fn TcpListener.bind(host: str, port: u16) -> Result[TcpListener, string]
 ```
 
@@ -1415,6 +1472,16 @@ fn TcpListener.bind(host: str, port: u16) -> Result[TcpListener, string]
 fn TcpListener.port(self: read TcpListener) -> u16
 ```
 The port the listener is bound to.
+
+```
+fn TcpListener.handle(self: read TcpListener) -> i64
+```
+The socket's number, for a `Poller` or `std.sock`.
+
+```
+fn TcpListener.set_nonblocking(self: read TcpListener, on: bool)
+```
+With `false`, `accept` returns an error at once when no client is waiting (`try_accept` is easier).
 
 ```
 fn TcpListener.accept_async(self: read TcpListener) -> Result[TcpStream, string]
@@ -1427,6 +1494,16 @@ fn TcpListener.accept(self: read TcpListener) -> Result[TcpStream, string]
 Waits for the next connection.
 
 ```
+fn TcpListener.accept_timeout(self: read TcpListener, ms: i64) -> Result[Optional[TcpStream], string]
+```
+Waits at most `ms` milliseconds for a connection;
+
+```
+fn TcpListener.try_accept(self: read TcpListener) -> Result[Optional[TcpStream], string]
+```
+A connection that is already waiting, or None;
+
+```
 fn TcpListener.drop(self: lend TcpListener)
 ```
 
@@ -1435,9 +1512,77 @@ fn TcpStream.connect(host: str, port: u16) -> Result[TcpStream, string]
 ```
 
 ```
+fn TcpStream.connect_timeout(host: str, port: u16, ms: i64) -> Result[TcpStream, string]
+```
+
+```
+fn TcpStream.connect_tls(host: str, port: u16, ms: i64) -> Result[TcpStream, string]
+```
+
+```
+fn TcpStream.handle(self: read TcpStream) -> i64
+```
+The socket's number, for a `Poller` or `std.sock`.
+
+```
+fn TcpStream.is_tls(self: read TcpStream) -> bool
+```
+True when the connection is secured with TLS.
+
+```
+fn TcpStream.set_timeout(self: lend TcpStream, ms: i64)
+```
+Limits every later send and receive to `ms` milliseconds;
+
+```
+fn TcpStream.set_nodelay(self: read TcpStream, on: bool)
+```
+Nagle's algorithm: `false` (the default here) sends small writes at once.
+
+```
+fn TcpStream.set_nonblocking(self: read TcpStream, on: bool)
+```
+With `true`, a send that cannot take all the bytes returns the part it took (see `send_some`).
+
+```
+fn TcpStream.set_buffers(self: read TcpStream, receive_bytes: i32, send_bytes: i32)
+```
+Makes the system's buffers for this socket about this big (bytes).
+
+```
+fn TcpStream.peer_addr(self: read TcpStream) -> Result[Addr, string]
+```
+The other side's address.
+
+```
+fn TcpStream.local_port(self: read TcpStream) -> u16
+```
+The port on this side.
+
+```
+fn TcpStream.shutdown_send(self: read TcpStream)
+```
+Says the other side nothing more will be sent (it can still send).
+
+```
+fn TcpStream.readable(self: read TcpStream, ms: i64) -> bool
+```
+True when `receive` would not wait: data (or the end of the connection) is there.
+
+```
 fn TcpStream.send(self: read TcpStream, data: str) -> Result[usize, string]
 ```
 Sends every byte of `data`.
+
+```
+fn TcpStream.send_some(self: read TcpStream, data: str) -> Result[usize, string]
+```
+Sends as much of `data` as the connection takes now and says how much (0 when it is full).
+
+```
+fn TcpStream.send_frame(self: read TcpStream, data: str) -> Result[usize, string]
+```
+Sends one message that `receive_frame` reads whole: a 4-byte length (big endian), then `data`.
 
 ```
 fn TcpStream.receive_async(self: read TcpStream, max: usize) -> Result[string, string]
@@ -1450,6 +1595,21 @@ fn TcpStream.receive(self: read TcpStream, max: usize) -> Result[string, string]
 Receives up to `max` bytes;
 
 ```
+fn TcpStream.try_receive(self: read TcpStream, max: usize) -> Result[Optional[string], string]
+```
+Receives only what is already there: None when nothing has come yet, an empty string when the other side closed the connection.
+
+```
+fn TcpStream.receive_exact(self: read TcpStream, n: usize) -> Result[string, string]
+```
+Receives exactly `n` bytes (Err if the connection closes first).
+
+```
+fn TcpStream.receive_frame(self: read TcpStream, max_len: usize) -> Result[string, string]
+```
+Receives one message sent by `send_frame`.
+
+```
 fn TcpStream.receive_all(self: read TcpStream) -> Result[string, string]
 ```
 Receives until the other side closes the connection.
@@ -1457,6 +1617,34 @@ Receives until the other side closes the connection.
 ```
 fn TcpStream.drop(self: lend TcpStream)
 ```
+
+```
+fn Poller.new() -> Poller
+```
+
+```
+fn Poller.add(self: lend Poller, handle: i64, also_write: bool)
+```
+Watches a socket (its `handle()`) for reading;
+
+```
+fn Poller.watch_write(self: lend Poller, handle: i64, on: bool)
+```
+Changes what is watched for a socket already added.
+
+```
+fn Poller.remove(self: lend Poller, handle: i64)
+```
+Stops watching a socket (do this before the socket is closed).
+
+```
+fn Poller.len(self: read Poller) -> usize
+```
+
+```
+fn Poller.wait(self: read Poller, ms: i64) -> List[PollEvent]
+```
+Waits at most `ms` milliseconds (negative: for ever;
 
 ```
 fn UdpSocket.bind(host: str, port: u16) -> Result[UdpSocket, string]
@@ -1467,9 +1655,38 @@ fn UdpSocket.port(self: read UdpSocket) -> u16
 ```
 
 ```
+fn UdpSocket.handle(self: read UdpSocket) -> i64
+```
+The socket's number, for a `Poller` or `std.sock`.
+
+```
+fn UdpSocket.set_timeout(self: lend UdpSocket, ms: i64)
+```
+Limits every later receive to `ms` milliseconds;
+
+```
+fn UdpSocket.set_broadcast(self: read UdpSocket, on: bool)
+```
+Allows sending to a broadcast address (such as "255.255.255.255").
+
+```
+fn UdpSocket.set_buffers(self: read UdpSocket, receive_bytes: i32, send_bytes: i32)
+```
+Makes the system's buffers for this socket about this big (bytes).
+
+```
 fn UdpSocket.send_to(self: read UdpSocket, data: str, host: str, port: u16) -> Result[usize, string]
 ```
 Sends `data` as one datagram to `host:port`.
+
+```
+fn UdpSocket.reply(self: read UdpSocket, to: read Datagram, data: str) -> Result[usize, string]
+```
+Replies to a datagram: sends `data` to the address it came from.
+
+```
+fn UdpSocket.send_to_ip(self: read UdpSocket, data: str, ip: [4]u8, port: u16) -> Result[usize, string]
+```
 
 ```
 fn UdpSocket.receive_from_async(self: read UdpSocket, max: usize) -> Result[Datagram, string]
@@ -1479,11 +1696,212 @@ Like `receive_from`, but other tasks run while it waits (std.tasks).
 ```
 fn UdpSocket.receive_from(self: read UdpSocket, max: usize) -> Result[Datagram, string]
 ```
-Waits for one datagram of at most `max` bytes (a longer one is cut).
+Waits for one datagram of at most `max` bytes (a longer one is cut), at most the socket's time limit.
+
+```
+fn UdpSocket.receive_from_try(self: read UdpSocket, max: usize) -> Result[Optional[Datagram], string]
+```
+A datagram that already arrived, or None;
 
 ```
 fn UdpSocket.drop(self: lend UdpSocket)
 ```
+
+
+## std.packet
+
+### struct
+
+```
+struct ByteWriter { buf: string }
+```
+Builds a message byte by byte.
+
+```
+struct ByteReader { data: string, pos: usize }
+```
+Reads a message from the front.
+
+```
+struct FrameBuffer { buf: string, start: usize }
+```
+Cuts a stream of bytes into length-prefixed messages.
+
+### fn
+
+```
+fn frame(data: str) -> string
+```
+`data` as one message for a TCP stream: a 4-byte big endian length, then the bytes.
+
+```
+fn ByteWriter.new() -> ByteWriter
+```
+
+```
+fn ByteWriter.len(self: read ByteWriter) -> usize
+```
+
+```
+fn ByteWriter.as_str(self: read ByteWriter) -> str
+```
+The bytes written so far.
+
+```
+fn ByteWriter.clear(self: lend ByteWriter)
+```
+
+```
+fn ByteWriter.put_u8(self: lend ByteWriter, v: u8)
+```
+
+```
+fn ByteWriter.put_bool(self: lend ByteWriter, v: bool)
+```
+
+```
+fn ByteWriter.put_u16(self: lend ByteWriter, v: u16)
+```
+
+```
+fn ByteWriter.put_u32(self: lend ByteWriter, v: u32)
+```
+
+```
+fn ByteWriter.put_u64(self: lend ByteWriter, v: u64)
+```
+
+```
+fn ByteWriter.put_u16_be(self: lend ByteWriter, v: u16)
+```
+
+```
+fn ByteWriter.put_u32_be(self: lend ByteWriter, v: u32)
+```
+
+```
+fn ByteWriter.put_u64_be(self: lend ByteWriter, v: u64)
+```
+
+```
+fn ByteWriter.put_i16(self: lend ByteWriter, v: i16)
+```
+
+```
+fn ByteWriter.put_i32(self: lend ByteWriter, v: i32)
+```
+
+```
+fn ByteWriter.put_i64(self: lend ByteWriter, v: i64)
+```
+
+```
+fn ByteWriter.put_f32(self: lend ByteWriter, v: f32)
+```
+
+```
+fn ByteWriter.put_f64(self: lend ByteWriter, v: f64)
+```
+
+```
+fn ByteWriter.put_bytes(self: lend ByteWriter, v: str)
+```
+Raw bytes, with no length.
+
+```
+fn ByteWriter.put_str(self: lend ByteWriter, v: str)
+```
+A string: a 2-byte length (at most 65535 bytes;
+
+```
+fn ByteReader.new(data: str) -> ByteReader
+```
+
+```
+fn ByteReader.remaining(self: read ByteReader) -> usize
+```
+Bytes not read yet.
+
+```
+fn ByteReader.get_u8(self: lend ByteReader) -> Result[u8, string]
+```
+
+```
+fn ByteReader.get_bool(self: lend ByteReader) -> Result[bool, string]
+```
+
+```
+fn ByteReader.get_u16(self: lend ByteReader) -> Result[u16, string]
+```
+
+```
+fn ByteReader.get_u32(self: lend ByteReader) -> Result[u32, string]
+```
+
+```
+fn ByteReader.get_u64(self: lend ByteReader) -> Result[u64, string]
+```
+
+```
+fn ByteReader.get_u16_be(self: lend ByteReader) -> Result[u16, string]
+```
+
+```
+fn ByteReader.get_u32_be(self: lend ByteReader) -> Result[u32, string]
+```
+
+```
+fn ByteReader.get_u64_be(self: lend ByteReader) -> Result[u64, string]
+```
+
+```
+fn ByteReader.get_i16(self: lend ByteReader) -> Result[i16, string]
+```
+
+```
+fn ByteReader.get_i32(self: lend ByteReader) -> Result[i32, string]
+```
+
+```
+fn ByteReader.get_i64(self: lend ByteReader) -> Result[i64, string]
+```
+
+```
+fn ByteReader.get_f32(self: lend ByteReader) -> Result[f32, string]
+```
+
+```
+fn ByteReader.get_f64(self: lend ByteReader) -> Result[f64, string]
+```
+
+```
+fn ByteReader.get_bytes(self: lend ByteReader, n: usize) -> Result[string, string]
+```
+The next `n` bytes.
+
+```
+fn ByteReader.get_str(self: lend ByteReader) -> Result[string, string]
+```
+A string written by `put_str`.
+
+```
+fn FrameBuffer.new() -> FrameBuffer
+```
+
+```
+fn FrameBuffer.push(self: lend FrameBuffer, data: str)
+```
+Adds bytes that arrived from the connection.
+
+```
+fn FrameBuffer.pending(self: read FrameBuffer) -> usize
+```
+Bytes held that are not yet a whole message.
+
+```
+fn FrameBuffer.next(self: lend FrameBuffer, max_len: usize) -> Result[Optional[string], string]
+```
+The next whole message, or None when more bytes are needed.
 
 
 ## std.process
@@ -1636,6 +2054,50 @@ Byte span of group `i`: (start, end), or None.
 ```
 fn Match.group_end(self: read Match, i: usize) -> Optional[usize]
 ```
+
+
+## std.sock
+
+### const
+
+```
+const READY_READ: i32
+```
+What `poll_many` reports for one socket (a sum of these).
+
+```
+const READY_WRITE: i32
+```
+
+```
+const READY_ERROR: i32
+```
+
+```
+const WANT_READ: i32
+```
+What to wait for in `poll_many` (a sum of these).
+
+```
+const WANT_WRITE: i32
+```
+
+### fn
+
+```
+fn cstr(s: str) -> *mut u8
+```
+A NUL-ended copy of `s` for a C function.
+
+```
+fn wait(fd: i64, writable: bool, ms: i64) -> i32
+```
+Waits until socket `fd` can be read (or written, with `writable`), at most `ms` milliseconds.
+
+```
+fn poll_many(fds: read List[i64], want: read List[i32], ms: i64) -> List[i32]
+```
+Waits until one of `fds` is ready for what `want` (WANT_READ / WANT_WRITE, same position) asks, at most `ms` milliseconds.
 
 
 ## std.sort
@@ -2148,6 +2610,36 @@ fn DateTime.add_millis(self: read DateTime, ms: i64) -> DateTime
 fn parse_iso(text: str) -> Result[DateTime, string]
 ```
 Reads `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, optional `.fff` fraction, and an optional `Z` or `+HH:MM` / `-HH:MM` offset (the result is in UTC).
+
+
+## std.tls
+
+### fn
+
+```
+fn handshake(fd: i64, host: str, timeout: i64) -> Result[i64, string]
+```
+Starts TLS on connected socket `fd` and checks the server's certificate for `host`.
+
+```
+fn write(h: i64, data: str, timeout: i64) -> Result[usize, string]
+```
+Sends all of `data` over the secured connection.
+
+```
+fn receive(h: i64, max: usize, timeout: i64) -> Result[string, string]
+```
+Receives at most `max` bytes.
+
+```
+fn pending(h: i64) -> bool
+```
+True when bytes were already decrypted and wait to be read: the socket is not readable then, but `receive` does not wait.
+
+```
+fn close(h: i64)
+```
+Ends the secured connection and frees it.
 
 ## Not in the catalog above
 

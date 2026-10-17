@@ -1,5 +1,19 @@
-# std.http: HTTP/1.1 over std.net: read requests, write responses, a simple server loop, and a client
-# for plain `http://` URLs (no TLS; hosts are IPv4 addresses or "localhost", as in std.net).
+# std.http: HTTP/1.1 over std.net: read requests, write responses, a simple server loop, and a client for
+# `http://` and `https://` URLs. Host names are looked up (std.net); https checks the server's certificate against the
+# system's trusted roots and the host name (std.tls), so a wrong or expired certificate is an error.
+#
+# The client gives up after a time limit (`Options.timeout_ms`, 30 seconds unless you change it; it limits each wait
+# for the server: the connect, the TLS handshake, and every receive), follows redirects, and reads bodies sent with
+# `Content-Length`, with `Transfer-Encoding: chunked`, or until the server closes the connection.
+#
+#     match http.get("https://example.com/"):
+#         Ok(r): print(r.status, r.body.len())
+#         Err(e): print("failed:", e)       # "timed out" when the server was too slow
+#
+#     opts = http.options()
+#     opts.timeout_ms = 2000
+#     opts.header("Authorization", "Bearer abc")
+#     r = http.fetch("POST", "https://api.example.com/x", "{}", opts)?
 #
 #     struct Hello:
 #         greeting: string
@@ -159,12 +173,14 @@ feature Handler:
 
 # Answers requests on `listener` one at a time with `app.handle`, closing each connection after its
 # response. Stops after `limit` requests (a negative limit never stops). A request that cannot be read
-# gets a 400.
+# gets a 400. A client that sends nothing for 10 seconds is dropped, so one stalled client cannot hold the
+# server (`serve_with` sets that time).
 fn serve[H: Handler](listener: read net.TcpListener, app: read H, limit: i64):
     served: i64 = 0
     while limit < 0 or served < limit:
-        match listener.accept():
+        match consume listener.accept():
             Ok(stream):
+                stream.set_timeout(10000)
                 answer = match read_request(stream, 1048576):
                     Ok(req) => app.handle(req)
                     Err(e) => response(400, e.as_str())
@@ -172,15 +188,104 @@ fn serve[H: Handler](listener: read net.TcpListener, app: read H, limit: i64):
                 served += 1
             Err(_e): pass
 
-# Sends a GET to an `http://host:port/path` URL and reads the whole response.
+# Like `serve`, with the time (in milliseconds, negative: none) a client may take for each read or write.
+fn serve_with[H: Handler](listener: read net.TcpListener, app: read H, limit: i64, timeout_ms: i64):
+    served: i64 = 0
+    while limit < 0 or served < limit:
+        match consume listener.accept():
+            Ok(stream):
+                stream.set_timeout(timeout_ms)
+                answer = match read_request(stream, 1048576):
+                    Ok(req) => app.handle(req)
+                    Err(e) => response(400, e.as_str())
+                sent = stream.send(answer.to_text().as_str())
+                served += 1
+            Err(_e): pass
+
+# How `fetch` behaves.
+struct Options:
+    timeout_ms: i64          # most time to wait for the server at each step; negative: no limit (default 30000)
+    max_redirects: i32       # how many redirects to follow; 0: return the 3xx response itself (default 5)
+    max_body: usize          # a larger response is an error (default 64 MiB)
+    headers: List[Header]    # sent with the request
+
+fn options() -> Options:
+    return Options{ timeout_ms: 30000, max_redirects: 5, max_body: 67108864, headers: List[Header]() }
+
+impl Options:
+    # Adds a request header, replacing one with the same name.
+    fn header(self: lend Self, name: str, value: str):
+        for i in 0..self.headers.len:
+            if self.headers[i].name.as_str().eq_ignore_case(name):
+                self.headers[i].value = string.from(value)
+                return
+        self.headers.push(Header{ name: string.from(name), value: string.from(value) })
+
+# Sends a GET to an `http://host:port/path` or `https://` URL and reads the whole response.
 fn get(url: str) -> Result[Response, string]:
     return request("GET", url, "")
 
+# Like `get`, giving up after `timeout_ms` milliseconds of waiting at any step (`Err("timed out")`).
+fn get_timeout(url: str, timeout_ms: i64) -> Result[Response, string]:
+    opts = options()
+    opts.timeout_ms = timeout_ms
+    return fetch("GET", url, "", opts)
+
 # Sends a request with a body (empty for none) and reads the whole response.
 fn request(method: str, url: str, body: str) -> Result[Response, string]:
-    if not url.starts_with("http://"):
-        return Err(string.from("only http:// URLs are supported"))
-    rest = url[7..]
+    return fetch(method, url, body, options())
+
+# Sends a request and reads the response, following redirects.
+fn fetch(method: str, url: str, body: str, opts: read Options) -> Result[Response, string]:
+    cur = string.from(url)
+    m = string.from(method)
+    b = string.from(body)
+    hops: i32 = 0
+    while true:
+        r = _fetch_once(m.as_str(), cur.as_str(), b.as_str(), opts)?
+        loc = r.header("Location")
+        if (r.status == 301 or r.status == 302 or r.status == 303 or r.status == 307 or r.status == 308) and loc.has_value() and opts.max_redirects > 0:
+            if hops >= opts.max_redirects:
+                return Err(string.from("too many redirects"))
+            hops += 1
+            cur = _resolve_location(cur.as_str(), loc.value_or_panic().as_str())
+            if r.status != 307 and r.status != 308 and m.as_str() != "HEAD":
+                m = string.from("GET")
+                b = string.new()
+        else:
+            return Ok(r)
+    return Err(string.from("unreachable"))
+
+# Where a `Location` header points, given the URL that was asked: absolute, `//host/..`, `/path`, or relative.
+fn _resolve_location(base: str, loc: str) -> string:
+    if loc.starts_with("http://") or loc.starts_with("https://"):
+        return string.from(loc)
+    scheme_end = match base.find("://"):
+        Valid(i) => i + 3
+        None => 0
+    if loc.starts_with("//"):
+        return f"{base[..scheme_end - 3]}:{loc}"
+    rest = base[scheme_end..]
+    origin_end = match rest.find("/"):
+        Valid(i) => scheme_end + i
+        None => base.len
+    if loc.starts_with("/"):
+        return f"{base[..origin_end]}{loc}"
+    # relative to the folder of the current path
+    path = base[origin_end..]
+    path = match path.find("?"):
+        Valid(q) => path[..q]
+        None => path
+    folder_end = match path.rfind("/"):
+        Valid(k) => k + 1
+        None => 0
+    return f"{base[..origin_end]}{path[..folder_end]}{loc}"
+
+fn _fetch_once(method: str, url: str, body: str, opts: read Options) -> Result[Response, string]:
+    https = url.starts_with("https://")
+    if not https and not url.starts_with("http://"):
+        return Err(string.from("only http:// and https:// URLs are supported"))
+    rest = if https then url[8..] else url[7..]
     slash = rest.find("/")
     host_port = rest
     path = "/"
@@ -190,7 +295,8 @@ fn request(method: str, url: str, body: str) -> Result[Response, string]:
             path = rest[i..]
         None: pass
     host = host_port
-    port: u16 = 80
+    port: u16 = if https then 443 else 80
+    explicit_port = false
     match host_port.find(":"):
         Valid(c):
             host = host_port[..c]
@@ -199,17 +305,128 @@ fn request(method: str, url: str, body: str) -> Result[Response, string]:
                     if p < 1 or p > 65535:
                         return Err(string.from("bad port"))
                     port = u16(p)
+                    explicit_port = true
                 None: return Err(string.from("bad port"))
         None: pass
-    stream = net.TcpStream.connect(host, port)?
-    text = f"{method} {path} HTTP/1.1\r\nHost: {host_port}\r\nConnection: close\r\n"
-    if body.len > 0 or method == "POST" or method == "PUT":
+    if host.len == 0:
+        return Err(string.from("the URL has no host"))
+    stream = if https then net.TcpStream.connect_tls(host, port, opts.timeout_ms)? else net.TcpStream.connect_timeout(host, port, opts.timeout_ms)?
+    host_header = if explicit_port then host_port else host
+    text = f"{method} {path} HTTP/1.1\r\nHost: {host_header}\r\nConnection: close\r\n"
+    wrote_agent = false
+    for h in opts.headers:
+        n = h.name.as_str()
+        if not n.eq_ignore_case("Host") and not n.eq_ignore_case("Connection") and not n.eq_ignore_case("Content-Length"):
+            text.append(f"{h.name}: {h.value}\r\n")
+            if n.eq_ignore_case("User-Agent"):
+                wrote_agent = true
+    if not wrote_agent:
+        text.append_str("User-Agent: greengold\r\n")
+    if body.len > 0 or method == "POST" or method == "PUT" or method == "PATCH":
         text.append(f"Content-Length: {body.len}\r\n")
     text.append_str("\r\n")
     text.append_str(body)
     sent = stream.send(text.as_str())?
-    raw = stream.receive_all()?
-    return parse_response(raw.as_str())
+    return _read_response(stream, method, opts.max_body)
+
+# Reads one response from a connection: the head, then the body as the head says (length, chunks, or until close).
+fn _read_response(stream: read net.TcpStream, method: str, max_bytes: usize) -> Result[Response, string]:
+    raw = string.new()
+    head_end: usize = 0
+    have_head = false
+    while not have_head:
+        match raw.as_str().find("\r\n\r\n"):
+            Valid(e):
+                head_end = e
+                have_head = true
+            None:
+                if raw.len() > 1048576:
+                    return Err(string.from("the response head is too large"))
+                chunk = stream.receive(8192)?
+                if chunk.len() == 0:
+                    return Err(string.from("the connection closed before the response head"))
+                raw.append(chunk)
+    head = parse_response(raw.as_str())?
+    no_body = method == "HEAD" or head.status == 204 or head.status == 304 or (head.status >= 100 and head.status < 200)
+    if no_body:
+        head.body = string.new()
+        return Ok(head)
+    body_start = head_end + 4
+    te = head.header("Transfer-Encoding")
+    chunked = te.has_value() and te.value_or_panic().as_str().to_lower().contains("chunked")
+    cl = head.header("Content-Length")
+    want: i64 = -1
+    if cl.has_value():
+        match cl.value_or_panic().as_str().parse_int():
+            Valid(n):
+                want = n
+            None: return Err(string.from("bad Content-Length"))
+    while true:
+        have = raw.len() - body_start
+        if chunked:
+            done = decode_chunked(raw.as_str()[body_start..])?
+            if done.has_value():
+                head.body = done.value_or_panic()
+                return Ok(head)
+        elif want >= 0 and have >= usize(want):
+            head.body = string.from(raw.as_str()[body_start..body_start + usize(want)])
+            return Ok(head)
+        if have > max_bytes:
+            return Err(string.from("the response is too large"))
+        chunk = stream.receive(16384)?
+        if chunk.len() == 0:
+            if chunked:
+                return Err(string.from("the connection closed in the middle of a chunked body"))
+            if want >= 0:
+                return Err(string.from("the connection closed before the whole body arrived"))
+            head.body = string.from(raw.as_str()[body_start..])
+            return Ok(head)
+        raw.append(chunk)
+    return Err(string.from("unreachable"))
+
+# Decodes a `Transfer-Encoding: chunked` body. None when more bytes are needed; an error when it is malformed.
+fn decode_chunked(raw: str) -> Result[Optional[string], string]:
+    out = string.new()
+    at: usize = 0
+    while true:
+        line_end: usize = 0
+        match raw[at..].find("\r\n"):
+            Valid(e): line_end = at + e
+            None: return Ok(None)
+        size_text = raw[at..line_end]
+        match size_text.find(";"):
+            Valid(semi): size_text = size_text[..semi]
+            None: pass
+        size: i64 = 0
+        digits = 0
+        for c in size_text.trim():
+            h = _hex(c)
+            if h < 0:
+                return Err(string.from("bad chunk size"))
+            size = size * 16 + i64(h)
+            digits += 1
+            if size > 4294967296:
+                return Err(string.from("bad chunk size"))
+        if digits == 0:
+            return Err(string.from("bad chunk size"))
+        at = line_end + 2
+        if size == 0:
+            # trailers (usually none), ended by a blank line
+            while true:
+                end: usize = 0
+                match raw[at..].find("\r\n"):
+                    Valid(e): end = at + e
+                    None: return Ok(None)
+                if end == at:
+                    return Ok(Valid(out))
+                at = end + 2
+        if raw.len < at + usize(size) + 2:
+            return Ok(None)
+        out.append_str(raw[at..at + usize(size)])
+        if raw[at + usize(size)] != '\r' or raw[at + usize(size) + 1] != '\n':
+            return Err(string.from("bad chunk"))
+        at = at + usize(size) + 2
+    return Err(string.from("unreachable"))
 
 # Reads `HTTP/1.1 200 OK`, the headers, and the body after them.
 fn parse_response(raw: str) -> Result[Response, string]:

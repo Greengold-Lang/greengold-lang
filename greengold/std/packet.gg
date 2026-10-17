@@ -1,0 +1,270 @@
+# std.packet: building and reading binary messages, and cutting a TCP byte stream into messages.
+#
+# Game and server protocols are made of small binary packets. `ByteWriter` builds one, `ByteReader` takes one apart
+# (every read checks that the bytes are there, so a short or hostile packet is an `Err`, never a crash), and a
+# `FrameBuffer` turns the bytes `try_receive` hands you, in any pieces, into whole messages. Numbers are little endian
+# (what the machines run on); the `_be` forms are big endian ("network order") for protocols that ask for it.
+#
+#     w = packet.ByteWriter.new()
+#     w.put_u8(1)             # message kind
+#     w.put_u32(player_id)
+#     w.put_f32(x)
+#     w.put_f32(y)
+#     udp.send_to(w.as_str(), host, port)?
+#
+#     r = packet.ByteReader.new(datagram.data.as_str())
+#     kind = r.get_u8()?
+#     id = r.get_u32()?
+#
+#     frames = packet.FrameBuffer.new()           # one per TCP connection
+#     frames.push(chunk.as_str())                  # whatever arrived, however split
+#     while let Valid(msg) = frames.next(65536)?:
+#         handle(msg)
+#
+# A message on a TCP stream is a 4-byte big endian length, then that many bytes: the format `TcpStream.send_frame` writes.
+
+public
+# Builds a message byte by byte.
+struct ByteWriter:
+    private
+    buf: string
+
+public
+# Reads a message from the front.
+struct ByteReader:
+    private
+    data: string
+    pos: usize
+
+public
+# Cuts a stream of bytes into length-prefixed messages.
+struct FrameBuffer:
+    private
+    buf: string
+    start: usize
+
+public
+# `data` as one message for a TCP stream: a 4-byte big endian length, then the bytes.
+fn frame(data: str) -> string:
+    n = data.len
+    out = string.new()
+    out.append_byte(u8((n >> 24) & 255))
+    out.append_byte(u8((n >> 16) & 255))
+    out.append_byte(u8((n >> 8) & 255))
+    out.append_byte(u8(n & 255))
+    out.append_str(data)
+    return out
+
+impl ByteWriter:
+    public
+    fn new() -> ByteWriter:
+        return ByteWriter{ buf: string.new() }
+
+    fn len(self: read Self) -> usize:
+        return self.buf.len()
+
+    # The bytes written so far.
+    fn as_str(self: read Self) -> str:
+        return self.buf.as_str()
+
+    fn clear(self: lend Self):
+        self.buf = string.new()
+
+    fn put_u8(self: lend Self, v: u8):
+        self.buf.append_byte(v)
+
+    fn put_bool(self: lend Self, v: bool):
+        self.buf.append_byte(if v then 1 else 0)
+
+    fn put_u16(self: lend Self, v: u16):
+        self.buf.append_byte(u8(v & 255))
+        self.buf.append_byte(u8(v >> 8))
+
+    fn put_u32(self: lend Self, v: u32):
+        for i in 0..4:
+            self.buf.append_byte(u8((v >> u32(i * 8)) & 255))
+
+    fn put_u64(self: lend Self, v: u64):
+        for i in 0..8:
+            self.buf.append_byte(u8((v >> u64(i * 8)) & 255))
+
+    fn put_u16_be(self: lend Self, v: u16):
+        self.buf.append_byte(u8(v >> 8))
+        self.buf.append_byte(u8(v & 255))
+
+    fn put_u32_be(self: lend Self, v: u32):
+        for i in 0..4:
+            self.buf.append_byte(u8((v >> u32((3 - i) * 8)) & 255))
+
+    fn put_u64_be(self: lend Self, v: u64):
+        for i in 0..8:
+            self.buf.append_byte(u8((v >> u64((7 - i) * 8)) & 255))
+
+    fn put_i16(self: lend Self, v: i16):
+        self.put_u16(u16(i32(v) & 65535))
+
+    fn put_i32(self: lend Self, v: i32):
+        self.put_u32(u32(i64(v) & 4294967295))
+
+    fn put_i64(self: lend Self, v: i64):
+        unsafe:
+            bits = ptr_cast[*u64](addr(v))[0]
+            self.put_u64(bits)
+
+    fn put_f32(self: lend Self, v: f32):
+        unsafe:
+            bits = ptr_cast[*u32](addr(v))[0]
+            self.put_u32(bits)
+
+    fn put_f64(self: lend Self, v: f64):
+        unsafe:
+            bits = ptr_cast[*u64](addr(v))[0]
+            self.put_u64(bits)
+
+    # Raw bytes, with no length.
+    fn put_bytes(self: lend Self, v: str):
+        self.buf.append_str(v)
+
+    # A string: a 2-byte length (at most 65535 bytes; a longer one is cut), then the bytes.
+    fn put_str(self: lend Self, v: str):
+        n = v.len
+        if n > 65535:
+            n = 65535
+        self.put_u16(u16(n))
+        self.buf.append_str(v[..n])
+
+impl ByteReader:
+    public
+    fn new(data: str) -> ByteReader:
+        return ByteReader{ data: string.from(data), pos: 0 }
+
+    # Bytes not read yet.
+    fn remaining(self: read Self) -> usize:
+        return self.data.len() - self.pos
+
+    fn get_u8(self: lend Self) -> Result[u8, string]:
+        if self.remaining() < 1:
+            return Err("the packet is too short")
+        v = self.data.as_str()[self.pos]
+        self.pos += 1
+        return Ok(v)
+
+    fn get_bool(self: lend Self) -> Result[bool, string]:
+        v = self.get_u8()?
+        return Ok(v != 0)
+
+    fn get_u16(self: lend Self) -> Result[u16, string]:
+        if self.remaining() < 2:
+            return Err("the packet is too short")
+        d = self.data.as_str()
+        v = u16(d[self.pos]) | (u16(d[self.pos + 1]) << 8)
+        self.pos += 2
+        return Ok(v)
+
+    fn get_u32(self: lend Self) -> Result[u32, string]:
+        if self.remaining() < 4:
+            return Err("the packet is too short")
+        d = self.data.as_str()
+        v: u32 = 0
+        for i in 0..4:
+            v = v | (u32(d[self.pos + usize(i)]) << u32(i * 8))
+        self.pos += 4
+        return Ok(v)
+
+    fn get_u64(self: lend Self) -> Result[u64, string]:
+        if self.remaining() < 8:
+            return Err("the packet is too short")
+        d = self.data.as_str()
+        v: u64 = 0
+        for i in 0..8:
+            v = v | (u64(d[self.pos + usize(i)]) << u64(i * 8))
+        self.pos += 8
+        return Ok(v)
+
+    fn get_u16_be(self: lend Self) -> Result[u16, string]:
+        v = self.get_u16()?
+        return Ok((v >> 8) + (v & 255) * 256)
+
+    fn get_u32_be(self: lend Self) -> Result[u32, string]:
+        v = self.get_u32()?
+        out: u32 = 0
+        for i in 0..4:
+            out = (out << 8) | ((v >> u32(i * 8)) & 255)
+        return Ok(out)
+
+    fn get_u64_be(self: lend Self) -> Result[u64, string]:
+        v = self.get_u64()?
+        out: u64 = 0
+        for i in 0..8:
+            out = (out << 8) | ((v >> u64(i * 8)) & 255)
+        return Ok(out)
+
+    fn get_i16(self: lend Self) -> Result[i16, string]:
+        v = self.get_u16()?
+        unsafe:
+            return Ok(ptr_cast[*i16](addr(v))[0])
+
+    fn get_i32(self: lend Self) -> Result[i32, string]:
+        v = self.get_u32()?
+        unsafe:
+            return Ok(ptr_cast[*i32](addr(v))[0])
+
+    fn get_i64(self: lend Self) -> Result[i64, string]:
+        v = self.get_u64()?
+        unsafe:
+            return Ok(ptr_cast[*i64](addr(v))[0])
+
+    fn get_f32(self: lend Self) -> Result[f32, string]:
+        v = self.get_u32()?
+        unsafe:
+            return Ok(ptr_cast[*f32](addr(v))[0])
+
+    fn get_f64(self: lend Self) -> Result[f64, string]:
+        v = self.get_u64()?
+        unsafe:
+            return Ok(ptr_cast[*f64](addr(v))[0])
+
+    # The next `n` bytes.
+    fn get_bytes(self: lend Self, n: usize) -> Result[string, string]:
+        if self.remaining() < n:
+            return Err("the packet is too short")
+        out = string.from(self.data.as_str()[self.pos..self.pos + n])
+        self.pos += n
+        return Ok(out)
+
+    # A string written by `put_str`.
+    fn get_str(self: lend Self) -> Result[string, string]:
+        n = self.get_u16()?
+        return self.get_bytes(usize(n))
+
+impl FrameBuffer:
+    public
+    fn new() -> FrameBuffer:
+        return FrameBuffer{ buf: string.new(), start: 0 }
+
+    # Adds bytes that arrived from the connection.
+    fn push(self: lend Self, data: str):
+        if self.start > 0 and self.start * 2 >= self.buf.len():
+            rest = string.from(self.buf.as_str()[self.start..])
+            self.buf = rest
+            self.start = 0
+        self.buf.append_str(data)
+
+    # Bytes held that are not yet a whole message.
+    fn pending(self: read Self) -> usize:
+        return self.buf.len() - self.start
+
+    # The next whole message, or None when more bytes are needed. A message longer than `max_len` is an error: the
+    # length comes from the other side, so always bound it; the connection should be closed then.
+    fn next(self: lend Self, max_len: usize) -> Result[Optional[string], string]:
+        if self.pending() < 4:
+            return Ok(None)
+        d = self.buf.as_str()
+        n = (usize(d[self.start]) << 24) | (usize(d[self.start + 1]) << 16) | (usize(d[self.start + 2]) << 8) | usize(d[self.start + 3])
+        if n > max_len:
+            return Err(f"the message is too large ({n} bytes)")
+        if self.pending() < 4 + n:
+            return Ok(None)
+        msg = string.from(d[self.start + 4..self.start + 4 + n])
+        self.start += 4 + n
+        return Ok(Valid(msg))

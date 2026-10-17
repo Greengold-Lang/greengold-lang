@@ -1,16 +1,32 @@
-# std.net: TCP connections and UDP datagrams over IPv4.
+# std.net: TCP connections and UDP datagrams over IPv4, with time limits, TLS, and many sockets at once.
 #
 # A server binds a TcpListener and accepts TcpStreams; a client connects a TcpStream. Each stream is
-# closed when it goes away (`drop`). Calls block; serve many clients with one thread per connection
-# (`Thread.spawn(fn() => handle(stream))`). Hosts are IPv4 addresses ("127.0.0.1", "0.0.0.0") or
-# "localhost".
+# closed when it goes away (`drop`). Hosts are IPv4 addresses ("127.0.0.1", "0.0.0.0"), "localhost", or a name the
+# system can look up ("example.com").
 #
-# Inside std.tasks tasks, the `_async` methods wait for the socket without blocking the other tasks.
+# Three ways to serve many clients:
+#   - one thread per connection (`Thread.spawn(fn() => handle(stream))`), with blocking calls;
+#   - tasks (std.tasks): the `_async` methods wait for the socket without blocking the other tasks;
+#   - one loop and a `Poller`: wait for any of many sockets, then use `try_receive` / `try_accept` /
+#     `receive_from_try` on the ones that are ready. This is the shape of a game server: one thread, a fixed tick,
+#     thousands of connections.
+#
+# Time limits (milliseconds; negative means none). `set_timeout(ms)` limits every later send and receive on a stream
+# or UDP socket: a call that waits longer returns `Err("timed out")` (`net.is_timeout(e)` tests for it) and the
+# stream stays usable. `TcpStream.connect_timeout` limits the connect, `connect_tls` the connect and the handshake,
+# and `accept_timeout` the wait for a client.
+#
+# TCP sockets are made with TCP_NODELAY on (small packets go out at once, as games need); `set_nodelay(false)`
+# turns Nagle's algorithm back on.
 import std.tasks
+import std.sock
+import std.tls
 
 private
 extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn calloc(n: usize, size: usize) -> *mut u8
 extern "stdlib.h" fn free(ptr: *u8)
+extern "string.h" fn memcpy(dst: *mut u8, src: *u8, n: usize) -> *mut u8
 extern "sys/socket.h" fn socket(family: i32, kind: i32, protocol: i32) -> i32
 extern "sys/socket.h" fn bind(s: i64, addr: *u8, len: i32) -> i32
 extern "sys/socket.h" fn listen(s: i64, backlog: i32) -> i32
@@ -19,11 +35,18 @@ extern "sys/socket.h" fn connect(s: i64, addr: *u8, len: i32) -> i32
 extern "sys/socket.h" fn recv(s: i64, buf: *mut u8, len: i64, flags: i32) -> i32
 extern "sys/socket.h" fn send(s: i64, buf: *u8, len: i64, flags: i32) -> i32
 extern "sys/socket.h" fn setsockopt(s: i64, level: i32, name: i32, value: *u8, len: i32) -> i32
+extern "sys/socket.h" fn getsockopt(s: i64, level: i32, name: i32, value: *mut u8, len: *mut i32) -> i32
 extern "sys/socket.h" fn sendto(s: i64, buf: *u8, len: i64, flags: i32, to: *u8, tolen: i32) -> i32
 extern "sys/socket.h" fn recvfrom(s: i64, buf: *mut u8, len: i64, flags: i32, from: *mut u8, fromlen: *mut i32) -> i32
 extern "sys/socket.h" fn getsockname(s: i64, addr: *mut u8, len: *mut i32) -> i32
+extern "sys/socket.h" fn getpeername(s: i64, addr: *mut u8, len: *mut i32) -> i32
+extern "sys/socket.h" fn shutdown(s: i64, how: i32) -> i32
+extern "netdb.h" fn getaddrinfo(node: *u8, service: *u8, hints: *u8, res: *mut *mut u8) -> i32
+extern "netdb.h" fn freeaddrinfo(res: *mut u8)
 extern "unistd.h" fn close(fd: i32) -> i32
+weak extern "fcntl.h" fn fcntl(fd: i32, cmd: i32, ...) -> i32
 weak extern "winsock2.h" fn closesocket(s: i64) -> i32
+weak extern "winsock2.h" fn ioctlsocket(s: i64, cmd: i32, arg: *mut u8) -> i32
 weak extern "winsock2.h" fn WSAStartup(version: u16, data: *mut u8) -> i32
 
 static NET_STATE: i64 = 0      # 0 not started, 1 being started by a thread, 2 ready
@@ -49,6 +72,42 @@ fn _close(fd: i64):
             closesocket(fd)
         else:
             close(i32(fd))
+
+# Socket option numbers differ by system: Linux has its own; Windows and macOS share the BSD ones.
+fn _sol() -> i32:
+    return if target_os() == "linux" then 1 else 65535
+
+fn _opt(linux: i32, bsd: i32) -> i32:
+    return if target_os() == "linux" then linux else bsd
+
+fn _setopt_int(fd: i64, level: i32, name: i32, value: i32):
+    unsafe:
+        v: i32 = value
+        setsockopt(fd, level, name, ptr_cast[*u8](addr(v)), 4)
+
+# Options every new TCP socket gets: no Nagle delay, and on macOS no SIGPIPE when the other side is gone.
+fn _tune_tcp(fd: i64):
+    _setopt_int(fd, 6, 1, 1)
+    if target_os() == "macos":
+        _setopt_int(fd, 65535, 4130, 1)
+
+# What `send` may be given so a closed connection is an error and not a signal that ends the program (Linux).
+fn _send_flags() -> i32:
+    return if target_os() == "linux" then 16384 else 0
+
+# Blocking or not, for a socket.
+fn _set_blocking(fd: i64, blocking: bool) -> bool:
+    unsafe:
+        if target_os() == "windows":
+            mode: u32 = if blocking then 0 else 1
+            return ioctlsocket(fd, -2147195266, ptr_cast[*mut u8](addr_mut(mode))) == 0
+        else:
+            flags = fcntl(i32(fd), 3)
+            if flags < 0:
+                return false
+            bit: i32 = if target_os() == "linux" then 2048 else 4
+            want = if blocking then flags & (bit ^ -1) else flags | bit
+            return fcntl(i32(fd), 4, want) == 0
 
 # `a.b.c.d` (or "localhost") as four bytes, or None.
 fn _ipv4(host: str) -> Optional[[4]u8]:
@@ -78,6 +137,37 @@ fn _ipv4(host: str) -> Optional[[4]u8]:
     parts[3] = u8(value)
     return Valid(parts)
 
+# An address for `host`: dotted digits and "localhost" need no lookup; any other name is looked up (IPv4 only).
+fn _resolve(host: str) -> Result[[4]u8, string]:
+    _start()
+    match _ipv4(host):
+        Valid(v): return Ok(v)
+        None: pass
+    if host.len == 0 or host.len > 253:
+        return Err(f"cannot resolve host: {host}")
+    unsafe:
+        hints = calloc(1, 64)
+        ptr_cast[*mut i32](ptr_offset(hints, 4))[0] = 2       # AF_INET
+        ptr_cast[*mut i32](ptr_offset(hints, 8))[0] = 1       # SOCK_STREAM, so each address comes once
+        name = sock.cstr(host)
+        found: *mut u8 = null
+        rc = getaddrinfo(name, null, hints, addr_mut(found))
+        free(name)
+        free(hints)
+        if rc != 0 or found == null:
+            return Err(f"cannot resolve host: {host}")
+        # struct addrinfo: ai_addr sits at byte 24 on Linux, 32 on Windows and macOS (64-bit).
+        at: i64 = if target_os() == "linux" then 24 else 32
+        sa = ptr_cast[*mut *mut u8](ptr_offset(found, at))[0]
+        if sa == null:
+            freeaddrinfo(found)
+            return Err(f"cannot resolve host: {host}")
+        ip: [4]u8 = [0; 4]
+        for i in 0..4:
+            ip[i] = ptr_cast[*u8](ptr_offset(sa, 4 + i64(i)))[0]
+        freeaddrinfo(found)
+        return Ok(ip)
+
 # The 16 bytes of a `sockaddr_in` for `ip:port`.
 fn _sockaddr(ip: [4]u8, port: u16) -> [16]u8:
     a: [16]u8 = [0; 16]
@@ -92,6 +182,50 @@ fn _sockaddr(ip: [4]u8, port: u16) -> [16]u8:
         a[4 + i] = ip[i]
     return a
 
+fn _port_of(sa: [16]u8) -> u16:
+    return u16(sa[2]) * 256 + u16(sa[3])
+
+fn _host_of(sa: [16]u8) -> string:
+    return f"{sa[4]}.{sa[5]}.{sa[6]}.{sa[7]}"
+
+# The pending error of a socket (0 when none), as `connect` leaves it.
+fn _so_error(fd: i64) -> i32:
+    unsafe:
+        v: i32 = 0
+        len: i32 = 4
+        getsockopt(fd, _sol(), _opt(4, 4103), ptr_cast[*mut u8](addr_mut(v)), addr_mut(len))
+        return v
+
+# A connected TCP socket for `ip:port`, or an error. `timeout` < 0 waits for ever.
+fn _tcp_connect(ip: [4]u8, host: str, port: u16, timeout: i64) -> Result[i64, string]:
+    unsafe:
+        fd = i64(socket(2, 1, 6))
+        if fd < 0:
+            return Err("socket() failed")
+        _tune_tcp(fd)
+        sa = _sockaddr(ip, port)
+        if timeout < 0:
+            if connect(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+                _close(fd)
+                return Err(f"cannot connect to {host}:{port}")
+            return Ok(fd)
+        _set_blocking(fd, false)
+        rc = connect(fd, ptr_cast[*u8](addr(sa)), 16)
+        if rc != 0:
+            if sock.wait(fd, true, timeout) != 1:
+                _close(fd)
+                return Err("timed out")
+            if _so_error(fd) != 0:
+                _close(fd)
+                return Err(f"cannot connect to {host}:{port}")
+        _set_blocking(fd, true)
+        return Ok(fd)
+
+public
+# True when `error` (the text of an `Err`) says a time limit ran out.
+fn is_timeout(error: str) -> bool:
+    return error == "timed out"
+
 public
 # A TCP socket listening for connections.
 struct TcpListener:
@@ -99,10 +233,33 @@ struct TcpListener:
     fd: i64
 
 public
-# One TCP connection.
+# One TCP connection (secured with TLS when made by `connect_tls`).
 struct TcpStream:
     private
     fd: i64
+    timeout: i64       # ms, < 0: none
+    tlsh: i64          # std.tls handle, 0: plain TCP
+
+public
+# An address: a dotted IPv4 host and a port.
+struct Addr:
+    host: string
+    port: u16
+
+public
+# What `Poller.wait` says about one socket that is ready.
+struct PollEvent:
+    handle: i64
+    readable: bool     # data can be read, or a connection accepted, or the other side closed
+    writable: bool
+    error: bool
+
+public
+# Many sockets, waited for together: add each with the `handle()` it gave, then `wait` says which are ready.
+struct Poller:
+    private
+    fds: List[i64]
+    want: List[i32]
 
 public
 
@@ -110,26 +267,20 @@ impl TcpListener:
     # Listens on `host:port`. Port 0 lets the system choose one; `port()` says which.
     public
     fn bind(host: str, port: u16) -> Result[TcpListener, string]:
-        _start()
-        fixed ip = match _ipv4(host):
-            Valid(v) => v
-            None => [0, 0, 0, 0]
-        if _ipv4(host).is_none():
-            return Err(f"not an IPv4 address: {host}")
+        ip = _resolve(host)?
         unsafe:
             fd = i64(socket(2, 1, 6))
             if fd < 0:
                 return Err("socket() failed")
-            one: i32 = 1
             if target_os() == "windows":
-                setsockopt(fd, 65535, 4, ptr_cast[*u8](addr(one)), 4)
+                _setopt_int(fd, 65535, 4, 1)
             else:
-                setsockopt(fd, 1, 2, ptr_cast[*u8](addr(one)), 4)
+                _setopt_int(fd, _sol(), _opt(2, 4), 1)
             sa = _sockaddr(ip, port)
             if bind(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
                 _close(fd)
                 return Err(f"cannot bind {host}:{port}")
-            if listen(fd, 128) != 0:
+            if listen(fd, 1024) != 0:
                 _close(fd)
                 return Err(f"cannot listen on {host}:{port}")
             return Ok(TcpListener{ fd: fd })
@@ -140,7 +291,15 @@ impl TcpListener:
         len: i32 = 16
         unsafe:
             getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
-        return u16(sa[2]) * 256 + u16(sa[3])
+        return _port_of(sa)
+
+    # The socket's number, for a `Poller` or `std.sock`.
+    fn handle(self: read Self) -> i64:
+        return self.fd
+
+    # With `false`, `accept` returns an error at once when no client is waiting (`try_accept` is easier).
+    fn set_nonblocking(self: read Self, on: bool):
+        _set_blocking(self.fd, not on)
 
     # Like `accept`, but other tasks run while it waits (std.tasks).
     fn accept_async(self: read Self) -> Result[TcpStream, string]:
@@ -153,7 +312,19 @@ impl TcpListener:
             fd = i64(accept(self.fd, null, null))
             if fd < 0:
                 return Err("accept() failed")
-            return Ok(TcpStream{ fd: fd })
+            _tune_tcp(fd)
+            return Ok(TcpStream{ fd: fd, timeout: -1, tlsh: 0 })
+
+    # Waits at most `ms` milliseconds for a connection; None when none came.
+    fn accept_timeout(self: read Self, ms: i64) -> Result[Optional[TcpStream], string]:
+        if sock.wait(self.fd, false, ms) != 1:
+            return Ok(None)
+        s = self.accept()?
+        return Ok(Valid(s))
+
+    # A connection that is already waiting, or None; never waits.
+    fn try_accept(self: read Self) -> Result[Optional[TcpStream], string]:
+        return self.accept_timeout(0)
 
     fn drop(self: lend Self):
         _close(self.fd)
@@ -162,41 +333,154 @@ impl TcpStream:
     # Connects to `host:port`.
     public
     fn connect(host: str, port: u16) -> Result[TcpStream, string]:
-        _start()
-        if _ipv4(host).is_none():
-            return Err(f"not an IPv4 address: {host}")
-        fixed ip = match _ipv4(host):
-            Valid(v) => v
-            None => [0, 0, 0, 0]
-        unsafe:
-            fd = i64(socket(2, 1, 6))
-            if fd < 0:
-                return Err("socket() failed")
-            sa = _sockaddr(ip, port)
-            if connect(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+        return TcpStream.connect_timeout(host, port, -1)
+
+    # Connects to `host:port`, giving up after `ms` milliseconds (`Err("timed out")`).
+    public
+    fn connect_timeout(host: str, port: u16, ms: i64) -> Result[TcpStream, string]:
+        ip = _resolve(host)?
+        fd = _tcp_connect(ip, host, port, ms)?
+        return Ok(TcpStream{ fd: fd, timeout: ms, tlsh: 0 })
+
+    # Connects and starts TLS (https): the server's certificate must be trusted and made for `host`. `ms` limits the
+    # connect and the handshake, and stays as the stream's `set_timeout` limit (negative: no limit).
+    public
+    fn connect_tls(host: str, port: u16, ms: i64) -> Result[TcpStream, string]:
+        ip = _resolve(host)?
+        fd = _tcp_connect(ip, host, port, ms)?
+        match consume tls.handshake(fd, host, ms):
+            Ok(h):
+                return Ok(TcpStream{ fd: fd, timeout: ms, tlsh: h })
+            Err(e):
                 _close(fd)
-                return Err(f"cannot connect to {host}:{port}")
-            return Ok(TcpStream{ fd: fd })
+                return Err(e)
+
+    # The socket's number, for a `Poller` or `std.sock`.
+    fn handle(self: read Self) -> i64:
+        return self.fd
+
+    # True when the connection is secured with TLS.
+    fn is_tls(self: read Self) -> bool:
+        return self.tlsh != 0
+
+    # Limits every later send and receive to `ms` milliseconds; negative removes the limit.
+    fn set_timeout(self: lend Self, ms: i64):
+        self.timeout = ms
+
+    # Nagle's algorithm: `false` (the default here) sends small writes at once.
+    fn set_nodelay(self: read Self, on: bool):
+        _setopt_int(self.fd, 6, 1, if on then 0 else 1)
+
+    # With `true`, a send that cannot take all the bytes returns the part it took (see `send_some`).
+    fn set_nonblocking(self: read Self, on: bool):
+        _set_blocking(self.fd, not on)
+
+    # Makes the system's buffers for this socket about this big (bytes).
+    fn set_buffers(self: read Self, receive_bytes: i32, send_bytes: i32):
+        _setopt_int(self.fd, _sol(), _opt(8, 4098), receive_bytes)
+        _setopt_int(self.fd, _sol(), _opt(7, 4097), send_bytes)
+
+    # The other side's address.
+    fn peer_addr(self: read Self) -> Result[Addr, string]:
+        sa: [16]u8 = [0; 16]
+        len: i32 = 16
+        unsafe:
+            if getpeername(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len)) != 0:
+                return Err("getpeername() failed")
+        return Ok(Addr{ host: _host_of(sa), port: _port_of(sa) })
+
+    # The port on this side.
+    fn local_port(self: read Self) -> u16:
+        sa: [16]u8 = [0; 16]
+        len: i32 = 16
+        unsafe:
+            getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
+        return _port_of(sa)
+
+    # Says the other side nothing more will be sent (it can still send). Does nothing on a TLS stream.
+    fn shutdown_send(self: read Self):
+        if self.tlsh == 0:
+            unsafe:
+                shutdown(self.fd, 1)
+
+    # True when `receive` would not wait: data (or the end of the connection) is there. Waits at most `ms`.
+    fn readable(self: read Self, ms: i64) -> bool:
+        if self.tlsh != 0 and tls.pending(self.tlsh):
+            return true
+        return sock.wait(self.fd, false, ms) == 1
 
     # Sends every byte of `data`.
     fn send(self: read Self, data: str) -> Result[usize, string]:
+        if self.tlsh != 0:
+            return tls.write(self.tlsh, data, self.timeout)
         sent: usize = 0
         while sent < data.len:
+            if self.timeout >= 0 and sock.wait(self.fd, true, self.timeout) == 0:
+                return Err("timed out")
             unsafe:
                 part = data[sent..]
-                n = send(self.fd, addr(part), i64(part.len), 0)
+                n = send(self.fd, addr(part), i64(part.len), _send_flags())
                 if n <= 0:
                     return Err("send() failed")
                 sent += usize(n)
         return Ok(sent)
 
+    # Sends as much of `data` as the connection takes now and says how much (0 when it is full). Never waits when
+    # the stream is non-blocking; on a TLS stream it is `send`.
+    fn send_some(self: read Self, data: str) -> Result[usize, string]:
+        if self.tlsh != 0:
+            return tls.write(self.tlsh, data, self.timeout)
+        if data.len == 0 or sock.wait(self.fd, true, 0) != 1:
+            return Ok(0)
+        unsafe:
+            n = send(self.fd, addr(data), i64(data.len), _send_flags())
+            if n < 0:
+                if _so_error(self.fd) == 0:
+                    return Ok(0)
+                return Err("send() failed")
+            return Ok(usize(n))
+
+    # Sends one message that `receive_frame` reads whole: a 4-byte length (big endian), then `data`.
+    fn send_frame(self: read Self, data: str) -> Result[usize, string]:
+        n = data.len
+        msg = string.new()
+        msg.append_byte(u8((n >> 24) & 255))
+        msg.append_byte(u8((n >> 16) & 255))
+        msg.append_byte(u8((n >> 8) & 255))
+        msg.append_byte(u8(n & 255))
+        msg.append_str(data)
+        return self.send(msg.as_str())
+
     # Like `receive`, but other tasks run while it waits (std.tasks).
     fn receive_async(self: read Self, max: usize) -> Result[string, string]:
-        tasks.wait_readable(self.fd)
+        if self.tlsh == 0 or not tls.pending(self.tlsh):
+            tasks.wait_readable(self.fd)
         return self.receive(max)
 
     # Receives up to `max` bytes; an empty string means the other side closed the connection.
     fn receive(self: read Self, max: usize) -> Result[string, string]:
+        if self.tlsh != 0:
+            return tls.receive(self.tlsh, max, self.timeout)
+        if self.timeout >= 0 and sock.wait(self.fd, false, self.timeout) == 0:
+            return Err("timed out")
+        return self._recv(max)
+
+    # Receives only what is already there: None when nothing has come yet, an empty string when the other side
+    # closed the connection.
+    fn try_receive(self: read Self, max: usize) -> Result[Optional[string], string]:
+        if self.tlsh != 0:
+            match consume tls.receive(self.tlsh, max, 0):
+                Ok(text): return Ok(Valid(text))
+                Err(e):
+                    if is_timeout(e.as_str()):
+                        return Ok(None)
+                    return Err(e)
+        if sock.wait(self.fd, false, 0) != 1:
+            return Ok(None)
+        text = self._recv(max)?
+        return Ok(Valid(text))
+
+    fn _recv(self: read Self, max: usize) -> Result[string, string]:
         out = string.new()
         unsafe:
             buf = malloc(max)
@@ -207,6 +491,28 @@ impl TcpStream:
             out.append_str(str_from_raw(buf, usize(n)))
             free(buf)
         return Ok(out)
+
+    # Receives exactly `n` bytes (Err if the connection closes first).
+    fn receive_exact(self: read Self, n: usize) -> Result[string, string]:
+        out = string.new()
+        while out.len() < n:
+            chunk = self.receive(n - out.len())?
+            if chunk.len() == 0:
+                return Err("the connection closed")
+            out.append(chunk)
+        return Ok(out)
+
+    # Receives one message sent by `send_frame`. A message longer than `max_len` bytes is an error (the length comes
+    # from the other side, so bound it).
+    fn receive_frame(self: read Self, max_len: usize) -> Result[string, string]:
+        head = self.receive_exact(4)?
+        h = head.as_str()
+        n = (usize(h[0]) << 24) | (usize(h[1]) << 16) | (usize(h[2]) << 8) | usize(h[3])
+        if n > max_len:
+            return Err(f"the message is too large ({n} bytes)")
+        if n == 0:
+            return Ok(string.new())
+        return self.receive_exact(n)
 
     # Receives until the other side closes the connection.
     fn receive_all(self: read Self) -> Result[string, string]:
@@ -219,13 +525,53 @@ impl TcpStream:
         return Ok(out)
 
     fn drop(self: lend Self):
+        if self.tlsh != 0:
+            tls.close(self.tlsh)
         _close(self.fd)
+
+impl Poller:
+    public
+    fn new() -> Poller:
+        return Poller{ fds: List[i64](), want: List[i32]() }
+
+    # Watches a socket (its `handle()`) for reading; with `also_write`, for writing too.
+    fn add(self: lend Self, handle: i64, also_write: bool):
+        self.fds.push(handle)
+        self.want.push(if also_write then 3 else 1)
+
+    # Changes what is watched for a socket already added.
+    fn watch_write(self: lend Self, handle: i64, on: bool):
+        for i in 0..self.fds.len:
+            if self.fds[i] == handle:
+                self.want[i] = if on then 3 else 1
+
+    # Stops watching a socket (do this before the socket is closed).
+    fn remove(self: lend Self, handle: i64):
+        for i in 0..self.fds.len:
+            if self.fds[i] == handle:
+                self.fds.swap_remove(i)
+                self.want.swap_remove(i)
+                return
+
+    fn len(self: read Self) -> usize:
+        return self.fds.len
+
+    # Waits at most `ms` milliseconds (negative: for ever; 0: just look) and returns the sockets that are ready.
+    fn wait(self: read Self, ms: i64) -> List[PollEvent]:
+        out = List[PollEvent]()
+        got = sock.poll_many(self.fds, self.want, ms)
+        for i in 0..got.len:
+            f = got[i]
+            if f != 0:
+                out.push(PollEvent{ handle: self.fds[i], readable: (f & 1) != 0, writable: (f & 2) != 0, error: (f & 4) != 0 })
+        return out
 
 public
 # A UDP socket: sends and receives single datagrams, without a connection.
 struct UdpSocket:
     private
     fd: i64
+    timeout: i64
 
 public
 # One datagram received, and who sent it.
@@ -238,12 +584,7 @@ impl UdpSocket:
     # Binds `host:port` (port 0 lets the system choose; `port()` says which).
     public
     fn bind(host: str, port: u16) -> Result[UdpSocket, string]:
-        _start()
-        if _ipv4(host).is_none():
-            return Err(f"not an IPv4 address: {host}")
-        fixed ip = match _ipv4(host):
-            Valid(v) => v
-            None => [0, 0, 0, 0]
+        ip = _resolve(host)?
         unsafe:
             fd = i64(socket(2, 2, 17))
             if fd < 0:
@@ -252,22 +593,48 @@ impl UdpSocket:
             if bind(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
                 _close(fd)
                 return Err(f"cannot bind {host}:{port}")
-            return Ok(UdpSocket{ fd: fd })
+            if target_os() == "windows":
+                # Windows reports an ICMP "port unreachable" from an earlier send as an error on the next receive
+                # (WSAECONNRESET); a server must not stop because one client went away.
+                off: u32 = 0
+                ioctlsocket(fd, -1744830452, ptr_cast[*mut u8](addr_mut(off)))
+            return Ok(UdpSocket{ fd: fd, timeout: -1 })
 
     fn port(self: read Self) -> u16:
         sa: [16]u8 = [0; 16]
         len: i32 = 16
         unsafe:
             getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
-        return u16(sa[2]) * 256 + u16(sa[3])
+        return _port_of(sa)
+
+    # The socket's number, for a `Poller` or `std.sock`.
+    fn handle(self: read Self) -> i64:
+        return self.fd
+
+    # Limits every later receive to `ms` milliseconds; negative removes the limit.
+    fn set_timeout(self: lend Self, ms: i64):
+        self.timeout = ms
+
+    # Allows sending to a broadcast address (such as "255.255.255.255").
+    fn set_broadcast(self: read Self, on: bool):
+        _setopt_int(self.fd, _sol(), _opt(6, 32), if on then 1 else 0)
+
+    # Makes the system's buffers for this socket about this big (bytes). A game server with many clients wants
+    # the receive buffer large, so a burst of datagrams is not dropped.
+    fn set_buffers(self: read Self, receive_bytes: i32, send_bytes: i32):
+        _setopt_int(self.fd, _sol(), _opt(8, 4098), receive_bytes)
+        _setopt_int(self.fd, _sol(), _opt(7, 4097), send_bytes)
 
     # Sends `data` as one datagram to `host:port`.
     fn send_to(self: read Self, data: str, host: str, port: u16) -> Result[usize, string]:
-        if _ipv4(host).is_none():
-            return Err(f"not an IPv4 address: {host}")
-        fixed ip = match _ipv4(host):
-            Valid(v) => v
-            None => [0, 0, 0, 0]
+        ip = _resolve(host)?
+        return self.send_to_ip(data, ip, port)
+
+    # Replies to a datagram: sends `data` to the address it came from.
+    fn reply(self: read Self, to: read Datagram, data: str) -> Result[usize, string]:
+        return self.send_to(data, to.host.as_str(), to.port)
+
+    fn send_to_ip(self: read Self, data: str, ip: [4]u8, port: u16) -> Result[usize, string]:
         sa = _sockaddr(ip, port)
         unsafe:
             n = sendto(self.fd, addr(data), i64(data.len), 0, ptr_cast[*u8](addr(sa)), 16)
@@ -280,8 +647,20 @@ impl UdpSocket:
         tasks.wait_readable(self.fd)
         return self.receive_from(max)
 
-    # Waits for one datagram of at most `max` bytes (a longer one is cut).
+    # Waits for one datagram of at most `max` bytes (a longer one is cut), at most the socket's time limit.
     fn receive_from(self: read Self, max: usize) -> Result[Datagram, string]:
+        if self.timeout >= 0 and sock.wait(self.fd, false, self.timeout) == 0:
+            return Err("timed out")
+        return self._recv_from(max)
+
+    # A datagram that already arrived, or None; never waits.
+    fn receive_from_try(self: read Self, max: usize) -> Result[Optional[Datagram], string]:
+        if sock.wait(self.fd, false, 0) != 1:
+            return Ok(None)
+        d = self._recv_from(max)?
+        return Ok(Valid(d))
+
+    fn _recv_from(self: read Self, max: usize) -> Result[Datagram, string]:
         sa: [16]u8 = [0; 16]
         len: i32 = 16
         out = string.new()
@@ -293,8 +672,7 @@ impl UdpSocket:
                 return Err("recvfrom() failed")
             out.append_str(str_from_raw(buf, usize(n)))
             free(buf)
-        host = f"{sa[4]}.{sa[5]}.{sa[6]}.{sa[7]}"
-        return Ok(Datagram{ data: out, host: host, port: u16(sa[2]) * 256 + u16(sa[3]) })
+        return Ok(Datagram{ data: out, host: _host_of(sa), port: _port_of(sa) })
 
     fn drop(self: lend Self):
         _close(self.fd)

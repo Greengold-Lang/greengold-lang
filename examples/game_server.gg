@@ -1,0 +1,129 @@
+# A tiny multiplayer game server and its bots, in one program.
+#
+# One thread runs the whole server. A Poller waits for the listener, every player's TCP connection, and the UDP
+# socket at once; the server loop wakes at least every tick (50 ms). TCP carries the reliable messages (login,
+# welcome, goodbye) as length-prefixed frames; UDP carries the position updates, which may be lost, and the server
+# sends back a snapshot of every player each tick.
+#
+#   message kinds   TCP client -> server: 1 = login(name)          server -> client: 2 = welcome(id, udp port)
+#                   UDP client -> server: 3 = move(id, x, y)       server -> client: 4 = snapshot(count, [id, x, y]...)
+import std.net
+import std.packet
+import std.thread
+import std.time
+
+struct Player:
+    id: u32
+    x: f32
+    y: f32
+    conn: net.TcpStream
+    frames: packet.FrameBuffer
+
+fn find(players: read List[Player], handle: i64) -> usize:
+    for i in 0..players.len:
+        if players[i].conn.handle() == handle:
+            return i
+    return players.len
+
+fn server(listener: net.TcpListener, udp: net.UdpSocket, expected: u32, ticks: i32):
+    poller = net.Poller.new()
+    poller.add(listener.handle(), false)
+    poller.add(udp.handle(), false)
+    players = List[Player]()
+    addrs = List[net.Addr]()       # where each player's UDP packets come from, same order as players
+    next_id: u32 = 1
+    tick: i32 = 0
+    next_tick = time.monotonic_nanos() + 50000000
+    while tick < ticks:
+        wait_ms = (next_tick - time.monotonic_nanos()) / 1000000
+        if wait_ms < 0:
+            wait_ms = 0
+        for ev in poller.wait(wait_ms):
+            if ev.handle == listener.handle():
+                while true:
+                    a = listener.try_accept().value_or_panic()
+                    if a.is_none():
+                        break
+                    conn = a.value_or_panic()
+                    poller.add(conn.handle(), false)
+                    players.push(Player{ id: next_id, x: 0.0, y: 0.0, conn: conn, frames: packet.FrameBuffer.new() })
+                    addrs.push(net.Addr{ host: string.new(), port: 0 })
+                    w = packet.ByteWriter.new()
+                    w.put_u8(2)
+                    w.put_u32(next_id)
+                    w.put_u16(udp.port())
+                    players[players.len - 1].conn.send_frame(w.as_str()).value_or_panic()
+                    next_id += 1
+            elif ev.handle == udp.handle():
+                while true:
+                    d = udp.receive_from_try(64).value_or_panic()
+                    if d.is_none():
+                        break
+                    dg = d.value_or_panic()
+                    r = packet.ByteReader.new(dg.data.as_str())
+                    kind = r.get_u8().value_or_panic()
+                    id = r.get_u32().value_or_panic()
+                    for i in 0..players.len:
+                        if players[i].id == id and kind == 3:
+                            players[i].x = r.get_f32().value_or_panic()
+                            players[i].y = r.get_f32().value_or_panic()
+                            addrs[i] = net.Addr{ host: dg.host.clone(), port: dg.port }
+            else:
+                i = find(players, ev.handle)
+                if i < players.len:
+                    chunk = players[i].conn.try_receive(4096).value_or_panic()
+                    if chunk.has_value() and chunk.value_or_panic().len() == 0:
+                        poller.remove(ev.handle)
+                        players.swap_remove(i)
+                        addrs.swap_remove(i)
+        if time.monotonic_nanos() >= next_tick:
+            next_tick += 50000000
+            tick += 1
+            if players.len >= usize(expected):
+                snap = packet.ByteWriter.new()
+                snap.put_u8(4)
+                snap.put_u16(u16(players.len))
+                for p in players:
+                    snap.put_u32(p.id)
+                    snap.put_f32(p.x)
+                    snap.put_f32(p.y)
+                for i in 0..players.len:
+                    if addrs[i].port != 0:
+                        udp.send_to(snap.as_str(), addrs[i].host.as_str(), addrs[i].port).value_or_panic()
+    print("server: ticks", tick, "players", players.len)
+
+fn bot(tcp_port: u16, name: i32):
+    c = net.TcpStream.connect_timeout("127.0.0.1", tcp_port, 2000).value_or_panic()
+    c.set_timeout(3000)
+    welcome = packet.ByteReader.new(c.receive_frame(100).value_or_panic().as_str())
+    welcome.get_u8().value_or_panic()
+    id = welcome.get_u32().value_or_panic()
+    udp_port = welcome.get_u16().value_or_panic()
+    u = net.UdpSocket.bind("127.0.0.1", 0).value_or_panic()
+    u.set_timeout(1000)
+    seen: u16 = 0
+    for step in 0..10:
+        m = packet.ByteWriter.new()
+        m.put_u8(3)
+        m.put_u32(id)
+        m.put_f32(f32(name) * 10.0 + f32(step))
+        m.put_f32(f32(name))
+        u.send_to(m.as_str(), "127.0.0.1", udp_port).value_or_panic()
+        r = packet.ByteReader.new(u.receive_from(256).value_or_panic().data.as_str())
+        r.get_u8().value_or_panic()
+        seen = r.get_u16().value_or_panic()
+    if name == 1:
+        print("bot 1 sees", seen, "players")
+
+fn main():
+    listener = net.TcpListener.bind("127.0.0.1", 0).value_or_panic()
+    udp = net.UdpSocket.bind("127.0.0.1", 0).value_or_panic()
+    port = listener.port()
+    srv = thread.Thread.spawn(fn() => server(listener, udp, 3, 30))
+    bots = List[thread.Thread]()
+    for i in 1..4:
+        n = i
+        bots.push(thread.Thread.spawn(fn() => bot(port, n)))
+    for b in bots:
+        b.join()
+    srv.join()

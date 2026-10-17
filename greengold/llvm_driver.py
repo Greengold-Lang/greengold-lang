@@ -185,6 +185,25 @@ def find_linker(triple: str) -> list[str] | None:
     return zig_linker(triple)
 
 
+def _uses_openssl(obj_path: Path) -> bool:
+    """True when the program calls OpenSSL (std.tls on Linux and macOS); only then is `-lssl` needed."""
+    try:
+        return b"SSL_CTX_new" in Path(obj_path).read_bytes()
+    except OSError:
+        return False
+
+
+def _openssl_link_args() -> list[str]:
+    """`-lssl -lcrypto`, plus the Homebrew library folders on macOS (OpenSSL is not in the system's)."""
+    args: list[str] = []
+    if sys.platform == "darwin":
+        for d in ("/opt/homebrew/opt/openssl@3/lib", "/usr/local/opt/openssl@3/lib",
+                  "/opt/homebrew/opt/openssl/lib", "/usr/local/opt/openssl/lib"):
+            if os.path.isdir(d):
+                args.append(f"-L{d}")
+    return args + ["-lssl", "-lcrypto"]
+
+
 def link_executable(obj_path: Path, exe_path: Path, triple: str, links: list[str] | None = None,
                     freestanding: bool = False, debug: bool = False) -> int:
     cmd = find_linker(triple)
@@ -201,10 +220,16 @@ def link_executable(obj_path: Path, exe_path: Path, triple: str, links: list[str
         cmd += link_args(links)
         if "windows" in triple:
             cmd.append("-lws2_32")  # sockets (std.net); unused libraries add nothing
+            cmd.append("-lsecur32")  # TLS (std.tls uses SChannel)
+        elif _uses_openssl(obj_path):
+            cmd += _openssl_link_args()
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print("Error: linking failed:", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
+        if "-lssl" in cmd and ("-lssl" in result.stderr or "-lcrypto" in result.stderr):
+            print("Hint: https and TLS (std.tls) need the OpenSSL library on this system: install libssl-dev "
+                  "(Debian, Ubuntu), openssl-devel (Fedora), or `brew install openssl` (macOS).", file=sys.stderr)
         return 1
     if debug and "apple" in triple:
         # The linker leaves the DWARF in the object file, which is deleted; dsymutil copies it into exe.dSYM

@@ -2,7 +2,7 @@
   "name": "greengold-vscode",
   "displayName": "Greengold Language Support",
   "description": "Full IDE experience for Greengold (.gg): LSP, Test Explorer, CodeLens, native debugging, syntax highlighting, diagnostics, hover, inlay hints, definition, references, rename, completion, formatting, snippets, and tasks.",
-  "version": "0.21.5",
+  "version": "0.22.0",
   "publisher": "greengoldlang",
   "icon": "icons/greengold_logo.png",
   "engines": {
