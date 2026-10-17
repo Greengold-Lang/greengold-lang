@@ -102,12 +102,14 @@ fn _round(x: f32) -> i32:
 # A vector of f32 quantized to `q8_0`, the form in which an activation meets a quantized matrix.
 struct Q8Vec:
     blocks: List[BlockQ8]
+    scales: List[f32]  # the block scales as f32, so a kernel does not convert them again for every row
+    corrections: List[f32]  # scale * 8 * (sum of the block's values): what a q4_0 row subtracts for its offset of 8
     len: usize
 
 fn quantize_q8(x: []f32) -> Q8Vec:
     if x.len % BLOCK != 0:
         panic("quantize_q8: the length must be a multiple of 32")
-    out = Q8Vec{ blocks: List[BlockQ8](), len: x.len }
+    out = Q8Vec{ blocks: List[BlockQ8](), scales: List[f32](), corrections: List[f32](), len: x.len }
     n = x.len / BLOCK
     out.blocks.reserve(n)
     for b in 0..n:
@@ -126,7 +128,13 @@ fn quantize_q8(x: []f32) -> Q8Vec:
         qs: [32]i8 = [0; 32]
         for j in 0..BLOCK:
             qs[j] = i8(_round(x[base + j] * id))
-        out.blocks.push(BlockQ8{ d: f32_to_f16(d), qs: qs })
+        h = f32_to_f16(d)
+        out.blocks.push(BlockQ8{ d: h, qs: qs })
+        out.scales.push(f16_scale(h))
+        total: i32 = 0
+        for j in 0..BLOCK:
+            total += i32(qs[j])
+        out.corrections.push(f16_scale(h) * 8.0 * f32(total))
     return out
 
 impl Q8Vec:
@@ -253,50 +261,98 @@ fn _quantize_block_q4(x: []f32, base: usize) -> BlockQ4:
         qs[j] = u8(lo) | (u8(hi) << 4)
     return BlockQ4{ d: f32_to_f16(d), qs: qs }
 
-# The dot product of one row of `q4_0` weights with a `q8_0` vector, `nb` blocks each.
-fn _row_dot_q4(w: []BlockQ4, wbase: usize, x: []BlockQ8, nb: usize) -> f32:
-    facc = f32x4.splat(0.0)
+# The dot product of one row of `q4_0` weights with a `q8_0` vector, `nb` blocks each. One 256-bit step per block:
+# the 16 low nibbles and the 16 high nibbles are joined into 32 signed bytes.
+fn _row_dot_q4(w: []BlockQ4, wbase: usize, x: []BlockQ8, xscale: []f32, xcorr: []f32, nb: usize) -> f32:
+    facc = f32x8.splat(0.0)
+    corr: f32 = 0.0
     for b in 0..nb:
         packed = u8x16.load(w[wbase + b].qs[..], 0)
-        lo = ((packed & u8x16.splat(0x0F)) - u8x16.splat(8)).as_i8()
-        hi = (packed.shr(4) - u8x16.splat(8)).as_i8()
-        xs = x[b].qs[..]
-        isum = i32x4.splat(0).dot_i8(lo, i8x16.load(xs, 0)).dot_i8(hi, i8x16.load(xs, 16))
-        facc = isum.to_f32().fma(f32x4.splat(f16_scale(w[wbase + b].d) * f16_scale(x[b].d)), facc)
+        nibbles = (packed & u8x16.splat(0x0F)).join(packed.shr(4))
+        isum = i32x8.splat(0).dot_u4i8(nibbles, i8x32.load(x[b].qs[..], 0))
+        scale = f16_scale(w[wbase + b].d)
+        facc = isum.to_f32().fma(f32x8.splat(scale * xscale[b]), facc)
+        corr += scale * xcorr[b]
+    return facc.sum() - corr
+
+fn _row_dot_q8(w: []BlockQ8, wbase: usize, x: []BlockQ8, xscale: []f32, nb: usize) -> f32:
+    facc = f32x8.splat(0.0)
+    for b in 0..nb:
+        isum = i32x8.splat(0).dot_i8(i8x32.load(w[wbase + b].qs[..], 0), i8x32.load(x[b].qs[..], 0))
+        facc = isum.to_f32().fma(f32x8.splat(f16_scale(w[wbase + b].d) * xscale[b]), facc)
     return facc.sum()
 
-fn _row_dot_q8(w: []BlockQ8, wbase: usize, x: []BlockQ8, nb: usize) -> f32:
-    facc = f32x4.splat(0.0)
+# Two rows at once: the vector block is loaded and its scale read once for both.
+fn _rows2_dot_q4(w: []BlockQ4, base: usize, nb: usize, x: []BlockQ8, xscale: []f32, xcorr: []f32) -> (f32, f32):
+    fa = f32x8.splat(0.0)
+    fb = f32x8.splat(0.0)
+    ca: f32 = 0.0
+    cb: f32 = 0.0
     for b in 0..nb:
-        ws = w[wbase + b].qs[..]
-        xs = x[b].qs[..]
-        isum = i32x4.splat(0).dot_i8(i8x16.load(ws, 0), i8x16.load(xs, 0)).dot_i8(i8x16.load(ws, 16), i8x16.load(xs, 16))
-        facc = isum.to_f32().fma(f32x4.splat(f16_scale(w[wbase + b].d) * f16_scale(x[b].d)), facc)
-    return facc.sum()
+        xv = i8x32.load(x[b].qs[..], 0)
+        xsc = xscale[b]
+        pa = u8x16.load(w[base + b].qs[..], 0)
+        pb = u8x16.load(w[base + nb + b].qs[..], 0)
+        ia = i32x8.splat(0).dot_u4i8((pa & u8x16.splat(0x0F)).join(pa.shr(4)), xv)
+        ib = i32x8.splat(0).dot_u4i8((pb & u8x16.splat(0x0F)).join(pb.shr(4)), xv)
+        sa = f16_scale(w[base + b].d)
+        sb = f16_scale(w[base + nb + b].d)
+        fa = ia.to_f32().fma(f32x8.splat(sa * xsc), fa)
+        fb = ib.to_f32().fma(f32x8.splat(sb * xsc), fb)
+        ca += sa * xcorr[b]
+        cb += sb * xcorr[b]
+    return (fa.sum() - ca, fb.sum() - cb)
+
+fn _rows2_dot_q8(w: []BlockQ8, base: usize, nb: usize, x: []BlockQ8, xscale: []f32) -> (f32, f32):
+    fa = f32x8.splat(0.0)
+    fb = f32x8.splat(0.0)
+    for b in 0..nb:
+        xv = i8x32.load(x[b].qs[..], 0)
+        xsc = xscale[b]
+        ia = i32x8.splat(0).dot_i8(i8x32.load(w[base + b].qs[..], 0), xv)
+        ib = i32x8.splat(0).dot_i8(i8x32.load(w[base + nb + b].qs[..], 0), xv)
+        fa = ia.to_f32().fma(f32x8.splat(f16_scale(w[base + b].d) * xsc), fa)
+        fb = ib.to_f32().fma(f32x8.splat(f16_scale(w[base + nb + b].d) * xsc), fb)
+    return (fa.sum(), fb.sum())
 
 struct _JobQ4:
     w: []BlockQ4
     x: []BlockQ8
+    xscale: []f32
+    xcorr: []f32
     y: *mut f32
     nb: usize
 
 struct _JobQ8:
     w: []BlockQ8
     x: []BlockQ8
+    xscale: []f32
     y: *mut f32
     nb: usize
 
 fn _rows_q4(start: usize, end: usize, ctx: *u8):
     unsafe:
         job = ptr_cast[*_JobQ4](ctx)
-        for r in start..end:
-            job[0].y[r] = _row_dot_q4(job[0].w, r * job[0].nb, job[0].x, job[0].nb)
+        r = start
+        while r + 2 <= end:
+            a, b = _rows2_dot_q4(job[0].w, r * job[0].nb, job[0].nb, job[0].x, job[0].xscale, job[0].xcorr)
+            job[0].y[r] = a
+            job[0].y[r + 1] = b
+            r += 2
+        if r < end:
+            job[0].y[r] = _row_dot_q4(job[0].w, r * job[0].nb, job[0].x, job[0].xscale, job[0].xcorr, job[0].nb)
 
 fn _rows_q8(start: usize, end: usize, ctx: *u8):
     unsafe:
         job = ptr_cast[*_JobQ8](ctx)
-        for r in start..end:
-            job[0].y[r] = _row_dot_q8(job[0].w, r * job[0].nb, job[0].x, job[0].nb)
+        r = start
+        while r + 2 <= end:
+            a, b = _rows2_dot_q8(job[0].w, r * job[0].nb, job[0].nb, job[0].x, job[0].xscale)
+            job[0].y[r] = a
+            job[0].y[r + 1] = b
+            r += 2
+        if r < end:
+            job[0].y[r] = _row_dot_q8(job[0].w, r * job[0].nb, job[0].x, job[0].xscale, job[0].nb)
 
 public
 # A matrix of `q4_0` blocks: `rows` rows of `cols` weights, each row `cols / 32` blocks.
@@ -338,8 +394,14 @@ impl Q4Matrix:
         nb = self.cols / BLOCK
         if x.len != self.cols or y.len != self.rows:
             panic("Q4Matrix.matvec: the sizes do not match")
-        for r in 0..self.rows:
-            y[r] = _row_dot_q4(self.blocks[..], r * nb, x.blocks[..], nb)
+        r: usize = 0
+        while r + 2 <= self.rows:
+            a, b = _rows2_dot_q4(self.blocks[..], r * nb, nb, x.blocks[..], x.scales[..], x.corrections[..])
+            y[r] = a
+            y[r + 1] = b
+            r += 2
+        if r < self.rows:
+            y[r] = _row_dot_q4(self.blocks[..], r * nb, x.blocks[..], x.scales[..], x.corrections[..], nb)
 
     # The same, with the rows shared between the threads of `pool`.
     fn matvec_parallel(self: read Q4Matrix, pool: lend parallel.Pool, x: read Q8Vec, y: lend []f32):
@@ -347,7 +409,7 @@ impl Q4Matrix:
         if x.len != self.cols or y.len != self.rows:
             panic("Q4Matrix.matvec_parallel: the sizes do not match")
         unsafe:
-            job = _JobQ4{ w: self.blocks[..], x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
+            job = _JobQ4{ w: self.blocks[..], x: x.blocks[..], xscale: x.scales[..], xcorr: x.corrections[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
             pool.for_range(self.rows, _rows_q4, ptr_cast[*u8](addr(job)))
 
 public
@@ -375,13 +437,19 @@ impl Q8Matrix:
         nb = self.cols / BLOCK
         if x.len != self.cols or y.len != self.rows:
             panic("Q8Matrix.matvec: the sizes do not match")
-        for r in 0..self.rows:
-            y[r] = _row_dot_q8(self.blocks[..], r * nb, x.blocks[..], nb)
+        r: usize = 0
+        while r + 2 <= self.rows:
+            a, b = _rows2_dot_q8(self.blocks[..], r * nb, nb, x.blocks[..], x.scales[..])
+            y[r] = a
+            y[r + 1] = b
+            r += 2
+        if r < self.rows:
+            y[r] = _row_dot_q8(self.blocks[..], r * nb, x.blocks[..], x.scales[..], nb)
 
     fn matvec_parallel(self: read Q8Matrix, pool: lend parallel.Pool, x: read Q8Vec, y: lend []f32):
         nb = self.cols / BLOCK
         if x.len != self.cols or y.len != self.rows:
             panic("Q8Matrix.matvec_parallel: the sizes do not match")
         unsafe:
-            job = _JobQ8{ w: self.blocks[..], x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
+            job = _JobQ8{ w: self.blocks[..], x: x.blocks[..], xscale: x.scales[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
             pool.for_range(self.rows, _rows_q8, ptr_cast[*u8](addr(job)))

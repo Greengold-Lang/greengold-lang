@@ -153,3 +153,23 @@ def test_shift_amount_out_of_range_panics():
     res = run_built("fn main():\n    k: usize = 8\n    print(u8x16.splat(1).shl(k))\n")
     assert res.returncode != 0
     assert "shift amount out of range" in res.stderr
+
+
+@pytest.mark.parametrize("cpu", ["", "x86-64-v2", "x86-64-v3", "native"])
+def test_dot_u4i8(cpu):
+    from greengold import llvm_driver
+    program = """fn main():
+    x = u8x32.splat(15)
+    w = i8x32.splat(-127)
+    acc = i32x8.splat(1).dot_u4i8(x, w)
+    print(acc.sum(), acc.lane(0))
+    a = i32x4.splat(0).dot_u4i8(u8x16.splat(7), i8x16.splat(3))
+    print(a.sum())
+"""
+    llvm_driver.set_cpu(cpu or None)
+    try:
+        res = run_built(program)
+    finally:
+        llvm_driver.set_cpu(None)
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.splitlines() == [f"{8 + 32 * 15 * -127} {1 + 4 * 15 * -127}", str(16 * 7 * 3)]

@@ -2330,7 +2330,7 @@ struct BlockQ4 { d: u16, qs: [16]u8 }
 One block of `q4_0`: 18 bytes.
 
 ```
-struct Q8Vec { blocks: List[BlockQ8], len: usize }
+struct Q8Vec { blocks: List[BlockQ8], scales: List[f32], corrections: List[f32], len: usize }
 ```
 A vector of f32 quantized to `q8_0`, the form in which an activation meets a quantized matrix.
 

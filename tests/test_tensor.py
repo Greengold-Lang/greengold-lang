@@ -98,8 +98,13 @@ fn main():
 """
 
 
-@pytest.mark.parametrize("release", [False, True])
-def test_quantized_matvec(release):
-    res = run_built(MATRIX, release=release, timeout=60)
+@pytest.mark.parametrize("release, cpu", [(False, ""), (True, ""), (True, "x86-64-v2"), (True, "native")])
+def test_quantized_matvec(release, cpu):
+    from greengold import llvm_driver
+    llvm_driver.set_cpu(cpu or None)
+    try:
+        res = run_built(MATRIX, release=release, timeout=60)
+    finally:
+        llvm_driver.set_cpu(None)
     assert res.returncode == 0, res.stderr
     assert res.stdout.splitlines() == ["34 18", "true true true true", "1 6720 6720"]

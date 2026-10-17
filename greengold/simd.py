@@ -11,9 +11,12 @@
 
     acc = a.fma(b, c)                    # a * b + c in one rounding (float vectors)
     acc = acc.dot_i8(x, w)               # i32x4 += 4-lane dot products of i8x16 x, w   (i32x8 with i8x32)
+    acc = acc.dot_u4i8(x, w)             # fast form for 4-bit x (every lane 0..15, or at most 128); lane j sums bytes 4j..4j+3
+    acc = acc.dot_u4i8(x, w)             # fast, for a 4-bit x (u8 lanes 0..15; at most 128 is exact); lane j sums bytes 4j..4j+3
     acc = acc.dot_u8i8(x, w)             # the same with an unsigned left operand (u8x16 / u8x32)
 
     v.shr(k) / v.shl(k)                  # shift every integer lane (arithmetic for signed lanes); k < lane bits
+    a.join(b)                            # u8x16 / i8x16 -> the 32 lanes of a, then those of b
     v.to_f32()                           # i32x4 -> f32x4, i32x8 -> f32x8 (exact below 2^24)
     v.as_i8() / v.as_u8()                # the same bits as 8-bit vector of the other signedness
 
@@ -41,6 +44,7 @@ _SIGN_FLIP = {"u8x16": ("as_i8", "i8x16"), "u8x32": ("as_i8", "i8x32"),
               "i8x16": ("as_u8", "u8x16"), "i8x32": ("as_u8", "u8x32")}
 
 
+_JOIN = {"u8x16": "u8x32", "i8x16": "i8x32"}
 _TO_F32 = {"i32x4": "f32x4", "i32x8": "f32x8"}
 
 
@@ -126,6 +130,8 @@ class SimdCheckMixin:
         if not _is_float(ty):
             table["shr"] = ([ParamInfo("k", "usize", "val", None)], ty)
             table["shl"] = ([ParamInfo("k", "usize", "val", None)], ty)
+        if ty in _JOIN:
+            table["join"] = ([ParamInfo("other", ty, "val", None)], _JOIN[ty])
         if ty in _TO_F32:
             table["to_f32"] = ([], _TO_F32[ty])
         if ty in _SIGN_FLIP:
@@ -133,6 +139,7 @@ class SimdCheckMixin:
         if ty in _DOT:
             signed, unsigned = _DOT[ty]
             table["dot_i8"] = ([ParamInfo("x", signed, "val", None), ParamInfo("w", signed, "val", None)], ty)
+            table["dot_u4i8"] = ([ParamInfo("x", unsigned, "val", None), ParamInfo("w", signed, "val", None)], ty)
             table["dot_u8i8"] = ([ParamInfo("x", unsigned, "val", None), ParamInfo("w", signed, "val", None)], ty)
         if e.method not in table:
             self._err(e, f"`{ty}` has no method named `{e.method}`.", f"Methods: {', '.join(table)}.")
@@ -246,6 +253,10 @@ def call(cg, e):
         else:
             less = b.icmp_signed("<", v, w)
         return b.select(less, v, w) if kind == "min" else b.select(less, w, v)
+    if kind == "join":
+        w = cg.expr(e.args[0])
+        mask = ir.Constant(ir.VectorType(ir.IntType(32), 2 * n), list(range(2 * n)))
+        return b.shuffle_vector(v, w, mask)
     if kind == "to_f32":
         return b.sitofp(v, llty(cg, _TO_F32[ty]))
     if kind in ("as_i8", "as_u8"):
@@ -264,6 +275,20 @@ def call(cg, e):
         name = f"llvm.fma.v{n}{f}"
         fn = cg.mod.globals.get(name) or ir.Function(cg.mod, ir.FunctionType(lt, [lt, lt, lt]), name)
         return b.call(fn, [v, cg.expr(e.args[0]), cg.expr(e.args[1])])
+    if kind == "dot_u4i8":
+        x, w = cg.expr(e.args[0]), cg.expr(e.args[1])
+        if cg.triple.startswith(("x86_64", "i686")) and _has_ssse3(cg):
+            return _dot_u4_x86(cg, v, x, w, n)
+        # other CPUs: groups of four neighbours, in 32 bits
+        i32 = ir.IntType(32)
+        wide = ir.VectorType(i32, n * 4)
+        prod = b.mul(b.zext(x, wide), b.sext(w, wide))
+        undef = ir.Constant(wide, ir.Undefined)
+        acc = v
+        for k in range(4):
+            mask = ir.Constant(ir.VectorType(i32, n), [4 * j + k for j in range(n)])
+            acc = b.add(acc, b.shuffle_vector(prod, undef, mask))
+        return acc
     if kind in ("dot_i8", "dot_u8i8"):
         x, w = cg.expr(e.args[0]), cg.expr(e.args[1])
         i16, i32 = ir.IntType(16), ir.IntType(32)
@@ -295,15 +320,28 @@ _AVX2_CPUS = {"haswell", "broadwell", "skylake", "skylake-avx512", "skx", "casca
               "x86-64-v3", "x86-64-v4", "core-avx2", "knl", "knm", "goldmont", "tremont"}
 
 
-def _has_avx2(cg) -> bool:
+_SSSE3_CPUS = _AVX2_CPUS | {"core2", "penryn", "nehalem", "westmere", "sandybridge", "ivybridge", "corei7", "corei7-avx",
+                            "core-avx-i", "bonnell", "atom", "silvermont", "slm", "goldmont-plus", "x86-64-v2",
+                            "btver1", "btver2", "bdver1", "bdver2", "bdver3", "bdver4", "barcelona"}
+
+
+def _feature(cg, names: tuple[str, ...], cpus: set[str]) -> bool:
+    """True when the chosen CPU (`--cpu` / `--features`) has one of the features: the last mention wins, else the CPU name."""
     from .llvm_driver import cpu_options
     cpu, feats = cpu_options(cg.triple)
-    flags = [f.strip() for f in feats.split(",") if f.strip()]
     on = None
-    for f in flags:  # the last mention wins
-        if f.lstrip("+-") == "avx2":
+    for f in (x.strip() for x in feats.split(",")):
+        if f and f.lstrip("+-") in names:
             on = f.startswith("+")
-    return on if on is not None else cpu in _AVX2_CPUS
+    return on if on is not None else cpu in cpus
+
+
+def _has_avx2(cg) -> bool:
+    return _feature(cg, ("avx2",), _AVX2_CPUS)
+
+
+def _has_ssse3(cg) -> bool:
+    return _has_avx2(cg) or _feature(cg, ("ssse3", "sse4.1", "sse4.2", "avx"), _SSSE3_CPUS)
 
 
 def _dot_x86(cg, acc, xs, ws, n: int):
@@ -332,6 +370,38 @@ def _dot_x86(cg, acc, xs, ws, n: int):
             prod = pmadd(2 * n, piece(xs, base, 2 * n), piece(ws, base, 2 * n))
         acc = b.add(acc, prod)
     return acc
+
+
+def _dot_u4_x86(cg, acc, x, w, n: int):
+    """`pmaddubsw` then `pmaddwd` with ones: lane j gets bytes 4j .. 4j+3. Exact while every byte of `x` is at
+    most 128 (two products must fit a signed 16-bit number)."""
+    b = cg.b
+    i8, i16, i32 = ir.IntType(8), ir.IntType(16), ir.IntType(32)
+    total = n * 4
+
+    def fn(name, ret, args):
+        return cg.mod.globals.get(name) or ir.Function(cg.mod, ir.FunctionType(ret, args), name)
+
+    def piece(vec, start, count):
+        undef = ir.Constant(vec.type, ir.Undefined)
+        return b.shuffle_vector(vec, undef, ir.Constant(ir.VectorType(i32, count), list(range(start, start + count))))
+
+    def one(xp, wp, width):  # `width` bytes -> width / 4 lanes of i32
+        if width == 32:
+            t = b.call(fn("llvm.x86.avx2.pmadd.ub.sw", ir.VectorType(i16, 16), [ir.VectorType(i8, 32)] * 2), [xp, wp])
+            ones = ir.Constant(ir.VectorType(i16, 16), [1] * 16)
+            return b.call(fn("llvm.x86.avx2.pmadd.wd", ir.VectorType(i32, 8), [ir.VectorType(i16, 16)] * 2), [t, ones])
+        t = b.call(fn("llvm.x86.ssse3.pmadd.ub.sw.128", ir.VectorType(i16, 8), [ir.VectorType(i8, 16)] * 2), [xp, wp])
+        ones = ir.Constant(ir.VectorType(i16, 8), [1] * 8)
+        return b.call(fn("llvm.x86.sse2.pmadd.wd", ir.VectorType(i32, 4), [ir.VectorType(i16, 8)] * 2), [t, ones])
+
+    if total == 32 and not _has_avx2(cg):
+        lo = one(piece(x, 0, 16), piece(w, 0, 16), 16)
+        hi = one(piece(x, 16, 16), piece(w, 16, 16), 16)
+        prod = b.shuffle_vector(lo, hi, ir.Constant(ir.VectorType(i32, 8), list(range(8))))
+    else:
+        prod = one(x, w, total)
+    return b.add(acc, prod)
 
 
 def show(cg, out, v, ty: str) -> None:
