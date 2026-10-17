@@ -1,0 +1,184 @@
+# std.parallel: a pool of worker threads that share a range of work.
+#
+#     import std.parallel
+#
+#     struct Job:
+#         src: *i32
+#         dst: *mut i32
+#
+#     fn square(start: usize, end: usize, ctx: *u8):
+#         unsafe:
+#             job = ptr_cast[*Job](ctx)
+#             for i in start..end:
+#                 job[0].dst[i] = job[0].src[i] * job[0].src[i]
+#
+#     pool = parallel.Pool.new(0)              # 0: one thread per CPU
+#     pool.for_range(n, square, ptr_cast[*u8](addr(job)))
+#
+# `for_range(n, f, ctx)` calls `f(start, end, ctx)` on pieces of `0..n` from all the pool's threads (the calling
+# thread takes part) and returns when every piece is done. The pieces are handed out one at a time, so a slow
+# piece does not hold the others back. `ctx` is whatever the pieces need, usually a pointer to a struct on the
+# caller's stack; two pieces never overlap, so a piece may write the part of an output that belongs to its range.
+# The threads sleep between calls and are joined when the pool goes away.
+
+import std.thread
+
+private
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+extern "pthread.h" fn pthread_mutex_init(m: *mut u8, attr: *u8) -> i32
+extern "pthread.h" fn pthread_mutex_lock(m: *mut u8) -> i32
+extern "pthread.h" fn pthread_mutex_unlock(m: *mut u8) -> i32
+extern "pthread.h" fn pthread_cond_init(c: *mut u8, attr: *u8) -> i32
+extern "pthread.h" fn pthread_cond_wait(c: *mut u8, m: *mut u8) -> i32
+extern "pthread.h" fn pthread_cond_broadcast(c: *mut u8) -> i32
+extern "windows.h" fn GetActiveProcessorCount(group: u16) -> u32
+weak extern "unistd.h" fn sysconf(name: i32) -> i64
+
+# The shared block, in i64 words: [0..8) mutex, [8..16) wake-up condition, [16..24) completion condition,
+# 24 generation, 25 quit, 26 workers still busy, 27 n, 28 piece size, 29 next piece start (atomic),
+# 30 job (function pointer), 31 ctx (pointer as integer).
+const WORDS: usize = 32
+
+public
+# How many CPUs this machine has (at least 1).
+fn cpu_count() -> usize:
+    unsafe:
+        if target_os() == "windows":
+            n = GetActiveProcessorCount(65535)
+            if n > 0:
+                return usize(n)
+        else:
+            id: i32 = 84
+            if target_os() == "macos":
+                id = 58
+            n = sysconf(id)
+            if n > 0:
+                return usize(n)
+    return 1
+
+private
+# Takes pieces of the current job until none are left.
+fn _drain(base: *mut i64):
+    unsafe:
+        job = ptr_read[fn(usize, usize, *u8)](ptr_cast[*mut u8](ptr_offset(base, 30)))
+        ctx = int_to_ptr[*u8](usize(base[31]))
+        n = base[27]
+        chunk = base[28]
+        counter = ptr_cast[*mut i64](ptr_offset(base, 29))
+        while true:
+            start = atomic_add[i64](counter, chunk, "seq_cst")
+            if start >= n:
+                break
+            end = start + chunk
+            if end > n:
+                end = n
+            job(usize(start), usize(end), ctx)
+
+fn _worker(arg: *u8) -> *u8:
+    unsafe:
+        base = ptr_cast[*mut i64](arg)
+        mtx = ptr_cast[*mut u8](arg)
+        wake = ptr_cast[*mut u8](ptr_offset(base, 8))
+        done = ptr_cast[*mut u8](ptr_offset(base, 16))
+        seen: i64 = 0
+        while true:
+            pthread_mutex_lock(mtx)
+            while base[24] == seen and base[25] == 0:
+                pthread_cond_wait(wake, mtx)
+            if base[25] != 0:
+                pthread_mutex_unlock(mtx)
+                return null
+            seen = base[24]
+            pthread_mutex_unlock(mtx)
+            _drain(base)
+            pthread_mutex_lock(mtx)
+            base[26] = base[26] - 1
+            if base[26] == 0:
+                pthread_cond_broadcast(done)
+            pthread_mutex_unlock(mtx)
+    return null
+
+public
+# Worker threads that run `for_range` jobs. One call at a time: `for_range` takes `lend self`.
+struct Pool:
+    private
+    cell: *mut u8
+    threads: List[thread.Thread]
+    size: usize
+
+impl Pool:
+    # A pool of `threads` threads in all, counting the caller's; 0 means one per CPU.
+    public
+    fn new(threads: usize) -> Pool:
+        total = threads
+        if total == 0:
+            total = cpu_count()
+        pool = Pool{ cell: null, threads: List[thread.Thread](), size: total }
+        unsafe:
+            raw = malloc(usize(WORDS * 8))
+            base = ptr_cast[*mut i64](raw)
+            for i in 0..WORDS:
+                base[i] = 0
+            pthread_mutex_init(raw, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(base, 8)), null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(base, 16)), null)
+            pool.cell = raw
+            for i in 1..total:
+                pool.threads.push(thread.Thread.spawn_raw(_worker, raw))
+        return pool
+
+    # The number of threads that share a job, the caller included.
+    fn size(self: read Pool) -> usize:
+        return self.size
+
+    # Calls `f(start, end, ctx)` for pieces of `0..n`, of about n / (4 * size) items each, and waits for all.
+    fn for_range(self: lend Pool, n: usize, f: fn(usize, usize, *u8), ctx: *u8):
+        chunk = (n + self.size * 4 - 1) / (self.size * 4)
+        self.for_range_chunked(n, chunk, f, ctx)
+
+    # The same with pieces of `chunk` items (the last one may be shorter). `chunk` 0 counts as 1.
+    fn for_range_chunked(self: lend Pool, n: usize, chunk: usize, f: fn(usize, usize, *u8), ctx: *u8):
+        size = chunk
+        if size == 0:
+            size = 1
+        if n == 0:
+            return
+        if self.size == 1 or n <= size:
+            f(0, n, ctx)
+            return
+        unsafe:
+            base = ptr_cast[*mut i64](self.cell)
+            mtx = self.cell
+            wake = ptr_cast[*mut u8](ptr_offset(base, 8))
+            done = ptr_cast[*mut u8](ptr_offset(base, 16))
+            workers = i64(self.size - 1)
+            pthread_mutex_lock(mtx)
+            base[27] = i64(n)
+            base[28] = i64(size)
+            base[29] = 0
+            ptr_write[fn(usize, usize, *u8)](ptr_cast[*mut u8](ptr_offset(base, 30)), f)
+            base[31] = i64(ptr_to_int(ctx))
+            base[26] = workers
+            base[24] = base[24] + 1
+            pthread_cond_broadcast(wake)
+            pthread_mutex_unlock(mtx)
+            _drain(base)
+            pthread_mutex_lock(mtx)
+            while base[26] != 0:
+                pthread_cond_wait(done, mtx)
+            pthread_mutex_unlock(mtx)
+
+    fn drop(self: lend Self):
+        if self.cell == null:
+            return
+        unsafe:
+            base = ptr_cast[*mut i64](self.cell)
+            pthread_mutex_lock(self.cell)
+            base[25] = 1
+            pthread_cond_broadcast(ptr_cast[*mut u8](ptr_offset(base, 8)))
+            pthread_mutex_unlock(self.cell)
+        for i in 0..self.threads.len():
+            self.threads[i].join()
+        unsafe:
+            free(self.cell)

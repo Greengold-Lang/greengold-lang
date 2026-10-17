@@ -17,6 +17,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.math](#stdmath) (22)
 - [std.net](#stdnet) (59)
 - [std.packet](#stdpacket) (44)
+- [std.parallel](#stdparallel) (7)
 - [std.process](#stdprocess) (6)
 - [std.rand](#stdrand) (10)
 - [std.regex](#stdregex) (13)
@@ -1902,6 +1903,46 @@ Bytes held that are not yet a whole message.
 fn FrameBuffer.next(self: lend FrameBuffer, max_len: usize) -> Result[Optional[string], string]
 ```
 The next whole message, or None when more bytes are needed.
+
+
+## std.parallel
+
+### struct
+
+```
+struct Pool { cell: *mut u8, threads: List[Thread], size: usize }
+```
+Worker threads that run `for_range` jobs.
+
+### fn
+
+```
+fn cpu_count() -> usize
+```
+How many CPUs this machine has (at least 1).
+
+```
+fn Pool.new(threads: usize) -> Pool
+```
+
+```
+fn Pool.size(self: read Pool) -> usize
+```
+The number of threads that share a job, the caller included.
+
+```
+fn Pool.for_range(self: lend Pool, n: usize, f: fn(usize, usize, *u8), ctx: *u8)
+```
+Calls `f(start, end, ctx)` for pieces of `0..n`, of about n / (4 * size) items each, and waits for all.
+
+```
+fn Pool.for_range_chunked(self: lend Pool, n: usize, chunk: usize, f: fn(usize, usize, *u8), ctx: *u8)
+```
+The same with pieces of `chunk` items (the last one may be shorter).
+
+```
+fn Pool.drop(self: lend Pool)
+```
 
 
 ## std.process
