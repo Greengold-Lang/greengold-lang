@@ -119,19 +119,25 @@ def test_sentencepiece_special_tokens(tmp_path, spm_model):
     assert ids_a == ids_b + [special]
     (plain, _), = run_encoder(tmp_path, blob, ["a<|sp|>"], special=False)
     assert special not in plain
+    # text that is not ASCII before and after a special token (the match must not cut a character)
+    (ids_c, _), (ids_d, _), (ids_e, _) = run_encoder(tmp_path, blob, ["é中<|sp|>", "é中", "é<|sp|>x"], special=True)
+    assert ids_c == ids_d + [special]
+    assert special in ids_e
 
 
 LLAMA3 = (r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+"
           r"|\s+(?!\S)|\s+")
 
 
-@pytest.fixture(scope="module")
-def bpe_model(tmp_path_factory):
-    tokenizers = pytest.importorskip("tokenizers")
+QWEN2 = LLAMA3.replace(r"\p{N}{1,3}", r"\p{N}")
+
+
+def make_bpe(regex, pre):
+    pytest.importorskip("tokenizers")
     from tokenizers import Regex, Tokenizer, decoders, models, pre_tokenizers, trainers
     tk = Tokenizer(models.BPE())
     tk.pre_tokenizer = pre_tokenizers.Sequence([
-        pre_tokenizers.Split(Regex(LLAMA3), behavior="isolated", invert=False),
+        pre_tokenizers.Split(Regex(regex), behavior="isolated", invert=False),
         pre_tokenizers.ByteLevel(add_prefix_space=False, use_regex=False)])
     tk.decoder = decoders.ByteLevel()
     trainer = trainers.BpeTrainer(vocab_size=420, initial_alphabet=pre_tokenizers.ByteLevel.alphabet(),
@@ -143,10 +149,29 @@ def bpe_model(tmp_path_factory):
     merges = [m if isinstance(m, str) else " ".join(m) for m in spec["model"]["merges"]]
     types = [3 if t.startswith("<|") else 1 for t in tokens]
     kvs = [kv_str("general.architecture", "llama"), kv_str("tokenizer.ggml.model", "gpt2"),
+           kv_str("tokenizer.ggml.pre", pre),
            kv_str_array("tokenizer.ggml.tokens", tokens), kv_i32_array("tokenizer.ggml.token_type", types),
            kv_str_array("tokenizer.ggml.merges", merges), kv_u32("tokenizer.ggml.bos_token_id", 0),
            kv_u32("tokenizer.ggml.eos_token_id", 1)]
     return tk, write_gguf(kvs, [])
+
+
+@pytest.fixture(scope="module")
+def bpe_model():
+    return make_bpe(LLAMA3, "llama-bpe")
+
+
+@pytest.fixture(scope="module")
+def bpe_qwen():
+    return make_bpe(QWEN2, "qwen2")
+
+
+def test_qwen2_pre_tokenizer_splits_digits(tmp_path, bpe_qwen):
+    tk, blob = bpe_qwen
+    texts = ["In 2024 there were 1234567 cats, 3.14159 and 007.", "x1y22z333"]
+    for text, (ids, back) in zip(texts, run_encoder(tmp_path, blob, texts)):
+        assert ids == tk.encode(text).ids, text
+        assert back == text
 
 
 def test_byte_level_bpe_matches_reference(tmp_path, bpe_model):

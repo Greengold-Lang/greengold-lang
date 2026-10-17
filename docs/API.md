@@ -15,11 +15,12 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.intern](#stdintern) (5)
 - [std.io](#stdio) (11)
 - [std.json](#stdjson) (23)
-- [std.llama](#stdllama) (12)
+- [std.kquant](#stdkquant) (14)
+- [std.llama](#stdllama) (15)
 - [std.math](#stdmath) (22)
 - [std.mmap](#stdmmap) (5)
 - [std.net](#stdnet) (59)
-- [std.nn](#stdnn) (20)
+- [std.nn](#stdnn) (21)
 - [std.packet](#stdpacket) (44)
 - [std.parallel](#stdparallel) (7)
 - [std.process](#stdprocess) (6)
@@ -1423,6 +1424,80 @@ fn Json.to_json(self: read Json) -> string
 `to_json(x)` of a struct with a `Json` field writes the value as it is.
 
 
+## std.kquant
+
+### struct
+
+```
+struct BlockQ4K { d: u16, dmin: u16, scales: [12]u8, qs: [128]u8 }
+```
+One super-block of `Q4_K`: 144 bytes.
+
+```
+struct BlockQ6K { ql: [128]u8, qh: [64]u8, scales: [16]i8, d: u16 }
+```
+One super-block of `Q6_K`: 210 bytes.
+
+```
+struct BlockQ8K { d: f32, qs: [256]i8, bsums: [16]i16 }
+```
+One super-block of the activation: 292 bytes.
+
+```
+struct Q8KVec { blocks: List[BlockQ8K], len: usize }
+```
+A vector quantized for the K-quant products.
+
+### const
+
+```
+const SUPER: usize
+```
+
+### fn
+
+```
+fn quantize_q8k(x: []f32) -> Q8KVec
+```
+
+```
+fn quantize_q8k_into(x: []f32, out: lend Q8KVec)
+```
+The same into an existing `Q8KVec`, reusing its memory.
+
+```
+fn Q8KVec.dequantize(self: read Q8KVec) -> List[f32]
+```
+
+```
+fn q4k_matvec(w: []BlockQ4K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32)
+```
+y = W x for `rows` x `cols` weights in `Q4_K` super-blocks (`cols` a multiple of 256) and a `Q8_K` vector.
+
+```
+fn q4k_matvec_parallel(pool: lend Pool, w: []BlockQ4K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32)
+```
+The same with the rows shared between the threads of `pool`.
+
+```
+fn q6k_matvec(w: []BlockQ6K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32)
+```
+
+```
+fn q6k_matvec_parallel(pool: lend Pool, w: []BlockQ6K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32)
+```
+
+```
+fn dequantize_row_q4k(w: []BlockQ4K, cols: usize, r: usize) -> List[f32]
+```
+Row `r` of a `Q4_K` matrix with `cols` columns, as f32.
+
+```
+fn dequantize_row_q6k(w: []BlockQ6K, cols: usize, r: usize) -> List[f32]
+```
+Row `r` of a `Q6_K` matrix with `cols` columns, as f32.
+
+
 ## std.llama
 
 ### struct
@@ -1430,31 +1505,44 @@ fn Json.to_json(self: read Json) -> string
 ```
 struct Weight { kind: u32, rows: usize, cols: usize, data: []u8 }
 ```
-A matrix as stored in the file: `rows` rows of `cols` values of type `kind` (0 f32, 1 f16, 2 q4_0, 8 q8_0).
+A matrix as stored in the file: `rows` rows of `cols` values of type `kind` (the ggml type: 0 f32, 1 f16, 2 q4_0, 8 q8_0, 12 Q4_K, 14 Q6_K).
 
 ```
-struct Config { dim: usize, hidden: usize, layers: usize, heads: usize, kv_heads: usize, head_dim: usize, vocab: usize, ctx: usize, rope_base: f32, eps: f32, neox: bool }
+struct Act { q8: Q8Vec, q8k: Q8KVec, has8: bool, hask: bool }
 ```
+The quantized forms of one activation vector, made when a weight asks for them: the `q4_0` and `q8_0` kernels use `q8`, the K-quant kernels `q8k`.
 
 ```
-struct Layer { attn_norm: []f32, wq: Weight, wk: Weight, wv: Weight, wo: Weight, ffn_norm: []f32, w_gate: Weight, w_up: Weight, w_down: Weight }
-```
-
-```
-struct Model { cfg: Config, embed: Weight, layers: List[Layer], out_norm: []f32, output: Weight, rope_factors: []f32, g: Gguf }
+struct Config { dim: usize, hidden: usize, layers: usize, heads: usize, kv_heads: usize, head_dim: usize, q_dim: usize, vocab: usize, ctx: usize, rope_base: f32, eps: f32, neox: bool, qk_norm: bool }
 ```
 
 ```
-struct State { x: List[f32], xb: List[f32], q: List[f32], k: List[f32], v: List[f32], att: List[f32], gate: List[f32], up: List[f32], logits: List[f32], xq: Q8Vec, hq: Q8Vec, caches: List[KvCache] }
+struct Layer { attn_norm: []f32, wq: Weight, wk: Weight, wv: Weight, wo: Weight, q_norm: []f32, k_norm: []f32, ffn_norm: []f32, w_gate: Weight, w_up: Weight, w_down: Weight }
+```
+
+```
+struct Model { cfg: Config, arch: string, embed: Weight, layers: List[Layer], out_norm: []f32, output: Weight, rope_factors: []f32, g: Gguf }
+```
+
+```
+struct State { x: List[f32], xb: List[f32], q: List[f32], k: List[f32], v: List[f32], att: List[f32], gate: List[f32], up: List[f32], logits: List[f32], a_dim: Act, a_att: Act, a_hid: Act, caches: List[KvCache] }
 ```
 The working memory of a run: activations, the KV cache of every layer, and the logits of the last token.
 
 ### fn
 
 ```
-fn Weight.matvec(self: read Weight, pool: lend Pool, xq: read Q8Vec, x: []f32, y: lend []f32)
+fn Act.new() -> Act
 ```
-y = W x.
+
+```
+fn Act.reset(self: lend Act)
+```
+
+```
+fn Weight.matvec(self: read Weight, pool: lend Pool, act: lend Act, x: []f32, y: lend []f32)
+```
+y = W x, where `act` stands for the vector `x` (it quantizes `x` the first time a weight needs it).
 
 ```
 fn Weight.row(self: read Weight, r: usize, out: lend []f32)
@@ -1943,6 +2031,11 @@ The softmax of `x`, in place.
 fn rmsnorm(x: []f32, weight: []f32, eps: f32, out: lend []f32)
 ```
 out = x / sqrt(mean(x * x) + eps) * weight.
+
+```
+fn rmsnorm_inplace(x: lend []f32, weight: []f32, eps: f32)
+```
+x = x / sqrt(mean(x * x) + eps) * weight, in place (the per-head norm of Qwen3's queries and keys).
 
 ```
 fn silu(x: lend []f32)
@@ -3206,7 +3299,7 @@ Ends the secured connection and frees it.
 ### struct
 
 ```
-struct Tokenizer { kind: i32, tokens: List[str], scores: List[f32], types: List[i32], index: HashMap[str, i32], ranks: HashMap[str, i32], specials: List[i32], byte_ids: List[i32], cp_to_byte: List[i32], bos: i32, eos: i32, unk: i32, add_space_prefix: bool }
+struct Tokenizer { kind: i32, tokens: List[str], scores: List[f32], types: List[i32], index: HashMap[str, i32], ranks: HashMap[str, i32], specials: List[i32], byte_ids: List[i32], cp_to_byte: List[i32], bos: i32, eos: i32, unk: i32, add_space_prefix: bool, max_digits: usize, add_bos: bool }
 ```
 
 ### fn

@@ -1,5 +1,6 @@
-# std.llama: runs LLaMA-family models (architecture "llama" in GGUF: LLaMA 1/2/3, TinyLlama, Mistral and many
-# fine-tunes) on the CPU, one token at a time.
+# std.llama: runs LLaMA-family and Qwen3 models on the CPU, one token at a time. GGUF architectures "llama" (LLaMA
+# 1/2/3, TinyLlama, Mistral and their fine-tunes) and "qwen3" (Qwen3 and models distilled onto it, such as
+# DeepSeek-R1-0528-Qwen3-8B) are read.
 #
 #     import std.llama
 #     import std.parallel
@@ -9,9 +10,10 @@
 #     st = llama.State.new(model.cfg, 2048)
 #     llama.forward(model, st, pool, token, pos)       # st.logits now holds the scores of the next token
 #
-# Weights may be stored as f32, f16, q4_0 or q8_0 (the K-quants such as Q4_K_M are not supported yet and give an
-# error naming the tensor). The weights stay in the memory-mapped file; `Model` owns the mapping.
+# Weights may be stored as f32, f16, q4_0, q8_0, Q4_K or Q6_K (so Q4_K_M files work); other types give an error
+# naming the tensor. The weights stay in the memory-mapped file; `Model` owns the mapping.
 import std.gguf
+import std.kquant
 import std.nn
 import std.parallel
 import std.string
@@ -20,7 +22,7 @@ import std.tensor
 private
 # The tensor types the matrix kernels can read.
 fn _supported(kind: u32) -> bool:
-    return kind == 0 or kind == 1 or kind == 2 or kind == 8
+    return kind == 0 or kind == 1 or kind == 2 or kind == 8 or kind == 12 or kind == 14
 
 fn _type_name(kind: u32) -> string:
     if kind == 0:
@@ -37,6 +39,10 @@ fn _type_name(kind: u32) -> string:
         return string.from("q5_1")
     if kind == 8:
         return string.from("q8_0")
+    if kind == 10:
+        return string.from("q2_K")
+    if kind == 11:
+        return string.from("q3_K")
     if kind == 12:
         return string.from("q4_K")
     if kind == 13:
@@ -64,7 +70,8 @@ fn _empty_f32() -> []f32:
         return slice_from_raw[f32](ptr_cast[*f32](nothing), 0)
 
 public
-# A matrix as stored in the file: `rows` rows of `cols` values of type `kind` (0 f32, 1 f16, 2 q4_0, 8 q8_0).
+# A matrix as stored in the file: `rows` rows of `cols` values of type `kind` (the ggml type: 0 f32, 1 f16, 2 q4_0,
+# 8 q8_0, 12 Q4_K, 14 Q6_K).
 struct Weight:
     kind: u32
     rows: usize
@@ -84,6 +91,14 @@ fn _q8s(w: Weight) -> []tensor.BlockQ8:
     unsafe:
         return slice_from_raw[tensor.BlockQ8](ptr_cast[*tensor.BlockQ8](addr(w.data)), w.rows * w.cols / 32)
 
+fn _q4ks(w: Weight) -> []kquant.BlockQ4K:
+    unsafe:
+        return slice_from_raw[kquant.BlockQ4K](ptr_cast[*kquant.BlockQ4K](addr(w.data)), w.rows * w.cols / 256)
+
+fn _q6ks(w: Weight) -> []kquant.BlockQ6K:
+    unsafe:
+        return slice_from_raw[kquant.BlockQ6K](ptr_cast[*kquant.BlockQ6K](addr(w.data)), w.rows * w.cols / 256)
+
 struct _F16Job:
     w: []u8
     x: []f32
@@ -101,6 +116,26 @@ fn _f16_rows(start: usize, end: usize, ctx: *u8):
                 total += tensor.f16_scale(h) * job[0].x[c]
             job[0].y[r] = total
 
+public
+# The quantized forms of one activation vector, made when a weight asks for them: the `q4_0` and `q8_0` kernels
+# use `q8`, the K-quant kernels `q8k`. Call `reset` when the vector changes.
+struct Act:
+    q8: tensor.Q8Vec
+    q8k: kquant.Q8KVec
+    has8: bool
+    hask: bool
+
+impl Act:
+    public
+    fn new() -> Act:
+        return Act{ q8: tensor.Q8Vec{ blocks: List[tensor.BlockQ8](), scales: List[f32](), corrections: List[f32](), len: 0 },
+            q8k: kquant.Q8KVec{ blocks: List[kquant.BlockQ8K](), len: 0 }, has8: false, hask: false }
+
+    fn reset(self: lend Act):
+        self.has8 = false
+        self.hask = false
+
+private
 # Waking the worker threads costs some tens of microseconds, so a product with fewer weights than this (or an
 # attention over fewer values than `PARALLEL_ATTENTION`) runs on the calling thread alone.
 const PARALLEL_WEIGHTS: usize = 1048576
@@ -108,19 +143,33 @@ const PARALLEL_ATTENTION: usize = 1048576
 
 public
 impl Weight:
-    # y = W x. `xq` is `x` quantized with `tensor.quantize_q8_into` (used by the q4_0 and q8_0 kernels).
-    fn matvec(self: read Weight, pool: lend parallel.Pool, xq: read tensor.Q8Vec, x: []f32, y: lend []f32):
+    # y = W x, where `act` stands for the vector `x` (it quantizes `x` the first time a weight needs it).
+    fn matvec(self: read Weight, pool: lend parallel.Pool, act: lend Act, x: []f32, y: lend []f32):
         small = self.rows * self.cols < PARALLEL_WEIGHTS or pool.size() == 1
-        if self.kind == 2:
-            if small:
-                tensor.q4_matvec(_q4s(self), self.rows, self.cols, xq, y)
+        if self.kind == 2 or self.kind == 8:
+            if not act.has8:
+                tensor.quantize_q8_into(x, act.q8)
+                act.has8 = true
+            if self.kind == 2 and small:
+                tensor.q4_matvec(_q4s(self), self.rows, self.cols, act.q8, y)
+            elif self.kind == 2:
+                tensor.q4_matvec_parallel(pool, _q4s(self), self.rows, self.cols, act.q8, y)
+            elif small:
+                tensor.q8_matvec(_q8s(self), self.rows, self.cols, act.q8, y)
             else:
-                tensor.q4_matvec_parallel(pool, _q4s(self), self.rows, self.cols, xq, y)
-        elif self.kind == 8:
-            if small:
-                tensor.q8_matvec(_q8s(self), self.rows, self.cols, xq, y)
+                tensor.q8_matvec_parallel(pool, _q8s(self), self.rows, self.cols, act.q8, y)
+        elif self.kind == 12 or self.kind == 14:
+            if not act.hask:
+                kquant.quantize_q8k_into(x, act.q8k)
+                act.hask = true
+            if self.kind == 12 and small:
+                kquant.q4k_matvec(_q4ks(self), self.rows, self.cols, act.q8k, y)
+            elif self.kind == 12:
+                kquant.q4k_matvec_parallel(pool, _q4ks(self), self.rows, self.cols, act.q8k, y)
+            elif small:
+                kquant.q6k_matvec(_q6ks(self), self.rows, self.cols, act.q8k, y)
             else:
-                tensor.q8_matvec_parallel(pool, _q8s(self), self.rows, self.cols, xq, y)
+                kquant.q6k_matvec_parallel(pool, _q6ks(self), self.rows, self.cols, act.q8k, y)
         elif self.kind == 0:
             if small:
                 nn.matvec(_f32s(self), self.rows, self.cols, x, y)
@@ -148,8 +197,16 @@ impl Weight:
             row = tensor.dequantize_row_q4(_q4s(self), self.cols, r)
             for c in 0..self.cols:
                 out[c] = row[c]
-        else:
+        elif self.kind == 8:
             row = tensor.dequantize_row_q8(_q8s(self), self.cols, r)
+            for c in 0..self.cols:
+                out[c] = row[c]
+        elif self.kind == 12:
+            row = kquant.dequantize_row_q4k(_q4ks(self), self.cols, r)
+            for c in 0..self.cols:
+                out[c] = row[c]
+        else:
+            row = kquant.dequantize_row_q6k(_q6ks(self), self.cols, r)
             for c in 0..self.cols:
                 out[c] = row[c]
 
@@ -170,11 +227,13 @@ fn _weight(g: read gguf.Gguf, name: str, rows: usize, cols: usize) -> Result[_Wh
     i = _find(g, name)?
     kind = g.tensors[i].kind
     if not _supported(kind):
-        return Err(f"tensor '{name}' is stored as {_type_name(kind).as_str()}, which is not supported yet (use f32, f16, q4_0 or q8_0)")
+        return Err(f"tensor '{name}' is stored as {_type_name(kind).as_str()}, which is not supported yet (use f32, f16, q4_0, q8_0, Q4_K or Q6_K)")
     if g.tensors[i].dims.len() != 2 or g.tensors[i].dims[0] != cols or g.tensors[i].dims[1] != rows:
         return Err(f"tensor '{name}' has an unexpected shape")
     if (kind == 2 or kind == 8) and cols % 32 != 0:
         return Err(f"tensor '{name}' has a row length that is not a multiple of 32")
+    if (kind == 12 or kind == 14) and cols % 256 != 0:
+        return Err(f"tensor '{name}' has a row length that is not a multiple of 256")
     return Ok(_Where{ kind: kind, offset: g.tensors[i].offset, size: g.tensors[i].size })
 
 fn _make(base: *u8, w: _Where, rows: usize, cols: usize) -> Weight:
@@ -198,12 +257,14 @@ struct Config:
     layers: usize
     heads: usize
     kv_heads: usize
-    head_dim: usize
+    head_dim: usize   # the size of one attention head
+    q_dim: usize      # heads * head_dim (equals dim in LLaMA models)
     vocab: usize
     ctx: usize
     rope_base: f32
     eps: f32
-    neox: bool
+    neox: bool        # rotary pairs are (i, i + head_dim / 2) instead of neighbours
+    qk_norm: bool     # Qwen3: queries and keys are normalized per head before the rotation
 
 struct Layer:
     attn_norm: []f32
@@ -211,6 +272,8 @@ struct Layer:
     wk: Weight
     wv: Weight
     wo: Weight
+    q_norm: []f32
+    k_norm: []f32
     ffn_norm: []f32
     w_gate: Weight
     w_up: Weight
@@ -219,6 +282,7 @@ struct Layer:
 public
 struct Model:
     cfg: Config
+    arch: string
     embed: Weight
     layers: List[Layer]
     out_norm: []f32
@@ -234,41 +298,49 @@ fn _int(g: read gguf.Gguf, key: str) -> Result[usize, string]:
     return Err(f"the model file has no '{key}'")
 
 impl Model:
-    # Opens a GGUF file and finds the weights of a LLaMA-architecture model.
+    # Opens a GGUF file and finds the weights of a LLaMA-architecture or Qwen3 model.
     public
     fn load(path: str) -> Result[Model, string]:
         g = gguf.Gguf.open(path)?
         arch = g.get_str("general.architecture").value_or(string.from(""))
-        if arch.as_str() != "llama":
-            return Err(f"unsupported architecture '{arch.as_str()}' (only 'llama' is supported)")
-        dim = _int(g, "llama.embedding_length")?
-        layers = _int(g, "llama.block_count")?
-        heads = _int(g, "llama.attention.head_count")?
-        hidden = _int(g, "llama.feed_forward_length")?
+        a = arch.as_str()
+        if a != "llama" and a != "qwen3":
+            return Err(f"unsupported architecture '{a}' (only 'llama' and 'qwen3' are supported)")
+        dim = _int(g, f"{a}.embedding_length".as_str())?
+        layers = _int(g, f"{a}.block_count".as_str())?
+        heads = _int(g, f"{a}.attention.head_count".as_str())?
+        hidden = _int(g, f"{a}.feed_forward_length".as_str())?
         kv_heads = heads
-        if let Valid(v) = g.get_int("llama.attention.head_count_kv"):
+        if let Valid(v) = g.get_int(f"{a}.attention.head_count_kv".as_str()):
             if v > 0:
                 kv_heads = usize(v)
-        if dim % heads != 0 or heads % kv_heads != 0 or dim % 32 != 0 or hidden % 32 != 0:
-            return Err(string.from("the model has sizes this reader cannot use"))
         head_dim = dim / heads
-        if let Valid(v) = g.get_int("llama.rope.dimension_count"):
+        if let Valid(v) = g.get_int(f"{a}.attention.key_length".as_str()):
+            if v > 0:
+                head_dim = usize(v)
+        if heads % kv_heads != 0 or dim % 32 != 0 or hidden % 32 != 0 or head_dim % 2 != 0:
+            return Err(string.from("the model has sizes this reader cannot use"))
+        if a == "llama" and dim % heads != 0:
+            return Err(string.from("the model has sizes this reader cannot use"))
+        if let Valid(v) = g.get_int(f"{a}.rope.dimension_count".as_str()):
             if usize(v) != head_dim:
                 return Err(string.from("rotary embeddings of part of the head are not supported"))
         ctx: usize = 2048
-        if let Valid(v) = g.get_int("llama.context_length"):
+        if let Valid(v) = g.get_int(f"{a}.context_length".as_str()):
             ctx = usize(v)
         base: f32 = 10000.0
-        if let Valid(v) = g.get_float("llama.rope.freq_base"):
+        if let Valid(v) = g.get_float(f"{a}.rope.freq_base".as_str()):
             base = f32(v)
         eps: f32 = 0.00001
-        if let Valid(v) = g.get_float("llama.attention.layer_norm_rms_epsilon"):
+        if let Valid(v) = g.get_float(f"{a}.attention.layer_norm_rms_epsilon".as_str()):
             eps = f32(v)
         fbase = _base(g)
         ti = _find(g, "token_embd.weight")?
         vocab = g.tensors[ti].dims[1]
+        q_dim = heads * head_dim
+        qwen = a == "qwen3"
         cfg = Config{ dim: dim, hidden: hidden, layers: layers, heads: heads, kv_heads: kv_heads, head_dim: head_dim,
-            vocab: vocab, ctx: ctx, rope_base: base, eps: eps, neox: false }
+            q_dim: q_dim, vocab: vocab, ctx: ctx, rope_base: base, eps: eps, neox: qwen, qk_norm: qwen }
         ew = _weight(g, "token_embd.weight", vocab, dim)?
         embed = _make(fbase, ew, vocab, dim)
         ni = _norm(g, "output_norm.weight", dim)?
@@ -285,18 +357,29 @@ impl Model:
         ls = List[Layer]()
         for l in 0..layers:
             n1 = _norm(g, f"blk.{l}.attn_norm.weight".as_str(), dim)?
-            wqw = _weight(g, f"blk.{l}.attn_q.weight".as_str(), dim, dim)?
+            wqw = _weight(g, f"blk.{l}.attn_q.weight".as_str(), q_dim, dim)?
             wkw = _weight(g, f"blk.{l}.attn_k.weight".as_str(), kv_dim, dim)?
             wvw = _weight(g, f"blk.{l}.attn_v.weight".as_str(), kv_dim, dim)?
-            wow = _weight(g, f"blk.{l}.attn_output.weight".as_str(), dim, dim)?
+            wow = _weight(g, f"blk.{l}.attn_output.weight".as_str(), dim, q_dim)?
+            qn = _empty_f32()
+            kn = _empty_f32()
+            if qwen:
+                qi = _norm(g, f"blk.{l}.attn_q_norm.weight".as_str(), head_dim)?
+                ki = _norm(g, f"blk.{l}.attn_k_norm.weight".as_str(), head_dim)?
+                qn = _f32_view(fbase, g.tensors[qi].offset, head_dim)
+                kn = _f32_view(fbase, g.tensors[ki].offset, head_dim)
             n2 = _norm(g, f"blk.{l}.ffn_norm.weight".as_str(), dim)?
             w_gatew = _weight(g, f"blk.{l}.ffn_gate.weight".as_str(), hidden, dim)?
             w_upw = _weight(g, f"blk.{l}.ffn_up.weight".as_str(), hidden, dim)?
             w_downw = _weight(g, f"blk.{l}.ffn_down.weight".as_str(), dim, hidden)?
-            ls.push(Layer{ attn_norm: _f32_view(fbase, g.tensors[n1].offset, dim), wq: _make(fbase, wqw, dim, dim), wk: _make(fbase, wkw, kv_dim, dim), wv: _make(fbase, wvw, kv_dim, dim), wo: _make(fbase, wow, dim, dim), ffn_norm: _f32_view(fbase, g.tensors[n2].offset, dim),
+            ls.push(Layer{ attn_norm: _f32_view(fbase, g.tensors[n1].offset, dim), wq: _make(fbase, wqw, q_dim, dim),
+                wk: _make(fbase, wkw, kv_dim, dim), wv: _make(fbase, wvw, kv_dim, dim),
+                wo: _make(fbase, wow, dim, q_dim), q_norm: qn, k_norm: kn,
+                ffn_norm: _f32_view(fbase, g.tensors[n2].offset, dim),
                 w_gate: _make(fbase, w_gatew, hidden, dim), w_up: _make(fbase, w_upw, hidden, dim),
                 w_down: _make(fbase, w_downw, dim, hidden) })
-        return Ok(Model{ cfg: cfg, embed: embed, layers: ls, out_norm: out_norm, output: output, rope_factors: factors, g: g })
+        return Ok(Model{ cfg: cfg, arch: arch, embed: embed, layers: ls, out_norm: out_norm, output: output,
+            rope_factors: factors, g: g })
 
 public
 # The working memory of a run: activations, the KV cache of every layer, and the logits of the last token.
@@ -310,8 +393,9 @@ struct State:
     gate: List[f32]
     up: List[f32]
     logits: List[f32]
-    xq: tensor.Q8Vec
-    hq: tensor.Q8Vec
+    a_dim: Act
+    a_att: Act
+    a_hid: Act
     caches: List[nn.KvCache]
 
 private
@@ -332,10 +416,10 @@ impl State:
         caches = List[nn.KvCache]()
         for l in 0..cfg.layers:
             caches.push(nn.KvCache.new(cfg.kv_heads, cfg.head_dim, n))
-        return State{ x: _zeros(cfg.dim), xb: _zeros(cfg.dim), q: _zeros(cfg.dim), k: _zeros(cfg.kv_heads * cfg.head_dim),
-            v: _zeros(cfg.kv_heads * cfg.head_dim), att: _zeros(cfg.dim), gate: _zeros(cfg.hidden),
-            up: _zeros(cfg.hidden), logits: _zeros(cfg.vocab), xq: tensor.quantize_q8(_zeros(cfg.dim)[..]),
-            hq: tensor.quantize_q8(_zeros(cfg.hidden)[..]), caches: caches }
+        return State{ x: _zeros(cfg.dim), xb: _zeros(cfg.dim), q: _zeros(cfg.q_dim),
+            k: _zeros(cfg.kv_heads * cfg.head_dim), v: _zeros(cfg.kv_heads * cfg.head_dim),
+            att: _zeros(cfg.q_dim), gate: _zeros(cfg.hidden), up: _zeros(cfg.hidden),
+            logits: _zeros(cfg.vocab), a_dim: Act.new(), a_att: Act.new(), a_hid: Act.new(), caches: caches }
 
     # How many tokens the run holds.
     fn len(self: read State) -> usize:
@@ -358,28 +442,33 @@ fn forward(model: read Model, st: lend State, pool: lend parallel.Pool, token: i
     model.embed.row(usize(token), st.x[..])
     for l in 0..c.layers:
         nn.rmsnorm(st.x[..], model.layers[l].attn_norm, c.eps, st.xb[..])
-        tensor.quantize_q8_into(st.xb[..], st.xq)
-        model.layers[l].wq.matvec(pool, st.xq, st.xb[..], st.q[..])
-        model.layers[l].wk.matvec(pool, st.xq, st.xb[..], st.k[..])
-        model.layers[l].wv.matvec(pool, st.xq, st.xb[..], st.v[..])
+        st.a_dim.reset()
+        model.layers[l].wq.matvec(pool, st.a_dim, st.xb[..], st.q[..])
+        model.layers[l].wk.matvec(pool, st.a_dim, st.xb[..], st.k[..])
+        model.layers[l].wv.matvec(pool, st.a_dim, st.xb[..], st.v[..])
+        if c.qk_norm:
+            for h in 0..c.heads:
+                nn.rmsnorm_inplace(st.q[h * c.head_dim..(h + 1) * c.head_dim], model.layers[l].q_norm, c.eps)
+            for h in 0..c.kv_heads:
+                nn.rmsnorm_inplace(st.k[h * c.head_dim..(h + 1) * c.head_dim], model.layers[l].k_norm, c.eps)
         nn.rope_scaled(st.q[..], c.heads, c.head_dim, pos, c.rope_base, c.neox, model.rope_factors)
         nn.rope_scaled(st.k[..], c.kv_heads, c.head_dim, pos, c.rope_base, c.neox, model.rope_factors)
         st.caches[l].append(st.k[..], st.v[..])
-        if pool.size() == 1 or st.caches[l].len() * c.dim < PARALLEL_ATTENTION:
+        if pool.size() == 1 or st.caches[l].len() * c.q_dim < PARALLEL_ATTENTION:
             nn.attention(st.q[..], st.caches[l], c.heads, st.att[..])
         else:
             nn.attention_parallel(pool, st.q[..], st.caches[l], c.heads, st.att[..])
-        tensor.quantize_q8_into(st.att[..], st.xq)
-        model.layers[l].wo.matvec(pool, st.xq, st.att[..], st.xb[..])
+        st.a_att.reset()
+        model.layers[l].wo.matvec(pool, st.a_att, st.att[..], st.xb[..])
         nn.add(st.x[..], st.xb[..])
         nn.rmsnorm(st.x[..], model.layers[l].ffn_norm, c.eps, st.xb[..])
-        tensor.quantize_q8_into(st.xb[..], st.xq)
-        model.layers[l].w_gate.matvec(pool, st.xq, st.xb[..], st.gate[..])
-        model.layers[l].w_up.matvec(pool, st.xq, st.xb[..], st.up[..])
+        st.a_dim.reset()
+        model.layers[l].w_gate.matvec(pool, st.a_dim, st.xb[..], st.gate[..])
+        model.layers[l].w_up.matvec(pool, st.a_dim, st.xb[..], st.up[..])
         nn.swiglu(st.gate[..], st.up[..])
-        tensor.quantize_q8_into(st.gate[..], st.hq)
-        model.layers[l].w_down.matvec(pool, st.hq, st.gate[..], st.xb[..])
+        st.a_hid.reset()
+        model.layers[l].w_down.matvec(pool, st.a_hid, st.gate[..], st.xb[..])
         nn.add(st.x[..], st.xb[..])
     nn.rmsnorm(st.x[..], model.out_norm, c.eps, st.xb[..])
-    tensor.quantize_q8_into(st.xb[..], st.xq)
-    model.output.matvec(pool, st.xq, st.xb[..], st.logits[..])
+    st.a_dim.reset()
+    model.output.matvec(pool, st.a_dim, st.xb[..], st.logits[..])

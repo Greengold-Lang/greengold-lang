@@ -13,7 +13,7 @@
 #       --top-p X             keep the tokens that add up to this probability (default 0.95)
 #       --repeat-penalty X    > 1 discourages repeating (default 1.0)
 #       --seed N              random seed (default 1)
-#       --no-bos              do not put the beginning-of-sequence token first
+#       --bos, --no-bos       force the beginning-of-sequence token on or off (default: what the model file says)
 #       --special             read <|special|> tokens in the prompt
 #       --info                print what the model file contains and stop
 # The text goes to standard output; the speed (tokens per second) to standard error.
@@ -43,7 +43,7 @@ fn usage() -> i32:
 
 fn describe(model: read llama.Model, tok: read tokenizer.Tokenizer):
     c = model.cfg
-    print("architecture   llama")
+    print("architecture   ", model.arch.as_str())
     print("layers         ", c.layers)
     print("embedding      ", c.dim)
     print("heads          ", c.heads, "(", c.kv_heads, "key/value )")
@@ -52,7 +52,8 @@ fn describe(model: read llama.Model, tok: read tokenizer.Tokenizer):
     print("vocabulary     ", c.vocab, "tokens")
     print("rope base      ", c.rope_base)
     print("tensors        ", model.g.tensors.len())
-    print("weights        ", model.layers[0].wq.kind, "(0 f32, 1 f16, 2 q4_0, 8 q8_0) in the first layer")
+    print("weights        ", model.layers[0].wq.kind, "(ggml type of the first layer's attn_q: 0 f32, 1 f16, 2 q4_0, 8 q8_0, 12 Q4_K, 14 Q6_K)")
+    print("head size      ", c.head_dim)
     print("bos / eos      ", tok.bos, "/", tok.eos)
 
 fn main():
@@ -69,14 +70,16 @@ fn main():
     top_p: f32 = 0.95
     penalty: f32 = 1.0
     seed: u64 = 1
-    add_bos = true
+    add_bos_flag = 0
     special = false
     info = false
     i: usize = 2
     while i < argv.len():
         a = argv[i]
         if a == "--no-bos":
-            add_bos = false
+            add_bos_flag = -1
+        elif a == "--bos":
+            add_bos_flag = 1
         elif a == "--special":
             special = true
         elif a == "--info":
@@ -134,6 +137,11 @@ fn main():
                         ctx = model.cfg.ctx
                         if ctx > 4096:
                             ctx = 4096
+                    add_bos = tok.add_bos
+                    if add_bos_flag == 1:
+                        add_bos = true
+                    elif add_bos_flag == -1:
+                        add_bos = false
                     ids = tok.encode(prompt.as_str(), add_bos, special)
                     if ids.len() == 0:
                         ids.push(tok.bos)

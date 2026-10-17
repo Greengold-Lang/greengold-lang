@@ -155,6 +155,30 @@ fn rmsnorm(x: []f32, weight: []f32, eps: f32, out: lend []f32):
         out[i] = x[i] * scale * weight[i]
         i += 1
 
+# x = x / sqrt(mean(x * x) + eps) * weight, in place (the per-head norm of Qwen3's queries and keys).
+fn rmsnorm_inplace(x: lend []f32, weight: []f32, eps: f32):
+    if x.len != weight.len or x.len == 0:
+        panic("nn.rmsnorm_inplace: the sizes do not match")
+    acc = f32x8.splat(0.0)
+    i: usize = 0
+    while i + 8 <= x.len:
+        v = f32x8.load(x, i)
+        acc = v.fma(v, acc)
+        i += 8
+    ss = acc.sum()
+    while i < x.len:
+        ss += x[i] * x[i]
+        i += 1
+    scale = 1.0 / f32x4.splat(ss / f32(x.len) + eps).sqrt().lane(0)
+    sv = f32x8.splat(scale)
+    i = 0
+    while i + 8 <= x.len:
+        (f32x8.load(x, i) * sv * f32x8.load(weight, i)).store(x, i)
+        i += 8
+    while i < x.len:
+        x[i] = x[i] * scale * weight[i]
+        i += 1
+
 # x = x * sigmoid(x), in place.
 fn silu(x: lend []f32):
     one = f32x8.splat(1.0)
