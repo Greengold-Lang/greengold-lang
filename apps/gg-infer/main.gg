@@ -1,0 +1,173 @@
+# gg-infer: runs a LLaMA-family GGUF model on the CPU and writes the text it generates.
+#
+#     gg run apps/gg-infer/main.gg --release --cpu native -- model.gguf -p "Once upon a time" -n 128
+#
+# Options (after the model file):
+#   -p, --prompt TEXT         the prompt (default: empty, only the beginning-of-sequence token)
+#   -f, --file PATH           read the prompt from a file
+#   -n, --predict N           the most tokens to generate (default 128)
+#   -c, --ctx N               context size in tokens (default: the model's, at most 4096)
+#   -t, --threads N           threads (default: one per CPU)
+#       --temp X              temperature, 0 = always the best token (default 0.8)
+#       --top-k N             keep the N best tokens (default 40)
+#       --top-p X             keep the tokens that add up to this probability (default 0.95)
+#       --repeat-penalty X    > 1 discourages repeating (default 1.0)
+#       --seed N              random seed (default 1)
+#       --no-bos              do not put the beginning-of-sequence token first
+#       --special             read <|special|> tokens in the prompt
+#       --info                print what the model file contains and stop
+# The text goes to standard output; the speed (tokens per second) to standard error.
+import std.fs
+import std.llama
+import std.parallel
+import std.process
+import std.sampler
+import std.string
+import std.time
+import std.tokenizer
+
+private
+extern "stdio.h" fn putchar(c: i32) -> i32
+extern "stdio.h" fn fflush(f: *mut u8) -> i32
+
+fn emit(text: str):
+    unsafe:
+        for i in 0..text.len:
+            putchar(i32(text[i]))
+        fflush(null)
+
+fn usage() -> i32:
+    eprint("usage: gg-infer MODEL.gguf [-p TEXT | -f FILE] [-n TOKENS] [-c CTX] [-t THREADS] [--temp X] [--top-k N]")
+    eprint("                [--top-p X] [--repeat-penalty X] [--seed N] [--no-bos] [--special] [--info]")
+    return 2
+
+fn describe(model: read llama.Model, tok: read tokenizer.Tokenizer):
+    c = model.cfg
+    print("architecture   llama")
+    print("layers         ", c.layers)
+    print("embedding      ", c.dim)
+    print("heads          ", c.heads, "(", c.kv_heads, "key/value )")
+    print("feed forward   ", c.hidden)
+    print("context        ", c.ctx)
+    print("vocabulary     ", c.vocab, "tokens")
+    print("rope base      ", c.rope_base)
+    print("tensors        ", model.g.tensors.len())
+    print("weights        ", model.layers[0].wq.kind, "(0 f32, 1 f16, 2 q4_0, 8 q8_0) in the first layer")
+    print("bos / eos      ", tok.bos, "/", tok.eos)
+
+fn main():
+    argv = process.args()
+    if argv.len() < 2:
+        process.process_exit(usage())
+    path = argv[1]
+    prompt = string.new()
+    n_predict: usize = 128
+    ctx: usize = 0
+    threads: usize = 0
+    temp: f32 = 0.8
+    top_k: usize = 40
+    top_p: f32 = 0.95
+    penalty: f32 = 1.0
+    seed: u64 = 1
+    add_bos = true
+    special = false
+    info = false
+    i: usize = 2
+    while i < argv.len():
+        a = argv[i]
+        if a == "--no-bos":
+            add_bos = false
+        elif a == "--special":
+            special = true
+        elif a == "--info":
+            info = true
+        else:
+            if i + 1 >= argv.len():
+                eprint("missing value after", a)
+                process.process_exit(usage())
+            v = argv[i + 1]
+            i += 1
+            if a == "-p" or a == "--prompt":
+                prompt = string.from(v)
+            elif a == "-f" or a == "--file":
+                text = fs.read_file_to_string(v)
+                if text.is_none():
+                    eprint("cannot read", v)
+                    process.process_exit(1)
+                prompt = text.value_or_panic()
+            elif a == "-n" or a == "--predict":
+                n_predict = usize(v.parse_int().value_or(128))
+            elif a == "-c" or a == "--ctx":
+                ctx = usize(v.parse_int().value_or(0))
+            elif a == "-t" or a == "--threads":
+                threads = usize(v.parse_int().value_or(0))
+            elif a == "--temp":
+                temp = f32(v.parse_float().value_or(0.8))
+            elif a == "--top-k":
+                top_k = usize(v.parse_int().value_or(40))
+            elif a == "--top-p":
+                top_p = f32(v.parse_float().value_or(0.95))
+            elif a == "--repeat-penalty":
+                penalty = f32(v.parse_float().value_or(1.0))
+            elif a == "--seed":
+                seed = u64(v.parse_int().value_or(1))
+            else:
+                eprint("unknown option", a)
+                process.process_exit(usage())
+        i += 1
+
+    started = time.Instant.now()
+    match llama.Model.load(path):
+        Err(e):
+            eprint("error:", e)
+            process.process_exit(1)
+        Ok(model):
+            match tokenizer.Tokenizer.from_gguf(model.g):
+                Err(e):
+                    eprint("error:", e)
+                    process.process_exit(1)
+                Ok(tok):
+                    if info:
+                        describe(model, tok)
+                        return
+                    if ctx == 0:
+                        ctx = model.cfg.ctx
+                        if ctx > 4096:
+                            ctx = 4096
+                    ids = tok.encode(prompt.as_str(), add_bos, special)
+                    if ids.len() == 0:
+                        ids.push(tok.bos)
+                    if ids.len() >= ctx:
+                        eprint("the prompt has", ids.len(), "tokens; the context holds", ctx)
+                        process.process_exit(1)
+                    pool = parallel.Pool.new(threads)
+                    st = llama.State.new(model.cfg, ctx)
+                    sm = sampler.Sampler.new(temp, top_k, top_p, seed)
+                    sm.repeat_penalty = penalty
+                    eprint("loaded in", started.elapsed_millis(), "ms;", pool.size(), "threads;", ids.len(), "prompt tokens")
+                    emit(prompt.as_str())
+                    t0 = time.Instant.now()
+                    for p in 0..ids.len():
+                        llama.forward(model, st, pool, ids[p], p)
+                    prompt_secs = t0.elapsed_secs()
+                    for k in 0..ids.len():
+                        sm.accept(ids[k])
+                    t1 = time.Instant.now()
+                    made: usize = 0
+                    pos = ids.len()
+                    while made < n_predict and pos < ctx:
+                        next = sm.sample(st.logits[..])
+                        if tok.is_end(next):
+                            break
+                        piece = string.new()
+                        tok.append_token(next, piece)
+                        emit(piece.as_str())
+                        sm.accept(next)
+                        made += 1
+                        llama.forward(model, st, pool, next, pos)
+                        pos += 1
+                    gen_secs = t1.elapsed_secs()
+                    emit("\n")
+                    eprint("prompt:", ids.len(), "tokens,", f64(ids.len()) / prompt_secs, "tokens/s")
+                    if made > 0:
+                        eprint("generated:", made, "tokens,", f64(made) / gen_secs, "tokens/s")

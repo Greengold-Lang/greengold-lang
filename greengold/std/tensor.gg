@@ -107,9 +107,18 @@ struct Q8Vec:
     len: usize
 
 fn quantize_q8(x: []f32) -> Q8Vec:
+    out = Q8Vec{ blocks: List[BlockQ8](), scales: List[f32](), corrections: List[f32](), len: x.len }
+    quantize_q8_into(x, out)
+    return out
+
+# The same into an existing `Q8Vec`, reusing its memory (for a loop that quantizes one vector after another).
+fn quantize_q8_into(x: []f32, out: lend Q8Vec):
     if x.len % BLOCK != 0:
         panic("quantize_q8: the length must be a multiple of 32")
-    out = Q8Vec{ blocks: List[BlockQ8](), scales: List[f32](), corrections: List[f32](), len: x.len }
+    out.blocks.clear()
+    out.scales.clear()
+    out.corrections.clear()
+    out.len = x.len
     n = x.len / BLOCK
     out.blocks.reserve(n)
     for b in 0..n:
@@ -135,7 +144,6 @@ fn quantize_q8(x: []f32) -> Q8Vec:
         for j in 0..BLOCK:
             total += i32(qs[j])
         out.corrections.push(f16_scale(h) * 8.0 * f32(total))
-    return out
 
 impl Q8Vec:
     # Back to f32 (for tests and debugging).

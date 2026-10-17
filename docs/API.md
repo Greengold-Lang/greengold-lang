@@ -10,28 +10,31 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [Core prelude (always in scope)](#core-prelude-always-in-scope) (69)
 - [std.collections](#stdcollections) (101)
 - [std.fs](#stdfs) (12)
-- [std.gguf](#stdgguf) (13)
+- [std.gguf](#stdgguf) (16)
 - [std.http](#stdhttp) (26)
 - [std.intern](#stdintern) (5)
 - [std.io](#stdio) (11)
 - [std.json](#stdjson) (23)
+- [std.llama](#stdllama) (12)
 - [std.math](#stdmath) (22)
 - [std.mmap](#stdmmap) (5)
 - [std.net](#stdnet) (59)
-- [std.nn](#stdnn) (18)
+- [std.nn](#stdnn) (20)
 - [std.packet](#stdpacket) (44)
 - [std.parallel](#stdparallel) (7)
 - [std.process](#stdprocess) (6)
 - [std.rand](#stdrand) (10)
 - [std.regex](#stdregex) (13)
+- [std.sampler](#stdsampler) (4)
 - [std.sock](#stdsock) (8)
 - [std.sort](#stdsort) (3)
 - [std.string](#stdstring) (25)
 - [std.tasks](#stdtasks) (9)
-- [std.tensor](#stdtensor) (40)
+- [std.tensor](#stdtensor) (41)
 - [std.thread](#stdthread) (49)
 - [std.time](#stdtime) (22)
 - [std.tls](#stdtls) (5)
+- [std.tokenizer](#stdtokenizer) (7)
 - [Not in the catalog](#not-in-the-catalog): attributes, intrinsics, JSON output formats
 
 ## Compiler builtins
@@ -1067,6 +1070,21 @@ fn Gguf.f32_values(self: read Gguf, i: usize) -> []f32
 ```
 Tensor `i` as f32 values (type 0).
 
+```
+fn Gguf.array_strs(self: read Gguf, key: str) -> List[str]
+```
+The strings of an array entry such as `tokenizer.ggml.tokens`, as views into the mapped file (valid while the `Gguf` lives).
+
+```
+fn Gguf.array_f32(self: read Gguf, key: str) -> List[f32]
+```
+An array of f32 numbers (such as `tokenizer.ggml.scores`) as a list;
+
+```
+fn Gguf.array_i32(self: read Gguf, key: str) -> List[i32]
+```
+An array of integers of any width (such as `tokenizer.ggml.token_type`) as a list of i32.
+
 
 ## std.http
 
@@ -1403,6 +1421,69 @@ JSON text with two-space indentation, one member or element per line.
 fn Json.to_json(self: read Json) -> string
 ```
 `to_json(x)` of a struct with a `Json` field writes the value as it is.
+
+
+## std.llama
+
+### struct
+
+```
+struct Weight { kind: u32, rows: usize, cols: usize, data: []u8 }
+```
+A matrix as stored in the file: `rows` rows of `cols` values of type `kind` (0 f32, 1 f16, 2 q4_0, 8 q8_0).
+
+```
+struct Config { dim: usize, hidden: usize, layers: usize, heads: usize, kv_heads: usize, head_dim: usize, vocab: usize, ctx: usize, rope_base: f32, eps: f32, neox: bool }
+```
+
+```
+struct Layer { attn_norm: []f32, wq: Weight, wk: Weight, wv: Weight, wo: Weight, ffn_norm: []f32, w_gate: Weight, w_up: Weight, w_down: Weight }
+```
+
+```
+struct Model { cfg: Config, embed: Weight, layers: List[Layer], out_norm: []f32, output: Weight, rope_factors: []f32, g: Gguf }
+```
+
+```
+struct State { x: List[f32], xb: List[f32], q: List[f32], k: List[f32], v: List[f32], att: List[f32], gate: List[f32], up: List[f32], logits: List[f32], xq: Q8Vec, hq: Q8Vec, caches: List[KvCache] }
+```
+The working memory of a run: activations, the KV cache of every layer, and the logits of the last token.
+
+### fn
+
+```
+fn Weight.matvec(self: read Weight, pool: lend Pool, xq: read Q8Vec, x: []f32, y: lend []f32)
+```
+y = W x.
+
+```
+fn Weight.row(self: read Weight, r: usize, out: lend []f32)
+```
+Row `r` as f32 (an embedding).
+
+```
+fn Model.load(path: str) -> Result[Model, string]
+```
+
+```
+fn State.new(cfg: Config, max_seq: usize) -> State
+```
+Memory for a conversation of up to `max_seq` tokens (at most the model's context length).
+
+```
+fn State.len(self: read State) -> usize
+```
+How many tokens the run holds.
+
+```
+fn State.truncate(self: lend State, n: usize)
+```
+Forgets everything after the first `n` tokens (to reuse a shared prompt).
+
+```
+fn forward(model: read Model, st: lend State, pool: lend Pool, token: i32, pos: usize)
+```
+Runs `token` at position `pos` through the model; `st.logits` then holds the scores for the token after it.
 
 
 ## std.math
@@ -1879,6 +1960,16 @@ fn rope(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base: f32, n
 Rotary position embedding, in place, for `n_heads` heads of `head_dim` values at position `pos`.
 
 ```
+fn rope_scaled(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base: f32, neox: bool, factors: []f32)
+```
+The same with a divisor per pair (`head_dim / 2` values, the `rope_freqs.weight` tensor of LLaMA 3.1 models): the angle of pair `i` is divided by `factors[i]`.
+
+```
+fn matvec_parallel(pool: lend Pool, w: []f32, rows: usize, cols: usize, x: []f32, y: lend []f32)
+```
+The same as `matvec`, with the rows shared between the threads of `pool`.
+
+```
 fn KvCache.new(n_kv_heads: usize, head_dim: usize, max_seq: usize) -> KvCache
 ```
 
@@ -2300,6 +2391,31 @@ fn Match.group_end(self: read Match, i: usize) -> Optional[usize]
 ```
 
 
+## std.sampler
+
+### struct
+
+```
+struct Sampler { temperature: f32, top_k: usize, top_p: f32, repeat_penalty: f32, history: List[i32], state: u64, idx: List[i32], val: List[f32] }
+```
+
+### fn
+
+```
+fn Sampler.new(temperature: f32, top_k: usize, top_p: f32, seed: u64) -> Sampler
+```
+
+```
+fn Sampler.accept(self: lend Sampler, token: i32)
+```
+Remembers a token of the text so far (prompt tokens and chosen ones) for the repeat penalty.
+
+```
+fn Sampler.sample(self: lend Sampler, logits: lend []f32) -> i32
+```
+Picks a token.
+
+
 ## std.sock
 
 ### const
@@ -2583,6 +2699,11 @@ fn f32_to_f16(x: f32) -> u16
 ```
 fn quantize_q8(x: []f32) -> Q8Vec
 ```
+
+```
+fn quantize_q8_into(x: []f32, out: lend Q8Vec)
+```
+The same into an existing `Q8Vec`, reusing its memory (for a loop that quantizes one vector after another).
 
 ```
 fn Q8Vec.dequantize(self: read Q8Vec) -> List[f32]
@@ -3078,6 +3199,46 @@ True when bytes were already decrypted and wait to be read: the socket is not re
 fn close(h: i64)
 ```
 Ends the secured connection and frees it.
+
+
+## std.tokenizer
+
+### struct
+
+```
+struct Tokenizer { kind: i32, tokens: List[str], scores: List[f32], types: List[i32], index: HashMap[str, i32], ranks: HashMap[str, i32], specials: List[i32], byte_ids: List[i32], cp_to_byte: List[i32], bos: i32, eos: i32, unk: i32, add_space_prefix: bool }
+```
+
+### fn
+
+```
+fn Tokenizer.from_gguf(g: read Gguf) -> Result[Tokenizer, string]
+```
+
+```
+fn Tokenizer.size(self: read Tokenizer) -> usize
+```
+The number of tokens.
+
+```
+fn Tokenizer.is_end(self: read Tokenizer, id: i32) -> bool
+```
+True for the token that ends a reply (the end-of-sequence token and, for chat models, end-of-turn tokens).
+
+```
+fn Tokenizer.encode(self: read Tokenizer, text: str, add_bos: bool, special: bool) -> List[i32]
+```
+Turns text into token ids.
+
+```
+fn Tokenizer.append_token(self: read Tokenizer, id: i32, out: lend string)
+```
+The bytes of token `id` appended to `out` (a byte-level BPE token or a SentencePiece one).
+
+```
+fn Tokenizer.decode(self: read Tokenizer, ids: []i32) -> string
+```
+The text of a list of ids.
 
 ## Not in the catalog above
 

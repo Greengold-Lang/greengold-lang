@@ -1,0 +1,385 @@
+# std.llama: runs LLaMA-family models (architecture "llama" in GGUF: LLaMA 1/2/3, TinyLlama, Mistral and many
+# fine-tunes) on the CPU, one token at a time.
+#
+#     import std.llama
+#     import std.parallel
+#
+#     model = llama.Model.load("llama-3.2-1b-q4_0.gguf")?
+#     pool = parallel.Pool.new(0)
+#     st = llama.State.new(model.cfg, 2048)
+#     llama.forward(model, st, pool, token, pos)       # st.logits now holds the scores of the next token
+#
+# Weights may be stored as f32, f16, q4_0 or q8_0 (the K-quants such as Q4_K_M are not supported yet and give an
+# error naming the tensor). The weights stay in the memory-mapped file; `Model` owns the mapping.
+import std.gguf
+import std.nn
+import std.parallel
+import std.string
+import std.tensor
+
+private
+# The tensor types the matrix kernels can read.
+fn _supported(kind: u32) -> bool:
+    return kind == 0 or kind == 1 or kind == 2 or kind == 8
+
+fn _type_name(kind: u32) -> string:
+    if kind == 0:
+        return string.from("f32")
+    if kind == 1:
+        return string.from("f16")
+    if kind == 2:
+        return string.from("q4_0")
+    if kind == 3:
+        return string.from("q4_1")
+    if kind == 6:
+        return string.from("q5_0")
+    if kind == 7:
+        return string.from("q5_1")
+    if kind == 8:
+        return string.from("q8_0")
+    if kind == 12:
+        return string.from("q4_K")
+    if kind == 13:
+        return string.from("q5_K")
+    if kind == 14:
+        return string.from("q6_K")
+    if kind == 30:
+        return string.from("bf16")
+    return f"type {kind}"
+
+# The start of the mapped file as a raw pointer. Views made from it by `slice_from_raw` are not tied to the
+# `Gguf`, so a `Model` can own the `Gguf` and the views together; they are valid as long as the `Model` lives.
+fn _base(g: read gguf.Gguf) -> *u8:
+    bytes = g.file.bytes()
+    unsafe:
+        return ptr_cast[*u8](addr(bytes))
+
+fn _bytes_of(base: *u8, offset: usize, size: usize) -> []u8:
+    unsafe:
+        return slice_from_raw[u8](ptr_offset(base, isize(offset)), size)
+
+fn _empty_f32() -> []f32:
+    unsafe:
+        nothing: *u8 = null
+        return slice_from_raw[f32](ptr_cast[*f32](nothing), 0)
+
+public
+# A matrix as stored in the file: `rows` rows of `cols` values of type `kind` (0 f32, 1 f16, 2 q4_0, 8 q8_0).
+struct Weight:
+    kind: u32
+    rows: usize
+    cols: usize
+    data: []u8
+
+private
+fn _f32s(w: Weight) -> []f32:
+    unsafe:
+        return slice_from_raw[f32](ptr_cast[*f32](addr(w.data)), w.rows * w.cols)
+
+fn _q4s(w: Weight) -> []tensor.BlockQ4:
+    unsafe:
+        return slice_from_raw[tensor.BlockQ4](ptr_cast[*tensor.BlockQ4](addr(w.data)), w.rows * w.cols / 32)
+
+fn _q8s(w: Weight) -> []tensor.BlockQ8:
+    unsafe:
+        return slice_from_raw[tensor.BlockQ8](ptr_cast[*tensor.BlockQ8](addr(w.data)), w.rows * w.cols / 32)
+
+struct _F16Job:
+    w: []u8
+    x: []f32
+    y: *mut f32
+    cols: usize
+
+fn _f16_rows(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_F16Job](ctx)
+        for r in start..end:
+            total: f32 = 0.0
+            base = r * job[0].cols * 2
+            for c in 0..job[0].cols:
+                h = u16(job[0].w[base + 2 * c]) | (u16(job[0].w[base + 2 * c + 1]) << 8)
+                total += tensor.f16_scale(h) * job[0].x[c]
+            job[0].y[r] = total
+
+# Waking the worker threads costs some tens of microseconds, so a product with fewer weights than this (or an
+# attention over fewer values than `PARALLEL_ATTENTION`) runs on the calling thread alone.
+const PARALLEL_WEIGHTS: usize = 1048576
+const PARALLEL_ATTENTION: usize = 1048576
+
+public
+impl Weight:
+    # y = W x. `xq` is `x` quantized with `tensor.quantize_q8_into` (used by the q4_0 and q8_0 kernels).
+    fn matvec(self: read Weight, pool: lend parallel.Pool, xq: read tensor.Q8Vec, x: []f32, y: lend []f32):
+        small = self.rows * self.cols < PARALLEL_WEIGHTS or pool.size() == 1
+        if self.kind == 2:
+            if small:
+                tensor.q4_matvec(_q4s(self), self.rows, self.cols, xq, y)
+            else:
+                tensor.q4_matvec_parallel(pool, _q4s(self), self.rows, self.cols, xq, y)
+        elif self.kind == 8:
+            if small:
+                tensor.q8_matvec(_q8s(self), self.rows, self.cols, xq, y)
+            else:
+                tensor.q8_matvec_parallel(pool, _q8s(self), self.rows, self.cols, xq, y)
+        elif self.kind == 0:
+            if small:
+                nn.matvec(_f32s(self), self.rows, self.cols, x, y)
+            else:
+                nn.matvec_parallel(pool, _f32s(self), self.rows, self.cols, x, y)
+        else:
+            unsafe:
+                job = _F16Job{ w: self.data, x: x, y: ptr_cast[*mut f32](addr_mut(y)), cols: self.cols }
+                if small:
+                    _f16_rows(0, self.rows, ptr_cast[*u8](addr(job)))
+                else:
+                    pool.for_range(self.rows, _f16_rows, ptr_cast[*u8](addr(job)))
+
+    # Row `r` as f32 (an embedding).
+    fn row(self: read Weight, r: usize, out: lend []f32):
+        if self.kind == 0:
+            src = _f32s(self)
+            for c in 0..self.cols:
+                out[c] = src[r * self.cols + c]
+        elif self.kind == 1:
+            for c in 0..self.cols:
+                i = (r * self.cols + c) * 2
+                out[c] = tensor.f16_scale(u16(self.data[i]) | (u16(self.data[i + 1]) << 8))
+        elif self.kind == 2:
+            row = tensor.dequantize_row_q4(_q4s(self), self.cols, r)
+            for c in 0..self.cols:
+                out[c] = row[c]
+        else:
+            row = tensor.dequantize_row_q8(_q8s(self), self.cols, r)
+            for c in 0..self.cols:
+                out[c] = row[c]
+
+private
+fn _find(g: read gguf.Gguf, name: str) -> Result[usize, string]:
+    i = g.find_tensor(name).value_or(max_value[usize]())
+    if i == max_value[usize]():
+        return Err(f"the model has no tensor '{name}'")
+    return Ok(i)
+
+# Where a weight lives in the file (numbers only, so it is not tied to the `Gguf`).
+struct _Where:
+    kind: u32
+    offset: usize
+    size: usize
+
+fn _weight(g: read gguf.Gguf, name: str, rows: usize, cols: usize) -> Result[_Where, string]:
+    i = _find(g, name)?
+    kind = g.tensors[i].kind
+    if not _supported(kind):
+        return Err(f"tensor '{name}' is stored as {_type_name(kind).as_str()}, which is not supported yet (use f32, f16, q4_0 or q8_0)")
+    if g.tensors[i].dims.len() != 2 or g.tensors[i].dims[0] != cols or g.tensors[i].dims[1] != rows:
+        return Err(f"tensor '{name}' has an unexpected shape")
+    if (kind == 2 or kind == 8) and cols % 32 != 0:
+        return Err(f"tensor '{name}' has a row length that is not a multiple of 32")
+    return Ok(_Where{ kind: kind, offset: g.tensors[i].offset, size: g.tensors[i].size })
+
+fn _make(base: *u8, w: _Where, rows: usize, cols: usize) -> Weight:
+    return Weight{ kind: w.kind, rows: rows, cols: cols, data: _bytes_of(base, w.offset, w.size) }
+
+# The index of a norm tensor: `n` f32 values.
+fn _norm(g: read gguf.Gguf, name: str, n: usize) -> Result[usize, string]:
+    i = _find(g, name)?
+    if g.tensors[i].kind != 0 or g.tensors[i].count != n:
+        return Err(f"tensor '{name}' must be {n} f32 values")
+    return Ok(i)
+
+fn _f32_view(base: *u8, offset: usize, count: usize) -> []f32:
+    unsafe:
+        return slice_from_raw[f32](ptr_cast[*f32](ptr_offset(base, isize(offset))), count)
+
+public
+struct Config:
+    dim: usize
+    hidden: usize
+    layers: usize
+    heads: usize
+    kv_heads: usize
+    head_dim: usize
+    vocab: usize
+    ctx: usize
+    rope_base: f32
+    eps: f32
+    neox: bool
+
+struct Layer:
+    attn_norm: []f32
+    wq: Weight
+    wk: Weight
+    wv: Weight
+    wo: Weight
+    ffn_norm: []f32
+    w_gate: Weight
+    w_up: Weight
+    w_down: Weight
+
+public
+struct Model:
+    cfg: Config
+    embed: Weight
+    layers: List[Layer]
+    out_norm: []f32
+    output: Weight
+    rope_factors: []f32
+    g: gguf.Gguf
+
+private
+fn _int(g: read gguf.Gguf, key: str) -> Result[usize, string]:
+    if let Valid(v) = g.get_int(key):
+        if v > 0:
+            return Ok(usize(v))
+    return Err(f"the model file has no '{key}'")
+
+impl Model:
+    # Opens a GGUF file and finds the weights of a LLaMA-architecture model.
+    public
+    fn load(path: str) -> Result[Model, string]:
+        g = gguf.Gguf.open(path)?
+        arch = g.get_str("general.architecture").value_or(string.from(""))
+        if arch.as_str() != "llama":
+            return Err(f"unsupported architecture '{arch.as_str()}' (only 'llama' is supported)")
+        dim = _int(g, "llama.embedding_length")?
+        layers = _int(g, "llama.block_count")?
+        heads = _int(g, "llama.attention.head_count")?
+        hidden = _int(g, "llama.feed_forward_length")?
+        kv_heads = heads
+        if let Valid(v) = g.get_int("llama.attention.head_count_kv"):
+            if v > 0:
+                kv_heads = usize(v)
+        if dim % heads != 0 or heads % kv_heads != 0 or dim % 32 != 0 or hidden % 32 != 0:
+            return Err(string.from("the model has sizes this reader cannot use"))
+        head_dim = dim / heads
+        if let Valid(v) = g.get_int("llama.rope.dimension_count"):
+            if usize(v) != head_dim:
+                return Err(string.from("rotary embeddings of part of the head are not supported"))
+        ctx: usize = 2048
+        if let Valid(v) = g.get_int("llama.context_length"):
+            ctx = usize(v)
+        base: f32 = 10000.0
+        if let Valid(v) = g.get_float("llama.rope.freq_base"):
+            base = f32(v)
+        eps: f32 = 0.00001
+        if let Valid(v) = g.get_float("llama.attention.layer_norm_rms_epsilon"):
+            eps = f32(v)
+        fbase = _base(g)
+        ti = _find(g, "token_embd.weight")?
+        vocab = g.tensors[ti].dims[1]
+        cfg = Config{ dim: dim, hidden: hidden, layers: layers, heads: heads, kv_heads: kv_heads, head_dim: head_dim,
+            vocab: vocab, ctx: ctx, rope_base: base, eps: eps, neox: false }
+        ew = _weight(g, "token_embd.weight", vocab, dim)?
+        embed = _make(fbase, ew, vocab, dim)
+        ni = _norm(g, "output_norm.weight", dim)?
+        out_norm = _f32_view(fbase, g.tensors[ni].offset, dim)
+        output = embed
+        if g.find_tensor("output.weight").has_value():
+            ow = _weight(g, "output.weight", vocab, dim)?
+            output = _make(fbase, ow, vocab, dim)
+        factors = _empty_f32()
+        if let Valid(fi) = g.find_tensor("rope_freqs.weight"):
+            if g.tensors[fi].kind == 0 and g.tensors[fi].count == head_dim / 2:
+                factors = _f32_view(fbase, g.tensors[fi].offset, head_dim / 2)
+        kv_dim = kv_heads * head_dim
+        ls = List[Layer]()
+        for l in 0..layers:
+            n1 = _norm(g, f"blk.{l}.attn_norm.weight".as_str(), dim)?
+            wqw = _weight(g, f"blk.{l}.attn_q.weight".as_str(), dim, dim)?
+            wkw = _weight(g, f"blk.{l}.attn_k.weight".as_str(), kv_dim, dim)?
+            wvw = _weight(g, f"blk.{l}.attn_v.weight".as_str(), kv_dim, dim)?
+            wow = _weight(g, f"blk.{l}.attn_output.weight".as_str(), dim, dim)?
+            n2 = _norm(g, f"blk.{l}.ffn_norm.weight".as_str(), dim)?
+            w_gatew = _weight(g, f"blk.{l}.ffn_gate.weight".as_str(), hidden, dim)?
+            w_upw = _weight(g, f"blk.{l}.ffn_up.weight".as_str(), hidden, dim)?
+            w_downw = _weight(g, f"blk.{l}.ffn_down.weight".as_str(), dim, hidden)?
+            ls.push(Layer{ attn_norm: _f32_view(fbase, g.tensors[n1].offset, dim), wq: _make(fbase, wqw, dim, dim), wk: _make(fbase, wkw, kv_dim, dim), wv: _make(fbase, wvw, kv_dim, dim), wo: _make(fbase, wow, dim, dim), ffn_norm: _f32_view(fbase, g.tensors[n2].offset, dim),
+                w_gate: _make(fbase, w_gatew, hidden, dim), w_up: _make(fbase, w_upw, hidden, dim),
+                w_down: _make(fbase, w_downw, dim, hidden) })
+        return Ok(Model{ cfg: cfg, embed: embed, layers: ls, out_norm: out_norm, output: output, rope_factors: factors, g: g })
+
+public
+# The working memory of a run: activations, the KV cache of every layer, and the logits of the last token.
+struct State:
+    x: List[f32]
+    xb: List[f32]
+    q: List[f32]
+    k: List[f32]
+    v: List[f32]
+    att: List[f32]
+    gate: List[f32]
+    up: List[f32]
+    logits: List[f32]
+    xq: tensor.Q8Vec
+    hq: tensor.Q8Vec
+    caches: List[nn.KvCache]
+
+private
+fn _zeros(n: usize) -> List[f32]:
+    out = List[f32]()
+    out.reserve(n)
+    for i in 0..n:
+        out.push(0.0)
+    return out
+
+public
+impl State:
+    # Memory for a conversation of up to `max_seq` tokens (at most the model's context length).
+    fn new(cfg: Config, max_seq: usize) -> State:
+        n = max_seq
+        if n > cfg.ctx:
+            n = cfg.ctx
+        caches = List[nn.KvCache]()
+        for l in 0..cfg.layers:
+            caches.push(nn.KvCache.new(cfg.kv_heads, cfg.head_dim, n))
+        return State{ x: _zeros(cfg.dim), xb: _zeros(cfg.dim), q: _zeros(cfg.dim), k: _zeros(cfg.kv_heads * cfg.head_dim),
+            v: _zeros(cfg.kv_heads * cfg.head_dim), att: _zeros(cfg.dim), gate: _zeros(cfg.hidden),
+            up: _zeros(cfg.hidden), logits: _zeros(cfg.vocab), xq: tensor.quantize_q8(_zeros(cfg.dim)[..]),
+            hq: tensor.quantize_q8(_zeros(cfg.hidden)[..]), caches: caches }
+
+    # How many tokens the run holds.
+    fn len(self: read State) -> usize:
+        return self.caches[0].len()
+
+    # Forgets everything after the first `n` tokens (to reuse a shared prompt).
+    fn truncate(self: lend State, n: usize):
+        for l in 0..self.caches.len():
+            self.caches[l].truncate(n)
+
+public
+# Runs `token` at position `pos` through the model; `st.logits` then holds the scores for the token after it.
+# `pos` must equal the number of tokens already in `st` (positions are consecutive from 0).
+fn forward(model: read Model, st: lend State, pool: lend parallel.Pool, token: i32, pos: usize):
+    c = model.cfg
+    if token < 0 or usize(token) >= c.vocab:
+        panic("llama.forward: the token is outside the vocabulary")
+    if pos != st.caches[0].len() or pos >= st.caches[0].max_seq:
+        panic("llama.forward: the position is not the next free one, or the context is full")
+    model.embed.row(usize(token), st.x[..])
+    for l in 0..c.layers:
+        nn.rmsnorm(st.x[..], model.layers[l].attn_norm, c.eps, st.xb[..])
+        tensor.quantize_q8_into(st.xb[..], st.xq)
+        model.layers[l].wq.matvec(pool, st.xq, st.xb[..], st.q[..])
+        model.layers[l].wk.matvec(pool, st.xq, st.xb[..], st.k[..])
+        model.layers[l].wv.matvec(pool, st.xq, st.xb[..], st.v[..])
+        nn.rope_scaled(st.q[..], c.heads, c.head_dim, pos, c.rope_base, c.neox, model.rope_factors)
+        nn.rope_scaled(st.k[..], c.kv_heads, c.head_dim, pos, c.rope_base, c.neox, model.rope_factors)
+        st.caches[l].append(st.k[..], st.v[..])
+        if pool.size() == 1 or st.caches[l].len() * c.dim < PARALLEL_ATTENTION:
+            nn.attention(st.q[..], st.caches[l], c.heads, st.att[..])
+        else:
+            nn.attention_parallel(pool, st.q[..], st.caches[l], c.heads, st.att[..])
+        tensor.quantize_q8_into(st.att[..], st.xq)
+        model.layers[l].wo.matvec(pool, st.xq, st.att[..], st.xb[..])
+        nn.add(st.x[..], st.xb[..])
+        nn.rmsnorm(st.x[..], model.layers[l].ffn_norm, c.eps, st.xb[..])
+        tensor.quantize_q8_into(st.xb[..], st.xq)
+        model.layers[l].w_gate.matvec(pool, st.xq, st.xb[..], st.gate[..])
+        model.layers[l].w_up.matvec(pool, st.xq, st.xb[..], st.up[..])
+        nn.swiglu(st.gate[..], st.up[..])
+        tensor.quantize_q8_into(st.gate[..], st.hq)
+        model.layers[l].w_down.matvec(pool, st.hq, st.gate[..], st.xb[..])
+        nn.add(st.x[..], st.xb[..])
+    nn.rmsnorm(st.x[..], model.out_norm, c.eps, st.xb[..])
+    tensor.quantize_q8_into(st.xb[..], st.xq)
+    model.output.matvec(pool, st.xq, st.xb[..], st.logits[..])

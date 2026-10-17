@@ -868,7 +868,7 @@ def cmd_run(files: list[str] | str, release: bool = False, links: list[str] | No
         if code != 0:
             return code
         sys.stdout.flush()
-        return subprocess.run([str(exe_path)]).returncode
+        return subprocess.run([str(exe_path), *PROGRAM_ARGS]).returncode
 
 
 def cmd_emit_llvm(files: list[str], release: bool, unchecked: bool, bitcode_out: str | None, optimized: bool,
@@ -935,6 +935,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     r = add("run", help="compile and run")
     r.add_argument("files", nargs="*", help="source file(s) (default: gg.toml main)")
+    r.epilog = "Arguments after `--` go to the program: gg run app.gg --release -- model.gguf -p hello"
     r.add_argument("-e", "--eval", metavar="CODE",
                    help="run a snippet instead of a file: the body of `main` (a last bare expression is printed)")
     r.add_argument("--release", action="store_true", help="optimize (LLVM -O3); bounds checks remain enabled")
@@ -1039,10 +1040,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return p
 
 
+# Arguments after `--` in `gg run file.gg -- ...`, handed to the program.
+PROGRAM_ARGS: list[str] = []
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    argv = list(sys.argv[1:] if argv is None else argv)
+    global PROGRAM_ARGS
+    PROGRAM_ARGS = []
+    if argv[:1] == ["run"] and "--" in argv:  # `gg run file.gg -- a b`: the program gets `a b`
+        cut = argv.index("--")
+        argv, PROGRAM_ARGS = argv[:cut], argv[cut + 1:]
     args = build_arg_parser().parse_args(argv)
     _set_color(getattr(args, "color", "auto"))
     global DEBUG_INFO, NATIVE

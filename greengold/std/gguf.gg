@@ -333,3 +333,57 @@ impl Gguf:
             panic("Gguf.f32_values: the tensor is not f32")
         unsafe:
             return slice_from_raw[f32](ptr_cast[*f32](addr(self.file.bytes()[self.tensors[i].offset..])), self.tensors[i].count)
+
+    # The strings of an array entry such as `tokenizer.ggml.tokens`, as views into the mapped file (valid while the
+    # `Gguf` lives). Empty when the key is missing or is not an array of strings.
+    fn array_strs(self: read Gguf, key: str) -> List[str]:
+        out = List[str]()
+        if let Valid(i) = self.find_meta(key):
+            if self.meta[i].kind != 9 or self.meta[i].arr_kind != 8:
+                return out
+            r = _Reader{ bytes: self.file.bytes(), pos: self.meta[i].offset, ok: true }
+            out.reserve(self.meta[i].count)
+            for k in 0..self.meta[i].count:
+                n = usize(r.u64())
+                if not r.take(n):
+                    return out
+                unsafe:
+                    out.push(str_from_raw(ptr_cast[*u8](addr(r.bytes[r.pos..])), n))
+                r.pos += n
+        return out
+
+    # An array of f32 numbers (such as `tokenizer.ggml.scores`) as a list; empty when missing or of another type.
+    fn array_f32(self: read Gguf, key: str) -> List[f32]:
+        out = List[f32]()
+        if let Valid(i) = self.find_meta(key):
+            if self.meta[i].kind != 9 or self.meta[i].arr_kind != 6:
+                return out
+            r = _Reader{ bytes: self.file.bytes(), pos: self.meta[i].offset, ok: true }
+            for k in 0..self.meta[i].count:
+                out.push(_f32_of(r.u32()))
+        return out
+
+    # An array of integers of any width (such as `tokenizer.ggml.token_type`) as a list of i32.
+    fn array_i32(self: read Gguf, key: str) -> List[i32]:
+        out = List[i32]()
+        if let Valid(i) = self.find_meta(key):
+            kind = self.meta[i].arr_kind
+            if self.meta[i].kind != 9 or kind == 6 or kind == 8 or kind == 9 or kind == 12 or kind == 10 or kind == 11:
+                return out
+            r = _Reader{ bytes: self.file.bytes(), pos: self.meta[i].offset, ok: true }
+            for k in 0..self.meta[i].count:
+                if kind == 0 or kind == 1 or kind == 7:
+                    v = r.u8()
+                    if kind == 1 and v > 127:
+                        out.push(i32(v) - 256)
+                    else:
+                        out.push(i32(v))
+                elif kind == 2 or kind == 3:
+                    v = r.u16()
+                    if kind == 3 and v > 32767:
+                        out.push(i32(v) - 65536)
+                    else:
+                        out.push(i32(v))
+                else:
+                    out.push(i32(r.u32()))
+        return out
