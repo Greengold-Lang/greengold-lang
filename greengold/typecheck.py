@@ -3524,15 +3524,15 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             self._err(e, f"`{orig_name}` can only be called in an `unsafe:` block.",
                       "Place the relevant lines inside `unsafe:`.")
         want_targs = 1 if name in ("ptr_cast", "int_to_ptr", "ptr_read", "ptr_write", "volatile_read",
-                                   "volatile_write") else 0
+                                   "volatile_write", "slice_from_raw") else 0
         want_args = {"addr": 1, "addr_mut": 1, "ptr_cast": 1, "ptr_to_int": 1, "int_to_ptr": 1, "ptr_offset": 2,
-                     "cstr_to_string": 1, "string_to_cstr": 1, "str_from_raw": 2, "ptr_read": 1, "ptr_write": 2,
+                     "cstr_to_string": 1, "string_to_cstr": 1, "str_from_raw": 2, "slice_from_raw": 2, "ptr_read": 1, "ptr_write": 2,
                      "volatile_read": 1, "volatile_write": 2}[name]
         if len(e.type_args) != want_targs or len(e.args) != want_args:
             sig = {"addr": "addr(x)", "addr_mut": "addr_mut(x)", "ptr_cast": "ptr_cast[*T](p)",
                    "ptr_to_int": "ptr_to_int(p)", "int_to_ptr": "int_to_ptr[*T](n)", "ptr_offset": "ptr_offset(p, n)",
                    "cstr_to_string": "cstr_to_string(p)", "string_to_cstr": "string_to_cstr(s)",
-                   "str_from_raw": "str_from_raw(p, len)", "ptr_read": "ptr_read[T](p)",
+                   "str_from_raw": "str_from_raw(p, len)", "slice_from_raw": "slice_from_raw[T](p, len)", "ptr_read": "ptr_read[T](p)",
                    "ptr_write": "ptr_write[T](p, value)", "volatile_read": "volatile_read[T](p)",
                    "volatile_write": "volatile_write[T](p, value)"}[name]
             self._err(e, f"`{name}` used incorrectly.", f"Correct form: `{sig}`.")
@@ -3656,6 +3656,18 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             if n != ERR:
                 self._expect_type("usize", n, e.args[1])
             return "str" if ERR not in (t, n) else ERR
+        if name == "slice_from_raw":  # `[]T` view over `len` values of type T at `p`
+            target = self._resolve(e.type_args[0])
+            t = self._expr(e.args[0])
+            n = self._expr(e.args[1], "usize")
+            if ERR in (target, t, n):
+                return ERR
+            if not is_ptr_type(t):
+                self._err(e.args[0], f"`slice_from_raw` requires a pointer, found `{t}`.")
+                return ERR
+            self._expect_type("usize", n, e.args[1])
+            e.mem_ty = target  # type: ignore[attr-defined]
+            return f"[]{target}"
         if name == "cstr_to_string":
             t = self._expr(e.args[0])
             if t != ERR and ptr_const(t) != "*u8" and ptr_const(t) != "*i8":

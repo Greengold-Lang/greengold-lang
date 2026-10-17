@@ -253,6 +253,7 @@ def _builtins() -> list[dict]:
         ("cstr_to_string", "fn cstr_to_string(p: *u8) -> str", "View a NUL-terminated C string. Only inside `unsafe:`."),
         ("string_to_cstr", "fn string_to_cstr(s: str) -> *u8", "Temporary NUL-terminated pointer for a `str`. Only inside `unsafe:`."),
         ("str_from_raw", "fn str_from_raw(p: *u8, len: usize) -> str", "View `len` bytes. The view is not NUL-terminated. Only inside `unsafe:`."),
+        ("slice_from_raw", "fn slice_from_raw[T](p: *T, len: usize) -> []T", "View `len` values of type `T` at `p` (the memory must stay alive and be aligned for `T`). Only inside `unsafe:`."),
         ("Num", "feature Num", "Numbers: integers and floats."),
         ("Int", "feature Int", "Integer types."),
         ("Float", "feature Float", "f32 and f64."),

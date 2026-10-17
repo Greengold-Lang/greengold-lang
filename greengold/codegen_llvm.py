@@ -3564,6 +3564,11 @@ class LLVMGen:
             return b.gep(v, [self.to_i64(self.expr(e.args[1]), e.args[1].ty)])
         if name == "ptr_read":
             return b.load(b.bitcast(v, self.llty(e.mem_ty).as_pointer()))  # type: ignore[attr-defined]
+        if name == "slice_from_raw":
+            slice_ty = self.llty(e.ty)
+            res = ir.Constant(slice_ty, ir.Undefined)
+            res = b.insert_value(res, b.bitcast(v, slice_ty.elements[0]), 0)
+            return b.insert_value(res, self.to_i64(self.expr(e.args[1]), e.args[1].ty), 1)
         if name == "str_from_raw":
             res = ir.Constant(self.llty("str"), ir.Undefined)
             res = b.insert_value(res, b.bitcast(v, I8P), 0)

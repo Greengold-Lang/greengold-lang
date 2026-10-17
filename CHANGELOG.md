@@ -8,6 +8,7 @@ Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0
 - SIMD: `fma` on float vectors, `dot_i8` / `dot_u8i8` (the int8 multiply-add of quantized matrix products; `pmaddwd` on x86), and the vector types `i8x16`, `i8x32`, `u8x32`. New benchmark `qmatvec` (int8 matrix-vector product).
 - New `std.parallel`: `Pool.new(threads)` and `pool.for_range(n, f, ctx)` share the range `0..n` between a pool of worker threads (the calling thread takes part). New benchmark `qmatvec_mt` (the same product on all CPUs).
 - New `std.tensor`: `Tensor`, the ggml-compatible blocks `BlockQ8` (`q8_0`) and `BlockQ4` (`q4_0`), `Q8Vec`, `Q4Matrix` / `Q8Matrix` with `matvec` and `matvec_parallel`, 16-bit float conversion. SIMD: `shr`, `shl`, `as_i8` / `as_u8`, `to_f32`, `join`, and `dot_u4i8` (4-bit data). The `std.tensor` matrix kernels use 256-bit steps, two rows at a time, and scales converted once per vector block (`q4_0` 4096x4096 product: 1.5 ms to 0.75 ms on one thread with `--cpu native`). Without `--cpu native` the 256-bit vectors are emulated and these kernels run several times slower. New benchmark `q4matvec`.
+- New `std.mmap` (`MappedFile`, read-only memory-mapped files) and `std.gguf` (`Gguf.open` reads GGUF model files: metadata, tensor table, and zero-copy `q4_blocks` / `q8_blocks` / `f32_values` views). New intrinsic `slice_from_raw[T](p, len)`. `std.tensor` gains `q4_matvec`, `q8_matvec` (and `_parallel`) on block views and `dequantize_row_q4` / `_q8`.
 
 ## 0.22.0
 

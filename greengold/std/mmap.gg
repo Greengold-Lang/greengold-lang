@@ -1,0 +1,104 @@
+# std.mmap: read-only memory-mapped files.
+#
+#     import std.mmap
+#
+#     match mmap.MappedFile.open("model.gguf"):
+#         Ok(f): print(f.len(), f.bytes()[0])
+#         Err(e): print(e)
+#
+# The file is not read into memory: the operating system pages it in when the bytes are used, shares those
+# pages between programs, and drops them again under memory pressure. This is how a model of several gigabytes
+# starts in a moment. `bytes()` is a view of the whole file; it is valid until the `MappedFile` goes away.
+import std.string
+
+private
+extern "windows.h" fn CreateFileA(name: *u8, access: u32, share: u32, security: *u8, disposition: u32, flags: u32, template: *u8) -> *mut u8
+extern "windows.h" fn CreateFileMappingA(file: *mut u8, security: *u8, protect: u32, high: u32, low: u32, name: *u8) -> *mut u8
+extern "windows.h" fn MapViewOfFile(mapping: *mut u8, access: u32, high: u32, low: u32, bytes: usize) -> *mut u8
+extern "windows.h" fn UnmapViewOfFile(p: *u8) -> i32
+extern "windows.h" fn CloseHandle(h: *mut u8) -> i32
+extern "windows.h" fn GetFileSizeEx(h: *mut u8, size: *mut i64) -> i32
+weak extern "fcntl.h" fn open(path: *u8, flags: i32, ...) -> i32
+weak extern "unistd.h" fn close(fd: i32) -> i32
+weak extern "unistd.h" fn lseek(fd: i32, offset: i64, whence: i32) -> i64
+weak extern "sys/mman.h" fn mmap(addr: *u8, len: usize, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
+weak extern "sys/mman.h" fn munmap(p: *u8, len: usize) -> i32
+
+public
+struct MappedFile:
+    private
+    ptr: *mut u8
+    size: usize
+    file: *mut u8     # Windows: the file handle
+    mapping: *mut u8  # Windows: the mapping handle
+    fd: i32           # elsewhere: the descriptor
+
+impl MappedFile:
+    # Maps the file at `path` for reading.
+    public
+    fn open(path: str) -> Result[MappedFile, string]:
+        owned = string.from(path)
+        owned.append_byte(0)
+        m = MappedFile{ ptr: null, size: 0, file: null, mapping: null, fd: -1 }
+        unsafe:
+            name = string_to_cstr(owned.as_str())
+            if target_os() == "windows":
+                # GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL
+                h = CreateFileA(name, 0x80000000, 1, null, 3, 0x80, null)
+                if ptr_to_int(h) == max_value[usize]():
+                    return Err(string.from("cannot open the file"))
+                m.file = h
+                size: i64 = 0
+                if GetFileSizeEx(h, addr_mut(size)) == 0:
+                    return Err(string.from("cannot read the size of the file"))
+                m.size = usize(size)
+                if m.size > 0:
+                    # PAGE_READONLY, FILE_MAP_READ
+                    mapping = CreateFileMappingA(h, null, 2, 0, 0, null)
+                    if ptr_to_int(mapping) == 0:
+                        return Err(string.from("cannot map the file"))
+                    m.mapping = mapping
+                    view = MapViewOfFile(mapping, 4, 0, 0, 0)
+                    if ptr_to_int(view) == 0:
+                        return Err(string.from("cannot map the file"))
+                    m.ptr = view
+            else:
+                fd = open(name, 0)  # O_RDONLY
+                if fd < 0:
+                    return Err(string.from("cannot open the file"))
+                m.fd = fd
+                end = lseek(fd, 0, 2)  # SEEK_END
+                if end < 0:
+                    return Err(string.from("cannot read the size of the file"))
+                m.size = usize(end)
+                if m.size > 0:
+                    # PROT_READ, MAP_PRIVATE
+                    view = mmap(null, m.size, 1, 2, fd, 0)
+                    if ptr_to_int(view) == max_value[usize]():
+                        return Err(string.from("cannot map the file"))
+                    m.ptr = view
+        return Ok(m)
+
+    # The size of the file in bytes.
+    fn len(self: read MappedFile) -> usize:
+        return self.size
+
+    # The whole file as bytes.
+    fn bytes(self: read MappedFile) -> []u8:
+        unsafe:
+            return slice_from_raw[u8](ptr_cast[*u8](self.ptr), self.size)
+
+    fn drop(self: lend Self):
+        unsafe:
+            if target_os() == "windows":
+                if ptr_to_int(self.ptr) != 0:
+                    UnmapViewOfFile(ptr_cast[*u8](self.ptr))
+                if ptr_to_int(self.mapping) != 0:
+                    CloseHandle(self.mapping)
+                if ptr_to_int(self.file) != 0:
+                    CloseHandle(self.file)
+            else:
+                if ptr_to_int(self.ptr) != 0:
+                    munmap(ptr_cast[*u8](self.ptr), self.size)
+                if self.fd >= 0:
+                    close(self.fd)

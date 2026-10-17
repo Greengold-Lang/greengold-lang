@@ -355,6 +355,52 @@ fn _rows_q8(start: usize, end: usize, ctx: *u8):
             job[0].y[r] = _row_dot_q8(job[0].w, r * job[0].nb, job[0].x, job[0].xscale, job[0].nb)
 
 public
+# y = W x for `rows` x `cols` weights in `q4_0` blocks (`w` has `rows * cols / 32` blocks, for instance a view
+# into a memory-mapped model file). `x` has `cols` values and `y` has `rows`.
+fn q4_matvec(w: []BlockQ4, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32):
+    nb = cols / BLOCK
+    if x.len != cols or y.len != rows or w.len != rows * nb:
+        panic("q4_matvec: the sizes do not match")
+    r: usize = 0
+    while r + 2 <= rows:
+        a, b = _rows2_dot_q4(w, r * nb, nb, x.blocks[..], x.scales[..], x.corrections[..])
+        y[r] = a
+        y[r + 1] = b
+        r += 2
+    if r < rows:
+        y[r] = _row_dot_q4(w, r * nb, x.blocks[..], x.scales[..], x.corrections[..], nb)
+
+# The same with the rows shared between the threads of `pool`.
+fn q4_matvec_parallel(pool: lend parallel.Pool, w: []BlockQ4, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32):
+    nb = cols / BLOCK
+    if x.len != cols or y.len != rows or w.len != rows * nb:
+        panic("q4_matvec_parallel: the sizes do not match")
+    unsafe:
+        job = _JobQ4{ w: w, x: x.blocks[..], xscale: x.scales[..], xcorr: x.corrections[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
+        pool.for_range(rows, _rows_q4, ptr_cast[*u8](addr(job)))
+
+# The same for `q8_0` weights.
+fn q8_matvec(w: []BlockQ8, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32):
+    nb = cols / BLOCK
+    if x.len != cols or y.len != rows or w.len != rows * nb:
+        panic("q8_matvec: the sizes do not match")
+    r: usize = 0
+    while r + 2 <= rows:
+        a, b = _rows2_dot_q8(w, r * nb, nb, x.blocks[..], x.scales[..])
+        y[r] = a
+        y[r + 1] = b
+        r += 2
+    if r < rows:
+        y[r] = _row_dot_q8(w, r * nb, x.blocks[..], x.scales[..], nb)
+
+fn q8_matvec_parallel(pool: lend parallel.Pool, w: []BlockQ8, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32):
+    nb = cols / BLOCK
+    if x.len != cols or y.len != rows or w.len != rows * nb:
+        panic("q8_matvec_parallel: the sizes do not match")
+    unsafe:
+        job = _JobQ8{ w: w, x: x.blocks[..], xscale: x.scales[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
+        pool.for_range(rows, _rows_q8, ptr_cast[*u8](addr(job)))
+
 # A matrix of `q4_0` blocks: `rows` rows of `cols` weights, each row `cols / 32` blocks.
 struct Q4Matrix:
     rows: usize
@@ -378,41 +424,39 @@ impl Q4Matrix:
 
     # Row `r` as f32.
     fn dequantize_row(self: read Q4Matrix, r: usize) -> List[f32]:
-        out = List[f32]()
-        nb = self.cols / BLOCK
-        for b in 0..nb:
-            blk = self.blocks[r * nb + b]
-            d = f16_to_f32(blk.d)
-            for j in 0..16:
-                out.push(d * f32(i32(blk.qs[j] & 0x0F) - 8))
-            for j in 0..16:
-                out.push(d * f32(i32(blk.qs[j] >> 4) - 8))
-        return out
+        return dequantize_row_q4(self.blocks[..], self.cols, r)
 
     # y = W x for a `q8_0` vector of `cols` values; `y` has `rows` values.
     fn matvec(self: read Q4Matrix, x: read Q8Vec, y: lend []f32):
-        nb = self.cols / BLOCK
-        if x.len != self.cols or y.len != self.rows:
-            panic("Q4Matrix.matvec: the sizes do not match")
-        r: usize = 0
-        while r + 2 <= self.rows:
-            a, b = _rows2_dot_q4(self.blocks[..], r * nb, nb, x.blocks[..], x.scales[..], x.corrections[..])
-            y[r] = a
-            y[r + 1] = b
-            r += 2
-        if r < self.rows:
-            y[r] = _row_dot_q4(self.blocks[..], r * nb, x.blocks[..], x.scales[..], x.corrections[..], nb)
+        q4_matvec(self.blocks[..], self.rows, self.cols, x, y)
 
     # The same, with the rows shared between the threads of `pool`.
     fn matvec_parallel(self: read Q4Matrix, pool: lend parallel.Pool, x: read Q8Vec, y: lend []f32):
-        nb = self.cols / BLOCK
-        if x.len != self.cols or y.len != self.rows:
-            panic("Q4Matrix.matvec_parallel: the sizes do not match")
-        unsafe:
-            job = _JobQ4{ w: self.blocks[..], x: x.blocks[..], xscale: x.scales[..], xcorr: x.corrections[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
-            pool.for_range(self.rows, _rows_q4, ptr_cast[*u8](addr(job)))
+        q4_matvec_parallel(pool, self.blocks[..], self.rows, self.cols, x, y)
 
 public
+# Row `r` of a `q4_0` matrix with `cols` columns, as f32.
+fn dequantize_row_q4(w: []BlockQ4, cols: usize, r: usize) -> List[f32]:
+    out = List[f32]()
+    nb = cols / BLOCK
+    for b in 0..nb:
+        d = f16_to_f32(w[r * nb + b].d)
+        for j in 0..16:
+            out.push(d * f32(i32(w[r * nb + b].qs[j] & 0x0F) - 8))
+        for j in 0..16:
+            out.push(d * f32(i32(w[r * nb + b].qs[j] >> 4) - 8))
+    return out
+
+# Row `r` of a `q8_0` matrix with `cols` columns, as f32.
+fn dequantize_row_q8(w: []BlockQ8, cols: usize, r: usize) -> List[f32]:
+    out = List[f32]()
+    nb = cols / BLOCK
+    for b in 0..nb:
+        d = f16_to_f32(w[r * nb + b].d)
+        for j in 0..BLOCK:
+            out.push(d * f32(w[r * nb + b].qs[j]))
+    return out
+
 # A matrix of `q8_0` blocks (8 bits per weight).
 struct Q8Matrix:
     rows: usize
@@ -433,23 +477,11 @@ impl Q8Matrix:
                 m.blocks.push(q.blocks[b])
         return m
 
+    fn dequantize_row(self: read Q8Matrix, r: usize) -> List[f32]:
+        return dequantize_row_q8(self.blocks[..], self.cols, r)
+
     fn matvec(self: read Q8Matrix, x: read Q8Vec, y: lend []f32):
-        nb = self.cols / BLOCK
-        if x.len != self.cols or y.len != self.rows:
-            panic("Q8Matrix.matvec: the sizes do not match")
-        r: usize = 0
-        while r + 2 <= self.rows:
-            a, b = _rows2_dot_q8(self.blocks[..], r * nb, nb, x.blocks[..], x.scales[..])
-            y[r] = a
-            y[r + 1] = b
-            r += 2
-        if r < self.rows:
-            y[r] = _row_dot_q8(self.blocks[..], r * nb, x.blocks[..], x.scales[..], nb)
+        q8_matvec(self.blocks[..], self.rows, self.cols, x, y)
 
     fn matvec_parallel(self: read Q8Matrix, pool: lend parallel.Pool, x: read Q8Vec, y: lend []f32):
-        nb = self.cols / BLOCK
-        if x.len != self.cols or y.len != self.rows:
-            panic("Q8Matrix.matvec_parallel: the sizes do not match")
-        unsafe:
-            job = _JobQ8{ w: self.blocks[..], x: x.blocks[..], xscale: x.scales[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
-            pool.for_range(self.rows, _rows_q8, ptr_cast[*u8](addr(job)))
+        q8_matvec_parallel(pool, self.blocks[..], self.rows, self.cols, x, y)

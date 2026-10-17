@@ -6,15 +6,17 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 
 ## Modules
 
-- [Compiler builtins](#compiler-builtins) (35)
+- [Compiler builtins](#compiler-builtins) (36)
 - [Core prelude (always in scope)](#core-prelude-always-in-scope) (69)
 - [std.collections](#stdcollections) (101)
 - [std.fs](#stdfs) (12)
+- [std.gguf](#stdgguf) (13)
 - [std.http](#stdhttp) (26)
 - [std.intern](#stdintern) (5)
 - [std.io](#stdio) (11)
 - [std.json](#stdjson) (23)
 - [std.math](#stdmath) (22)
+- [std.mmap](#stdmmap) (5)
 - [std.net](#stdnet) (59)
 - [std.packet](#stdpacket) (44)
 - [std.parallel](#stdparallel) (7)
@@ -25,7 +27,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.sort](#stdsort) (3)
 - [std.string](#stdstring) (25)
 - [std.tasks](#stdtasks) (9)
-- [std.tensor](#stdtensor) (33)
+- [std.tensor](#stdtensor) (40)
 - [std.thread](#stdthread) (49)
 - [std.time](#stdtime) (22)
 - [std.tls](#stdtls) (5)
@@ -184,6 +186,11 @@ Temporary NUL-terminated pointer for a `str`.
 fn str_from_raw(p: *u8, len: usize) -> str
 ```
 View `len` bytes.
+
+```
+fn slice_from_raw[T](p: *T, len: usize) -> []T
+```
+View `len` values of type `T` at `p` (the memory must stay alive and be aligned for `T`).
 
 ```
 feature Num
@@ -990,6 +997,76 @@ fn rename_file(old_path: str, new_path: str) -> bool
 Rename `old_path` to `new_path`.
 
 
+## std.gguf
+
+### struct
+
+```
+struct Meta { key: string, kind: u32, ival: i64, fval: f64, text: string, arr_kind: u32, count: usize, offset: usize }
+```
+One key/value pair of the metadata.
+
+```
+struct TensorInfo { name: string, dims: List[usize], kind: u32, count: usize, offset: usize, size: usize }
+```
+One entry of the tensor table.
+
+```
+struct Gguf { version: u32, meta: List[Meta], tensors: List[TensorInfo], data_start: usize, file: MappedFile }
+```
+
+### fn
+
+```
+fn Gguf.open(path: str) -> Result[Gguf, string]
+```
+
+```
+fn Gguf.find_meta(self: read Gguf, key: str) -> Optional[usize]
+```
+The index of the metadata entry `key`.
+
+```
+fn Gguf.get_int(self: read Gguf, key: str) -> Optional[i64]
+```
+An integer (or boolean) entry.
+
+```
+fn Gguf.get_float(self: read Gguf, key: str) -> Optional[f64]
+```
+A float entry.
+
+```
+fn Gguf.get_str(self: read Gguf, key: str) -> Optional[string]
+```
+A string entry (a copy).
+
+```
+fn Gguf.find_tensor(self: read Gguf, name: str) -> Optional[usize]
+```
+The index of the tensor called `name`.
+
+```
+fn Gguf.raw(self: read Gguf, i: usize) -> []u8
+```
+The bytes of tensor `i`, as stored.
+
+```
+fn Gguf.q4_blocks(self: read Gguf, i: usize) -> []BlockQ4
+```
+Tensor `i` as `q4_0` blocks (it must have type 2), straight from the mapped file.
+
+```
+fn Gguf.q8_blocks(self: read Gguf, i: usize) -> []BlockQ8
+```
+Tensor `i` as `q8_0` blocks (type 8).
+
+```
+fn Gguf.f32_values(self: read Gguf, i: usize) -> []f32
+```
+Tensor `i` as f32 values (type 0).
+
+
 ## std.http
 
 ### struct
@@ -1417,6 +1494,35 @@ fn gcd_u64(a: u64, b: u64) -> u64
 
 ```
 fn pow_i64(base: i64, exp_: u32) -> i64
+```
+
+
+## std.mmap
+
+### struct
+
+```
+struct MappedFile { ptr: *mut u8, size: usize, file: *mut u8, mapping: *mut u8, fd: i32 }
+```
+
+### fn
+
+```
+fn MappedFile.open(path: str) -> Result[MappedFile, string]
+```
+
+```
+fn MappedFile.len(self: read MappedFile) -> usize
+```
+The size of the file in bytes.
+
+```
+fn MappedFile.bytes(self: read MappedFile) -> []u8
+```
+The whole file as bytes.
+
+```
+fn MappedFile.drop(self: lend MappedFile)
 ```
 
 
@@ -2445,6 +2551,25 @@ fn Tensor.reshape(self: lend Tensor, dims: []usize)
 Gives the same values other dimensions (the product must not change).
 
 ```
+fn q4_matvec(w: []BlockQ4, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32)
+```
+y = W x for `rows` x `cols` weights in `q4_0` blocks (`w` has `rows * cols / 32` blocks, for instance a view into a memory-mapped model file).
+
+```
+fn q4_matvec_parallel(pool: lend Pool, w: []BlockQ4, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32)
+```
+The same with the rows shared between the threads of `pool`.
+
+```
+fn q8_matvec(w: []BlockQ8, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32)
+```
+The same for `q8_0` weights.
+
+```
+fn q8_matvec_parallel(pool: lend Pool, w: []BlockQ8, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32)
+```
+
+```
 fn Q4Matrix.quantize(t: read Tensor) -> Q4Matrix
 ```
 
@@ -2464,7 +2589,21 @@ fn Q4Matrix.matvec_parallel(self: read Q4Matrix, pool: lend Pool, x: read Q8Vec,
 The same, with the rows shared between the threads of `pool`.
 
 ```
+fn dequantize_row_q4(w: []BlockQ4, cols: usize, r: usize) -> List[f32]
+```
+Row `r` of a `q4_0` matrix with `cols` columns, as f32.
+
+```
+fn dequantize_row_q8(w: []BlockQ8, cols: usize, r: usize) -> List[f32]
+```
+Row `r` of a `q8_0` matrix with `cols` columns, as f32.
+
+```
 fn Q8Matrix.quantize(t: read Tensor) -> Q8Matrix
+```
+
+```
+fn Q8Matrix.dequantize_row(self: read Q8Matrix, r: usize) -> List[f32]
 ```
 
 ```

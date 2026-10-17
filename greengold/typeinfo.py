@@ -41,7 +41,7 @@ PTR_BUILTIN_ALIASES: dict[str, str] = {
     "int_to_pointer": "int_to_ptr",
 }
 PTR_BUILTINS = ({"addr", "addr_mut", "ptr_cast", "ptr_to_int", "int_to_ptr", "ptr_offset",
-                 "cstr_to_string", "string_to_cstr", "str_from_raw", "ptr_read", "ptr_write",
+                 "cstr_to_string", "string_to_cstr", "str_from_raw", "slice_from_raw", "ptr_read", "ptr_write",
                  "size_of", "align_of", "volatile_read", "volatile_write",
                  "atomic_load", "atomic_store", "atomic_add", "atomic_sub", "atomic_and", "atomic_or", "atomic_xor",
                  "atomic_swap", "atomic_cas", "fence", "asm"} | set(PTR_BUILTIN_ALIASES.keys()))
