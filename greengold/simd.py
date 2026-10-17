@@ -17,6 +17,9 @@
 
     v.shr(k) / v.shl(k)                  # shift every integer lane (arithmetic for signed lanes); k < lane bits
     a.join(b)                            # u8x16 / i8x16 -> the 32 lanes of a, then those of b
+    v.floor() / v.abs()                  # float vectors, lane by lane
+    v.to_i32()                           # f32x4 -> i32x4, f32x8 -> i32x8, truncating (the values must fit)
+    v.as_i32() / v.as_f32()              # the same bits as the other kind of 32-bit vector
     v.to_f32()                           # i32x4 -> f32x4, i32x8 -> f32x8 (exact below 2^24)
     v.as_i8() / v.as_u8()                # the same bits as 8-bit vector of the other signedness
 
@@ -45,6 +48,8 @@ _SIGN_FLIP = {"u8x16": ("as_i8", "i8x16"), "u8x32": ("as_i8", "i8x32"),
 
 
 _JOIN = {"u8x16": "u8x32", "i8x16": "i8x32"}
+_FLOAT_BITS = {"f32x4": "i32x4", "f32x8": "i32x8"}
+_BITS_FLOAT = {"i32x4": "f32x4", "i32x8": "f32x8"}
 _TO_F32 = {"i32x4": "f32x4", "i32x8": "f32x8"}
 
 
@@ -126,12 +131,19 @@ class SimdCheckMixin:
         }
         if _is_float(ty):
             table["sqrt"] = ([], ty)
+            table["floor"] = ([], ty)
+            table["abs"] = ([], ty)
             table["fma"] = ([ParamInfo("b", ty, "val", None), ParamInfo("c", ty, "val", None)], ty)
         if not _is_float(ty):
             table["shr"] = ([ParamInfo("k", "usize", "val", None)], ty)
             table["shl"] = ([ParamInfo("k", "usize", "val", None)], ty)
         if ty in _JOIN:
             table["join"] = ([ParamInfo("other", ty, "val", None)], _JOIN[ty])
+        if ty in _FLOAT_BITS:
+            table["to_i32"] = ([], _FLOAT_BITS[ty])
+            table["as_i32"] = ([], _FLOAT_BITS[ty])
+        if ty in _BITS_FLOAT:
+            table["as_f32"] = ([], _BITS_FLOAT[ty])
         if ty in _TO_F32:
             table["to_f32"] = ([], _TO_F32[ty])
         if ty in _SIGN_FLIP:
@@ -257,6 +269,17 @@ def call(cg, e):
         w = cg.expr(e.args[0])
         mask = ir.Constant(ir.VectorType(ir.IntType(32), 2 * n), list(range(2 * n)))
         return b.shuffle_vector(v, w, mask)
+    if kind in ("floor", "abs"):
+        f = "f32" if lane_type(ty) == "f32" else "f64"
+        name = f"llvm.{'floor' if kind == 'floor' else 'fabs'}.v{n}{f}"
+        fn = cg.mod.globals.get(name) or ir.Function(cg.mod, ir.FunctionType(lt, [lt]), name)
+        return b.call(fn, [v])
+    if kind == "to_i32":
+        return b.fptosi(v, llty(cg, _FLOAT_BITS[ty]))
+    if kind == "as_i32":
+        return b.bitcast(v, llty(cg, _FLOAT_BITS[ty]))
+    if kind == "as_f32":
+        return b.bitcast(v, llty(cg, _BITS_FLOAT[ty]))
     if kind == "to_f32":
         return b.sitofp(v, llty(cg, _TO_F32[ty]))
     if kind in ("as_i8", "as_u8"):

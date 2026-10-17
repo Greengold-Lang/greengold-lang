@@ -18,6 +18,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.math](#stdmath) (22)
 - [std.mmap](#stdmmap) (5)
 - [std.net](#stdnet) (59)
+- [std.nn](#stdnn) (18)
 - [std.packet](#stdpacket) (44)
 - [std.parallel](#stdparallel) (7)
 - [std.process](#stdprocess) (6)
@@ -1814,6 +1815,101 @@ A datagram that already arrived, or None;
 ```
 fn UdpSocket.drop(self: lend UdpSocket)
 ```
+
+
+## std.nn
+
+### struct
+
+```
+struct KvCache { k: List[f32], v: List[f32], n_kv_heads: usize, head_dim: usize, max_seq: usize, used: usize }
+```
+The keys and values of the tokens seen so far, for one layer.
+
+### fn
+
+```
+fn exp(x: f32) -> f32
+```
+e^x.
+
+```
+fn dot(a: []f32, b: []f32) -> f32
+```
+The dot product of two slices of the same length.
+
+```
+fn axpy(a: f32, x: []f32, y: lend []f32)
+```
+y += a * x.
+
+```
+fn add(x: lend []f32, y: []f32)
+```
+x += y (the residual connection).
+
+```
+fn matvec(w: []f32, rows: usize, cols: usize, x: []f32, y: lend []f32)
+```
+y = W x for f32 weights: `w` has `rows * cols` values, row by row.
+
+```
+fn softmax(x: lend []f32)
+```
+The softmax of `x`, in place.
+
+```
+fn rmsnorm(x: []f32, weight: []f32, eps: f32, out: lend []f32)
+```
+out = x / sqrt(mean(x * x) + eps) * weight.
+
+```
+fn silu(x: lend []f32)
+```
+x = x * sigmoid(x), in place.
+
+```
+fn swiglu(gate: lend []f32, up: []f32)
+```
+gate = silu(gate) * up, in place on `gate`: the activation of a SwiGLU feed-forward layer.
+
+```
+fn rope(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base: f32, neox: bool)
+```
+Rotary position embedding, in place, for `n_heads` heads of `head_dim` values at position `pos`.
+
+```
+fn KvCache.new(n_kv_heads: usize, head_dim: usize, max_seq: usize) -> KvCache
+```
+
+```
+fn KvCache.len(self: read KvCache) -> usize
+```
+How many tokens are stored.
+
+```
+fn KvCache.append(self: lend KvCache, key: []f32, value: []f32)
+```
+Stores the key and value of the next token (each `n_kv_heads * head_dim` values).
+
+```
+fn KvCache.truncate(self: lend KvCache, n: usize)
+```
+Forgets the tokens from position `n` on (for instance to go back to a shared prompt).
+
+```
+fn KvCache.clear(self: lend KvCache)
+```
+
+```
+fn attention(q: []f32, cache: read KvCache, n_heads: usize, out: lend []f32)
+```
+Attention of the new token's query `q` (`n_heads * head_dim` values) over every token in `cache`, which must already hold the new token's own key and value.
+
+```
+fn attention_parallel(pool: lend Pool, q: []f32, cache: read KvCache, n_heads: usize, out: lend []f32)
+```
+The same with the key/value heads (each with its group of query heads) shared between the threads of `pool`.
 
 
 ## std.packet

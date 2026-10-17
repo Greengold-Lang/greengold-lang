@@ -83,9 +83,8 @@ class SliceVal:
             return self._struct
         v = ir.Constant(sty, ir.Undefined)
         v = b.insert_value(v, self.ptr, 0)
-        v = b.insert_value(v, self.len, 1)
-        self._struct = v
-        return v
+        # Not cached: the first use may sit in a branch that does not dominate the later ones.
+        return b.insert_value(v, self.len, 1)
 
 
 def _walk(node: Any):
