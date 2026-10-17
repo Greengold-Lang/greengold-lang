@@ -2,7 +2,7 @@
 
 Greengold follows [semantic versioning](https://semver.org/) once it reaches 1.0. Until then, minor versions may contain breaking changes. See [`docs/STABILITY.md`](docs/STABILITY.md) for the editions and API-lock policy.
 
-## Unreleased
+## 0.23.0
 
 - **`--cpu` and `--features`** for `build`, `run`, `emit-ll` and `emit-bc` (and `GG_CPU`, `GG_FEATURES`): `--cpu native` makes code for the CPU that runs the compiler, `--cpu haswell` / `x86-64-v3` / `apple-m1` for a named one, `--features +avx2,+fma,-avx512f` adds or removes features. Without them the code still runs on any CPU of the target. It works with the built-in LLVM and with an outside clang, and is part of the build cache key.
 - SIMD: `fma` on float vectors, `dot_i8` / `dot_u8i8` (the int8 multiply-add of quantized matrix products; `pmaddwd` on x86), and the vector types `i8x16`, `i8x32`, `u8x32`. New benchmark `qmatvec` (int8 matrix-vector product).
