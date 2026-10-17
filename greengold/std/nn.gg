@@ -215,19 +215,70 @@ fn rope(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base: f32, n
 # The same with a divisor per pair (`head_dim / 2` values, the `rope_freqs.weight` tensor of LLaMA 3.1 models):
 # the angle of pair `i` is divided by `factors[i]`. An empty slice means no divisors.
 fn rope_scaled(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base: f32, neox: bool, factors: []f32):
-    if x.len != n_heads * head_dim or head_dim % 2 != 0:
-        panic("nn.rope: the sizes do not match")
     half = head_dim / 2
+    cs = List[f32]()
+    sn = List[f32]()
+    for i in 0..half:
+        cs.push(0.0)
+        sn.push(0.0)
+    rope_table(pos, head_dim, base, factors, 1.0, 0, 1.0, cs[..], sn[..])
+    rope_apply(x, n_heads, head_dim, neox, cs[..], sn[..])
+
+# The cosines and sines of the angles of the `head_dim / 2` pairs at position `pos` (the same for every head, so a
+# model computes them once per token). `factors` are the divisors of `rope_scaled`. `linear` divides every angle by
+# that number (linear position scaling; 1 = none). `yarn` > 1 is YaRN scaling by that factor, as llama.cpp does it:
+# `original_ctx` is the context length the model was trained with; pairs that turn fast keep their angle, pairs
+# that turn slowly get it divided by `yarn`, those in between a mixture, and the sines and cosines are multiplied
+# by `1 + 0.1 * ln(yarn)`.
+fn rope_table(pos: usize, head_dim: usize, base: f32, factors: []f32, linear: f32, original_ctx: usize, yarn: f32,
+    cos: lend []f32, sin: lend []f32):
+    half = head_dim / 2
+    if cos.len != half or sin.len != half or head_dim % 2 != 0:
+        panic("nn.rope_table: the sizes do not match")
     if factors.len != 0 and factors.len != half:
-        panic("nn.rope: there must be head_dim / 2 factors")
+        panic("nn.rope_table: there must be head_dim / 2 factors")
+    freq_scale = 1.0 / f64(linear)
+    ext: f64 = 0.0
+    mscale: f64 = 1.0
+    low: f64 = 0.0
+    high: f64 = 0.0
+    if yarn > 1.0 and original_ctx > 0:
+        freq_scale = 1.0 / f64(yarn)
+        ext = 1.0
+        mscale = 1.0 + 0.1 * math.ln(f64(yarn))
+        # the pairs whose wavelength fits 32 (fast) and 1 (slow) times into the original context
+        pi2 = 2.0 * math.pi()
+        start = math.floor(f64(head_dim) * math.ln(f64(original_ctx) / (32.0 * pi2)) / (2.0 * math.ln(f64(base))))
+        end = math.ceil(f64(head_dim) * math.ln(f64(original_ctx) / (1.0 * pi2)) / (2.0 * math.ln(f64(base))))
+        low = start
+        if low < 0.0:
+            low = 0.0
+        high = end
+        if high > f64(head_dim - 1):
+            high = f64(head_dim - 1)
     for i in 0..half:
         freq = math.pow(f64(base), 0.0 - f64(2 * i) / f64(head_dim))
         if factors.len != 0:
             freq = freq / f64(factors[i])
-        angle = f64(pos) * freq
-        c = f32(math.cos(angle))
-        s = f32(math.sin(angle))
-        for h in 0..n_heads:
+        extrap = f64(pos) * freq
+        theta = extrap * freq_scale
+        if ext != 0.0:
+            span = high - low
+            if span < 0.001:
+                span = 0.001
+            ramp = 1.0 - math.min_f64(1.0, math.max_f64(0.0, (f64(i) - low) / span))
+            mix = ramp * ext
+            theta = theta * (1.0 - mix) + extrap * mix
+        cos[i] = f32(math.cos(theta) * mscale)
+        sin[i] = f32(math.sin(theta) * mscale)
+
+# Turns every head of `x` by the angles of a `rope_table`.
+fn rope_apply(x: lend []f32, n_heads: usize, head_dim: usize, neox: bool, cos: []f32, sin: []f32):
+    half = head_dim / 2
+    if x.len != n_heads * head_dim or cos.len != half or sin.len != half or head_dim % 2 != 0:
+        panic("nn.rope: the sizes do not match")
+    for h in 0..n_heads:
+        for i in 0..half:
             a = h * head_dim + 2 * i
             b = a + 1
             if neox:
@@ -235,8 +286,8 @@ fn rope_scaled(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base:
                 b = a + half
             x0 = x[a]
             x1 = x[b]
-            x[a] = x0 * c - x1 * s
-            x[b] = x0 * s + x1 * c
+            x[a] = x0 * cos[i] - x1 * sin[i]
+            x[b] = x0 * sin[i] + x1 * cos[i]
 
 struct _MatvecJob:
     w: []f32
@@ -352,36 +403,94 @@ fn _attn_groups(start: usize, end: usize, ctx: *u8):
             _attend_group(job[0].q[kvh * span..(kvh + 1) * span], job[0].keys, job[0].values, job[0].kv_width, hd, kvh,
                 job[0].group, job[0].tokens, scores, out)
 
+struct _BatchAttnJob:
+    q: []f32
+    keys: []f32
+    values: []f32
+    kv_width: usize
+    head_dim: usize
+    kv_heads: usize
+    group: usize
+    pos0: usize
+    most: usize
+    scores: *mut f32
+    out: *mut f32
+
+# One unit is one token of the batch and one key/value head with its group of query heads.
+fn _attn_batch_units(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_BatchAttnJob](ctx)
+        hd = job[0].head_dim
+        span = job[0].group * hd
+        q_dim = job[0].kv_heads * span
+        for u in start..end:
+            b = u / job[0].kv_heads
+            kvh = u % job[0].kv_heads
+            tokens = job[0].pos0 + b + 1
+            scores = slice_from_raw[f32](ptr_offset(job[0].scores, isize(u * job[0].group * job[0].most)), job[0].group * tokens)
+            out = slice_from_raw[f32](ptr_offset(job[0].out, isize(b * q_dim + kvh * span)), span)
+            _attend_group(job[0].q[b * q_dim + kvh * span..b * q_dim + (kvh + 1) * span], job[0].keys, job[0].values,
+                job[0].kv_width, hd, kvh, job[0].group, tokens, scores, out)
+
 public
 # Attention of the new token's query `q` (`n_heads * head_dim` values) over every token in `cache`, which must
 # already hold the new token's own key and value. `n_heads` must be a multiple of `cache.n_kv_heads` (grouped-query
 # attention: neighbouring query heads share a key/value head). `out` has `n_heads * head_dim` values.
 fn attention(q: []f32, cache: read KvCache, n_heads: usize, out: lend []f32):
+    attention_prefix(q, cache, n_heads, cache.used, out)
+
+# The same over only the first `tokens` tokens of the cache: when a batch of tokens has been appended, token `i` of
+# the batch looks at the tokens up to and including itself.
+fn attention_prefix(q: []f32, cache: read KvCache, n_heads: usize, tokens: usize, out: lend []f32):
     w = cache.n_kv_heads * cache.head_dim
-    if cache.used == 0 or n_heads % cache.n_kv_heads != 0 or q.len != n_heads * cache.head_dim or out.len != q.len:
+    if tokens == 0 or tokens > cache.used or n_heads % cache.n_kv_heads != 0 or q.len != n_heads * cache.head_dim or out.len != q.len:
         panic("nn.attention: the sizes do not match")
     group = n_heads / cache.n_kv_heads
     scores = List[f32]()
-    for i in 0..group * cache.used:
+    for i in 0..group * tokens:
         scores.push(0.0)
     ss = scores[..]
     hd = cache.head_dim
     span = group * hd
     for kvh in 0..cache.n_kv_heads:
-        _attend_group(q[kvh * span..(kvh + 1) * span], cache.k[..], cache.v[..], w, hd, kvh, group, cache.used, ss,
+        _attend_group(q[kvh * span..(kvh + 1) * span], cache.k[..], cache.v[..], w, hd, kvh, group, tokens, ss,
             out[kvh * span..(kvh + 1) * span])
 
 # The same with the key/value heads (each with its group of query heads) shared between the threads of `pool`.
 fn attention_parallel(pool: lend parallel.Pool, q: []f32, cache: read KvCache, n_heads: usize, out: lend []f32):
+    attention_prefix_parallel(pool, q, cache, n_heads, cache.used, out)
+
+fn attention_prefix_parallel(pool: lend parallel.Pool, q: []f32, cache: read KvCache, n_heads: usize, tokens: usize, out: lend []f32):
     w = cache.n_kv_heads * cache.head_dim
-    if cache.used == 0 or n_heads % cache.n_kv_heads != 0 or q.len != n_heads * cache.head_dim or out.len != q.len:
+    if tokens == 0 or tokens > cache.used or n_heads % cache.n_kv_heads != 0 or q.len != n_heads * cache.head_dim or out.len != q.len:
         panic("nn.attention_parallel: the sizes do not match")
     scores = List[f32]()
-    for i in 0..n_heads * cache.used:
+    for i in 0..n_heads * tokens:
         scores.push(0.0)
     ss = scores[..]
     unsafe:
         job = _AttnJob{ q: q, keys: cache.k[..], values: cache.v[..], kv_width: w, head_dim: cache.head_dim,
-            group: n_heads / cache.n_kv_heads, tokens: cache.used,
+            group: n_heads / cache.n_kv_heads, tokens: tokens,
             scores: ptr_cast[*mut f32](addr_mut(ss)), out: ptr_cast[*mut f32](addr_mut(out)) }
         pool.for_range_chunked(cache.n_kv_heads, 1, _attn_groups, ptr_cast[*u8](addr(job)))
+
+# Attention for a batch of `m` tokens that were appended to the cache at positions `pos0 .. pos0 + m` (the cache holds
+# `pos0 + m` tokens): token `i` looks at the first `pos0 + i + 1`. `q` and `out` hold the `m` tokens one after
+# another (`n_heads * head_dim` values each). All the (token, key/value head) pairs are shared between the threads
+# of `pool` in one go.
+fn attention_batch_parallel(pool: lend parallel.Pool, q: []f32, cache: read KvCache, n_heads: usize, pos0: usize, m: usize, out: lend []f32):
+    w = cache.n_kv_heads * cache.head_dim
+    q_dim = n_heads * cache.head_dim
+    if m == 0 or pos0 + m > cache.used or n_heads % cache.n_kv_heads != 0 or q.len != m * q_dim or out.len != q.len:
+        panic("nn.attention_batch_parallel: the sizes do not match")
+    group = n_heads / cache.n_kv_heads
+    most = pos0 + m
+    scores = List[f32]()
+    for i in 0..m * cache.n_kv_heads * group * most:
+        scores.push(0.0)
+    ss = scores[..]
+    unsafe:
+        job = _BatchAttnJob{ q: q, keys: cache.k[..], values: cache.v[..], kv_width: w, head_dim: cache.head_dim,
+            kv_heads: cache.n_kv_heads, group: group, pos0: pos0, most: most,
+            scores: ptr_cast[*mut f32](addr_mut(ss)), out: ptr_cast[*mut f32](addr_mut(out)) }
+        pool.for_range_chunked(m * cache.n_kv_heads, 1, _attn_batch_units, ptr_cast[*u8](addr(job)))

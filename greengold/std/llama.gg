@@ -183,6 +183,31 @@ impl Weight:
                 else:
                     pool.for_range(self.rows, _f16_rows, ptr_cast[*u8](addr(job)))
 
+    # y = W x for `nvec` vectors at once (a batch of tokens): `x` holds them one after another (`nvec * cols` values),
+    # `y` receives `nvec * rows`. Every weight is read from memory once for the whole batch.
+    fn matmul(self: read Weight, pool: lend parallel.Pool, act: lend Act, nvec: usize, x: []f32, y: lend []f32):
+        if nvec == 1:
+            self.matvec(pool, act, x, y)
+        elif self.kind == 2 or self.kind == 8:
+            if not act.has8:
+                tensor.quantize_q8_into(x, act.q8)
+                act.has8 = true
+            if self.kind == 2:
+                tensor.q4_matmul_parallel(pool, _q4s(self), self.rows, self.cols, nvec, act.q8, y)
+            else:
+                tensor.q8_matmul_parallel(pool, _q8s(self), self.rows, self.cols, nvec, act.q8, y)
+        elif self.kind == 12 or self.kind == 14:
+            if not act.hask:
+                kquant.quantize_q8k_into(x, act.q8k)
+                act.hask = true
+            if self.kind == 12:
+                kquant.q4k_matmul_parallel(pool, _q4ks(self), self.rows, self.cols, nvec, act.q8k, y)
+            else:
+                kquant.q6k_matmul_parallel(pool, _q6ks(self), self.rows, self.cols, nvec, act.q8k, y)
+        else:
+            for a in 0..nvec:
+                self.matvec(pool, act, x[a * self.cols..(a + 1) * self.cols], y[a * self.rows..(a + 1) * self.rows])
+
     # Row `r` as f32 (an embedding).
     fn row(self: read Weight, r: usize, out: lend []f32):
         if self.kind == 0:
@@ -265,6 +290,9 @@ struct Config:
     eps: f32
     neox: bool        # rotary pairs are (i, i + head_dim / 2) instead of neighbours
     qk_norm: bool     # Qwen3: queries and keys are normalized per head before the rotation
+    rope_linear: f32  # linear position scaling: every angle is divided by this (1 = none)
+    rope_yarn: f32    # YaRN scaling factor (1 = none), see `nn.rope_table`
+    rope_orig_ctx: usize  # the context length the model was trained with, for YaRN
 
 struct Layer:
     attn_norm: []f32
@@ -334,13 +362,25 @@ impl Model:
         eps: f32 = 0.00001
         if let Valid(v) = g.get_float(f"{a}.attention.layer_norm_rms_epsilon".as_str()):
             eps = f32(v)
+        linear: f32 = 1.0
+        yarn: f32 = 1.0
+        orig_ctx: usize = 0
+        kind_name = g.get_str(f"{a}.rope.scaling.type".as_str()).value_or(string.from(""))
+        if kind_name.as_str() == "linear" or kind_name.as_str() == "yarn":
+            factor = f32(g.get_float(f"{a}.rope.scaling.factor".as_str()).value_or(1.0))
+            if factor > 1.0 and kind_name.as_str() == "linear":
+                linear = factor
+            elif factor > 1.0:
+                yarn = factor
+                orig_ctx = usize(g.get_int(f"{a}.rope.scaling.original_context_length".as_str()).value_or(i64(ctx)))
         fbase = _base(g)
         ti = _find(g, "token_embd.weight")?
         vocab = g.tensors[ti].dims[1]
         q_dim = heads * head_dim
         qwen = a == "qwen3"
         cfg = Config{ dim: dim, hidden: hidden, layers: layers, heads: heads, kv_heads: kv_heads, head_dim: head_dim,
-            q_dim: q_dim, vocab: vocab, ctx: ctx, rope_base: base, eps: eps, neox: qwen, qk_norm: qwen }
+            q_dim: q_dim, vocab: vocab, ctx: ctx, rope_base: base, eps: eps, neox: qwen, qk_norm: qwen, rope_linear: linear, rope_yarn: yarn,
+            rope_orig_ctx: orig_ctx }
         ew = _weight(g, "token_embd.weight", vocab, dim)?
         embed = _make(fbase, ew, vocab, dim)
         ni = _norm(g, "output_norm.weight", dim)?
@@ -393,10 +433,13 @@ struct State:
     gate: List[f32]
     up: List[f32]
     logits: List[f32]
+    rcos: List[f32]
+    rsin: List[f32]
     a_dim: Act
     a_att: Act
     a_hid: Act
     caches: List[nn.KvCache]
+    bt: Batch
 
 private
 fn _zeros(n: usize) -> List[f32]:
@@ -410,6 +453,10 @@ public
 impl State:
     # Memory for a conversation of up to `max_seq` tokens (at most the model's context length).
     fn new(cfg: Config, max_seq: usize) -> State:
+        return State.with_batch(cfg, max_seq, 1)
+
+    # The same with room for `forward_batch` to take up to `batch` tokens at once.
+    fn with_batch(cfg: Config, max_seq: usize, batch: usize) -> State:
         n = max_seq
         if n > cfg.ctx:
             n = cfg.ctx
@@ -419,7 +466,7 @@ impl State:
         return State{ x: _zeros(cfg.dim), xb: _zeros(cfg.dim), q: _zeros(cfg.q_dim),
             k: _zeros(cfg.kv_heads * cfg.head_dim), v: _zeros(cfg.kv_heads * cfg.head_dim),
             att: _zeros(cfg.q_dim), gate: _zeros(cfg.hidden), up: _zeros(cfg.hidden),
-            logits: _zeros(cfg.vocab), a_dim: Act.new(), a_att: Act.new(), a_hid: Act.new(), caches: caches }
+            logits: _zeros(cfg.vocab), rcos: _zeros(cfg.head_dim / 2), rsin: _zeros(cfg.head_dim / 2), a_dim: Act.new(), a_att: Act.new(), a_hid: Act.new(), caches: caches, bt: Batch.new(cfg, batch) }
 
     # How many tokens the run holds.
     fn len(self: read State) -> usize:
@@ -440,6 +487,8 @@ fn forward(model: read Model, st: lend State, pool: lend parallel.Pool, token: i
     if pos != st.caches[0].len() or pos >= st.caches[0].max_seq:
         panic("llama.forward: the position is not the next free one, or the context is full")
     model.embed.row(usize(token), st.x[..])
+    nn.rope_table(pos, c.head_dim, c.rope_base, model.rope_factors, c.rope_linear, c.rope_orig_ctx, c.rope_yarn,
+        st.rcos[..], st.rsin[..])
     for l in 0..c.layers:
         nn.rmsnorm(st.x[..], model.layers[l].attn_norm, c.eps, st.xb[..])
         st.a_dim.reset()
@@ -451,8 +500,8 @@ fn forward(model: read Model, st: lend State, pool: lend parallel.Pool, token: i
                 nn.rmsnorm_inplace(st.q[h * c.head_dim..(h + 1) * c.head_dim], model.layers[l].q_norm, c.eps)
             for h in 0..c.kv_heads:
                 nn.rmsnorm_inplace(st.k[h * c.head_dim..(h + 1) * c.head_dim], model.layers[l].k_norm, c.eps)
-        nn.rope_scaled(st.q[..], c.heads, c.head_dim, pos, c.rope_base, c.neox, model.rope_factors)
-        nn.rope_scaled(st.k[..], c.kv_heads, c.head_dim, pos, c.rope_base, c.neox, model.rope_factors)
+        nn.rope_apply(st.q[..], c.heads, c.head_dim, c.neox, st.rcos[..], st.rsin[..])
+        nn.rope_apply(st.k[..], c.kv_heads, c.head_dim, c.neox, st.rcos[..], st.rsin[..])
         st.caches[l].append(st.k[..], st.v[..])
         if pool.size() == 1 or st.caches[l].len() * c.q_dim < PARALLEL_ATTENTION:
             nn.attention(st.q[..], st.caches[l], c.heads, st.att[..])
@@ -470,5 +519,92 @@ fn forward(model: read Model, st: lend State, pool: lend parallel.Pool, token: i
         model.layers[l].w_down.matvec(pool, st.a_hid, st.gate[..], st.xb[..])
         nn.add(st.x[..], st.xb[..])
     nn.rmsnorm(st.x[..], model.out_norm, c.eps, st.xb[..])
+    st.a_dim.reset()
+    model.output.matvec(pool, st.a_dim, st.xb[..], st.logits[..])
+
+public
+# The activations of up to `n` tokens at once, for `forward_batch` (a field of `State`).
+struct Batch:
+    n: usize
+    x: List[f32]
+    xb: List[f32]
+    q: List[f32]
+    k: List[f32]
+    v: List[f32]
+    att: List[f32]
+    gate: List[f32]
+    up: List[f32]
+    rcos: List[f32]
+    rsin: List[f32]
+    a_dim: Act
+    a_att: Act
+    a_hid: Act
+
+public
+impl Batch:
+    fn new(cfg: Config, n: usize) -> Batch:
+        kv = cfg.kv_heads * cfg.head_dim
+        return Batch{ n: n, x: _zeros(n * cfg.dim), xb: _zeros(n * cfg.dim), q: _zeros(n * cfg.q_dim), k: _zeros(n * kv),
+            v: _zeros(n * kv), att: _zeros(n * cfg.q_dim), gate: _zeros(n * cfg.hidden), up: _zeros(n * cfg.hidden),
+            rcos: _zeros(n * (cfg.head_dim / 2)), rsin: _zeros(n * (cfg.head_dim / 2)), a_dim: Act.new(),
+            a_att: Act.new(), a_hid: Act.new() }
+
+public
+# Runs the tokens `tokens` (at most `st.bt.n` of them) at the positions `pos0`, `pos0 + 1`, ... through the model in one
+# go, which reads every weight from memory once instead of once per token: the way to process a prompt. The result is
+# what `forward` gives called token by token (up to rounding in the last digits). `st.logits` then holds the scores
+# for the token after the last one of the batch.
+fn forward_batch(model: read Model, st: lend State, pool: lend parallel.Pool, tokens: []i32, pos0: usize):
+    c = model.cfg
+    m = tokens.len
+    if m == 0 or m > st.bt.n:
+        panic("llama.forward_batch: the batch is empty or larger than the batch the State was made for")
+    if pos0 != st.caches[0].len() or pos0 + m > st.caches[0].max_seq:
+        panic("llama.forward_batch: the position is not the next free one, or the context is full")
+    half = c.head_dim / 2
+    kvd = c.kv_heads * c.head_dim
+    for b in 0..m:
+        if tokens[b] < 0 or usize(tokens[b]) >= c.vocab:
+            panic("llama.forward_batch: a token is outside the vocabulary")
+        model.embed.row(usize(tokens[b]), st.bt.x[b * c.dim..(b + 1) * c.dim])
+        nn.rope_table(pos0 + b, c.head_dim, c.rope_base, model.rope_factors, c.rope_linear, c.rope_orig_ctx, c.rope_yarn,
+            st.bt.rcos[b * half..(b + 1) * half], st.bt.rsin[b * half..(b + 1) * half])
+    for l in 0..c.layers:
+        for b in 0..m:
+            nn.rmsnorm(st.bt.x[b * c.dim..(b + 1) * c.dim], model.layers[l].attn_norm, c.eps, st.bt.xb[b * c.dim..(b + 1) * c.dim])
+        st.bt.a_dim.reset()
+        model.layers[l].wq.matmul(pool, st.bt.a_dim, m, st.bt.xb[0..m * c.dim], st.bt.q[0..m * c.q_dim])
+        model.layers[l].wk.matmul(pool, st.bt.a_dim, m, st.bt.xb[0..m * c.dim], st.bt.k[0..m * kvd])
+        model.layers[l].wv.matmul(pool, st.bt.a_dim, m, st.bt.xb[0..m * c.dim], st.bt.v[0..m * kvd])
+        for b in 0..m:
+            if c.qk_norm:
+                for h in 0..c.heads:
+                    nn.rmsnorm_inplace(st.bt.q[b * c.q_dim + h * c.head_dim..b * c.q_dim + (h + 1) * c.head_dim], model.layers[l].q_norm, c.eps)
+                for h in 0..c.kv_heads:
+                    nn.rmsnorm_inplace(st.bt.k[b * kvd + h * c.head_dim..b * kvd + (h + 1) * c.head_dim], model.layers[l].k_norm, c.eps)
+            nn.rope_apply(st.bt.q[b * c.q_dim..(b + 1) * c.q_dim], c.heads, c.head_dim, c.neox, st.bt.rcos[b * half..(b + 1) * half], st.bt.rsin[b * half..(b + 1) * half])
+            nn.rope_apply(st.bt.k[b * kvd..(b + 1) * kvd], c.kv_heads, c.head_dim, c.neox, st.bt.rcos[b * half..(b + 1) * half], st.bt.rsin[b * half..(b + 1) * half])
+            st.caches[l].append(st.bt.k[b * kvd..(b + 1) * kvd], st.bt.v[b * kvd..(b + 1) * kvd])
+        if pool.size() == 1 or (pos0 + m) * c.q_dim * m < PARALLEL_ATTENTION:
+            for b in 0..m:
+                nn.attention_prefix(st.bt.q[b * c.q_dim..(b + 1) * c.q_dim], st.caches[l], c.heads, pos0 + b + 1, st.bt.att[b * c.q_dim..(b + 1) * c.q_dim])
+        else:
+            nn.attention_batch_parallel(pool, st.bt.q[0..m * c.q_dim], st.caches[l], c.heads, pos0, m, st.bt.att[0..m * c.q_dim])
+        st.bt.a_att.reset()
+        model.layers[l].wo.matmul(pool, st.bt.a_att, m, st.bt.att[0..m * c.q_dim], st.bt.xb[0..m * c.dim])
+        for b in 0..m:
+            nn.add(st.bt.x[b * c.dim..(b + 1) * c.dim], st.bt.xb[b * c.dim..(b + 1) * c.dim])
+            nn.rmsnorm(st.bt.x[b * c.dim..(b + 1) * c.dim], model.layers[l].ffn_norm, c.eps, st.bt.xb[b * c.dim..(b + 1) * c.dim])
+        st.bt.a_dim.reset()
+        model.layers[l].w_gate.matmul(pool, st.bt.a_dim, m, st.bt.xb[0..m * c.dim], st.bt.gate[0..m * c.hidden])
+        model.layers[l].w_up.matmul(pool, st.bt.a_dim, m, st.bt.xb[0..m * c.dim], st.bt.up[0..m * c.hidden])
+        for b in 0..m:
+            nn.swiglu(st.bt.gate[b * c.hidden..(b + 1) * c.hidden], st.bt.up[b * c.hidden..(b + 1) * c.hidden])
+        st.bt.a_hid.reset()
+        model.layers[l].w_down.matmul(pool, st.bt.a_hid, m, st.bt.gate[0..m * c.hidden], st.bt.xb[0..m * c.dim])
+        for b in 0..m:
+            nn.add(st.bt.x[b * c.dim..(b + 1) * c.dim], st.bt.xb[b * c.dim..(b + 1) * c.dim])
+    last = m - 1
+    nn.rmsnorm(st.bt.x[last * c.dim..(last + 1) * c.dim], model.out_norm, c.eps, st.xb[..])
     st.a_dim.reset()
     model.output.matvec(pool, st.a_dim, st.xb[..], st.logits[..])

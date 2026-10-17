@@ -6,6 +6,9 @@
 # the high two bits of 256 6-bit numbers, sixteen signed 8-bit scales (one for each group of 16), and `d`:
 # value = d * scale * (q - 32). The matrix products take the activation as `Q8KVec` (blocks of 256 `i8` with an f32
 # scale and the sums of each 16 values) and need the number of columns to be a multiple of 256.
+#
+# A product reads the scales and minimums of a row of weights once and then uses them for every vector of a batch,
+# so the work per vector is only the integer dot products.
 import std.parallel
 import std.tensor
 
@@ -29,13 +32,13 @@ struct BlockQ6K:
     scales: [16]i8
     d: u16
 
-# One super-block of the activation: 292 bytes.
+# One super-block of the activation: 324 bytes.
 struct BlockQ8K:
     d: f32
     qs: [256]i8
-    bsums: [16]i16
+    bsums: [16]i32  # the sum of each group of 16 values
 
-# A vector quantized for the K-quant products.
+# A vector quantized for the K-quant products. It may hold several vectors one after another (a batch).
 struct Q8KVec:
     blocks: List[BlockQ8K]
     len: usize
@@ -45,7 +48,8 @@ fn quantize_q8k(x: []f32) -> Q8KVec:
     quantize_q8k_into(x, out)
     return out
 
-# The same into an existing `Q8KVec`, reusing its memory.
+# The same into an existing `Q8KVec`, reusing its memory. `x` may be several vectors one after another, each a
+# multiple of 256 long: their blocks come out the same as if they were quantized one by one.
 fn quantize_q8k_into(x: []f32, out: lend Q8KVec):
     if x.len % SUPER != 0:
         panic("quantize_q8k: the length must be a multiple of 256")
@@ -67,11 +71,11 @@ fn quantize_q8k_into(x: []f32, out: lend Q8KVec):
         if d != 0.0:
             id = 1.0 / d
         qs: [256]i8 = [0; 256]
-        bsums: [16]i16 = [0; 16]
+        bsums: [16]i32 = [0; 16]
         for j in 0..SUPER:
             q = i32(floorf(x[base + j] * id + 0.5))
             qs[j] = i8(q)
-            bsums[j / 16] = bsums[j / 16] + i16(q)
+            bsums[j / 16] = bsums[j / 16] + q
         out.blocks.push(BlockQ8K{ d: d, qs: qs, bsums: bsums })
 
 impl Q8KVec:
@@ -95,40 +99,81 @@ fn _scale_min(s: [12]u8, j: usize) -> (i32, i32):
     top_b = i32(s[j] >> 6)
     return (lo | (top_a << 4), hi | (top_b << 4))
 
-# The dot product of one row of `Q4_K` weights with a `Q8_K` vector, `nb` super-blocks each.
-fn _row_dot_q4k(w: []BlockQ4K, wbase: usize, x: []BlockQ8K, nb: usize) -> f32:
-    facc = f32x8.splat(0.0)
-    corr: f32 = 0.0
-    chunks: usize = 4
+# What a row of weights contributes besides its 4-bit or 6-bit numbers, read out once for all the vectors:
+#   sc    the scale of each group (8 per Q4_K super-block, 16 per Q6_K), as the multiplier of the dot product
+#   coef  for each group of 16: the minimum (Q4_K) or 32 * scale (Q6_K) that multiplies the sum of the vector's values
+#   dd    the block's `d`, dm the block's `dmin` (Q4_K)
+struct _RowInfo:
+    sc: List[i32]
+    coef: List[i32]
+    dd: List[f32]
+    dm: List[f32]
+
+fn _row_info(nb: usize, per_scale: usize) -> _RowInfo:
+    info = _RowInfo{ sc: List[i32](), coef: List[i32](), dd: List[f32](), dm: List[f32]() }
+    for i in 0..nb * per_scale:
+        info.sc.push(0)
+    for i in 0..nb * 16:
+        info.coef.push(0)
+    for i in 0..nb:
+        info.dd.push(0.0)
+        info.dm.push(0.0)
+    return info
+
+fn _decode_q4k(w: []BlockQ4K, wbase: usize, nb: usize, info: lend _RowInfo):
+    groups: usize = 8
     for b in 0..nb:
         sm = w[wbase + b].scales
+        for g in 0..groups:
+            s, m = _scale_min(sm, g)
+            info.sc[b * 8 + g] = s
+            info.coef[b * 16 + 2 * g] = m
+            info.coef[b * 16 + 2 * g + 1] = m
+        info.dd[b] = tensor.f16_scale(w[wbase + b].d)
+        info.dm[b] = tensor.f16_scale(w[wbase + b].dmin)
+
+fn _decode_q6k(w: []BlockQ6K, wbase: usize, nb: usize, info: lend _RowInfo):
+    groups: usize = 16
+    for b in 0..nb:
+        for g in 0..groups:
+            s = i32(w[wbase + b].scales[g])
+            info.sc[b * 16 + g] = s
+            info.coef[b * 16 + g] = 32 * s
+        info.dd[b] = tensor.f16_scale(w[wbase + b].d)
+
+# The dot product of the row of `Q4_K` weights that `_decode_q4k` read with one `Q8_K` vector of `nb` super-blocks.
+fn _dot_q4k(w: []BlockQ4K, wbase: usize, info: _RowInfo, x: []BlockQ8K, nb: usize) -> f32:
+    facc = f32x8.splat(0.0)
+    cacc = f32x8.splat(0.0)
+    chunks: usize = 4
+    m15 = u8x32.splat(15)
+    for b in 0..nb:
         qs = w[wbase + b].qs[..]
         xq = x[b].qs[..]
         acc = i32x8.splat(0)
         for c in 0..chunks:
-            s0, m0 = _scale_min(sm, 2 * c)
-            s1, m1 = _scale_min(sm, 2 * c + 1)
             v = u8x32.load(qs, c * 32)
-            p0 = i32x8.splat(0).dot_u4i8(v & u8x32.splat(15), i8x32.load(xq, c * 64))
-            p1 = i32x8.splat(0).dot_u4i8(v.shr(4), i8x32.load(xq, c * 64 + 32))
-            acc = acc + p0 * i32x8.splat(s0) + p1 * i32x8.splat(s1)
-            bs = x[b].bsums
-            msum = m0 * (i32(bs[4 * c]) + i32(bs[4 * c + 1])) + m1 * (i32(bs[4 * c + 2]) + i32(bs[4 * c + 3]))
-            corr += tensor.f16_scale(w[wbase + b].dmin) * x[b].d * f32(msum)
-        facc = acc.to_f32().fma(f32x8.splat(tensor.f16_scale(w[wbase + b].d) * x[b].d), facc)
-    return facc.sum() - corr
+            s0 = info.sc[b * 8 + 2 * c]
+            s1 = info.sc[b * 8 + 2 * c + 1]
+            acc = acc.dot_u4i8_scaled(v & m15, i8x32.load(xq, c * 64), s0, s0)
+            acc = acc.dot_u4i8_scaled(v.shr(4), i8x32.load(xq, c * 64 + 32), s1, s1)
+        xd = x[b].d
+        facc = acc.to_f32().fma(f32x8.splat(info.dd[b] * xd), facc)
+        bs = x[b].bsums[..]
+        mins = i32x8.load(info.coef[..], b * 16) * i32x8.load(bs, 0) + i32x8.load(info.coef[..], b * 16 + 8) * i32x8.load(bs, 8)
+        cacc = mins.to_f32().fma(f32x8.splat(info.dm[b] * xd), cacc)
+    return facc.sum() - cacc.sum()
 
 # The same for `Q6_K`.
-fn _row_dot_q6k(w: []BlockQ6K, wbase: usize, x: []BlockQ8K, nb: usize) -> f32:
+fn _dot_q6k(w: []BlockQ6K, wbase: usize, info: _RowInfo, x: []BlockQ8K, nb: usize) -> f32:
     facc = f32x8.splat(0.0)
-    corr: f32 = 0.0
+    cacc = f32x8.splat(0.0)
     halves: usize = 2
     m4 = u8x32.splat(15)
     m3 = u8x32.splat(3)
     for b in 0..nb:
         ql = w[wbase + b].ql[..]
         qh = w[wbase + b].qh[..]
-        sc = w[wbase + b].scales
         xq = x[b].qs[..]
         acc = i32x8.splat(0)
         for h in 0..halves:
@@ -139,47 +184,202 @@ fn _row_dot_q6k(w: []BlockQ6K, wbase: usize, x: []BlockQ8K, nb: usize) -> f32:
             q2 = (v1 & m4) | (hq.shr(2) & m3).shl(4)
             q3 = v0.shr(4) | (hq.shr(4) & m3).shl(4)
             q4 = v1.shr(4) | (hq.shr(6) & m3).shl(4)
-            g = 8 * h
-            s1 = i32x8(i32(sc[g]), i32(sc[g]), i32(sc[g]), i32(sc[g]), i32(sc[g + 1]), i32(sc[g + 1]), i32(sc[g + 1]), i32(sc[g + 1]))
-            s2 = i32x8(i32(sc[g + 2]), i32(sc[g + 2]), i32(sc[g + 2]), i32(sc[g + 2]), i32(sc[g + 3]), i32(sc[g + 3]), i32(sc[g + 3]), i32(sc[g + 3]))
-            s3 = i32x8(i32(sc[g + 4]), i32(sc[g + 4]), i32(sc[g + 4]), i32(sc[g + 4]), i32(sc[g + 5]), i32(sc[g + 5]), i32(sc[g + 5]), i32(sc[g + 5]))
-            s4 = i32x8(i32(sc[g + 6]), i32(sc[g + 6]), i32(sc[g + 6]), i32(sc[g + 6]), i32(sc[g + 7]), i32(sc[g + 7]), i32(sc[g + 7]), i32(sc[g + 7]))
-            acc = acc + i32x8.splat(0).dot_u4i8(q1, i8x32.load(xq, 128 * h)) * s1
-            acc = acc + i32x8.splat(0).dot_u4i8(q2, i8x32.load(xq, 128 * h + 32)) * s2
-            acc = acc + i32x8.splat(0).dot_u4i8(q3, i8x32.load(xq, 128 * h + 64)) * s3
-            acc = acc + i32x8.splat(0).dot_u4i8(q4, i8x32.load(xq, 128 * h + 96)) * s4
-        bs = x[b].bsums
-        csum: i32 = 0
-        for k in 0..16:
-            csum += i32(sc[k]) * i32(bs[k])
-        dd = tensor.f16_scale(w[wbase + b].d) * x[b].d
-        facc = acc.to_f32().fma(f32x8.splat(dd), facc)
-        corr += dd * 32.0 * f32(csum)
-    return facc.sum() - corr
+            g = b * 16 + 8 * h
+            acc = acc.dot_u4i8_scaled(q1, i8x32.load(xq, 128 * h), info.sc[g], info.sc[g + 1])
+            acc = acc.dot_u4i8_scaled(q2, i8x32.load(xq, 128 * h + 32), info.sc[g + 2], info.sc[g + 3])
+            acc = acc.dot_u4i8_scaled(q3, i8x32.load(xq, 128 * h + 64), info.sc[g + 4], info.sc[g + 5])
+            acc = acc.dot_u4i8_scaled(q4, i8x32.load(xq, 128 * h + 96), info.sc[g + 6], info.sc[g + 7])
+        dx = info.dd[b] * x[b].d
+        facc = acc.to_f32().fma(f32x8.splat(dx), facc)
+        bs = x[b].bsums[..]
+        cs = i32x8.load(info.coef[..], b * 16) * i32x8.load(bs, 0) + i32x8.load(info.coef[..], b * 16 + 8) * i32x8.load(bs, 8)
+        cacc = cs.to_f32().fma(f32x8.splat(dx), cacc)
+    return facc.sum() - cacc.sum()
 
-struct _JobQ4K:
+# Four vectors at once: a weight block is unpacked once for all of them.
+fn _dot4_q4k(w: []BlockQ4K, wbase: usize, info: _RowInfo, x0: []BlockQ8K, x1: []BlockQ8K, x2: []BlockQ8K, x3: []BlockQ8K, nb: usize) -> (f32, f32, f32, f32):
+    f0 = f32x8.splat(0.0)
+    m0 = f32x8.splat(0.0)
+    f1 = f32x8.splat(0.0)
+    m1 = f32x8.splat(0.0)
+    f2 = f32x8.splat(0.0)
+    m2 = f32x8.splat(0.0)
+    f3 = f32x8.splat(0.0)
+    m3 = f32x8.splat(0.0)
+    chunks: usize = 4
+    m15 = u8x32.splat(15)
+    for b in 0..nb:
+        qs = w[wbase + b].qs[..]
+        y0 = x0[b].qs[..]
+        a0 = i32x8.splat(0)
+        y1 = x1[b].qs[..]
+        a1 = i32x8.splat(0)
+        y2 = x2[b].qs[..]
+        a2 = i32x8.splat(0)
+        y3 = x3[b].qs[..]
+        a3 = i32x8.splat(0)
+        for c in 0..chunks:
+            v = u8x32.load(qs, c * 32)
+            lo = v & m15
+            hi = v.shr(4)
+            s0 = info.sc[b * 8 + 2 * c]
+            s1 = info.sc[b * 8 + 2 * c + 1]
+            a0 = a0.dot_u4i8_scaled(lo, i8x32.load(y0, c * 64), s0, s0)
+            a0 = a0.dot_u4i8_scaled(hi, i8x32.load(y0, c * 64 + 32), s1, s1)
+            a1 = a1.dot_u4i8_scaled(lo, i8x32.load(y1, c * 64), s0, s0)
+            a1 = a1.dot_u4i8_scaled(hi, i8x32.load(y1, c * 64 + 32), s1, s1)
+            a2 = a2.dot_u4i8_scaled(lo, i8x32.load(y2, c * 64), s0, s0)
+            a2 = a2.dot_u4i8_scaled(hi, i8x32.load(y2, c * 64 + 32), s1, s1)
+            a3 = a3.dot_u4i8_scaled(lo, i8x32.load(y3, c * 64), s0, s0)
+            a3 = a3.dot_u4i8_scaled(hi, i8x32.load(y3, c * 64 + 32), s1, s1)
+        c0 = i32x8.load(info.coef[..], b * 16)
+        c1 = i32x8.load(info.coef[..], b * 16 + 8)
+        dd = info.dd[b]
+        dm = info.dm[b]
+        e0 = x0[b].d
+        b0 = x0[b].bsums[..]
+        f0 = a0.to_f32().fma(f32x8.splat(dd * e0), f0)
+        m0 = (c0 * i32x8.load(b0, 0) + c1 * i32x8.load(b0, 8)).to_f32().fma(f32x8.splat(dm * e0), m0)
+        e1 = x1[b].d
+        b1 = x1[b].bsums[..]
+        f1 = a1.to_f32().fma(f32x8.splat(dd * e1), f1)
+        m1 = (c0 * i32x8.load(b1, 0) + c1 * i32x8.load(b1, 8)).to_f32().fma(f32x8.splat(dm * e1), m1)
+        e2 = x2[b].d
+        b2 = x2[b].bsums[..]
+        f2 = a2.to_f32().fma(f32x8.splat(dd * e2), f2)
+        m2 = (c0 * i32x8.load(b2, 0) + c1 * i32x8.load(b2, 8)).to_f32().fma(f32x8.splat(dm * e2), m2)
+        e3 = x3[b].d
+        b3 = x3[b].bsums[..]
+        f3 = a3.to_f32().fma(f32x8.splat(dd * e3), f3)
+        m3 = (c0 * i32x8.load(b3, 0) + c1 * i32x8.load(b3, 8)).to_f32().fma(f32x8.splat(dm * e3), m3)
+    return (f0.sum() - m0.sum(), f1.sum() - m1.sum(), f2.sum() - m2.sum(), f3.sum() - m3.sum())
+
+fn _dot4_q6k(w: []BlockQ6K, wbase: usize, info: _RowInfo, x0: []BlockQ8K, x1: []BlockQ8K, x2: []BlockQ8K, x3: []BlockQ8K, nb: usize) -> (f32, f32, f32, f32):
+    f0 = f32x8.splat(0.0)
+    m0 = f32x8.splat(0.0)
+    f1 = f32x8.splat(0.0)
+    m1 = f32x8.splat(0.0)
+    f2 = f32x8.splat(0.0)
+    m2 = f32x8.splat(0.0)
+    f3 = f32x8.splat(0.0)
+    m3 = f32x8.splat(0.0)
+    halves: usize = 2
+    mask4 = u8x32.splat(15)
+    mask3 = u8x32.splat(3)
+    for b in 0..nb:
+        ql = w[wbase + b].ql[..]
+        qh = w[wbase + b].qh[..]
+        y0 = x0[b].qs[..]
+        a0 = i32x8.splat(0)
+        y1 = x1[b].qs[..]
+        a1 = i32x8.splat(0)
+        y2 = x2[b].qs[..]
+        a2 = i32x8.splat(0)
+        y3 = x3[b].qs[..]
+        a3 = i32x8.splat(0)
+        for h in 0..halves:
+            v0 = u8x32.load(ql, 64 * h)
+            v1 = u8x32.load(ql, 64 * h + 32)
+            hq = u8x32.load(qh, 32 * h)
+            q1 = (v0 & mask4) | (hq & mask3).shl(4)
+            q2 = (v1 & mask4) | (hq.shr(2) & mask3).shl(4)
+            q3 = v0.shr(4) | (hq.shr(4) & mask3).shl(4)
+            q4 = v1.shr(4) | (hq.shr(6) & mask3).shl(4)
+            g = b * 16 + 8 * h
+            a0 = a0.dot_u4i8_scaled(q1, i8x32.load(y0, 128 * h), info.sc[g], info.sc[g + 1])
+            a0 = a0.dot_u4i8_scaled(q2, i8x32.load(y0, 128 * h + 32), info.sc[g + 2], info.sc[g + 3])
+            a0 = a0.dot_u4i8_scaled(q3, i8x32.load(y0, 128 * h + 64), info.sc[g + 4], info.sc[g + 5])
+            a0 = a0.dot_u4i8_scaled(q4, i8x32.load(y0, 128 * h + 96), info.sc[g + 6], info.sc[g + 7])
+            a1 = a1.dot_u4i8_scaled(q1, i8x32.load(y1, 128 * h), info.sc[g], info.sc[g + 1])
+            a1 = a1.dot_u4i8_scaled(q2, i8x32.load(y1, 128 * h + 32), info.sc[g + 2], info.sc[g + 3])
+            a1 = a1.dot_u4i8_scaled(q3, i8x32.load(y1, 128 * h + 64), info.sc[g + 4], info.sc[g + 5])
+            a1 = a1.dot_u4i8_scaled(q4, i8x32.load(y1, 128 * h + 96), info.sc[g + 6], info.sc[g + 7])
+            a2 = a2.dot_u4i8_scaled(q1, i8x32.load(y2, 128 * h), info.sc[g], info.sc[g + 1])
+            a2 = a2.dot_u4i8_scaled(q2, i8x32.load(y2, 128 * h + 32), info.sc[g + 2], info.sc[g + 3])
+            a2 = a2.dot_u4i8_scaled(q3, i8x32.load(y2, 128 * h + 64), info.sc[g + 4], info.sc[g + 5])
+            a2 = a2.dot_u4i8_scaled(q4, i8x32.load(y2, 128 * h + 96), info.sc[g + 6], info.sc[g + 7])
+            a3 = a3.dot_u4i8_scaled(q1, i8x32.load(y3, 128 * h), info.sc[g], info.sc[g + 1])
+            a3 = a3.dot_u4i8_scaled(q2, i8x32.load(y3, 128 * h + 32), info.sc[g + 2], info.sc[g + 3])
+            a3 = a3.dot_u4i8_scaled(q3, i8x32.load(y3, 128 * h + 64), info.sc[g + 4], info.sc[g + 5])
+            a3 = a3.dot_u4i8_scaled(q4, i8x32.load(y3, 128 * h + 96), info.sc[g + 6], info.sc[g + 7])
+        c0 = i32x8.load(info.coef[..], b * 16)
+        c1 = i32x8.load(info.coef[..], b * 16 + 8)
+        dd = info.dd[b]
+        e0 = dd * x0[b].d
+        b0 = x0[b].bsums[..]
+        f0 = a0.to_f32().fma(f32x8.splat(e0), f0)
+        m0 = (c0 * i32x8.load(b0, 0) + c1 * i32x8.load(b0, 8)).to_f32().fma(f32x8.splat(e0), m0)
+        e1 = dd * x1[b].d
+        b1 = x1[b].bsums[..]
+        f1 = a1.to_f32().fma(f32x8.splat(e1), f1)
+        m1 = (c0 * i32x8.load(b1, 0) + c1 * i32x8.load(b1, 8)).to_f32().fma(f32x8.splat(e1), m1)
+        e2 = dd * x2[b].d
+        b2 = x2[b].bsums[..]
+        f2 = a2.to_f32().fma(f32x8.splat(e2), f2)
+        m2 = (c0 * i32x8.load(b2, 0) + c1 * i32x8.load(b2, 8)).to_f32().fma(f32x8.splat(e2), m2)
+        e3 = dd * x3[b].d
+        b3 = x3[b].bsums[..]
+        f3 = a3.to_f32().fma(f32x8.splat(e3), f3)
+        m3 = (c0 * i32x8.load(b3, 0) + c1 * i32x8.load(b3, 8)).to_f32().fma(f32x8.splat(e3), m3)
+    return (f0.sum() - m0.sum(), f1.sum() - m1.sum(), f2.sum() - m2.sum(), f3.sum() - m3.sum())
+
+struct _MatJobQ4K:
     w: []BlockQ4K
     x: []BlockQ8K
     y: *mut f32
     nb: usize
+    rows: usize
+    nvec: usize
 
-struct _JobQ6K:
+struct _MatJobQ6K:
     w: []BlockQ6K
     x: []BlockQ8K
     y: *mut f32
     nb: usize
+    rows: usize
+    nvec: usize
 
-fn _rows_q4k(start: usize, end: usize, ctx: *u8):
+# Each row of weights is read out once and used for all the vectors before the next row is read, so it stays in the
+# cache.
+fn _mat_rows_q4k(start: usize, end: usize, ctx: *u8):
     unsafe:
-        job = ptr_cast[*_JobQ4K](ctx)
+        job = ptr_cast[*_MatJobQ4K](ctx)
+        info = _row_info(job[0].nb, 8)
         for r in start..end:
-            job[0].y[r] = _row_dot_q4k(job[0].w, r * job[0].nb, job[0].x, job[0].nb)
+            _decode_q4k(job[0].w, r * job[0].nb, job[0].nb, info)
+            nb = job[0].nb
+            a: usize = 0
+            while a + 4 <= job[0].nvec:
+                f0, f1, f2, f3 = _dot4_q4k(job[0].w, r * nb, info, job[0].x[a * nb..(a + 1) * nb], job[0].x[(a + 1) * nb..(a + 2) * nb],
+                    job[0].x[(a + 2) * nb..(a + 3) * nb], job[0].x[(a + 3) * nb..(a + 4) * nb], nb)
+                job[0].y[a * job[0].rows + r] = f0
+                job[0].y[(a + 1) * job[0].rows + r] = f1
+                job[0].y[(a + 2) * job[0].rows + r] = f2
+                job[0].y[(a + 3) * job[0].rows + r] = f3
+                a += 4
+            while a < job[0].nvec:
+                job[0].y[a * job[0].rows + r] = _dot_q4k(job[0].w, r * nb, info, job[0].x[a * nb..(a + 1) * nb], nb)
+                a += 1
 
-fn _rows_q6k(start: usize, end: usize, ctx: *u8):
+fn _mat_rows_q6k(start: usize, end: usize, ctx: *u8):
     unsafe:
-        job = ptr_cast[*_JobQ6K](ctx)
+        job = ptr_cast[*_MatJobQ6K](ctx)
+        info = _row_info(job[0].nb, 16)
         for r in start..end:
-            job[0].y[r] = _row_dot_q6k(job[0].w, r * job[0].nb, job[0].x, job[0].nb)
+            _decode_q6k(job[0].w, r * job[0].nb, job[0].nb, info)
+            nb = job[0].nb
+            a: usize = 0
+            while a + 4 <= job[0].nvec:
+                f0, f1, f2, f3 = _dot4_q6k(job[0].w, r * nb, info, job[0].x[a * nb..(a + 1) * nb], job[0].x[(a + 1) * nb..(a + 2) * nb],
+                    job[0].x[(a + 2) * nb..(a + 3) * nb], job[0].x[(a + 3) * nb..(a + 4) * nb], nb)
+                job[0].y[a * job[0].rows + r] = f0
+                job[0].y[(a + 1) * job[0].rows + r] = f1
+                job[0].y[(a + 2) * job[0].rows + r] = f2
+                job[0].y[(a + 3) * job[0].rows + r] = f3
+                a += 4
+            while a < job[0].nvec:
+                job[0].y[a * job[0].rows + r] = _dot_q6k(job[0].w, r * nb, info, job[0].x[a * nb..(a + 1) * nb], nb)
+                a += 1
 
 public
 # y = W x for `rows` x `cols` weights in `Q4_K` super-blocks (`cols` a multiple of 256) and a `Q8_K` vector.
@@ -187,34 +387,44 @@ fn q4k_matvec(w: []BlockQ4K, rows: usize, cols: usize, x: read Q8KVec, y: lend [
     nb = cols / SUPER
     if x.len != cols or y.len != rows or w.len != rows * nb:
         panic("q4k_matvec: the sizes do not match")
-    xs = x.blocks[..]
-    for r in 0..rows:
-        y[r] = _row_dot_q4k(w, r * nb, xs, nb)
+    unsafe:
+        job = _MatJobQ4K{ w: w, x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb, rows: rows, nvec: 1 }
+        _mat_rows_q4k(0, rows, ptr_cast[*u8](addr(job)))
 
 # The same with the rows shared between the threads of `pool`.
 fn q4k_matvec_parallel(pool: lend parallel.Pool, w: []BlockQ4K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32):
+    q4k_matmul_parallel(pool, w, rows, cols, 1, x, y)
+
+# y = W x for `nvec` vectors at once (a batch of tokens): `x` holds them one after another (a `Q8KVec` of
+# `nvec * cols` values) and `y` receives `nvec * rows` values, vector after vector. Every weight is read from memory
+# once for the whole batch, so this is much faster per vector than `nvec` calls of `q4k_matvec` when the weights
+# do not fit in the cache. The rows are shared between the threads of `pool`.
+fn q4k_matmul_parallel(pool: lend parallel.Pool, w: []BlockQ4K, rows: usize, cols: usize, nvec: usize, x: read Q8KVec, y: lend []f32):
     nb = cols / SUPER
-    if x.len != cols or y.len != rows or w.len != rows * nb:
-        panic("q4k_matvec_parallel: the sizes do not match")
+    if x.len != cols * nvec or y.len != rows * nvec or w.len != rows * nb:
+        panic("q4k_matmul_parallel: the sizes do not match")
     unsafe:
-        job = _JobQ4K{ w: w, x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
-        pool.for_range(rows, _rows_q4k, ptr_cast[*u8](addr(job)))
+        job = _MatJobQ4K{ w: w, x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb, rows: rows, nvec: nvec }
+        pool.for_range(rows, _mat_rows_q4k, ptr_cast[*u8](addr(job)))
 
 fn q6k_matvec(w: []BlockQ6K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32):
     nb = cols / SUPER
     if x.len != cols or y.len != rows or w.len != rows * nb:
         panic("q6k_matvec: the sizes do not match")
-    xs = x.blocks[..]
-    for r in 0..rows:
-        y[r] = _row_dot_q6k(w, r * nb, xs, nb)
+    unsafe:
+        job = _MatJobQ6K{ w: w, x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb, rows: rows, nvec: 1 }
+        _mat_rows_q6k(0, rows, ptr_cast[*u8](addr(job)))
 
 fn q6k_matvec_parallel(pool: lend parallel.Pool, w: []BlockQ6K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32):
+    q6k_matmul_parallel(pool, w, rows, cols, 1, x, y)
+
+fn q6k_matmul_parallel(pool: lend parallel.Pool, w: []BlockQ6K, rows: usize, cols: usize, nvec: usize, x: read Q8KVec, y: lend []f32):
     nb = cols / SUPER
-    if x.len != cols or y.len != rows or w.len != rows * nb:
-        panic("q6k_matvec_parallel: the sizes do not match")
+    if x.len != cols * nvec or y.len != rows * nvec or w.len != rows * nb:
+        panic("q6k_matmul_parallel: the sizes do not match")
     unsafe:
-        job = _JobQ6K{ w: w, x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb }
-        pool.for_range(rows, _rows_q6k, ptr_cast[*u8](addr(job)))
+        job = _MatJobQ6K{ w: w, x: x.blocks[..], y: ptr_cast[*mut f32](addr_mut(y)), nb: nb, rows: rows, nvec: nvec }
+        pool.for_range(rows, _mat_rows_q6k, ptr_cast[*u8](addr(job)))
 
 # Row `r` of a `Q4_K` matrix with `cols` columns, as f32.
 fn dequantize_row_q4k(w: []BlockQ4K, cols: usize, r: usize) -> List[f32]:

@@ -14,8 +14,10 @@ For a program you start often, build it once: `gg build apps/gg-infer/main.gg --
 | `-n`, `--predict N` | most tokens to generate (128) |
 | `-c`, `--ctx N` | context size (the model's, at most 4096) |
 | `-t`, `--threads N` | threads (one per CPU) |
+| `-b`, `--batch N` | prompt tokens processed at once (32; 1 = one at a time) |
 | `--temp X`, `--top-k N`, `--top-p X`, `--repeat-penalty X`, `--seed N` | sampling (`--temp 0` is greedy) |
 | `--no-bos`, `--special` | no beginning-of-sequence token; read `<|special|>` tokens in the prompt |
+| `--show-tokens`, `--probs N` | print the prompt's token ids / the N most likely tokens at each step (to compare with another program) |
 | `--info` | print what the model file contains |
 
 **Always build with `--cpu native`** (or `--cpu x86-64-v3`): without it the 256-bit kernels are emulated with 128-bit

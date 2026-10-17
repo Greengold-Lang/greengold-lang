@@ -8,6 +8,7 @@
 #   -n, --predict N           the most tokens to generate (default 128)
 #   -c, --ctx N               context size in tokens (default: the model's, at most 4096)
 #   -t, --threads N           threads (default: one per CPU)
+#   -b, --batch N             tokens of the prompt processed at once (default 32; 1 = one at a time)
 #       --temp X              temperature, 0 = always the best token (default 0.8)
 #       --top-k N             keep the N best tokens (default 40)
 #       --top-p X             keep the tokens that add up to this probability (default 0.95)
@@ -15,10 +16,13 @@
 #       --seed N              random seed (default 1)
 #       --bos, --no-bos       force the beginning-of-sequence token on or off (default: what the model file says)
 #       --special             read <|special|> tokens in the prompt
+#       --show-tokens         print the token ids of the prompt to standard error
+#       --probs N             print the N most likely tokens at every step to standard error (for checking a model)
 #       --info                print what the model file contains and stop
 # The text goes to standard output; the speed (tokens per second) to standard error.
 import std.fs
 import std.llama
+import std.nn
 import std.parallel
 import std.process
 import std.sampler
@@ -40,6 +44,33 @@ fn usage() -> i32:
     eprint("usage: gg-infer MODEL.gguf [-p TEXT | -f FILE] [-n TOKENS] [-c CTX] [-t THREADS] [--temp X] [--top-k N]")
     eprint("                [--top-p X] [--repeat-penalty X] [--seed N] [--no-bos] [--special] [--info]")
     return 2
+
+# The `n` most likely tokens of `logits` with their probabilities, on standard error.
+fn show_probs(tok: read tokenizer.Tokenizer, logits: []f32, n: usize):
+    top = logits[0]
+    for i in 1..logits.len:
+        if logits[i] > top:
+            top = logits[i]
+    total: f32 = 0.0
+    for i in 0..logits.len:
+        total += nn.exp(logits[i] - top)
+    taken = List[usize]()
+    line = string.new()
+    for k in 0..n:
+        best = max_value[usize]()
+        for i in 0..logits.len:
+            if best == max_value[usize]() or logits[i] > logits[best]:
+                skip = false
+                for t in 0..taken.len():
+                    if taken[t] == i:
+                        skip = true
+                if not skip:
+                    best = i
+        taken.push(best)
+        piece = string.new()
+        tok.append_token(i32(best), piece)
+        line.append(f" {best}:{piece.as_str()}={nn.exp(logits[best] - top) / total}")
+    eprint(line.as_str())
 
 fn describe(model: read llama.Model, tok: read tokenizer.Tokenizer):
     c = model.cfg
@@ -65,6 +96,7 @@ fn main():
     n_predict: usize = 128
     ctx: usize = 0
     threads: usize = 0
+    batch: usize = 32
     temp: f32 = 0.8
     top_k: usize = 40
     top_p: f32 = 0.95
@@ -73,6 +105,8 @@ fn main():
     add_bos_flag = 0
     special = false
     info = false
+    show_tokens = false
+    n_probs: usize = 0
     i: usize = 2
     while i < argv.len():
         a = argv[i]
@@ -84,6 +118,8 @@ fn main():
             special = true
         elif a == "--info":
             info = true
+        elif a == "--show-tokens":
+            show_tokens = true
         else:
             if i + 1 >= argv.len():
                 eprint("missing value after", a)
@@ -102,6 +138,10 @@ fn main():
                 n_predict = usize(v.parse_int().value_or(128))
             elif a == "-c" or a == "--ctx":
                 ctx = usize(v.parse_int().value_or(0))
+            elif a == "-b" or a == "--batch":
+                batch = usize(v.parse_int().value_or(32))
+                if batch == 0:
+                    batch = 1
             elif a == "-t" or a == "--threads":
                 threads = usize(v.parse_int().value_or(0))
             elif a == "--temp":
@@ -112,6 +152,8 @@ fn main():
                 top_p = f32(v.parse_float().value_or(0.95))
             elif a == "--repeat-penalty":
                 penalty = f32(v.parse_float().value_or(1.0))
+            elif a == "--probs":
+                n_probs = usize(v.parse_int().value_or(0))
             elif a == "--seed":
                 seed = u64(v.parse_int().value_or(1))
             else:
@@ -148,15 +190,25 @@ fn main():
                     if ids.len() >= ctx:
                         eprint("the prompt has", ids.len(), "tokens; the context holds", ctx)
                         process.process_exit(1)
+                    if show_tokens:
+                        line = string.new()
+                        for k in 0..ids.len():
+                            line.append(f" {ids[k]}")
+                        eprint("tokens:", line.as_str())
                     pool = parallel.Pool.new(threads)
-                    st = llama.State.new(model.cfg, ctx)
+                    st = llama.State.with_batch(model.cfg, ctx, batch)
                     sm = sampler.Sampler.new(temp, top_k, top_p, seed)
                     sm.repeat_penalty = penalty
                     eprint("loaded in", started.elapsed_millis(), "ms;", pool.size(), "threads;", ids.len(), "prompt tokens")
                     emit(prompt.as_str())
                     t0 = time.Instant.now()
-                    for p in 0..ids.len():
-                        llama.forward(model, st, pool, ids[p], p)
+                    done: usize = 0
+                    while done < ids.len():
+                        m = ids.len() - done
+                        if m > batch:
+                            m = batch
+                        llama.forward_batch(model, st, pool, ids[done..done + m], done)
+                        done += m
                     prompt_secs = t0.elapsed_secs()
                     for k in 0..ids.len():
                         sm.accept(ids[k])
@@ -164,6 +216,8 @@ fn main():
                     made: usize = 0
                     pos = ids.len()
                     while made < n_predict and pos < ctx:
+                        if n_probs > 0:
+                            show_probs(tok, st.logits[..], n_probs)
                         next = sm.sample(st.logits[..])
                         if tok.is_end(next):
                             break

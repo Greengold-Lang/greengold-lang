@@ -164,3 +164,69 @@ def test_kquant_matches_reference(tmp_path, kind, cpu):
     want_y = want_rows @ xd
     np.testing.assert_allclose(y, want_y, rtol=1e-4, atol=1e-4 * np.abs(want_y).max())
     np.testing.assert_array_equal(y, yp)
+
+
+MATMUL = """import std.kquant
+import std.mmap
+import std.parallel
+
+fn main():
+    f = mmap.MappedFile.open("PATH").value_or_panic()
+    rows: usize = 6
+    cols: usize = 512
+    nvec: usize = 7
+    x = List[f32]()
+    for i in 0..cols * nvec:
+        x.push(f32((i * 37 + 5 + (i / 512) * 11) % 101) / 50.0 - 1.0)
+    xq = kquant.quantize_q8k(x[..])
+    pool = parallel.Pool.new(3)
+    ys = List[f32]()
+    for i in 0..rows * nvec:
+        ys.push(0.0)
+    bytes = f.bytes()
+    worst: f32 = 0.0
+    unsafe:
+        if KIND == 4:
+            w = slice_from_raw[kquant.BlockQ4K](ptr_cast[*kquant.BlockQ4K](addr(bytes)), rows * cols / 256)
+            kquant.q4k_matmul_parallel(pool, w, rows, cols, nvec, xq, ys[..])
+            for a in 0..nvec:
+                one = kquant.quantize_q8k(x[a * cols..(a + 1) * cols])
+                y = List[f32]()
+                for r in 0..rows:
+                    y.push(0.0)
+                kquant.q4k_matvec(w, rows, cols, one, y[..])
+                for r in 0..rows:
+                    d = y[r] - ys[a * rows + r]
+                    if d < 0.0:
+                        d = 0.0 - d
+                    if d > worst:
+                        worst = d
+        else:
+            w = slice_from_raw[kquant.BlockQ6K](ptr_cast[*kquant.BlockQ6K](addr(bytes)), rows * cols / 256)
+            kquant.q6k_matmul_parallel(pool, w, rows, cols, nvec, xq, ys[..])
+            for a in 0..nvec:
+                one = kquant.quantize_q8k(x[a * cols..(a + 1) * cols])
+                y = List[f32]()
+                for r in 0..rows:
+                    y.push(0.0)
+                kquant.q6k_matvec(w, rows, cols, one, y[..])
+                for r in 0..rows:
+                    d = y[r] - ys[a * rows + r]
+                    if d < 0.0:
+                        d = 0.0 - d
+                    if d > worst:
+                        worst = d
+    print(f64(worst), f64(ys[0]), f64(ys[rows * nvec - 1]))
+"""
+
+
+@pytest.mark.parametrize("kind", [4, 6])
+def test_matmul_of_seven_vectors_equals_seven_matvecs(tmp_path, kind):
+    rng = np.random.default_rng(kind + 10)
+    blob = random_q4k(rng, ROWS * NB) if kind == 4 else random_q6k(rng, ROWS * NB)
+    path = tmp_path / "w.bin"
+    path.write_bytes(blob)
+    res = run_built(MATMUL.replace("PATH", path.as_posix()).replace("KIND", str(kind)), release=True, timeout=120)
+    assert res.returncode == 0, res.stderr
+    worst, first, last = (float(t) for t in res.stdout.split())
+    assert worst == 0.0 and abs(first) + abs(last) > 0

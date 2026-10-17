@@ -105,6 +105,17 @@ fn main():
     pool = parallel.Pool.new(3)
     nn.attention_parallel(pool, qa[..], cache, 4, ob[..])
     show("attention_parallel", ob[..])
+    # a batch of 3 tokens (positions 2, 3, 4) in one go equals three single calls over growing prefixes
+    qb = vec(96, 3, 8)
+    ofull = zeros(96)
+    nn.attention_batch_parallel(pool, qb[..], cache, 4, 2, 3, ofull[..])
+    show("batch_attention", ofull[..])
+    three: usize = 3
+    for t in 0..three:
+        qt = qb[t * 32..(t + 1) * 32]
+        one = zeros(32)
+        nn.attention_prefix(qt, cache, 4, 2 + t + 1, one[..])
+        show("prefix_attention", one[..])
     cache.truncate(2)
     print("#", "len")
     print(cache.len())
@@ -207,6 +218,7 @@ def test_attention(result):
         want += [sum(p[t] * values[t][g * hd + i] for t in range(tokens)) for i in range(hd)]
     close(result["attention"][0], want)
     assert result["attention_parallel"][0] == result["attention"][0]
+    assert result["batch_attention"][0] == sum(result["prefix_attention"], [])
     assert result["len"][0] == [2.0]
 
 

@@ -13,6 +13,7 @@
     acc = acc.dot_i8(x, w)               # i32x4 += 4-lane dot products of i8x16 x, w   (i32x8 with i8x32)
     acc = acc.dot_u4i8(x, w)             # fast form for 4-bit x (every lane 0..15, or at most 128); lane j sums bytes 4j..4j+3
     acc = acc.dot_u4i8(x, w)             # fast, for a 4-bit x (u8 lanes 0..15; at most 128 is exact); lane j sums bytes 4j..4j+3
+    acc = acc.dot_u4i8_scaled(x, w, s0, s1)  # i32x8 only: dot_u4i8, lanes 0..3 times s0 and lanes 4..7 times s1 (i16 range)
     acc = acc.dot_u8i8(x, w)             # the same with an unsigned left operand (u8x16 / u8x32)
 
     v.shr(k) / v.shl(k)                  # shift every integer lane (arithmetic for signed lanes); k < lane bits
@@ -151,6 +152,9 @@ class SimdCheckMixin:
         if ty in _DOT:
             signed, unsigned = _DOT[ty]
             table["dot_i8"] = ([ParamInfo("x", signed, "val", None), ParamInfo("w", signed, "val", None)], ty)
+            if ty == "i32x8":
+                table["dot_u4i8_scaled"] = ([ParamInfo("x", unsigned, "val", None), ParamInfo("w", signed, "val", None),
+                                             ParamInfo("s0", "i32", "val", None), ParamInfo("s1", "i32", "val", None)], ty)
             table["dot_u4i8"] = ([ParamInfo("x", unsigned, "val", None), ParamInfo("w", signed, "val", None)], ty)
             table["dot_u8i8"] = ([ParamInfo("x", unsigned, "val", None), ParamInfo("w", signed, "val", None)], ty)
         if e.method not in table:
@@ -298,6 +302,26 @@ def call(cg, e):
         name = f"llvm.fma.v{n}{f}"
         fn = cg.mod.globals.get(name) or ir.Function(cg.mod, ir.FunctionType(lt, [lt, lt, lt]), name)
         return b.call(fn, [v, cg.expr(e.args[0]), cg.expr(e.args[1])])
+    if kind == "dot_u4i8_scaled":
+        x, w = cg.expr(e.args[0]), cg.expr(e.args[1])
+        s0, s1 = cg.expr(e.args[2]), cg.expr(e.args[3])
+        i16 = ir.IntType(16)
+        s0, s1 = b.trunc(s0, i16), b.trunc(s1, i16)
+        if cg.triple.startswith(("x86_64", "i686")) and _has_ssse3(cg):
+            return _dot_u4_x86(cg, v, x, w, n, scales=(s0, s1))
+        i32 = ir.IntType(32)
+        wide = ir.VectorType(i32, n * 4)
+        prod = b.mul(b.zext(x, wide), b.sext(w, wide))
+        undef = ir.Constant(wide, ir.Undefined)
+        sums = ir.Constant(ir.VectorType(i32, n), ir.Undefined)
+        for k in range(4):
+            mask = ir.Constant(ir.VectorType(i32, n), [4 * j + k for j in range(n)])
+            part = b.shuffle_vector(prod, undef, mask)
+            sums = part if k == 0 else b.add(sums, part)
+        scale = ir.Constant(ir.VectorType(i32, n), ir.Undefined)
+        for j in range(n):
+            scale = b.insert_element(scale, b.sext(s0 if j < n // 2 else s1, i32), ir.Constant(i32, j))
+        return b.add(v, b.mul(sums, scale))
     if kind == "dot_u4i8":
         x, w = cg.expr(e.args[0]), cg.expr(e.args[1])
         if cg.triple.startswith(("x86_64", "i686")) and _has_ssse3(cg):
@@ -395,7 +419,7 @@ def _dot_x86(cg, acc, xs, ws, n: int):
     return acc
 
 
-def _dot_u4_x86(cg, acc, x, w, n: int):
+def _dot_u4_x86(cg, acc, x, w, n: int, scales=None):
     """`pmaddubsw` then `pmaddwd` with ones: lane j gets bytes 4j .. 4j+3. Exact while every byte of `x` is at
     most 128 (two products must fit a signed 16-bit number)."""
     b = cg.b
@@ -409,21 +433,31 @@ def _dot_u4_x86(cg, acc, x, w, n: int):
         undef = ir.Constant(vec.type, ir.Undefined)
         return b.shuffle_vector(vec, undef, ir.Constant(ir.VectorType(i32, count), list(range(start, start + count))))
 
-    def one(xp, wp, width):  # `width` bytes -> width / 4 lanes of i32
+    def factors(count, per_half):
+        """The i16 multipliers of `pmaddwd`: ones, or the scales (`per_half` gives the value of each half)."""
+        if scales is None:
+            return ir.Constant(ir.VectorType(i16, count), [1] * count)
+        v = ir.Constant(ir.VectorType(i16, count), ir.Undefined)
+        for k in range(count):
+            v = b.insert_element(v, per_half[0 if k < count // 2 or len(per_half) == 1 else 1], ir.Constant(i32, k))
+        return v
+
+    def one(xp, wp, width, per_half):  # `width` bytes -> width / 4 lanes of i32
         if width == 32:
             t = b.call(fn("llvm.x86.avx2.pmadd.ub.sw", ir.VectorType(i16, 16), [ir.VectorType(i8, 32)] * 2), [xp, wp])
-            ones = ir.Constant(ir.VectorType(i16, 16), [1] * 16)
-            return b.call(fn("llvm.x86.avx2.pmadd.wd", ir.VectorType(i32, 8), [ir.VectorType(i16, 16)] * 2), [t, ones])
+            return b.call(fn("llvm.x86.avx2.pmadd.wd", ir.VectorType(i32, 8), [ir.VectorType(i16, 16)] * 2),
+                          [t, factors(16, per_half)])
         t = b.call(fn("llvm.x86.ssse3.pmadd.ub.sw.128", ir.VectorType(i16, 8), [ir.VectorType(i8, 16)] * 2), [xp, wp])
-        ones = ir.Constant(ir.VectorType(i16, 8), [1] * 8)
-        return b.call(fn("llvm.x86.sse2.pmadd.wd", ir.VectorType(i32, 4), [ir.VectorType(i16, 8)] * 2), [t, ones])
+        return b.call(fn("llvm.x86.sse2.pmadd.wd", ir.VectorType(i32, 4), [ir.VectorType(i16, 8)] * 2),
+                      [t, factors(8, per_half)])
 
+    sc = list(scales) if scales is not None else [None, None]
     if total == 32 and not _has_avx2(cg):
-        lo = one(piece(x, 0, 16), piece(w, 0, 16), 16)
-        hi = one(piece(x, 16, 16), piece(w, 16, 16), 16)
+        lo = one(piece(x, 0, 16), piece(w, 0, 16), 16, [sc[0]])
+        hi = one(piece(x, 16, 16), piece(w, 16, 16), 16, [sc[1]])
         prod = b.shuffle_vector(lo, hi, ir.Constant(ir.VectorType(i32, 8), list(range(8))))
     else:
-        prod = one(x, w, total)
+        prod = one(x, w, total, sc)
     return b.add(acc, prod)
 
 

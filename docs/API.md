@@ -15,12 +15,12 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.intern](#stdintern) (5)
 - [std.io](#stdio) (11)
 - [std.json](#stdjson) (23)
-- [std.kquant](#stdkquant) (14)
-- [std.llama](#stdllama) (15)
+- [std.kquant](#stdkquant) (16)
+- [std.llama](#stdllama) (20)
 - [std.math](#stdmath) (22)
 - [std.mmap](#stdmmap) (5)
 - [std.net](#stdnet) (59)
-- [std.nn](#stdnn) (21)
+- [std.nn](#stdnn) (26)
 - [std.packet](#stdpacket) (44)
 - [std.parallel](#stdparallel) (7)
 - [std.process](#stdprocess) (6)
@@ -31,7 +31,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.sort](#stdsort) (3)
 - [std.string](#stdstring) (25)
 - [std.tasks](#stdtasks) (9)
-- [std.tensor](#stdtensor) (41)
+- [std.tensor](#stdtensor) (43)
 - [std.thread](#stdthread) (49)
 - [std.time](#stdtime) (22)
 - [std.tls](#stdtls) (5)
@@ -1439,9 +1439,9 @@ struct BlockQ6K { ql: [128]u8, qh: [64]u8, scales: [16]i8, d: u16 }
 One super-block of `Q6_K`: 210 bytes.
 
 ```
-struct BlockQ8K { d: f32, qs: [256]i8, bsums: [16]i16 }
+struct BlockQ8K { d: f32, qs: [256]i8, bsums: [16]i32 }
 ```
-One super-block of the activation: 292 bytes.
+One super-block of the activation: 324 bytes.
 
 ```
 struct Q8KVec { blocks: List[BlockQ8K], len: usize }
@@ -1480,11 +1480,20 @@ fn q4k_matvec_parallel(pool: lend Pool, w: []BlockQ4K, rows: usize, cols: usize,
 The same with the rows shared between the threads of `pool`.
 
 ```
+fn q4k_matmul_parallel(pool: lend Pool, w: []BlockQ4K, rows: usize, cols: usize, nvec: usize, x: read Q8KVec, y: lend []f32)
+```
+y = W x for `nvec` vectors at once (a batch of tokens): `x` holds them one after another (a `Q8KVec` of `nvec * cols` values) and `y` receives `nvec * rows` values, vector after...
+
+```
 fn q6k_matvec(w: []BlockQ6K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32)
 ```
 
 ```
 fn q6k_matvec_parallel(pool: lend Pool, w: []BlockQ6K, rows: usize, cols: usize, x: read Q8KVec, y: lend []f32)
+```
+
+```
+fn q6k_matmul_parallel(pool: lend Pool, w: []BlockQ6K, rows: usize, cols: usize, nvec: usize, x: read Q8KVec, y: lend []f32)
 ```
 
 ```
@@ -1513,7 +1522,7 @@ struct Act { q8: Q8Vec, q8k: Q8KVec, has8: bool, hask: bool }
 The quantized forms of one activation vector, made when a weight asks for them: the `q4_0` and `q8_0` kernels use `q8`, the K-quant kernels `q8k`.
 
 ```
-struct Config { dim: usize, hidden: usize, layers: usize, heads: usize, kv_heads: usize, head_dim: usize, q_dim: usize, vocab: usize, ctx: usize, rope_base: f32, eps: f32, neox: bool, qk_norm: bool }
+struct Config { dim: usize, hidden: usize, layers: usize, heads: usize, kv_heads: usize, head_dim: usize, q_dim: usize, vocab: usize, ctx: usize, rope_base: f32, eps: f32, neox: bool, qk_norm: bool, rope_linear: f32, rope_yarn: f32, rope_orig_ctx: usize }
 ```
 
 ```
@@ -1525,9 +1534,14 @@ struct Model { cfg: Config, arch: string, embed: Weight, layers: List[Layer], ou
 ```
 
 ```
-struct State { x: List[f32], xb: List[f32], q: List[f32], k: List[f32], v: List[f32], att: List[f32], gate: List[f32], up: List[f32], logits: List[f32], a_dim: Act, a_att: Act, a_hid: Act, caches: List[KvCache] }
+struct State { x: List[f32], xb: List[f32], q: List[f32], k: List[f32], v: List[f32], att: List[f32], gate: List[f32], up: List[f32], logits: List[f32], rcos: List[f32], rsin: List[f32], a_dim: Act, a_att: Act, a_hid: Act, caches: List[KvCache], bt: Batch }
 ```
 The working memory of a run: activations, the KV cache of every layer, and the logits of the last token.
+
+```
+struct Batch { n: usize, x: List[f32], xb: List[f32], q: List[f32], k: List[f32], v: List[f32], att: List[f32], gate: List[f32], up: List[f32], rcos: List[f32], rsin: List[f32], a_dim: Act, a_att: Act, a_hid: Act }
+```
+The activations of up to `n` tokens at once, for `forward_batch` (a field of `State`).
 
 ### fn
 
@@ -1545,6 +1559,11 @@ fn Weight.matvec(self: read Weight, pool: lend Pool, act: lend Act, x: []f32, y:
 y = W x, where `act` stands for the vector `x` (it quantizes `x` the first time a weight needs it).
 
 ```
+fn Weight.matmul(self: read Weight, pool: lend Pool, act: lend Act, nvec: usize, x: []f32, y: lend []f32)
+```
+y = W x for `nvec` vectors at once (a batch of tokens): `x` holds them one after another (`nvec * cols` values), `y` receives `nvec * rows`.
+
+```
 fn Weight.row(self: read Weight, r: usize, out: lend []f32)
 ```
 Row `r` as f32 (an embedding).
@@ -1557,6 +1576,11 @@ fn Model.load(path: str) -> Result[Model, string]
 fn State.new(cfg: Config, max_seq: usize) -> State
 ```
 Memory for a conversation of up to `max_seq` tokens (at most the model's context length).
+
+```
+fn State.with_batch(cfg: Config, max_seq: usize, batch: usize) -> State
+```
+The same with room for `forward_batch` to take up to `batch` tokens at once.
 
 ```
 fn State.len(self: read State) -> usize
@@ -1572,6 +1596,15 @@ Forgets everything after the first `n` tokens (to reuse a shared prompt).
 fn forward(model: read Model, st: lend State, pool: lend Pool, token: i32, pos: usize)
 ```
 Runs `token` at position `pos` through the model; `st.logits` then holds the scores for the token after it.
+
+```
+fn Batch.new(cfg: Config, n: usize) -> Batch
+```
+
+```
+fn forward_batch(model: read Model, st: lend State, pool: lend Pool, tokens: []i32, pos0: usize)
+```
+Runs the tokens `tokens` (at most `st.bt.n` of them) at the positions `pos0`, `pos0 + 1`, ...
 
 
 ## std.math
@@ -2058,6 +2091,16 @@ fn rope_scaled(x: lend []f32, n_heads: usize, head_dim: usize, pos: usize, base:
 The same with a divisor per pair (`head_dim / 2` values, the `rope_freqs.weight` tensor of LLaMA 3.1 models): the angle of pair `i` is divided by `factors[i]`.
 
 ```
+fn rope_table(pos: usize, head_dim: usize, base: f32, factors: []f32, linear: f32, original_ctx: usize, yarn: f32, cos: lend []f32, sin: lend []f32)
+```
+The cosines and sines of the angles of the `head_dim / 2` pairs at position `pos` (the same for every head, so a model computes them once per token).
+
+```
+fn rope_apply(x: lend []f32, n_heads: usize, head_dim: usize, neox: bool, cos: []f32, sin: []f32)
+```
+Turns every head of `x` by the angles of a `rope_table`.
+
+```
 fn matvec_parallel(pool: lend Pool, w: []f32, rows: usize, cols: usize, x: []f32, y: lend []f32)
 ```
 The same as `matvec`, with the rows shared between the threads of `pool`.
@@ -2091,9 +2134,23 @@ fn attention(q: []f32, cache: read KvCache, n_heads: usize, out: lend []f32)
 Attention of the new token's query `q` (`n_heads * head_dim` values) over every token in `cache`, which must already hold the new token's own key and value.
 
 ```
+fn attention_prefix(q: []f32, cache: read KvCache, n_heads: usize, tokens: usize, out: lend []f32)
+```
+The same over only the first `tokens` tokens of the cache: when a batch of tokens has been appended, token `i` of the batch looks at the tokens up to and including itself.
+
+```
 fn attention_parallel(pool: lend Pool, q: []f32, cache: read KvCache, n_heads: usize, out: lend []f32)
 ```
 The same with the key/value heads (each with its group of query heads) shared between the threads of `pool`.
+
+```
+fn attention_prefix_parallel(pool: lend Pool, q: []f32, cache: read KvCache, n_heads: usize, tokens: usize, out: lend []f32)
+```
+
+```
+fn attention_batch_parallel(pool: lend Pool, q: []f32, cache: read KvCache, n_heads: usize, pos0: usize, m: usize, out: lend []f32)
+```
+Attention for a batch of `m` tokens that were appended to the cache at positions `pos0 ..
 
 
 ## std.packet
@@ -2877,6 +2934,15 @@ The same for `q8_0` weights.
 
 ```
 fn q8_matvec_parallel(pool: lend Pool, w: []BlockQ8, rows: usize, cols: usize, x: read Q8Vec, y: lend []f32)
+```
+
+```
+fn q4_matmul_parallel(pool: lend Pool, w: []BlockQ4, rows: usize, cols: usize, nvec: usize, x: read Q8Vec, y: lend []f32)
+```
+y = W x for `nvec` vectors at once (a batch of tokens), `x` holding them one after another (a `Q8Vec` of `nvec * cols` values) and `y` receiving `nvec * rows` values, vector aft...
+
+```
+fn q8_matmul_parallel(pool: lend Pool, w: []BlockQ8, rows: usize, cols: usize, nvec: usize, x: read Q8Vec, y: lend []f32)
 ```
 
 ```

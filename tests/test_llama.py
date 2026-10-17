@@ -178,3 +178,26 @@ fn main():
 """)
     assert res.returncode == 0, res.stderr
     assert "blk.1.ffn_up.weight" in res.stdout
+
+
+def test_q8_batched_prompt_equals_token_by_token(tmp_path):
+    w = make_weights()
+    blob = build_gguf(w, quantized=True)
+    sequential, _ = run_model(tmp_path, blob)
+    path = tmp_path / "tiny-llama.gguf"
+    res = run_built("""import std.llama
+import std.parallel
+
+fn main():
+    model = llama.Model.load("PATH").value_or_panic()
+    pool = parallel.Pool.new(3)
+    st = llama.State.with_batch(model.cfg, 32, 4)
+    a: [4]i32 = [5, 17, 3, 40]
+    b: [2]i32 = [22, 9]
+    llama.forward_batch(model, st, pool, a, 0)
+    llama.forward_batch(model, st, pool, b, 4)
+    for i in 0..st.logits.len():
+        print(f64(st.logits[i]))
+""".replace("PATH", path.as_posix()), release=True, timeout=120)
+    assert res.returncode == 0, res.stderr
+    np.testing.assert_allclose(np.array([float(t) for t in res.stdout.split()]), sequential[-1], rtol=1e-5, atol=1e-5)

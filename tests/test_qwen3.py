@@ -214,3 +214,40 @@ fn main():
 """)
     assert res.returncode == 0, res.stderr
     assert "q5_K" in res.stdout and "blk.0.attn_q.weight" in res.stdout
+
+
+BATCH_PROGRAM = """import std.llama
+import std.parallel
+
+fn main():
+    model = llama.Model.load("PATH").value_or_panic()
+    pool = parallel.Pool.new(3)
+    st = llama.State.with_batch(model.cfg, 32, 3)
+    first: [3]i32 = [5, 17, 3]
+    second: [2]i32 = [22, 9]
+    llama.forward_batch(model, st, pool, first, 0)
+    llama.forward_batch(model, st, pool, second, 3)
+    for i in 0..st.logits.len():
+        print(f64(st.logits[i]))
+    print(st.len())
+"""
+
+
+@pytest.mark.parametrize("arch, kind", [("qwen3", "f32"), ("qwen3", "kquant"), ("llama", "kquant")])
+def test_batched_prompt_equals_token_by_token(tmp_path, arch, kind):
+    if kind == "f32":
+        cfg = Cfg(arch, dim=64, heads=4, kv=2, head_dim=24, hidden=96, layers=2, vocab=48, base=1000000.0)
+        fmts = {k: "f32" for k in ("embd", "output", "q", "k", "v", "o", "gate", "up", "down")}
+    else:
+        cfg = Cfg(arch, dim=256, heads=4, kv=2, head_dim=64, hidden=512, layers=2, vocab=40)
+        fmts = {"embd": "q6k", "output": "q6k", "q": "q4k", "k": "q4k", "v": "q6k", "o": "q4k",
+                "gate": "q4k", "up": "q4k", "down": "q6k"}
+    blob, _ = make_model(cfg, fmts, seed=4)
+    path = tmp_path / "m.gguf"
+    path.write_bytes(blob)
+    sequential = run(tmp_path, blob, cfg)[-1]
+    res = run_built(BATCH_PROGRAM.replace("PATH", path.as_posix()), release=True, timeout=180)
+    assert res.returncode == 0, res.stderr
+    vals = [float(t) for t in res.stdout.split()]
+    assert vals[-1] == 5
+    np.testing.assert_allclose(np.array(vals[:-1]), sequential, rtol=1e-5, atol=1e-5)
