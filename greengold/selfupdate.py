@@ -206,8 +206,9 @@ def finish_after_exit(new: Path, target: Path) -> None:
               f'Move-Item -LiteralPath "{home}\\_internal" -Destination "{backup}\\_internal" -Force -ErrorAction SilentlyContinue; '
               f'robocopy "{staged}" "{home}" /E /MOVE /IS /IT /R:30 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; '
               f'if ($LASTEXITCODE -ge 8) {{ '
-              f'Remove-Item -LiteralPath "{home}\\_internal" -Recurse -Force -ErrorAction SilentlyContinue; '
-              f'Move-Item -LiteralPath "{backup}\\_internal" -Destination "{home}\\_internal" -Force -ErrorAction SilentlyContinue }}; '
+              # Mirror, never Move-Item: if the half-copied `_internal` could not be fully removed, Move-Item would
+              # nest the old one inside it (`_internal\\_internal`) and gg would no longer find python312.dll.
+              f'robocopy "{backup}\\_internal" "{home}\\_internal" /MIR /IS /IT /R:30 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null }}; '
               f'Remove-Item -LiteralPath "{staged}" -Recurse -Force -ErrorAction SilentlyContinue')
     flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW   # DETACHED_PROCESS + CREATE_NO_WINDOW fails
     subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script],
