@@ -1,0 +1,84 @@
+{
+ "title": "Dinero: std.money",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "El dinero no se calcula con `f64` (0.1 + 0.2 ≠ 0.3). `std.money` guarda el importe como un **número entero de la unidad mínima** (céntimos) junto con su moneda; el redondeo es siempre explícito y no se pierde ni se inventa ningún céntimo. Sumar monedas distintas da un `Err`, no un total silencioso."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.money { Money, usd, eur }",
+    "",
+    "fn main():",
+    "    total = usd(1999).times(3)",
+    "    print(total.to_string().as_str())",
+    "    print(usd(5).plus(eur(5)).is_ok())",
+    "    print(usd(5).plus(usd(7)).value_or_panic().to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "59.97 USD",
+    "false",
+    "0.12 USD"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`allocate` reparte un importe en proporción a unas razones y las partes suman **exactamente** el total: 1,00 USD dividido en tres es 0,34 + 0,33 + 0,33."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.money { Money, usd }",
+    "",
+    "fn main():",
+    "    thirds: [3]i64 = [1, 1, 1]",
+    "    for part in usd(100).allocate(thirds[..]):",
+    "        print(part.to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "0.34 USD",
+    "0.33 USD",
+    "0.33 USD"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l01-x1",
+   "prompt": "Reparte `usd(1000)` (10,00 USD) en la proporción `[1, 2]` e imprime ambas partes.",
+   "starter": [
+    "import std.money { Money, usd }",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.money { Money, usd }",
+    "",
+    "fn main():",
+    "    ratios: [2]i64 = [1, 2]",
+    "    for part in usd(1000).allocate(ratios[..]):",
+    "        print(part.to_string().as_str())"
+   ],
+   "hint": "`ratios[..]` es un slice; pásalo a `allocate`.",
+   "expected": [
+    "3.33 USD",
+    "6.67 USD"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l01-q1",
+   "q": "¿Por qué se usa un número entero para el dinero en lugar de `f64`?",
+   "options": [
+    "Porque es más rápido",
+    "Para evitar errores de redondeo de fracciones",
+    "Porque ocupa menos espacio"
+   ],
+   "answer": 1,
+   "why": "Los errores de fracciones binarias como 0.1 + 0.2 hacen perder céntimos."
+  }
+ ]
+}

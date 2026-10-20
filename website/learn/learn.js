@@ -3,43 +3,24 @@
   var $ = function (id) { return document.getElementById(id); };
   var H = window.GGHighlight;
 
-  // ---- interface strings ----
-  var UI = {
-    tr: {
-      title: "Greengold Öğren", lede: "Sıfırdan başlayıp standart kütüphaneye kadar. Kodu tarayıcıda yaz, çalıştır, alıştırmayı çöz.",
-      pickPath: "Yolunu seç", beginner: "Yeni başlıyorum", dev: "Başka bir dil biliyorum",
-      pathNote: "Programcı yolunda 'programlamaya giriş' dersleri atlanır.", skipped: "atlandı",
-      run: "Çalıştır", stop: "Durdur", reset: "Sıfırla", check: "Kontrol et", hint: "İpucu", solution: "Çözümü göster",
-      tryIt: "Dene", exercise: "Alıştırma", openEx: "Editörde aç", quiz: "Soru", next: "Sonraki", prev: "Önceki", done: "Tamamlandı",
-      loading: "Yükleniyor…", ready: "Hazır", building: "Derleniyor…", running: "Çalışıyor…", couldNotBuild: "Derlenemedi.",
-      correct: "Doğru!", wrong: "Çıktı beklenenle aynı değil.", expected: "Beklenen", got: "Senin çıktın", answer: "Doğru cevap",
-      contents: "İçindekiler", badges: "Rozetler", progress: "İlerleme", lessons: "ders",
-      b_first_run: "İlk program", b_first_ex: "İlk alıştırma", b_ex10: "10 alıştırma", b_quiz5: "5 doğru cevap", b_chapter: "Bölüm bitirildi",
-      cont: "Kaldığın yerden devam et", start: "Başla", review: "Önce şunu bitirmeni öneririz", localOnly: "Bu örnek tarayıcıda çalışmaz; kendi bilgisayarında dene.", ref: "Standart kütüphane referansı", search: "Ara: fonksiyon, tip, modül…", modules: "Modüller", results: "sonuç", noResults: "Sonuç yok.", openInEditor: "Editörde dene", finishNeeds: "Tamamlamak için gerekli", stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
-    },
-    en: {
-      title: "Learn Greengold", lede: "From zero to the standard library. Write code in the browser, run it, solve the exercises.",
-      pickPath: "Choose your path", beginner: "I'm new to programming", dev: "I know another language",
-      pathNote: "The programmer path skips the 'introduction to programming' lessons.", skipped: "skipped",
-      run: "Run", stop: "Stop", reset: "Reset", check: "Check", hint: "Hint", solution: "Show solution",
-      tryIt: "Try it", exercise: "Exercise", openEx: "Open in editor", quiz: "Question", next: "Next", prev: "Previous", done: "Completed",
-      loading: "Loading…", ready: "Ready", building: "Building…", running: "Running…", couldNotBuild: "Could not build.",
-      correct: "Correct!", wrong: "The output is not what was expected.", expected: "Expected", got: "Your output", answer: "Correct answer",
-      contents: "Contents", badges: "Badges", progress: "Progress", lessons: "lessons",
-      b_first_run: "First program", b_first_ex: "First exercise", b_ex10: "10 exercises", b_quiz5: "5 correct answers", b_chapter: "Chapter finished",
-      cont: "Continue where you left off", start: "Start", review: "We suggest finishing this first", localOnly: "This example does not run in the browser; try it on your own machine.", ref: "Standard library reference", search: "Search: function, type, module…", modules: "Modules", results: "results", noResults: "No results.", openInEditor: "Try in editor", finishNeeds: "Needed to complete", stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
-    }
-  };
+  // ---- interface strings (ui.js) ----
+  var UI = window.GGLearnUI.strings, LANGS = window.GGLearnUI.langs;
 
   // ---- persisted state ----
   var store = {
     get: function (k, d) { try { var v = localStorage.getItem("gg-learn-" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem("gg-learn-" + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
   };
-  var lang = store.get("lang", /^tr/i.test(navigator.language || "") ? "tr" : "en");
+  function guessLang() {
+    var want = (navigator.language || "en").slice(0, 2).toLowerCase();
+    return LANGS.some(function (l) { return l[0] === want; }) ? want : "en";
+  }
+  var lang = store.get("lang", guessLang());
+  if (!UI[lang]) lang = "en";
+  document.documentElement.lang = lang;
   var level = store.get("level", null);                       // "beginner" | "dev" | null
   var progress = store.get("progress", { lessons: {}, exercises: {}, quiz: {}, ran: false });
-  function T(k) { return UI[lang][k] || k; }
+  function T(k) { return UI[lang][k] || UI.en[k] || k; }
   function save() { store.set("progress", progress); }
 
   // ---- tiny text formatting: `code` and **bold** ----
@@ -204,15 +185,15 @@
 
   function side(activeId) {
     var s = $("learn-side"), html = "";
-    html += '<div class="learn-tools"><div class="pg-seg" role="radiogroup" aria-label="Language">' +
-      ["tr", "en"].map(function (l) { return '<button type="button" role="radio" aria-checked="' + (l === lang) + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>"; }).join("") + "</div></div>";
+    html += '<div class="learn-tools"><select id="lang-select" aria-label="Language">' +
+      LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === lang ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + "</select></div>";
     html += '<a href="#/">' + T("contents") + "</a>";
     html += '<a href="#/ref"' + (activeId === "ref" ? ' aria-current="page"' : "") + '>' + T("ref") + "</a>";
     var next = nextToDo();
     manifest.chapters.forEach(function (ch, ci) {
       var sk = skipped(ch), open = activeId ? ch.lessons.indexOf(activeId) >= 0 : ch.lessons.indexOf(next) >= 0;
       var doneN = ch.lessons.filter(function (l) { return progress.lessons[l]; }).length;
-      html += '<details class="chapter' + (sk ? " skipped" : "") + '"' + (open ? " open" : "") + "><summary>" + H.esc(ch.title[lang]) +
+      html += '<details class="chapter' + (sk ? " skipped" : "") + '"' + (open ? " open" : "") + "><summary>" + H.esc(ch.title[lang] || ch.title.en) +
         (sk ? " · " + T("skipped") : "") + ' <span class="count">' + doneN + "/" + ch.lessons.length + "</span></summary><ul>";
       ch.lessons.forEach(function (id) {
         var cls = (progress.lessons[id] ? "done" : "todo") + (!sk && id === next ? " next" : "");
@@ -222,8 +203,10 @@
       html += "</ul></details>";
     });
     s.innerHTML = html;
-    Array.prototype.forEach.call(s.querySelectorAll("[data-lang]"), function (b) {
-      b.addEventListener("click", function () { lang = b.dataset.lang; store.set("lang", lang); loadTitles().then(route); });
+    $("lang-select").addEventListener("change", function (e) {
+      lang = e.target.value; store.set("lang", lang);
+      document.documentElement.lang = lang;
+      loadTitles().then(route);
     });
   }
 
@@ -248,7 +231,7 @@
     if (nx) html += '<p><a class="btn btn-primary" href="#/' + nx + '">' + (done ? T("cont") : T("start")) + ": " + H.esc(titles[nx] || nx) + "</a></p>";
     html += "<h3>" + T("progress") + ": " + done + "/" + total + " " + T("lessons") + "</h3>" + badges();
     manifest.chapters.forEach(function (ch) {
-      html += '<div class="chapter-card"><h3>' + H.esc(ch.title[lang]) + (skipped(ch) ? " · " + T("skipped") : "") + "</h3>" +
+      html += '<div class="chapter-card"><h3>' + H.esc(ch.title[lang] || ch.title.en) + (skipped(ch) ? " · " + T("skipped") : "") + "</h3>" +
         ch.lessons.map(function (id) { return '<a class="' + (progress.lessons[id] ? "done" : "todo") + '" href="#/' + id + '">' + (progress.lessons[id] ? "✓ " : "") + H.esc(titles[id] || id) + "</a>"; }).join("") + "</div>";
     });
     main.innerHTML = html;

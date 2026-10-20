@@ -1,0 +1,87 @@
+{
+ "title": "Lambda-Ausdrücke",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Für eine kleine Aufgabe kannst du statt eines eigenen `fn` eine anonyme **Lambda** schreiben: `fn(parameter) -> Rückgabe => ausdruck`. Sie wird in einer Variablen gespeichert oder direkt als Argument übergeben."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x * x)",
+    "    adder = fn(a: i32, b: i32) -> i32 => a + b",
+    "    print(\"sum:\", adder(10, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1",
+    "4",
+    "9",
+    "sum: 30"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Bei einer Lambda ohne Rückgabewert entfällt der Rückgabetyp, und der Rumpf muss ein Aufrufausdruck sein:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    logger = fn(s: str) => print(\"[LOG]\", s)",
+    "    logger(\"the lambda ran\")"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] the lambda ran"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l03-x1",
+   "prompt": "Verwende `transform` mit einer Lambda, die jede Zahl um 10 erhöht, und gib die Ergebnisse aus (11, 12, 13 für `[1, 2, 3]`).",
+   "starter": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x)"
+   ],
+   "solution": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x + 10)"
+   ],
+   "hint": "Mach den Rumpf der Lambda zu `x + 10`.",
+   "expected": [
+    "11",
+    "12",
+    "13"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l03-q1",
+   "q": "Was ist `fn(x: i32) -> i32 => x * 2`?",
+   "options": [
+    "Ein Struct",
+    "Eine anonyme Funktion (Lambda), die ihre Eingabe mit zwei multipliziert",
+    "Ein Fehler"
+   ],
+   "answer": 1,
+   "why": "`=>` beginnt den Rumpf der Lambda."
+  }
+ ]
+}

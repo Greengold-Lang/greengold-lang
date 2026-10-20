@@ -1,0 +1,80 @@
+{
+ "title": "Funktionen als Werte",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In Greengold sind Funktionen ebenfalls Werte: Du kannst eine in einer Variablen speichern, als Parameter übergeben oder in ein Struct-Feld legen. Ein Funktionstyp wird `fn(T1, T2) -> R` geschrieben; weil er lang ist, bekommt er oft mit `type` einen Namen."
+  },
+  {
+   "t": "code",
+   "code": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn multiply(a: i32, b: i32) -> i32:",
+    "    return a * b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    current: MathOp = multiply",
+    "    print(apply_op(current, 6, 7))",
+    "    print(apply_op(add, 6, 7))"
+   ],
+   "run": true,
+   "output": [
+    "42",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`apply_op` weiß nicht, welche Operation es ausführen wird; die übergebene Funktion entscheidet. Das ist der grundlegende Weg, Verhalten als Parameter weiterzugeben."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l01-x1",
+   "prompt": "Schreibe eine Funktion `subtract` und gib das Ergebnis von `apply_op(subtract, 10, 4)` aus.",
+   "starter": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(apply_op(subtract, 10, 4))"
+   ],
+   "hint": "Schreibe `fn subtract(a: i32, b: i32) -> i32:` und übergib sie in `main`.",
+   "expected": [
+    "6"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l01-q1",
+   "q": "Was für ein Typ ist `fn(i32, i32) -> i32`?",
+   "options": [
+    "Ein Zahlentyp",
+    "Der Typ von Funktionen, die zwei `i32` nehmen und `i32` zurückgeben",
+    "Ein Struct"
+   ],
+   "answer": 1,
+   "why": "Ein Funktionstyp beschreibt die Parameter- und Rückgabetypen."
+  }
+ ]
+}

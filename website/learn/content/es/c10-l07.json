@@ -1,0 +1,87 @@
+{
+ "title": "JSON: std.json",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`json.parse(texto)` da un `Result[Json, string]`. `Json` es un enum; `doc.get(\"clave\")` toma un subvalor y `as_i64()`, `as_string()`, `as_bool()` ... lo extraen como `Optional`. Para construir un documento nuevo usa `json.object()`, `set`, `json.integer`, `json.text`; `to_text()` lo convierte en texto."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"name\\\": \\\"Ada\\\", \\\"age\\\": 36, \\\"tags\\\": [\\\"math\\\", \\\"code\\\"]}\"):",
+    "        Ok(doc):",
+    "            print(doc.get(\"name\").as_string().value_or(\"?\").as_str())",
+    "            print(doc.get(\"age\").as_i64().value_or(0))",
+    "            print(doc.get(\"tags\").len())",
+    "        Err(msg):",
+    "            print(\"bad json:\", msg.as_str())"
+   ],
+   "run": true,
+   "output": [
+    "Ada",
+    "36",
+    "2"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    doc = json.object()",
+    "    doc.set(\"id\", json.integer(7))",
+    "    doc.set(\"ok\", json.text(\"yes\"))",
+    "    print(doc.to_text().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "{\"id\":7,\"ok\":\"yes\"}"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l07-x1",
+   "prompt": "Analiza el JSON `{\"price\": 12, \"qty\": 3}` e imprime `price * qty`.",
+   "starter": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"price\\\": 12, \\\"qty\\\": 3}\"):",
+    "        Ok(doc):",
+    "            print(0)",
+    "        Err(msg):",
+    "            print(\"bad json\")"
+   ],
+   "solution": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"price\\\": 12, \\\"qty\\\": 3}\"):",
+    "        Ok(doc):",
+    "            print(doc.get(\"price\").as_i64().value_or(0) * doc.get(\"qty\").as_i64().value_or(0))",
+    "        Err(msg):",
+    "            print(\"bad json\")"
+   ],
+   "hint": "Obtén los valores con `doc.get(\"price\").as_i64().value_or(0)`.",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l07-q1",
+   "q": "¿Por qué `json.parse` devuelve un `Result`?",
+   "options": [
+    "El texto puede ser un JSON inválido",
+    "Siempre falla",
+    "Por velocidad"
+   ],
+   "answer": 0,
+   "why": "Un fallo esperado (entrada incorrecta) se transporta como valor con `Err`."
+  }
+ ]
+}

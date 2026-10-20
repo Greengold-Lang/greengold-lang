@@ -1,0 +1,65 @@
+{
+ "title": "Matemáticas: std.math",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.math` ofrece funciones `f64` como `sqrt`, `pow`, `sin`, `cos`, `floor`, `ceil`, `round`, `hypot`, `ln`, `log10`... y constantes. Las constantes se llaman como funciones: `math.pi()`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(2.0))",
+    "    print(math.floor(2.7), math.ceil(2.1), math.round(2.5))",
+    "    print(math.hypot(3.0, 4.0))",
+    "    print(math.pi())",
+    "    print(math.pow_i64(2, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1.4142135623731",
+    "2 3 3",
+    "5",
+    "3.14159265358979",
+    "1048576"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l05-x1",
+   "prompt": "Calcula el área de un círculo de radio 3 con `pi * r * r` e imprímela redondeada hacia abajo con `math.floor`.",
+   "starter": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    r = 3.0",
+    "    print(0.0)"
+   ],
+   "solution": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    r = 3.0",
+    "    print(math.floor(math.pi() * r * r))"
+   ],
+   "hint": "`math.floor(math.pi() * r * r)`",
+   "expected": [
+    "28"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l05-q1",
+   "q": "¿Cómo se obtiene el valor de `pi`?",
+   "options": [
+    "`math.pi`",
+    "`math.pi()`",
+    "`PI`"
+   ],
+   "answer": 1,
+   "why": "En `std.math` las constantes se obtienen con una llamada a función."
+  }
+ ]
+}

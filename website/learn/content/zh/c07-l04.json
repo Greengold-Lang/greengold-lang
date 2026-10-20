@@ -1,0 +1,72 @@
+{
+ "title": "内置约束",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "编译器为常见能力提供了现成的约束：`Num`（数值：`+ - * /`）、`Int`（仅整数）、`Float`（仅小数）、`Ord`（可排序：`< > <= >=`）和 `Eq`（相等：`== !=`）。它们可以组合：`[T: Num + Ord]`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum3[T: Num](a: T, b: T, c: T) -> T:",
+    "    return a + b + c",
+    "",
+    "fn clamp[T: Num + Ord](x: T, lo: T, hi: T) -> T:",
+    "    if x < lo:",
+    "        return lo",
+    "    if x > hi:",
+    "        return hi",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(sum3(1, 2, 3))",
+    "    print(sum3(0.5, 0.25, 0.25))",
+    "    print(clamp(15, 0, 10))",
+    "    print(clamp(-3, 0, 10))"
+   ],
+   "run": true,
+   "output": [
+    "6",
+    "1",
+    "10",
+    "0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l04-x1",
+   "prompt": "`abs_of[T: Num + Ord](x: T, zero: T)`：当 `x` 小于零时返回 `zero - x`，否则返回 `x`。用 `-8` 和 `2.5` 试一试。",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn abs_of[T: Num + Ord](x: T, zero: T) -> T:",
+    "    if x < zero:",
+    "        return zero - x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(abs_of(-8, 0))",
+    "    print(abs_of(2.5, 0.0))"
+   ],
+   "hint": "`[T: Num + Ord]` 让减法和比较都成为可能。",
+   "expected": [
+    "8",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l04-q1",
+   "q": "在泛型函数中使用 `<`，`T` 需要哪种约束？",
+   "options": [
+    "`Eq`",
+    "`Ord`",
+    "`Int`"
+   ],
+   "answer": 1,
+   "why": "`Ord` 提供排序运算符；`Eq` 只提供相等。"
+  }
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "title": "Sichere Wrapper",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Die beste Praxis in der professionellen Systemprogrammierung ist, `unsafe`-Code in kleinen Funktionen einzuschließen und der Außenwelt eine **völlig sichere** API anzubieten. Der Aufrufer muss nie `unsafe` schreiben, und ungültige Eingaben werden im Wrapper herausgefiltert."
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"stdlib.h\" fn rand() -> i32",
+    "extern \"stdlib.h\" fn srand(seed: u32)",
+    "",
+    "fn get_c_random(max: i32) -> i32:",
+    "    if max <= 0:",
+    "        return 0",
+    "    unsafe:",
+    "        raw = rand()",
+    "        return raw % max",
+    "",
+    "fn main():",
+    "    dice = get_c_random(6) + 1",
+    "    print(\"dice:\", dice)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Im Beispiel unten wird das `sqrt` von C in einer sicheren Funktion versteckt, die ein `Result` zurückgibt:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sqrt(x: f64) -> f64",
+    "",
+    "fn square_root(x: f64) -> Result[f64, str]:",
+    "    if x < 0.0:",
+    "        return Err(\"negative number\")",
+    "    unsafe:",
+    "        return Ok(sqrt(x))",
+    "",
+    "fn main():",
+    "    match square_root(16.0):",
+    "        Ok(v):",
+    "            print(v)",
+    "        Err(m):",
+    "            print(m)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l04-q1",
+   "q": "Was ist der Zweck eines sicheren Wrappers?",
+   "options": [
+    "Den Code zu verlangsamen",
+    "`unsafe`-Code an einer kleinen Stelle zu sammeln und den Aufrufer sicher zu halten",
+    "`extern` zu entfernen"
+   ],
+   "answer": 1,
+   "why": "Die zu prüfende `unsafe`-Fläche schrumpft."
+  }
+ ]
+}

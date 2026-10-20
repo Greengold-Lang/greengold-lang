@@ -1,0 +1,96 @@
+{
+ "title": "Tuplas",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Una **tupla** mantiene unidos unos pocos valores sin definir un struct: `(100, 3.14, \"Greengold\")`. Accedes a los elementos con `.0`, `.1`, `.2`. Su uso más común es devolver varios valores desde una función."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn divmod(a: i32, b: i32) -> (i32, i32):",
+    "    return (a / b, a % b)",
+    "",
+    "fn main():",
+    "    res = divmod(17, 5)",
+    "    print(\"quotient:\", res.0, \"remainder:\", res.1)"
+   ],
+   "run": true,
+   "output": [
+    "quotient: 3 remainder: 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "La **desestructuración** divide una tupla en variables separadas en una sola línea. Puedes saltarte un elemento que no necesites con `_`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn divmod(a: i32, b: i32) -> (i32, i32):",
+    "    return (a / b, a % b)",
+    "",
+    "fn user() -> (i32, str, str):",
+    "    return (101, \"Ali Veli\", \"ali@example.com\")",
+    "",
+    "fn main():",
+    "    quotient, remainder = divmod(27, 4)",
+    "    print(quotient, remainder)",
+    "    id, _, email = user()",
+    "    print(id, email)"
+   ],
+   "run": true,
+   "output": [
+    "6 3",
+    "101 ali@example.com"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l03-x1",
+   "prompt": "Haz que `min_max(a, b, c)` devuelva una tupla: el número más pequeño y el más grande. Desestructúrala e imprime `3 9` (para `min_max(5, 3, 9)`).",
+   "starter": [
+    "fn min_max(a: i32, b: i32, c: i32) -> (i32, i32):",
+    "    return (0, 0)",
+    "",
+    "fn main():",
+    "    lo, hi = min_max(5, 3, 9)",
+    "    print(lo, hi)"
+   ],
+   "solution": [
+    "fn min_max(a: i32, b: i32, c: i32) -> (i32, i32):",
+    "    lo = a",
+    "    hi = a",
+    "    if b < lo:",
+    "        lo = b",
+    "    if c < lo:",
+    "        lo = c",
+    "    if b > hi:",
+    "        hi = b",
+    "    if c > hi:",
+    "        hi = c",
+    "    return (lo, hi)",
+    "",
+    "fn main():",
+    "    lo, hi = min_max(5, 3, 9)",
+    "    print(lo, hi)"
+   ],
+   "hint": "Empieza `lo` y `hi` en `a` y actualízalos comparando con `b` y `c`.",
+   "expected": [
+    "3 9"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l03-q1",
+   "q": "Con `t = (7, \"a\")`, ¿qué es `t.1`?",
+   "options": [
+    "7",
+    "\"a\"",
+    "Un error"
+   ],
+   "answer": 1,
+   "why": "La cuenta empieza en 0: `.0` es el primer elemento y `.1` el segundo."
+  }
+ ]
+}

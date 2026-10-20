@@ -1,0 +1,80 @@
+{
+ "title": "Atomare Werte und Mutex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greifen mehrere Threads auf denselben Speicher zu, darf kein Datenwettlauf entstehen. Für eine einzelne Zahl ist die einfachste Lösung eine **atomare** Variable: Die Operationen sind unteilbar. `AtomicI64.fetch_and_add(n)` addiert, `load()` liest."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    counter = thread.AtomicI64.new(0)",
+    "    counter.fetch_and_add(10)",
+    "    counter.fetch_and_add(5)",
+    "    print(\"counter:\", counter.load())",
+    "    print(counter.compare_and_swap(15, 100), counter.load())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Für komplexere Daten verwendest du einen **`Mutex`**: Du nimmst ihn mit `lock()` und gibst ihn mit `unlock()` frei. Ein sichererer Weg, bei dem man das Freigeben nicht vergessen kann, ist **`Locked[T]`**, das den Wert in das Schloss steckt: `lock()` liefert einen `Guard`, und das Schloss wird automatisch freigegeben, wenn der `Guard` seinen Gültigkeitsbereich verlässt."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn work(c: Arc[thread.Locked[i64]]):",
+    "    for _i in 0..1000:",
+    "        g = c.value.lock()",
+    "        g.value() += 1",
+    "",
+    "fn main():",
+    "    counter = Arc[thread.Locked[i64]](thread.Locked[i64].new(0))",
+    "    workers = List[thread.Thread]()",
+    "    for w in 0..4:",
+    "        c = counter.clone()",
+    "        workers.push(thread.Thread.spawn(fn() =>",
+    "            work(c)))",
+    "    for i in 0..workers.len:",
+    "        workers[i].join()",
+    "    print(counter.value.get())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Arc[T]` ist gezähltes Teilen, bei dem mehrere Threads denselben Wert besitzen: `clone()` fügt einen neuen Besitzer hinzu, und der Wert wird freigegeben, wenn der letzte Besitzer loslässt."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q1",
+   "q": "Wann wird das Schloss freigegeben, wenn du auf den Wert in `Locked[T]` zugreifst?",
+   "options": [
+    "Wenn du `unlock()` von Hand schreibst",
+    "Automatisch, wenn der `Guard` seinen Gültigkeitsbereich verlässt",
+    "Nie"
+   ],
+   "answer": 1,
+   "why": "Das Vergessen des Freigebens kann bei diesem Entwurf nicht passieren."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q2",
+   "q": "Der einfachste sichere Weg, einen einzelnen Zähler aus mehreren Threads zu erhöhen?",
+   "options": [
+    "Ein normaler `i64`",
+    "`AtomicI64`",
+    "Eine `List`"
+   ],
+   "answer": 1,
+   "why": "Atomare Operationen sind unteilbar; es entsteht kein Datenwettlauf."
+  }
+ ]
+}

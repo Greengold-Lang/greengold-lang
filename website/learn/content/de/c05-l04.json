@@ -1,0 +1,72 @@
+{
+ "title": "Copy- und Move-Typen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Ein Typ gehört zu einer von zwei Gruppen. **Copy-Typen** (Zahlen, `bool`, `str`, einfache Structs, Arrays aus Copy-Elementen) leben auf dem Stack und sind billig zu kopieren. **Move-Typen** (`List`, `Box`, `string` und alles, was sie enthält) besitzen Heap-Speicher; sie werden nie kopiert, nur **verschoben** (so gibt es kein doppeltes Freigeben)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 5",
+    "    b = a",
+    "    b += 1",
+    "    print(a, b)",
+    "",
+    "    list_a = List[i32]()",
+    "    list_a.push(10)",
+    "    list_b = list_a",
+    "    list_c = list_b.clone()",
+    "    list_c.push(20)",
+    "    print(list_b.len, list_c.len)"
+   ],
+   "run": true,
+   "output": [
+    "5 6",
+    "1 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Bei Zahlen kopiert `b = a`; `a` bleibt nutzbar. Bei Listen verschiebt `list_b = list_a` den Besitz: Nur `list_b` ist jetzt gültig. Willst du eine unabhängige Kopie, schreibst du `.clone()`."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l04-x1",
+   "prompt": "Erstelle mit `.clone()` einen Klon der Liste `original` namens `dup`, füge `dup` die 99 hinzu und gib die Länge beider Listen aus.",
+   "starter": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    print(original.len)"
+   ],
+   "solution": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    dup = original.clone()",
+    "    dup.push(99)",
+    "    print(original.len, dup.len)"
+   ],
+   "hint": "`dup = original.clone()` und `dup.push(99)`.",
+   "expected": [
+    "2 3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l04-q1",
+   "q": "Welcher ist ein Move-Typ?",
+   "options": [
+    "`i32`",
+    "`List[i32]`",
+    "`bool`"
+   ],
+   "answer": 1,
+   "why": "`List` lebt auf dem Heap und wird daher verschoben; Zahlen werden kopiert."
+  }
+ ]
+}

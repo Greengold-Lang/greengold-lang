@@ -1,0 +1,93 @@
+{
+ "title": "参数和结果",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "函数可以互相调用；一个函数的结果可以作为另一个函数的参数。`return` 会立即离开函数，因此也用于**提前返回**。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn abs_value(x: i32) -> i32:",
+    "    if x < 0:",
+    "        return -x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(square(abs_value(-4)))"
+   ],
+   "run": true,
+   "output": [
+    "16"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "返回 `bool` 的函数读起来像问题（`is_even`、`is_positive`），放在 `if` 里很合适。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn is_even(n: i32) -> bool:",
+    "    return n % 2 == 0",
+    "",
+    "fn main():",
+    "    for i in 1..=4:",
+    "        if is_even(i):",
+    "            print(i, \"is even\")",
+    "        else:",
+    "            print(i, \"is odd\")"
+   ],
+   "run": true,
+   "output": [
+    "1 is odd",
+    "2 is even",
+    "3 is odd",
+    "4 is even"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l02-x1",
+   "prompt": "编写 `max_of(a, b)`：返回较大的那个。",
+   "starter": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "solution": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "hint": "如果 `a > b` 返回 `a`，否则返回 `b`。",
+   "expected": [
+    "12",
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l02-q1",
+   "q": "当 `return` 在函数中间执行时会怎样？",
+   "options": [
+    "函数立即结束",
+    "下一行会运行",
+    "这是个错误"
+   ],
+   "answer": 0,
+   "why": "`return` 会立刻离开函数；它下面的行不会运行。"
+  }
+ ]
+}

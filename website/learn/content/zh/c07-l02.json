@@ -1,0 +1,66 @@
+{
+ "title": "泛型结构体",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "结构体和枚举也可以带类型参数。`Pair[A, B]` 保存两种不同类型的两个值。方法写在 `impl Pair[A, B]:` 块中。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Pair[A, B]:",
+    "    first: A",
+    "    second: B",
+    "",
+    "impl Pair[A, B]:",
+    "    fn swap(self) -> Pair[B, A]:",
+    "        return Pair[B, A]{ first: self.second.clone(), second: self.first.clone() }",
+    "",
+    "fn main():",
+    "    p = Pair[i32, str]{ first: 1, second: \"one\" }",
+    "    s = p.swap()",
+    "    print(s.first, s.second)"
+   ],
+   "run": true,
+   "output": [
+    "one 1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l02-x1",
+   "prompt": "编写一个保存单个值（`value: T`）的 `Wrapper[T]` 结构体。创建 `Wrapper[i32]{ value: 5 }` 和 `Wrapper[str]{ value: \"hi\" }` 并输出它们的值。",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Wrapper[T]:",
+    "    value: T",
+    "",
+    "fn main():",
+    "    a = Wrapper[i32]{ value: 5 }",
+    "    b = Wrapper[str]{ value: \"hi\" }",
+    "    print(a.value)",
+    "    print(b.value)"
+   ],
+   "hint": "`struct Wrapper[T]:`，下面写 `value: T`。",
+   "expected": [
+    "5",
+    "hi"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l02-q1",
+   "q": "`Pair[i32, str]` 和 `Pair[f64, f64]` 是同一个类型吗？",
+   "options": [
+    "是",
+    "不是，它们是不同的类型",
+    "取决于编译器"
+   ],
+   "answer": 1,
+   "why": "类型参数的每一种组合都会产生各自的类型。"
+  }
+ ]
+}

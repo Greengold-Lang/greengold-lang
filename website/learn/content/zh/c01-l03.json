@@ -1,0 +1,91 @@
+{
+ "title": "运算符",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "算术运算：`+ - * / %`。对整数而言，`/` 会丢掉小数部分（`20 / 3` 是 6），`%` 给出余数（`20 % 3` 是 2）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(10 + 20, 30 - 5, 4 * 6)",
+    "    print(20 / 3, 20 % 3)"
+   ],
+   "run": true,
+   "output": [
+    "30 25 24",
+    "6 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "比较会得到 `true` 或 `false`（一个 bool）：`== != < > <= >=`。逻辑运算符用单词书写：`and`、`or`、`not`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number = 15",
+    "    print(number > 10, number == 20)",
+    "    print(number > 10 and number < 20)",
+    "    print(not (number > 10))"
+   ],
+   "run": true,
+   "output": [
+    "true false",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "在 Greengold 中，位运算符（`&`、`|`、`^`、`<<`、`>>`）会**先于**比较运算执行，所以 `bits & 1 == 0` 就是你期望的 `(bits & 1) == 0`。（C 语言里的那个陷阱在这里不存在。）"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    bits = 6",
+    "    print(bits & 1 == 0)",
+    "    print(1 << 4)"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "16"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l03-x1",
+   "prompt": "如果 `n` 是偶数就输出 `true`，是奇数就输出 `false`。（`n % 2 == 0`）",
+   "starter": [
+    "fn main():",
+    "    n = 14",
+    "    print(false)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = 14",
+    "    print(n % 2 == 0)"
+   ],
+   "hint": "输出条件本身，而不是 `false`。",
+   "expected": [
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l03-q1",
+   "q": "`17 % 5` 等于多少？",
+   "options": [
+    "3",
+    "2",
+    "3.4"
+   ],
+   "answer": 1,
+   "why": "17 里有三个 5，还剩 2；`%` 给出余数。"
+  }
+ ]
+}

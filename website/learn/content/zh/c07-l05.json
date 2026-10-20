@@ -1,0 +1,97 @@
+{
+ "title": "运算符重载",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "你可以对自己的类型使用 `+`、`-`、`*`、`==`、`<` 这样的运算符。在 Greengold 中，运算符对应**特定的方法名**：`+` → `add`，`-` → `sub`，`*` → `mul`，`/` → `div`，`%` → `rem`，`-x` → `neg`，`==` → `eq`，`<` → `lt`。`!=`、`>`、`<=`、`>=` 会由它们自动推导。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Vec2:",
+    "    x: f64",
+    "    y: f64",
+    "",
+    "impl Vec2:",
+    "    fn add(self, o: Vec2) -> Vec2:",
+    "        return Vec2{ x: self.x + o.x, y: self.y + o.y }",
+    "",
+    "    fn sub(self, o: Vec2) -> Vec2:",
+    "        return Vec2{ x: self.x - o.x, y: self.y - o.y }",
+    "",
+    "    fn neg(self) -> Vec2:",
+    "        return Vec2{ x: -self.x, y: -self.y }",
+    "",
+    "    fn eq(self, o: Vec2) -> bool:",
+    "        return self.x == o.x and self.y == o.y",
+    "",
+    "fn main():",
+    "    v1 = Vec2{ x: 3.0, y: 4.0 }",
+    "    v2 = Vec2{ x: 1.0, y: 2.0 }",
+    "    v3 = v1 + v2",
+    "    v4 = v1 - v2",
+    "    inv = -v1",
+    "    print(v3.x, v3.y)",
+    "    print(v4.x, v4.y)",
+    "    print(inv.x, inv.y)",
+    "    print(v1 == v2, v1 != v2)"
+   ],
+   "run": true,
+   "output": [
+    "4 6",
+    "2 2",
+    "-3 -4",
+    "false true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l05-x1",
+   "prompt": "给 `Money` 结构体（`cents: i32`）添加 `add` 和 `lt` 方法。输出 `Money{ cents: 250 } + Money{ cents: 175 }` 的和，以及第一个 `Money` 是否小于第二个。",
+   "starter": [
+    "struct Money:",
+    "    cents: i32",
+    "",
+    "fn main():",
+    "    a = Money{ cents: 250 }",
+    "    b = Money{ cents: 175 }",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Money:",
+    "    cents: i32",
+    "",
+    "impl Money:",
+    "    fn add(self, o: Money) -> Money:",
+    "        return Money{ cents: self.cents + o.cents }",
+    "",
+    "    fn lt(self, o: Money) -> bool:",
+    "        return self.cents < o.cents",
+    "",
+    "fn main():",
+    "    a = Money{ cents: 250 }",
+    "    b = Money{ cents: 175 }",
+    "    total = a + b",
+    "    print(total.cents)",
+    "    print(a < b)"
+   ],
+   "hint": "在 `impl Money:` 中写 `fn add(self, o: Money) -> Money` 和 `fn lt(self, o: Money) -> bool`。",
+   "expected": [
+    "425",
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l05-q1",
+   "q": "要支持 `a - b`，应定义哪个方法？",
+   "options": [
+    "`minus`",
+    "`sub`",
+    "`diff`"
+   ],
+   "answer": 1,
+   "why": "`-` 运算符对应 `sub` 方法。"
+  }
+ ]
+}

@@ -5,7 +5,11 @@
    "only": "beginner",
    "title": {
     "tr": "Programlamaya giriş",
-    "en": "Introduction to programming"
+    "en": "Introduction to programming",
+    "es": "Introducción a la programación",
+    "de": "Einführung in die Programmierung",
+    "ru": "Введение в программирование",
+    "zh": "编程入门"
    },
    "lessons": [
     "c00-l01",
@@ -19,7 +23,11 @@
    "id": "c01",
    "title": {
     "tr": "Temeller ve tipler",
-    "en": "Basics and types"
+    "en": "Basics and types",
+    "es": "Fundamentos y tipos",
+    "de": "Grundlagen und Typen",
+    "ru": "Основы и типы",
+    "zh": "基础与类型"
    },
    "lessons": [
     "c01-l01",
@@ -34,7 +42,11 @@
    "id": "c02",
    "title": {
     "tr": "Kontrol akışı",
-    "en": "Control flow"
+    "en": "Control flow",
+    "es": "Control de flujo",
+    "de": "Kontrollfluss",
+    "ru": "Управление потоком выполнения",
+    "zh": "控制流"
    },
    "lessons": [
     "c02-l01",
@@ -49,7 +61,11 @@
    "id": "c03",
    "title": {
     "tr": "Fonksiyonlar",
-    "en": "Functions"
+    "en": "Functions",
+    "es": "Funciones",
+    "de": "Funktionen",
+    "ru": "Функции",
+    "zh": "函数"
    },
    "lessons": [
     "c03-l01",
@@ -62,7 +78,11 @@
    "id": "c04",
    "title": {
     "tr": "Veri yapıları ve metotlar",
-    "en": "Data structures and methods"
+    "en": "Data structures and methods",
+    "es": "Estructuras de datos y métodos",
+    "de": "Datenstrukturen und Methoden",
+    "ru": "Структуры данных и методы",
+    "zh": "数据结构与方法"
    },
    "lessons": [
     "c04-l01",
@@ -77,7 +97,11 @@
    "id": "c05",
    "title": {
     "tr": "Sahiplik, modlar ve bellek",
-    "en": "Ownership, modes and memory"
+    "en": "Ownership, modes and memory",
+    "es": "Propiedad, modos y memoria",
+    "de": "Besitz, Modi und Speicher",
+    "ru": "Владение, режимы и память",
+    "zh": "所有权、模式与内存"
    },
    "lessons": [
     "c05-l01",
@@ -93,7 +117,11 @@
    "id": "c06",
    "title": {
     "tr": "Enum ve desen eşleştirme",
-    "en": "Enums and pattern matching"
+    "en": "Enums and pattern matching",
+    "es": "Enums y coincidencia de patrones",
+    "de": "Enums und Mustererkennung",
+    "ru": "Перечисления и сопоставление с образцом",
+    "zh": "枚举与模式匹配"
    },
    "lessons": [
     "c06-l01",
@@ -108,7 +136,11 @@
    "id": "c07",
    "title": {
     "tr": "Generics, feature'lar ve operatörler",
-    "en": "Generics, features and operators"
+    "en": "Generics, features and operators",
+    "es": "Genéricos, features y operadores",
+    "de": "Generics, Features und Operatoren",
+    "ru": "Обобщения, фичи и операторы",
+    "zh": "泛型、Feature 与运算符"
    },
    "lessons": [
     "c07-l01",
@@ -122,7 +154,11 @@
    "id": "c08",
    "title": {
     "tr": "Hata yönetimi ve prelude",
-    "en": "Error handling and the prelude"
+    "en": "Error handling and the prelude",
+    "es": "Gestión de errores y el prelude",
+    "de": "Fehlerbehandlung und das Prelude",
+    "ru": "Обработка ошибок и prelude",
+    "zh": "错误处理与 prelude"
    },
    "lessons": [
     "c08-l01",
@@ -138,7 +174,11 @@
    "id": "c09",
    "title": {
     "tr": "Lambdalar ve fonksiyon değerleri",
-    "en": "Lambdas and function values"
+    "en": "Lambdas and function values",
+    "es": "Lambdas y valores de función",
+    "de": "Lambdas und Funktionswerte",
+    "ru": "Лямбды и значения-функции",
+    "zh": "Lambda 与函数值"
    },
    "lessons": [
     "c09-l01",
@@ -153,7 +193,11 @@
    "id": "c10",
    "title": {
     "tr": "Standart kütüphane turu",
-    "en": "A tour of the standard library"
+    "en": "A tour of the standard library",
+    "es": "Un recorrido por la biblioteca estándar",
+    "de": "Ein Rundgang durch die Standardbibliothek",
+    "ru": "Обзор стандартной библиотеки",
+    "zh": "标准库巡礼"
    },
    "lessons": [
     "c10-l01",
@@ -172,7 +216,11 @@
    "id": "c11",
    "title": {
     "tr": "gg araçları ve proje yönetimi",
-    "en": "The gg tools and project management"
+    "en": "The gg tools and project management",
+    "es": "Las herramientas gg y la gestión de proyectos",
+    "de": "Die gg-Werkzeuge und Projektverwaltung",
+    "ru": "Инструменты gg и управление проектом",
+    "zh": "gg 工具与项目管理"
    },
    "lessons": [
     "c11-l01",
@@ -187,7 +235,11 @@
    "id": "c12",
    "title": {
     "tr": "Eşzamanlılık",
-    "en": "Concurrency"
+    "en": "Concurrency",
+    "es": "Concurrencia",
+    "de": "Nebenläufigkeit",
+    "ru": "Параллелизм",
+    "zh": "并发"
    },
    "lessons": [
     "c12-l01",
@@ -201,7 +253,11 @@
    "id": "c13",
    "title": {
     "tr": "Sistem programlama: FFI ve unsafe",
-    "en": "Systems programming: FFI and unsafe"
+    "en": "Systems programming: FFI and unsafe",
+    "es": "Programación de sistemas: FFI y unsafe",
+    "de": "Systemprogrammierung: FFI und unsafe",
+    "ru": "Системное программирование: FFI и unsafe",
+    "zh": "系统编程：FFI 与 unsafe"
    },
    "lessons": [
     "c13-l01",
@@ -214,7 +270,11 @@
    "id": "c14",
    "title": {
     "tr": "Alan kütüphaneleri: finans, güvenlik, gömülü",
-    "en": "Domain libraries: finance, security, embedded"
+    "en": "Domain libraries: finance, security, embedded",
+    "es": "Bibliotecas de dominio: finanzas, seguridad, embebidos",
+    "de": "Fachbibliotheken: Finanzen, Sicherheit, Embedded",
+    "ru": "Предметные библиотеки: финансы, безопасность, встраиваемые системы",
+    "zh": "领域库：金融、安全、嵌入式"
    },
    "lessons": [
     "c14-l01",

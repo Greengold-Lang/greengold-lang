@@ -1,0 +1,73 @@
+{
+ "title": "if, elif, else",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Скобки вокруг условия не нужны; в конце пишется `:`, а строки ниже сдвигаются на 4 пробела. Для нескольких случаев цепляйте `elif`; `else` ловит всё остальное."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 85",
+    "    if score >= 90:",
+    "        print(\"Grade: A\")",
+    "    elif score >= 80:",
+    "        print(\"Grade: B\")",
+    "    elif score >= 70:",
+    "        print(\"Grade: C\")",
+    "    else:",
+    "        print(\"Grade: F\")"
+   ],
+   "run": true,
+   "output": [
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Выполняется первая истинная ветка, остальные пропускаются. Поэтому большие пороги ставят первыми."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l01-x1",
+   "prompt": "Завершите цепочку: выведите `Cold`, если `temperature` меньше 10, `Hot`, если больше 25, и `Mild` в остальных случаях.",
+   "starter": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"?\")",
+    "    elif temperature > 25:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"Cold\")",
+    "    elif temperature > 25:",
+    "        print(\"Hot\")",
+    "    else:",
+    "        print(\"Mild\")"
+   ],
+   "hint": "Замените три `?` на `Cold`, `Hot`, `Mild` в таком порядке.",
+   "expected": [
+    "Cold"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l01-q1",
+   "q": "Если истинны несколько веток, сколько из них выполнится?",
+   "options": [
+    "Все",
+    "Только первая истинная",
+    "Только последняя"
+   ],
+   "answer": 1,
+   "why": "Цепочка `if`/`elif` останавливается на первой истинной ветке."
+  }
+ ]
+}

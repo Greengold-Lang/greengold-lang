@@ -77,3 +77,4 @@
 .chapter-card a { padding: 4px 10px; border-radius: 8px; margin: 3px 8px 3px 0; text-decoration: none; }
 .lesson-nav .btn:disabled { opacity: .45; cursor: not-allowed; }
 .finish-hint { margin: 8px 0 0; text-align: right; color: var(--muted); font-size: .9rem; }
+.learn-tools select { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--bg-soft); color: var(--text); font: inherit; }

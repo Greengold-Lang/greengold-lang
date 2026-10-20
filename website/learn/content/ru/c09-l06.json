@@ -1,0 +1,82 @@
+{
+ "title": "Практика: сортировка с лямбдой",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`sort.sort_by` из стандартной библиотеки сортирует список по заданному вами правилу «идёт раньше». Правило пишется лямбдой: верните `true`, если `a` должно идти раньше `b`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a > b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "5",
+    "2",
+    "1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l06-x1",
+   "prompt": "Измените лямбду, чтобы отсортировать тот же список **от меньшего к большему**.",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a > b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a < b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "hint": "`a < b` вместо `a > b`.",
+   "expected": [
+    "1",
+    "2",
+    "5",
+    "9"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l06-q1",
+   "q": "Что означает, что лямбда, переданная в `sort_by`, возвращает `true`?",
+   "options": [
+    "`a` идёт раньше `b`",
+    "`a` удаляется",
+    "Список заканчивается"
+   ],
+   "answer": 0,
+   "why": "Лямбда отвечает на вопрос «идёт раньше?»."
+  }
+ ]
+}

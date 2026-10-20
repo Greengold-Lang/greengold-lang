@@ -1,0 +1,93 @@
+{
+ "title": "Parameter und Ergebnisse",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Funktionen können einander aufrufen; das Ergebnis der einen kann Argument der anderen sein. `return` verlässt die Funktion sofort und dient deshalb auch für eine **frühe Rückkehr**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn abs_value(x: i32) -> i32:",
+    "    if x < 0:",
+    "        return -x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(square(abs_value(-4)))"
+   ],
+   "run": true,
+   "output": [
+    "16"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Funktionen, die `bool` zurückgeben, lesen sich wie Fragen (`is_even`, `is_positive`) und passen gut in ein `if`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn is_even(n: i32) -> bool:",
+    "    return n % 2 == 0",
+    "",
+    "fn main():",
+    "    for i in 1..=4:",
+    "        if is_even(i):",
+    "            print(i, \"is even\")",
+    "        else:",
+    "            print(i, \"is odd\")"
+   ],
+   "run": true,
+   "output": [
+    "1 is odd",
+    "2 is even",
+    "3 is odd",
+    "4 is even"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l02-x1",
+   "prompt": "Schreibe `max_of(a, b)`: Sie gibt die größere Zahl zurück.",
+   "starter": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "solution": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "hint": "Gib `a` zurück, wenn `a > b`, sonst `b`.",
+   "expected": [
+    "12",
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l02-q1",
+   "q": "Was passiert, wenn `return` mitten in einer Funktion ausgeführt wird?",
+   "options": [
+    "Die Funktion endet sofort",
+    "Die nächste Zeile wird ausgeführt",
+    "Es ist ein Fehler"
+   ],
+   "answer": 0,
+   "why": "`return` verlässt die Funktion sofort; die Zeilen darunter laufen nicht."
+  }
+ ]
+}

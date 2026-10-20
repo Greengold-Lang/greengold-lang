@@ -1,0 +1,60 @@
+{
+ "title": "作为表达式的 if",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`if` 也可以产生一个值：`if 条件 then A else B`。结果可以直接赋给变量。`else` 是必须的，所有分支必须是**相同**的类型。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    status = if age >= 18 then \"Adult\" else \"Child\"",
+    "    print(status)",
+    "",
+    "    score = 75",
+    "    grade = if score >= 90 then \"A\" elif score >= 70 then \"B\" else \"C\"",
+    "    print(\"Grade:\", grade)"
+   ],
+   "run": true,
+   "output": [
+    "Adult",
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l02-x1",
+   "prompt": "用 `if ... then ... else` 写变量 `sign`：`n` 为负时是 `-1`，否则是 `1`。然后输出它。",
+   "starter": [
+    "fn main():",
+    "    n = -7",
+    "    sign = 0",
+    "    print(sign)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = -7",
+    "    sign = if n < 0 then -1 else 1",
+    "    print(sign)"
+   ],
+   "hint": "`sign = if n < 0 then -1 else 1`",
+   "expected": [
+    "-1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l02-q1",
+   "q": "`if` 表达式中必须写 `else` 吗？",
+   "options": [
+    "不必",
+    "必须",
+    "只有存在 `elif` 时"
+   ],
+   "answer": 1,
+   "why": "产生值的 `if` 必须在每种情况下都给出一个值。"
+  }
+ ]
+}

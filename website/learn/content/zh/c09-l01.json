@@ -1,0 +1,80 @@
+{
+ "title": "函数作为值",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "在 Greengold 中，函数也是值：你可以把它存进变量、作为参数传递，或放进结构体字段。函数类型写作 `fn(T1, T2) -> R`；因为它很长，通常用 `type` 给它起个名字。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn multiply(a: i32, b: i32) -> i32:",
+    "    return a * b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    current: MathOp = multiply",
+    "    print(apply_op(current, 6, 7))",
+    "    print(apply_op(add, 6, 7))"
+   ],
+   "run": true,
+   "output": [
+    "42",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`apply_op` 并不知道自己要执行哪种运算；由传入的函数决定。这是把行为当作参数传递的基本方式。"
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l01-x1",
+   "prompt": "编写一个 `subtract` 函数，并输出 `apply_op(subtract, 10, 4)` 的结果。",
+   "starter": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(apply_op(subtract, 10, 4))"
+   ],
+   "hint": "写 `fn subtract(a: i32, b: i32) -> i32:`，并在 `main` 中传入它。",
+   "expected": [
+    "6"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l01-q1",
+   "q": "`fn(i32, i32) -> i32` 是什么类型？",
+   "options": [
+    "一种数字类型",
+    "接收两个 `i32` 并返回 `i32` 的函数的类型",
+    "一个结构体"
+   ],
+   "answer": 1,
+   "why": "函数类型描述参数类型和返回类型。"
+  }
+ ]
+}

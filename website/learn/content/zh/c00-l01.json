@@ -1,0 +1,75 @@
+{
+ "title": "什么是程序？",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**程序**是一段文本，它一步一步地告诉计算机该做什么。在 Greengold 中，你把它写在 `.gg` 文件里，编译器会把它转换成计算机能理解的代码。"
+  },
+  {
+   "t": "p",
+   "text": "每个 Greengold 程序都从名为 `main` 的**函数**开始。函数内部的每一行缩进 4 个空格。缩进表明哪些行属于这个函数。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "run": true,
+   "output": [
+    "Hello, world!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`print` 会在屏幕上输出内容。引号里的文字叫做**字符串**（string）。以 `#` 开头的行是**注释**：计算机会忽略它，它是写给人看的备注。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    # This line is a comment",
+    "    print(\"First line\")",
+    "    print(\"Second line\")"
+   ],
+   "run": true,
+   "output": [
+    "First line",
+    "Second line"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "各行按从上到下的顺序依次执行。"
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l01-x1",
+   "prompt": "修改程序，让它输出 `Hello, Greengold!`。",
+   "starter": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"Hello, Greengold!\")"
+   ],
+   "hint": "只需要修改引号里的文字。",
+   "expected": [
+    "Hello, Greengold!"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l01-q1",
+   "q": "Greengold 程序从哪个函数开始？",
+   "options": [
+    "start",
+    "main",
+    "begin"
+   ],
+   "answer": 1,
+   "why": "程序总是从 `main` 开始执行。"
+  }
+ ]
+}

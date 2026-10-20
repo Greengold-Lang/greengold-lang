@@ -1,0 +1,42 @@
+{
+ "title": "Archivos: std.fs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.fs` trabaja con el sistema de archivos independientemente del sistema operativo. Escribir, `fs.write_string_to_file(ruta, texto)`, da un `bool`; leer, `fs.read_file_to_string(ruta)`, da un `Optional[string]`; también existen `fs.file_exists` y `fs.remove_file`. Si necesitas información de error más detallada, `File.open`/`File.create` de `std.io` dan un `Result`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.fs",
+    "",
+    "fn main():",
+    "    path = \"record.txt\"",
+    "    if fs.write_string_to_file(path, \"First line\\nSecond line\"):",
+    "        print(\"written\")",
+    "    match fs.read_file_to_string(path):",
+    "        Valid(text):",
+    "            print(text.as_str())",
+    "        None:",
+    "            print(\"could not read\")",
+    "    if fs.file_exists(path):",
+    "        fs.remove_file(path)",
+    "        print(\"cleaned up\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l10-q1",
+   "q": "¿Qué devuelve `fs.read_file_to_string` cuando no se encuentra el archivo?",
+   "options": [
+    "`None`",
+    "Una cadena vacía",
+    "El programa se cae"
+   ],
+   "answer": 0,
+   "why": "El tipo de retorno es `Optional[string]`; la ausencia se indica con `None`."
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+{
+ "title": "Инструменты гарантий и поддержка редактора",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Для ПО, которому нужны безопасность и качество, `gg` предлагает дополнительные проверки:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg check --profile safety main.gg   # also rejects unsafe, panic, recursion, heap use,",
+    "                                    # unbounded loops and mutable statics",
+    "gg test --coverage                  # statement, decision, condition and MC/DC coverage",
+    "gg coverage --annotate              # list what never ran",
+    "gg fuzz main.gg                     # run fn fuzz_target(data: []u8) on mutated inputs",
+    "gg sbom main.gg                     # software bill of materials (CycloneDX or SPDX)",
+    "gg repro main.gg                    # build twice, compare the bytes (reproducible build)",
+    "gg unsafe-audit main.gg             # every unsafe block, asm, foreign function and static"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Чтобы изучить стадии компилятора, есть `gg emit-ll` (LLVM IR), `gg emit-bc` (битовый код), `gg ast` (синтаксическое дерево) и `gg attrs` (использования `@атрибутов`, в JSON)."
+  },
+  {
+   "t": "p",
+   "text": "**Редактор:** расширение Greengold для VS Code со встроенным языковым сервером (LSP) показывает ошибки по мере набора, переход к определению (`F12`), документацию при наведении, автодополнение после `.`, форматирование по `Shift+Alt+F`, исправления компилятора в меню лампочки и кнопки Run/Release/Build. При сохранении файла также применяются исправления `safe`."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q1",
+   "q": "Какая команда перечисляет каждый блок `unsafe` программы?",
+   "options": [
+    "`gg unsafe-audit`",
+    "`gg fix`",
+    "`gg doctor`"
+   ],
+   "answer": 0,
+   "why": "`unsafe-audit` собирает места, где вы должны вручную обеспечивать безопасность памяти."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q2",
+   "q": "Что отвергает `gg check --profile safety`?",
+   "options": [
+    "Только длинные строки",
+    "Такие вещи, как `unsafe`, `panic`, рекурсия и использование кучи",
+    "Ничего"
+   ],
+   "answer": 1,
+   "why": "Профиль безопасности отключает возможности, безопасность которых трудно доказать."
+  }
+ ]
+}

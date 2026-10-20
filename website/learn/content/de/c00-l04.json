@@ -1,0 +1,86 @@
+{
+ "title": "Dinge wiederholen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Um dieselbe Arbeit viele Male zu erledigen, verwendest du eine **Schleife**. `for i in 0..5:` führt den eingerückten Teil fünfmal aus, wobei `i` die Werte 0, 1, 2, 3, 4 hat (5 ist nicht enthalten)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..5:",
+    "        print(\"Round\", i)"
+   ],
+   "run": true,
+   "output": [
+    "Round 0",
+    "Round 1",
+    "Round 2",
+    "Round 3",
+    "Round 4"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Eine `while`-Schleife läuft so lange weiter, wie die Bedingung wahr ist. Wenn du vergisst, sie irgendwann falsch zu machen, endet die Schleife nie!"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 3",
+    "    while n > 0:",
+    "        print(n)",
+    "        n -= 1",
+    "    print(\"Go!\")"
+   ],
+   "run": true,
+   "output": [
+    "3",
+    "2",
+    "1",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`n -= 1` ist die Kurzform von `n = n - 1`; `+=` erhöht auf dieselbe Weise."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l04-x1",
+   "prompt": "Addiere die Zahlen von 1 bis 5 und gib die Summe aus. (`1..=5` enthält sowohl 1 als auch 5.)",
+   "starter": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        pass",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        total += i",
+    "    print(total)"
+   ],
+   "hint": "Ersetze `pass` durch `total += i`.",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l04-q1",
+   "q": "Wie oft läuft `for i in 0..3:`?",
+   "options": [
+    "2",
+    "3",
+    "4"
+   ],
+   "answer": 1,
+   "why": "`i` ist 0, 1 und 2; die 3 ist nicht enthalten."
+  }
+ ]
+}

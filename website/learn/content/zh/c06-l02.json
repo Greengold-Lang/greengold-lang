@@ -1,0 +1,99 @@
+{
+ "title": "携带数据的变体",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "在 Greengold 中，枚举变体可以**携带数据**，而且每个变体携带的内容可以不同。这样的值叫做“代数数据类型”。在 `match` 里，你在模式中给数据起名字。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Shape:",
+    "    Circle(f64)",
+    "    Rectangle(f64, f64)",
+    "    Point",
+    "",
+    "fn describe(s: Shape):",
+    "    match s:",
+    "        Shape.Circle(radius):",
+    "            print(\"circle, radius\", radius)",
+    "        Shape.Rectangle(w, h):",
+    "            print(\"rectangle\", w, \"x\", h)",
+    "        Shape.Point:",
+    "            print(\"a point\")",
+    "",
+    "fn main():",
+    "    describe(Shape.Circle(5.0))",
+    "    describe(Shape.Rectangle(10.0, 4.0))",
+    "    describe(Shape.Point)"
+   ],
+   "run": true,
+   "output": [
+    "circle, radius 5",
+    "rectangle 10 x 4",
+    "a point"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "不关心的字段可以用 `_` 忽略：`Shape.Rectangle(w, _):`。"
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l02-x1",
+   "prompt": "补全 `area(s)`：矩形用 `w * h`，正方形用 `side * side`，`Empty` 返回 0。输出 `Rect(3, 4)` 的面积。",
+   "starter": [
+    "enum Figure:",
+    "    Rect(i32, i32)",
+    "    Square(i32)",
+    "    Empty",
+    "",
+    "fn area(s: Figure) -> i32:",
+    "    match s:",
+    "        Figure.Rect(w, h):",
+    "            return 0",
+    "        Figure.Square(side):",
+    "            return 0",
+    "        Figure.Empty:",
+    "            return 0",
+    "",
+    "fn main():",
+    "    print(area(Figure.Rect(3, 4)))"
+   ],
+   "solution": [
+    "enum Figure:",
+    "    Rect(i32, i32)",
+    "    Square(i32)",
+    "    Empty",
+    "",
+    "fn area(s: Figure) -> i32:",
+    "    match s:",
+    "        Figure.Rect(w, h):",
+    "            return w * h",
+    "        Figure.Square(side):",
+    "            return side * side",
+    "        Figure.Empty:",
+    "            return 0",
+    "",
+    "fn main():",
+    "    print(area(Figure.Rect(3, 4)))"
+   ],
+   "hint": "把前两个 `return 0` 改成相应的计算。",
+   "expected": [
+    "12"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l02-q1",
+   "q": "在模式 `Shape.Rectangle(w, _)` 中，`_` 起什么作用？",
+   "options": [
+    "忽略第二个字段",
+    "这是个错误",
+    "把第二个字段设为 0"
+   ],
+   "answer": 0,
+   "why": "`_` 是通配符：不需要那个值。"
+  }
+ ]
+}

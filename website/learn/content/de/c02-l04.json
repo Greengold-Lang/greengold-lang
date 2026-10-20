@@ -1,0 +1,96 @@
+{
+ "title": "for und Bereiche",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`for i in a..b` zählt von `a` bis `b`; **`b` ist nicht enthalten**. Schreibe `..=`, um das Ende einzuschließen. Eine einfache Zahl bedeutet `0..n`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..3:",
+    "        print(\"a\", i)",
+    "    for i in 1..=3:",
+    "        print(\"b\", i)",
+    "    for i in 2:",
+    "        print(\"c\", i)"
+   ],
+   "run": true,
+   "output": [
+    "a 0",
+    "a 1",
+    "a 2",
+    "b 1",
+    "b 2",
+    "b 3",
+    "c 0",
+    "c 1"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`step` legt die Schrittweite fest; eine negative Schrittweite zählt rückwärts."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..10 step 3:",
+    "        print(i)",
+    "    for i in 10..0 step -4:",
+    "        print(\"back\", i)"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "3",
+    "6",
+    "9",
+    "back 10",
+    "back 6",
+    "back 2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l04-x1",
+   "prompt": "Zähle von 10 bis 1 rückwärts und gib jede Zahl aus.",
+   "starter": [
+    "fn main():",
+    "    for i in 1..=10:",
+    "        print(i)"
+   ],
+   "solution": [
+    "fn main():",
+    "    for i in 10..0 step -1:",
+    "        print(i)"
+   ],
+   "hint": "`10..0 step -1` geht von 10 bis 1 (0 ist nicht enthalten).",
+   "expected": [
+    "10",
+    "9",
+    "8",
+    "7",
+    "6",
+    "5",
+    "4",
+    "3",
+    "2",
+    "1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l04-q1",
+   "q": "Welche Zahlen liefert `for i in 1..4:`?",
+   "options": [
+    "1 2 3 4",
+    "1 2 3",
+    "0 1 2 3"
+   ],
+   "answer": 1,
+   "why": "Der Anfang ist enthalten, das Ende nicht; mit `..=` schließt du es ein."
+  }
+ ]
+}

@@ -1,0 +1,100 @@
+{
+ "title": "Der Compiler findet den Modus",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Gute Nachricht: Meistens **musst du diese drei Modi nicht schreiben**. Bei einem Typ mit Heap-Besitz (`List`, `string`, `Box` und Structs, die sie enthalten) schaut der Compiler, wenn du am Parameter keinen Modus schreibst, **in den Funktionsrumpf und erkennt den Modus selbst**:"
+  },
+  {
+   "t": "p",
+   "text": "Wenn der Rumpf den Parameter nur **liest** → `read`; wenn er ihn **ändert** → `lend`; wenn er ihn zu einem anderen Besitzer **verschiebt** → `consume`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn add(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn wrap(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add(v)",
+    "    add(v)",
+    "    print(total(v))",
+    "    b = wrap(v)",
+    "    print(b.items.len)"
+   ],
+   "run": true,
+   "output": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "In keiner der drei Funktionen steht ein Modus. `add` wurde zu `lend`, weil es die Liste ändert, `total` wurde zu `read`, weil es nur liest, und `wrap` wurde zu `consume`, weil es die Liste in `Bag` steckt. Nach `wrap(v)` kann die Variable `v` nicht mehr benutzt werden; versuchst du es, meldet der Compiler den Fehler und sagt dir auch, **welchen Modus er erkannt hat und warum**."
+  },
+  {
+   "t": "p",
+   "text": "Bei Copy-Typen wie Zahlen und einfachen Structs wird der Wert, wenn kein Modus geschrieben ist, **kopiert** und kann innerhalb der Funktion nicht geändert werden; um ihn an Ort und Stelle zu ändern, schreibst du `lend` aus (`n: lend i32`). Du kannst den Modus immer selbst schreiben (zur Lesbarkeit oder um die Entscheidung festzulegen)."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l05-x1",
+   "prompt": "Schreibe ohne einen Modus `keep(xs: List[i32]) -> Bag`: Es steckt die Liste in ein `Bag` (der Compiler erkennt das als `consume`). Rufe es in `main` mit einer Liste aus 3 Elementen auf und gib `b.items.len` aus.",
+   "starter": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn keep(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    b = keep(v)",
+    "    print(b.items.len)"
+   ],
+   "hint": "`return Bag{ items: xs }`; dann `b = keep(v)` und `print(b.items.len)`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l05-q1",
+   "q": "Du hast an einem `List`-Parameter mit Heap-Besitz keinen Modus geschrieben, und der Rumpf ruft `xs.push(1)` auf. Welchen Modus erkennt der Compiler?",
+   "options": [
+    "`read`",
+    "`lend`",
+    "`consume`"
+   ],
+   "answer": 1,
+   "why": "Der Rumpf ändert die Liste, also ist der Modus `lend`; du musst ihn nicht schreiben."
+  }
+ ]
+}

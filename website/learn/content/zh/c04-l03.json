@@ -1,0 +1,96 @@
+{
+ "title": "元组",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**元组**无需定义结构体，就能把几个值放在一起：`(100, 3.14, \"Greengold\")`。用 `.0`、`.1`、`.2` 访问元素。它最常见的用途是从函数返回多个值。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn divmod(a: i32, b: i32) -> (i32, i32):",
+    "    return (a / b, a % b)",
+    "",
+    "fn main():",
+    "    res = divmod(17, 5)",
+    "    print(\"quotient:\", res.0, \"remainder:\", res.1)"
+   ],
+   "run": true,
+   "output": [
+    "quotient: 3 remainder: 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**解构**可以在一行中把元组拆成独立的变量。不需要的元素可以用 `_` 跳过。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn divmod(a: i32, b: i32) -> (i32, i32):",
+    "    return (a / b, a % b)",
+    "",
+    "fn user() -> (i32, str, str):",
+    "    return (101, \"Ali Veli\", \"ali@example.com\")",
+    "",
+    "fn main():",
+    "    quotient, remainder = divmod(27, 4)",
+    "    print(quotient, remainder)",
+    "    id, _, email = user()",
+    "    print(id, email)"
+   ],
+   "run": true,
+   "output": [
+    "6 3",
+    "101 ali@example.com"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l03-x1",
+   "prompt": "让 `min_max(a, b, c)` 返回一个元组：最小数和最大数。把它解构，并输出 `3 9`（针对 `min_max(5, 3, 9)`）。",
+   "starter": [
+    "fn min_max(a: i32, b: i32, c: i32) -> (i32, i32):",
+    "    return (0, 0)",
+    "",
+    "fn main():",
+    "    lo, hi = min_max(5, 3, 9)",
+    "    print(lo, hi)"
+   ],
+   "solution": [
+    "fn min_max(a: i32, b: i32, c: i32) -> (i32, i32):",
+    "    lo = a",
+    "    hi = a",
+    "    if b < lo:",
+    "        lo = b",
+    "    if c < lo:",
+    "        lo = c",
+    "    if b > hi:",
+    "        hi = b",
+    "    if c > hi:",
+    "        hi = c",
+    "    return (lo, hi)",
+    "",
+    "fn main():",
+    "    lo, hi = min_max(5, 3, 9)",
+    "    print(lo, hi)"
+   ],
+   "hint": "让 `lo` 和 `hi` 都从 `a` 开始，通过与 `b`、`c` 比较来更新它们。",
+   "expected": [
+    "3 9"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l03-q1",
+   "q": "当 `t = (7, \"a\")` 时，`t.1` 是什么？",
+   "options": [
+    "7",
+    "\"a\"",
+    "一个错误"
+   ],
+   "answer": 1,
+   "why": "计数从 0 开始：`.0` 是第一个元素，`.1` 是第二个。"
+  }
+ ]
+}

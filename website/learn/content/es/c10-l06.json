@@ -1,0 +1,70 @@
+{
+ "title": "Números aleatorios: std.rand",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.rand` da un generador que parte de una **semilla** y siempre produce la misma secuencia con la misma semilla: `rand.rng_new(42)`. `below(n)` da un número de 0 a `n-1`, `range(a, b)` uno desde `a` hasta `b` sin incluir `b`, `next_f64()` uno entre 0 y 1. Para aleatoriedad real existe `rand.rng_from_entropy()` o `secure_u64()` (usa `secure_*` para criptografía)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(42)",
+    "    for i in 0..3:",
+    "        print(r.below(100))",
+    "    print(r.range(1, 6))"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "98",
+    "46",
+    "1"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Mantener fija la semilla es la forma más fácil de obtener resultados reproducibles en pruebas y juegos."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l06-x1",
+   "prompt": "Con la semilla 7, tira un dado (1–6) tres veces e imprime los resultados. El límite superior se excluye, así que usa `range(1, 7)`.",
+   "starter": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    for i in 0..3:",
+    "        print(r.range(1, 7))"
+   ],
+   "hint": "Imprime `r.range(1, 7)` en un bucle.",
+   "expected": [
+    "5",
+    "3",
+    "1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l06-q1",
+   "q": "¿Qué pasa si `rng_new(42)` se ejecuta dos veces con la misma semilla?",
+   "options": [
+    "Produce secuencias distintas",
+    "Produce la misma secuencia",
+    "Es un error"
+   ],
+   "answer": 1,
+   "why": "Es un generador pseudoaleatorio: la semilla decide la secuencia."
+  }
+ ]
+}

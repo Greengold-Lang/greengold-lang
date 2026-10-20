@@ -1,0 +1,78 @@
+{
+ "title": "Expresiones regulares: std.regex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`regex.compile(patrón)` da un `Result[Regex, string]` (el patrón puede estar mal). `is_match` dice si hay coincidencia, `find` encuentra la primera (`Optional[Match]`), `find_all` las encuentra todas, `replace_all` sustituye; `Match.text()` da el texto coincidente."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[0-9]+\"):",
+    "        Ok(re):",
+    "            print(re.is_match(\"order 42\"))",
+    "            for m in re.find_all(\"a1 b22 c333\"):",
+    "                print(m.text().as_str())",
+    "            print(re.replace_all(\"a1 b22\", \"#\").as_str())",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "1",
+    "22",
+    "333",
+    "a# b#"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l08-x1",
+   "prompt": "Busca el patrón `[a-z]+` en `\"Hi 42 you\"` e imprime el texto de la primera coincidencia (`find` y `Valid`).",
+   "starter": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            print(\"?\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "solution": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            match re.find(\"Hi 42 you\"):",
+    "                Valid(m):",
+    "                    print(m.text().as_str())",
+    "                None:",
+    "                    print(\"no match\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "hint": "`re.find(...)` devuelve un `Optional`; ábrelo con `match`.",
+   "expected": [
+    "i"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l08-q1",
+   "q": "¿Por qué `regex.compile` devuelve un `Result`?",
+   "options": [
+    "El patrón puede estar escrito mal",
+    "Porque es lento",
+    "Porque el texto puede estar vacío"
+   ],
+   "answer": 0,
+   "why": "Un patrón inválido vuelve como un valor de error."
+  }
+ ]
+}

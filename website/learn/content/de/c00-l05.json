@@ -1,0 +1,81 @@
+{
+ "title": "Funktionen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Um eine Aufgabe einmal zu schreiben und oft zu verwenden, definieren wir eine **Funktion**. Sie beginnt mit `fn` und hat einen Namen und Klammern. `main` ist ebenfalls eine Funktion; die anderen Funktionen rufen wir aus `main` heraus auf."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn greet():",
+    "    print(\"Hello!\")",
+    "    print(\"Welcome.\")",
+    "",
+    "fn main():",
+    "    greet()",
+    "    greet()"
+   ],
+   "run": true,
+   "output": [
+    "Hello!",
+    "Welcome.",
+    "Hello!",
+    "Welcome."
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Eine Funktion kann Informationen entgegennehmen (**Parameter**) und ein Ergebnis zurückgeben (`return`). Der Typ des Parameters steht nach `:`, der Rückgabetyp nach `->`. `i32` ist der Typ für ganze Zahlen; Typen lernst du im nächsten Kapitel."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn twice(x: i32) -> i32:",
+    "    return x * 2",
+    "",
+    "fn main():",
+    "    print(twice(21))"
+   ],
+   "run": true,
+   "output": [
+    "42"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l05-x1",
+   "prompt": "Vervollständige die Funktion `square`: Sie soll das Quadrat der übergebenen Zahl zurückgeben (die Zahl mal sich selbst).",
+   "starter": [
+    "fn square(x: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(square(9))"
+   ],
+   "solution": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn main():",
+    "    print(square(9))"
+   ],
+   "hint": "Ersetze `return 0` durch `return x * x`.",
+   "expected": [
+    "81"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l05-q1",
+   "q": "Welches Wort gibt aus einer Funktion ein Ergebnis zurück?",
+   "options": [
+    "give",
+    "return",
+    "print"
+   ],
+   "answer": 1,
+   "why": "`return` schickt den Wert an den Aufrufer zurück; `print` schreibt nur auf den Bildschirm."
+  }
+ ]
+}

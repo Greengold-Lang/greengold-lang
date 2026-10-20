@@ -1,0 +1,97 @@
+{
+ "title": "Результат с ошибкой: Result",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Когда важно, почему операция не удалась, используют `Result[T, E]`. `Ok(значение)` несёт успех, `Err(ошибка)` — неудачу. Ошибку обычно выражают собственным `enum`, чтобы у каждого вида ошибки было имя."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum MathError:",
+    "    DivisionByZero",
+    "    NegativeSquareRoot",
+    "",
+    "fn safe_divide(a: f64, b: f64) -> Result[f64, MathError]:",
+    "    if b == 0.0:",
+    "        return Err(MathError.DivisionByZero)",
+    "    return Ok(a / b)",
+    "",
+    "fn main():",
+    "    match safe_divide(10.0, 4.0):",
+    "        Ok(res):",
+    "            print(\"result:\", res)",
+    "        Err(e):",
+    "            print(\"error\")",
+    "    match safe_divide(10.0, 0.0):",
+    "        Ok(res):",
+    "            print(\"result:\", res)",
+    "        Err(e):",
+    "            match e:",
+    "                MathError.DivisionByZero:",
+    "                    print(\"division by zero prevented\")",
+    "                MathError.NegativeSquareRoot:",
+    "                    print(\"negative root\")"
+   ],
+   "run": true,
+   "output": [
+    "result: 2.5",
+    "division by zero prevented"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l03-x1",
+   "prompt": "Напишите `validate_age(age: i32) -> Result[i32, str]`: `Err(\"invalid age\")`, если меньше 0 или больше 150, иначе `Ok(age)`. Выведите результат для 200 и 30 через `match`.",
+   "starter": [
+    "fn validate_age(age: i32) -> Result[i32, str]:",
+    "    return Ok(age)",
+    "",
+    "fn show(age: i32):",
+    "    match validate_age(age):",
+    "        Ok(a):",
+    "            print(\"ok\", a)",
+    "        Err(msg):",
+    "            print(\"error:\", msg)",
+    "",
+    "fn main():",
+    "    show(200)",
+    "    show(30)"
+   ],
+   "solution": [
+    "fn validate_age(age: i32) -> Result[i32, str]:",
+    "    if age < 0 or age > 150:",
+    "        return Err(\"invalid age\")",
+    "    return Ok(age)",
+    "",
+    "fn show(age: i32):",
+    "    match validate_age(age):",
+    "        Ok(a):",
+    "            print(\"ok\", a)",
+    "        Err(msg):",
+    "            print(\"error:\", msg)",
+    "",
+    "fn main():",
+    "    show(200)",
+    "    show(30)"
+   ],
+   "hint": "`Err` в `if age < 0 or age > 150:`, затем `Ok(age)`.",
+   "expected": [
+    "error: invalid age",
+    "ok 30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l03-q1",
+   "q": "Когда `Result` предпочтительнее `Optional`?",
+   "options": [
+    "Никогда",
+    "Когда важна причина неудачи",
+    "Только с числами"
+   ],
+   "answer": 1,
+   "why": "`Result` несёт информацию об ошибке; `Optional` лишь говорит «ничего»."
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+{
+ "title": "Sortieren und Suchen: std.sort",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`sort.sort(liste)` sortiert eine `List` an Ort und Stelle (`T: Ord` ist nötig); `sort.sort_by(liste, regel)` sortiert nach deiner eigenen Regel; `sort.binary_search(liste, x)` sucht schnell in einer **sortierten** Liste und liefert ein `Optional[usize]` (die Position)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(40)",
+    "    v.push(10)",
+    "    v.push(30)",
+    "    v.push(20)",
+    "    sort.sort(v)",
+    "    for x in v:",
+    "        print(x)",
+    "    print(sort.is_sorted(v))",
+    "    match sort.binary_search(v, 30):",
+    "        Valid(i):",
+    "            print(\"30 is at index\", i)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "10",
+    "20",
+    "30",
+    "40",
+    "true",
+    "30 is at index 2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l04-x1",
+   "prompt": "Sortiere die Liste und gib das mittlere Element aus (das 3. vom kleinsten): `[9, 2, 7, 4, 5]`.",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(v[0])"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    sort.sort(v)",
+    "    print(v[2])"
+   ],
+   "hint": "`sort.sort(v)` und danach `v[2]`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l04-q1",
+   "q": "Wann funktioniert `binary_search` korrekt?",
+   "options": [
+    "Wenn die Liste sortiert ist",
+    "Wenn die Liste leer ist",
+    "Immer"
+   ],
+   "answer": 0,
+   "why": "Die binäre Suche setzt voraus, dass die Liste sortiert ist."
+  }
+ ]
+}

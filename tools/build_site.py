@@ -1128,6 +1128,7 @@ def build_learn() -> str:
     </div>
     <script src="playground/highlight.js"></script>
     <script src="playground/editor.js"></script>
+    <script src="learn/ui.js"></script>
     <script src="learn/learn.js"></script>"""
     return layout("learn", "learn/index.html", "Learn",
                   "Learn Greengold step by step in your browser: lessons, runnable code, exercises, and the standard library.",

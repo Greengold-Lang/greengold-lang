@@ -1,0 +1,65 @@
+{
+ "title": "哈希与编码：std.hash、std.encoding",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.hash` 提供 SHA-256/384/512、SHA-3、SHAKE、HMAC、HKDF 和 PBKDF2；代码是可移植的 Greengold，不需要 libc。字节数据以 `[]u8` 传入（`List[u8]`、数组或 `文本.as_bytes()`）。`std.encoding` 把字节数组转换为十六进制或 base64 文本。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hash",
+    "import std.encoding",
+    "",
+    "fn main():",
+    "    d = hash.sha256(\"abc\".as_bytes())",
+    "    print(encoding.hex_encode(d).as_str())"
+   ],
+   "run": true,
+   "output": [
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**绝不要用 `==` 比较**摘要或 MAC：可测量的时间差会泄露信息。请使用 `crypto.constant_time_eq`。`std.crypto` 还提供 ChaCha20-Poly1305、AES-GCM、X25519、Ed25519 以及会自我清除的 `SecretBytes`。"
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l03-x1",
+   "prompt": "计算 `\"abc\"` 和 `\"abd\"` 的 SHA-256 摘要，用 `crypto.constant_time_eq` 比较，并输出结果。",
+   "starter": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    a = hash.sha256(\"abc\".as_bytes())",
+    "    b = hash.sha256(\"abd\".as_bytes())",
+    "    print(crypto.constant_time_eq(a[..], b[..]))"
+   ],
+   "hint": "摘要是 `[32]u8` 数组；用 `a[..]` 把它们转成切片。",
+   "expected": [
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l03-q1",
+   "q": "为什么比较两个摘要时用 `constant_time_eq` 而不是 `==`？",
+   "options": [
+    "因为更短",
+    "因为时间差可能泄露信息",
+    "因为 `==` 不能用"
+   ],
+   "answer": 1,
+   "why": "恒定时间比较不会在第一个不同的字节处停止。"
+  }
+ ]
+}

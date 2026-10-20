@@ -1,0 +1,76 @@
+{
+ "title": "Module und import",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Die Standardbibliothek besteht aus `std.*`-Modulen. Ein Modul holst du mit `import std.modul` am Dateianfang; die Namen werden mit dem Modulnamen geschrieben: `math.sqrt(...)`. Um bestimmte Namen direkt zu holen, schreibe `import std.math { sqrt }`; zum Umbenennen `import std.math as m`. Der Kern (Prelude) und die eingebauten Dinge brauchen keinen Import (`print`, `List`, `Optional`, `Result`...)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(16.0))",
+    "    print(math.pow(2.0, 10.0))"
+   ],
+   "run": true,
+   "output": [
+    "4",
+    "1024"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math { sqrt, floor }",
+    "",
+    "fn main():",
+    "    print(sqrt(81.0))",
+    "    print(floor(3.99))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "3"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Jeder Import gilt nur für diese Datei und wird nicht an andere Dateien weitergegeben. Was in welchem Modul steckt, kannst du in der **Referenz der Standardbibliothek** im linken Menü nachschlagen; im Terminal gibt `gg api` dieselbe Liste aus."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l01-x1",
+   "prompt": "Importiere `sqrt` und `pow` direkt aus `std.math`. Gib `sqrt(49.0)` und `pow(3.0, 4.0)` aus.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.math { sqrt, pow }",
+    "",
+    "fn main():",
+    "    print(sqrt(49.0))",
+    "    print(pow(3.0, 4.0))"
+   ],
+   "hint": "Schreibe `import std.math { sqrt, pow }`.",
+   "expected": [
+    "7",
+    "81"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l01-q1",
+   "q": "Wofür ist kein `import` nötig?",
+   "options": [
+    "`math.sqrt`",
+    "`List` und `print`",
+    "`sort.sort`"
+   ],
+   "answer": 1,
+   "why": "Das Kern-Prelude und die eingebauten Dinge sind immer im Gültigkeitsbereich."
+  }
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "title": "Безопасные обёртки",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Лучшая практика профессионального системного программирования — запереть код `unsafe` в небольших функциях и предложить внешнему миру **полностью безопасный** API. Вызывающему никогда не придётся писать `unsafe`, а неверный ввод отсеивается в обёртке."
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"stdlib.h\" fn rand() -> i32",
+    "extern \"stdlib.h\" fn srand(seed: u32)",
+    "",
+    "fn get_c_random(max: i32) -> i32:",
+    "    if max <= 0:",
+    "        return 0",
+    "    unsafe:",
+    "        raw = rand()",
+    "        return raw % max",
+    "",
+    "fn main():",
+    "    dice = get_c_random(6) + 1",
+    "    print(\"dice:\", dice)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "В примере ниже `sqrt` из C спрятан внутри безопасной функции, возвращающей `Result`:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sqrt(x: f64) -> f64",
+    "",
+    "fn square_root(x: f64) -> Result[f64, str]:",
+    "    if x < 0.0:",
+    "        return Err(\"negative number\")",
+    "    unsafe:",
+    "        return Ok(sqrt(x))",
+    "",
+    "fn main():",
+    "    match square_root(16.0):",
+    "        Ok(v):",
+    "            print(v)",
+    "        Err(m):",
+    "            print(m)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l04-q1",
+   "q": "Какова цель безопасной обёртки?",
+   "options": [
+    "Замедлить код",
+    "Собрать код `unsafe` в одном небольшом месте и оставить вызывающего в безопасности",
+    "Убрать `extern`"
+   ],
+   "answer": 1,
+   "why": "Поверхность `unsafe`, подлежащая аудиту, сокращается."
+  }
+ ]
+}

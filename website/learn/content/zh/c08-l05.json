@@ -1,0 +1,94 @@
+{
+ "title": "if let 和 while let",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "如果你只关心一个变体，可以写 **`if let`** 来代替 `match`：模式匹配时，它会绑定到变量并运行代码块，否则运行 `else`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    maybe: Optional[i32] = Valid(42)",
+    "    if let Valid(x) = maybe:",
+    "        print(\"found\", x)",
+    "    else:",
+    "        print(\"nothing\")",
+    "",
+    "    none_here: Optional[i32] = None",
+    "    if let Valid(y) = none_here:",
+    "        print(\"found\", y)",
+    "    else:",
+    "        print(\"nothing\")"
+   ],
+   "run": true,
+   "output": [
+    "found 42",
+    "nothing"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "只要模式匹配，**`while let`** 就会循环。`List.pop()` 在列表取空之前给出 `Valid(元素)`，之后给出 `None`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    stack = List[str]()",
+    "    stack.push(\"first\")",
+    "    stack.push(\"second\")",
+    "    stack.push(\"third\")",
+    "    while let Valid(item) = stack.pop():",
+    "        print(\"popped:\", item)"
+   ],
+   "run": true,
+   "output": [
+    "popped: third",
+    "popped: second",
+    "popped: first"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l05-x1",
+   "prompt": "用 `while let` 和 `pop` 逐个取出 `nums` 列表中的数字，并输出它们的总和。",
+   "starter": [
+    "fn main():",
+    "    nums = List[i32]()",
+    "    nums.push(4)",
+    "    nums.push(5)",
+    "    nums.push(6)",
+    "    total = 0",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    nums = List[i32]()",
+    "    nums.push(4)",
+    "    nums.push(5)",
+    "    nums.push(6)",
+    "    total = 0",
+    "    while let Valid(n) = nums.pop():",
+    "        total += n",
+    "    print(total)"
+   ],
+   "hint": "在 `while let Valid(n) = nums.pop():` 中执行 `total += n`。",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l05-q1",
+   "q": "`while let` 什么时候停止？",
+   "options": [
+    "10 轮之后",
+    "当模式不再匹配时（例如 `pop()` 给出 `None`）",
+    "从不"
+   ],
+   "answer": 1,
+   "why": "匹配失败时循环结束。"
+  }
+ ]
+}

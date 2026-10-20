@@ -1,0 +1,115 @@
+{
+ "title": "方法和 impl",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "想给一个类型添加行为，就写一个 **`impl`** 块。方法的第一个参数是 `self`；通过 `self.字段` 访问对象的字段。调用形如 `对象.方法()`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rectangle:",
+    "    width: f64",
+    "    height: f64",
+    "",
+    "impl Rectangle:",
+    "    fn area(self) -> f64:",
+    "        return self.width * self.height",
+    "",
+    "fn main():",
+    "    rect = Rectangle{ width: 10.0, height: 5.0 }",
+    "    print(\"Area:\", rect.area())"
+   ],
+   "run": true,
+   "output": [
+    "Area: 50"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "就地修改对象的方法写成 `self: lend 类型`（`lend` 会在第 5 章学到：“借用并修改”）。不带 `self` 的方法是**静态**方法，常用作构造函数：`类型.名字(...)`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    name: str",
+    "    health: i32",
+    "",
+    "impl Player:",
+    "    fn new(name: str) -> Player:",
+    "        return Player{ name: name, health: 100 }",
+    "",
+    "    fn is_alive(self) -> bool:",
+    "        return self.health > 0",
+    "",
+    "    fn take_damage(self: lend Player, amount: i32):",
+    "        self.health -= amount",
+    "        if self.health < 0:",
+    "            self.health = 0",
+    "",
+    "fn main():",
+    "    hero = Player.new(\"Aragorn\")",
+    "    hero.take_damage(35)",
+    "    print(\"Health:\", hero.health)",
+    "    print(\"Alive?\", hero.is_alive())"
+   ],
+   "run": true,
+   "output": [
+    "Health: 65",
+    "Alive? true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l02-x1",
+   "prompt": "给 `Counter` 结构体（`value: i32`）添加方法 `increment`：把 `value` 加 1。调用三次并输出 `value`。",
+   "starter": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        pass",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "solution": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        self.value += 1",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "hint": "把 `pass` 换成 `self.value += 1`。",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l02-q1",
+   "q": "没有 `self` 的方法叫什么？",
+   "options": [
+    "私有方法",
+    "静态方法（常用作构造函数）",
+    "损坏的方法"
+   ],
+   "answer": 1,
+   "why": "像 `Player.new(...)` 这样调用的方法是静态方法。"
+  }
+ ]
+}

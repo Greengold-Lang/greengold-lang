@@ -1,0 +1,104 @@
+{
+ "title": "? 运算符",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "嵌套的 `match` 很快就会变得复杂。**`?` 运算符**把错误向上传递：如果被调用的函数返回 `Ok(v)`，`?` 就取出值 `v`；如果返回 `Err(e)`，你所在的函数会**立即**停止，并把同一个错误返回给它的调用者。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn step_one() -> Result[i32, str]:",
+    "    return Ok(10)",
+    "",
+    "fn step_two(x: i32) -> Result[i32, str]:",
+    "    if x > 5:",
+    "        return Ok(x * 2)",
+    "    return Err(\"x is too small\")",
+    "",
+    "fn workflow() -> Result[i32, str]:",
+    "    val1 = step_one()?",
+    "    val2 = step_two(val1)?",
+    "    return Ok(val2 + 5)",
+    "",
+    "fn main():",
+    "    match workflow():",
+    "        Ok(v):",
+    "            print(\"succeeded:\", v)",
+    "        Err(msg):",
+    "            print(\"failed:\", msg)"
+   ],
+   "run": true,
+   "output": [
+    "succeeded: 25"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "规则：`?` 只能用在完整的表达式中（`x = f()?`、`return f()?`、`f()?`）。不能用在 `g(f()?)` 或 `x += f()?` 这样的子表达式中。"
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l04-x1",
+   "prompt": "编写 `parse_and_double(a: i32) -> Result[i32, str]`：用 `check(a)?` 验证（负数时为 `Err(\"negative\")`），然后返回 `Ok(a * 2)`。用 21 和 -4 试一试。",
+   "starter": [
+    "fn check(a: i32) -> Result[i32, str]:",
+    "    if a < 0:",
+    "        return Err(\"negative\")",
+    "    return Ok(a)",
+    "",
+    "fn parse_and_double(a: i32) -> Result[i32, str]:",
+    "    return Ok(0)",
+    "",
+    "fn show(a: i32):",
+    "    match parse_and_double(a):",
+    "        Ok(v):",
+    "            print(\"ok\", v)",
+    "        Err(m):",
+    "            print(\"error:\", m)",
+    "",
+    "fn main():",
+    "    show(21)",
+    "    show(-4)"
+   ],
+   "solution": [
+    "fn check(a: i32) -> Result[i32, str]:",
+    "    if a < 0:",
+    "        return Err(\"negative\")",
+    "    return Ok(a)",
+    "",
+    "fn parse_and_double(a: i32) -> Result[i32, str]:",
+    "    v = check(a)?",
+    "    return Ok(v * 2)",
+    "",
+    "fn show(a: i32):",
+    "    match parse_and_double(a):",
+    "        Ok(v):",
+    "            print(\"ok\", v)",
+    "        Err(m):",
+    "            print(\"error:\", m)",
+    "",
+    "fn main():",
+    "    show(21)",
+    "    show(-4)"
+   ],
+   "hint": "写 `v = check(a)?`，然后返回 `Ok(v * 2)`。",
+   "expected": [
+    "ok 42",
+    "error: negative"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l04-q1",
+   "q": "在 `x = f()?` 中，如果 `f()` 返回 `Err`，会怎样？",
+   "options": [
+    "`x` 变成 0",
+    "当前函数立即返回同一个错误",
+    "程序崩溃"
+   ],
+   "answer": 1,
+   "why": "`?` 提前返回，并把错误向上传递。"
+  }
+ ]
+}

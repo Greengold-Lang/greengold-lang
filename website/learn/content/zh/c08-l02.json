@@ -1,0 +1,79 @@
+{
+ "title": "Optional 的辅助方法",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "不必每次都写 `match`，有一些便利的方法：`.has_value()` 告诉你是否有值，`.value_or(默认值)` 在没有值时给出默认值，`.value_or_panic()` 在你确信值存在时取出它（否则程序会崩溃；只在测试和原型中使用）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(find_index(numbers, 25).has_value())",
+    "    print(find_index(numbers, 99).has_value())",
+    "    print(find_index(numbers, 99).value_or(0))",
+    "    print(find_index(numbers, 25).value_or_panic())"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "false",
+    "0",
+    "1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l02-x1",
+   "prompt": "当 `find_index(numbers, 99)` 什么也没找到时，用 `value_or` 输出 1000；对 40 则输出找到的索引。",
+   "starter": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(0)",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(find_index(numbers, 99).value_or(1000))",
+    "    print(find_index(numbers, 40).value_or(1000))"
+   ],
+   "hint": "把 `.value_or(1000)` 放在两个调用的末尾。",
+   "expected": [
+    "1000",
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l02-q1",
+   "q": "对一个为 `None` 的 `Optional` 调用 `value_or_panic()` 会怎样？",
+   "options": [
+    "返回 0",
+    "用 `panic` 停止程序",
+    "返回一个新的 `Optional`"
+   ],
+   "answer": 1,
+   "why": "所以只有在你确信有值时才使用它。"
+  }
+ ]
+}

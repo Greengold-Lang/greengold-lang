@@ -1,0 +1,96 @@
+{
+ "title": "lend: tomar prestado y cambiar",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`lend` permite que la función tome prestados los datos durante un tiempo y los **cambie en el sitio**. El cambio se ve en la variable de quien llamó. En la llamada no se escribe `lend`; pero la variable no puede ser `fixed`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn take_damage(p: lend Player, amount: i32):",
+    "    p.health -= amount",
+    "",
+    "fn inc(n: lend i32):",
+    "    n += 1",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    take_damage(hero, 25)",
+    "    print(hero.health)",
+    "",
+    "    score = 10",
+    "    inc(score)",
+    "    print(score)"
+   ],
+   "run": true,
+   "output": [
+    "75",
+    "11"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Con tipos que poseen heap ni siquiera necesitas escribir `lend`: cuando el cuerpo cambia el parámetro, el compilador **detecta `lend` automáticamente**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add_one(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add_one(v)",
+    "    add_one(v)",
+    "    print(v.len)"
+   ],
+   "run": true,
+   "output": [
+    "2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l02-x1",
+   "prompt": "Haz que `reset(n: lend i32)` ponga `n` a 0. Llámala con `x = 42` e imprime `x`.",
+   "starter": [
+    "fn reset(n: lend i32):",
+    "    pass",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn reset(n: lend i32):",
+    "    n = 0",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "hint": "Sustituye `pass` por `n = 0`.",
+   "expected": [
+    "0"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l02-q1",
+   "q": "¿Puede ser `fixed` una variable pasada con `lend`?",
+   "options": [
+    "Sí",
+    "No, porque se va a cambiar",
+    "Solo si es un número"
+   ],
+   "answer": 1,
+   "why": "Cambiar un valor que declaraste constante es un error de compilación."
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+{
+ "title": "Каналы: обмен через сообщения",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Вместо общения через общую память самый безопасный путь — **обмен через общение**. **Канал** позволяет одному потоку получать значения, которые отправляет другой. `ChannelI64` несёт `i64`; для значений любого типа есть `Queue[T]`. `send` отправляет, `recv` возвращает `Optional` (`None`, когда канал закрыт и пуст), `close` закрывает его."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    ch = thread.ChannelI64.new()",
+    "    ch.send(100)",
+    "    ch.send(200)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    ch.close()"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l03-q1",
+   "q": "Что даёт `recv()` на закрытом и пустом канале?",
+   "options": [
+    "`0`",
+    "`None`",
+    "Ошибку"
+   ],
+   "answer": 1,
+   "why": "Поэтому цикл `while let Valid(v) = ch.recv()` заканчивается сам."
+  }
+ ]
+}

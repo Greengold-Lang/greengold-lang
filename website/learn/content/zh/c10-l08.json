@@ -1,0 +1,78 @@
+{
+ "title": "正则表达式：std.regex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`regex.compile(模式)` 返回 `Result[Regex, string]`（模式可能写错）。`is_match` 表示是否匹配，`find` 找到第一个（`Optional[Match]`），`find_all` 找出全部，`replace_all` 进行替换；`Match.text()` 给出匹配到的文本。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[0-9]+\"):",
+    "        Ok(re):",
+    "            print(re.is_match(\"order 42\"))",
+    "            for m in re.find_all(\"a1 b22 c333\"):",
+    "                print(m.text().as_str())",
+    "            print(re.replace_all(\"a1 b22\", \"#\").as_str())",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "1",
+    "22",
+    "333",
+    "a# b#"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l08-x1",
+   "prompt": "在 `\"Hi 42 you\"` 中查找模式 `[a-z]+`，并输出第一个匹配的文本（用 `find` 和 `Valid`）。",
+   "starter": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            print(\"?\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "solution": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            match re.find(\"Hi 42 you\"):",
+    "                Valid(m):",
+    "                    print(m.text().as_str())",
+    "                None:",
+    "                    print(\"no match\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "hint": "`re.find(...)` 返回一个 `Optional`；用 `match` 把它打开。",
+   "expected": [
+    "i"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l08-q1",
+   "q": "`regex.compile` 为什么返回 `Result`？",
+   "options": [
+    "模式可能写错",
+    "因为它很慢",
+    "因为文本可能为空"
+   ],
+   "answer": 0,
+   "why": "无效的模式会以错误值返回。"
+  }
+ ]
+}

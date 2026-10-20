@@ -1,0 +1,78 @@
+{
+ "title": "数据格式：std.csv、std.uuid、std.log",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.csv`（RFC 4180）按引号和分隔符规则正确读取字段：`csv.parse(文本, ',')` 返回 `Result[List[List[string]], string]`。`csv.format_row` 写出一行，必要时加引号。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"name,age\\nAda,36\\n\\\"Smith, J\\\",41\\n\", ',').value_or_panic()",
+    "    print(rows.len, rows[2][0].as_str())"
+   ],
+   "run": true,
+   "output": [
+    "3 Smith, J"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`std.uuid` 生成 RFC 9562 标识符：`v4` 随机，`v7` 按时间排序，`v5` 基于名字（相同的名字总是得到相同的 id）。`std.log` 把带级别的行写到 stderr（`log.info`、`log.warn`、`log.kv`），用 `log.set_json(true)` 输出 JSON。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.uuid",
+    "",
+    "fn main():",
+    "    ns = uuid.namespace_dns()",
+    "    id = uuid.v5(ns, \"example.com\".as_bytes())",
+    "    print(id.to_string().as_str())",
+    "    print(id.version())"
+   ],
+   "run": true,
+   "output": [
+    "cfbff0d1-9375-5685-968c-48ce8b15ae17",
+    "5"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l04-x1",
+   "prompt": "用 `csv.parse` 读取文本 `\"a,b\\nc,d\\n\"` 并输出行数。",
+   "starter": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"a,b\\nc,d\\n\", ',').value_or_panic()",
+    "    print(rows.len)"
+   ],
+   "hint": "`csv.parse(...).value_or_panic()` 和 `rows.len`。",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l04-q1",
+   "q": "哪个版本对同一个名字总是生成相同的 UUID？",
+   "options": [
+    "`v4`",
+    "`v5`",
+    "`v7`"
+   ],
+   "answer": 1,
+   "why": "`v5` 由名字和命名空间计算得出；`v4` 是随机的，`v7` 取决于时间。"
+  }
+ ]
+}

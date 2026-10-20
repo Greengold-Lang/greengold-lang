@@ -1,0 +1,77 @@
+{
+ "title": "Преобразование ошибок и panic",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Разные библиотеки создают разные типы ошибок. Если вызывающая функция возвращает `Result[T, AppError]`, вызываемая — `Result[T, i32]`, а `impl AppError:` определяет `fn from(e: i32) -> AppError`, то `?` выполняет преобразование **сам**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum AppError:",
+    "    Database(i32)",
+    "    Network(str)",
+    "",
+    "impl AppError:",
+    "    fn from(code: i32) -> AppError:",
+    "        return AppError.Database(code)",
+    "",
+    "fn query_db() -> Result[str, i32]:",
+    "    return Err(500)",
+    "",
+    "fn handle_request() -> Result[str, AppError]:",
+    "    data = query_db()?",
+    "    return Ok(data)",
+    "",
+    "fn main():",
+    "    if let Err(e) = handle_request():",
+    "        print(\"application error caught\")"
+   ],
+   "run": true,
+   "output": [
+    "application error caught"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Для неисправимых ситуаций, когда программа не может продолжать, используйте **`panic`**: сообщение пишется в `stderr`, и программа сразу завершается с кодом 101. Для ожидаемых ошибок используйте `Result`, а `panic` — для случаев «этого никогда не должно быть»."
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l06-x1",
+   "prompt": "Напишите `check_level(level: i32)`: `panic(\"invalid level\")`, если `level < 0`, иначе выведите `access granted`. Вызывайте её только с допустимым уровнем (3).",
+   "starter": [
+    "fn check_level(level: i32):",
+    "    print(\"?\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "solution": [
+    "fn check_level(level: i32):",
+    "    if level < 0:",
+    "        panic(\"invalid level\")",
+    "    print(\"access granted\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "hint": "Используйте `panic(...)` внутри `if level < 0:`.",
+   "expected": [
+    "access granted"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l06-q1",
+   "q": "Когда вместо `panic` используют `Result`?",
+   "options": [
+    "Для ожидаемых, поправимых ошибок",
+    "Никогда",
+    "Только с числами"
+   ],
+   "answer": 0,
+   "why": "`panic` — для неисправимых ситуаций."
+  }
+ ]
+}

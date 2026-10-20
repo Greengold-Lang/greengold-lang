@@ -1,0 +1,100 @@
+{
+ "title": "El compilador encuentra el modo",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Buenas noticias: la mayoría de las veces **no tienes que escribir** estos tres modos. En un tipo que posee heap (`List`, `string`, `Box` y structs que los contienen), si no escribes ningún modo en el parámetro, el compilador **mira el cuerpo de la función y detecta el modo por sí mismo**:"
+  },
+  {
+   "t": "p",
+   "text": "Si el cuerpo solo **lee** el parámetro → `read`; si lo **cambia** → `lend`; si lo **mueve** a otro propietario → `consume`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn add(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn wrap(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add(v)",
+    "    add(v)",
+    "    print(total(v))",
+    "    b = wrap(v)",
+    "    print(b.items.len)"
+   ],
+   "run": true,
+   "output": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "En ninguna de las tres funciones hay un modo escrito. `add` pasó a ser `lend` porque cambia la lista, `total` pasó a ser `read` porque solo lee, y `wrap` pasó a ser `consume` porque mete la lista dentro de `Bag`. Después de `wrap(v)` la variable `v` ya no se puede usar; si lo intentas, el compilador da el error y además te dice **el modo que detectó y por qué**."
+  },
+  {
+   "t": "p",
+   "text": "Con tipos Copy como los números y los structs simples, si no se escribe ningún modo el valor se **copia** y no se puede cambiar dentro de la función; para cambiarlo en el sitio escribes `lend` (`n: lend i32`). Siempre puedes escribir el modo tú mismo (por legibilidad o para fijar la decisión)."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l05-x1",
+   "prompt": "Sin escribir ningún modo, escribe `keep(xs: List[i32]) -> Bag`: mete la lista dentro de un `Bag` (el compilador lo detecta como `consume`). En `main` llámala con una lista de 3 elementos e imprime `b.items.len`.",
+   "starter": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn keep(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    b = keep(v)",
+    "    print(b.items.len)"
+   ],
+   "hint": "`return Bag{ items: xs }`; luego `b = keep(v)` y `print(b.items.len)`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l05-q1",
+   "q": "No escribiste ningún modo en un parámetro `List` que posee heap y el cuerpo llama a `xs.push(1)`. ¿Qué modo detecta el compilador?",
+   "options": [
+    "`read`",
+    "`lend`",
+    "`consume`"
+   ],
+   "answer": 1,
+   "why": "El cuerpo cambia la lista, así que el modo es `lend`; no tienes que escribirlo."
+  }
+ ]
+}

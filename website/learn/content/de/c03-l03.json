@@ -1,0 +1,66 @@
+{
+ "title": "Rekursion",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Eine Funktion kann sich selbst aufrufen; das heißt **Rekursion**. Jede rekursive Funktion braucht einen **Basisfall**, in dem sie aufhört, sich selbst aufzurufen, und ein Ergebnis liefert; sonst läuft sie ewig weiter."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn factorial(n: i32) -> i32:",
+    "    if n <= 1:",
+    "        return 1",
+    "    return n * factorial(n - 1)",
+    "",
+    "fn main():",
+    "    print(factorial(5))"
+   ],
+   "run": true,
+   "output": [
+    "120"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`factorial(5)` bedeutet `5 * factorial(4)` und so weiter bis `factorial(1)`; dann kommen die Produkte wieder nach oben: 5 · 4 · 3 · 2 · 1 = 120."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l03-x1",
+   "prompt": "Berechne eine Fibonacci-Zahl rekursiv: `fib(0)` = 0, `fib(1)` = 1, und jede weitere ist die Summe der beiden vorherigen. Gib `fib(10)` aus.",
+   "starter": [
+    "fn fib(n: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "solution": [
+    "fn fib(n: i32) -> i32:",
+    "    if n < 2:",
+    "        return n",
+    "    return fib(n - 1) + fib(n - 2)",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "hint": "Ist `n < 2`, gib `n` zurück; sonst `fib(n - 1) + fib(n - 2)`.",
+   "expected": [
+    "55"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l03-q1",
+   "q": "Was passiert in einer rekursiven Funktion ohne Basisfall?",
+   "options": [
+    "Sie läuft nie",
+    "Sie ruft sich endlos selbst auf (der Stack läuft über)",
+    "Sie gibt 0 zurück"
+   ],
+   "answer": 1,
+   "why": "Ohne Haltepunkt häufen sich die Aufrufe an, und der Stack läuft über."
+  }
+ ]
+}

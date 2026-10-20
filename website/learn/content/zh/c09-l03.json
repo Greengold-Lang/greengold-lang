@@ -1,0 +1,87 @@
+{
+ "title": "Lambda 表达式",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "对于小任务，不必另写一个 `fn`，可以写一个匿名的 **lambda**：`fn(参数) -> 返回类型 => 表达式`。它可以存进变量，也可以直接作为参数传入。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x * x)",
+    "    adder = fn(a: i32, b: i32) -> i32 => a + b",
+    "    print(\"sum:\", adder(10, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1",
+    "4",
+    "9",
+    "sum: 30"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "在不返回值的 lambda 中，省略返回类型，并且函数体必须是一个调用表达式："
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    logger = fn(s: str) => print(\"[LOG]\", s)",
+    "    logger(\"the lambda ran\")"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] the lambda ran"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l03-x1",
+   "prompt": "用 `transform` 配合一个给每个数字加 10 的 lambda，并输出结果（对 `[1, 2, 3]` 是 11、12、13）。",
+   "starter": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x)"
+   ],
+   "solution": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x + 10)"
+   ],
+   "hint": "让 lambda 的函数体为 `x + 10`。",
+   "expected": [
+    "11",
+    "12",
+    "13"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l03-q1",
+   "q": "`fn(x: i32) -> i32 => x * 2` 是什么？",
+   "options": [
+    "一个结构体",
+    "一个把输入乘以二的匿名函数（lambda）",
+    "一个错误"
+   ],
+   "answer": 1,
+   "why": "`=>` 开始 lambda 的函数体。"
+  }
+ ]
+}

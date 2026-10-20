@@ -1,0 +1,72 @@
+{
+ "title": "Tipos Copy y Move",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Un tipo pertenece a uno de dos grupos. Los **tipos Copy** (números, `bool`, `str`, structs simples, arrays de elementos Copy) viven en la pila y copiarlos es barato. Los **tipos Move** (`List`, `Box`, `string` y todo lo que los contenga) poseen memoria del heap; nunca se copian, solo se **mueven** (así no hay doble liberación)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 5",
+    "    b = a",
+    "    b += 1",
+    "    print(a, b)",
+    "",
+    "    list_a = List[i32]()",
+    "    list_a.push(10)",
+    "    list_b = list_a",
+    "    list_c = list_b.clone()",
+    "    list_c.push(20)",
+    "    print(list_b.len, list_c.len)"
+   ],
+   "run": true,
+   "output": [
+    "5 6",
+    "1 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Con números, `b = a` copia; `a` sigue siendo utilizable. Con listas, `list_b = list_a` mueve la propiedad: ahora solo `list_b` es válida. Si quieres una copia independiente, escribes `.clone()`."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l04-x1",
+   "prompt": "Haz un `.clone()` de la lista `original` llamado `dup`, añade 99 a `dup` e imprime la longitud de ambas listas.",
+   "starter": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    print(original.len)"
+   ],
+   "solution": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    dup = original.clone()",
+    "    dup.push(99)",
+    "    print(original.len, dup.len)"
+   ],
+   "hint": "`dup = original.clone()` y `dup.push(99)`.",
+   "expected": [
+    "2 3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l04-q1",
+   "q": "¿Cuál es un tipo Move?",
+   "options": [
+    "`i32`",
+    "`List[i32]`",
+    "`bool`"
+   ],
+   "answer": 1,
+   "why": "`List` vive en el heap, así que se mueve; los números se copian."
+  }
+ ]
+}

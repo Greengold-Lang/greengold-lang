@@ -1,0 +1,66 @@
+{
+ "title": "Punteros crudos y unsafe",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "En código seguro las referencias se gestionan con `lend` y `ref`. En FFI y acceso al hardware entran en juego los **punteros crudos**: `*T` es de solo lectura (`const T*`), `*mut T` es escribible (`T*`), `*void` es independiente del tipo. Un puntero que no apunta a nada es `null` y puede compararse con `null` en código seguro."
+  },
+  {
+   "t": "p",
+   "text": "Leer/escribir los datos a los que apunta un puntero, la aritmética de punteros y llamar a funciones C crudas se hace **solo dentro de un bloque `unsafe:`**. Ahí el compilador dice: \"las salvaguardas están desactivadas; la seguridad de memoria, las comprobaciones de límites y la validez de los punteros son responsabilidad exclusiva del programador.\""
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number: i32 = 42",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(number)",
+    "        p[0] = 99",
+    "    print(\"updated number:\", number)"
+   ],
+   "run": true,
+   "output": [
+    "updated number: 99"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Ayudantes (todos requieren `unsafe:`): `addr(x)` / `addr_mut(x)` toman la dirección de una variable, `ptr_offset(p, n)` mueve el puntero, `ptr_cast[*T](p)` cambia su tipo, `ptr_to_int` / `int_to_ptr` convierten entre un entero y un puntero, `string_to_cstr` / `cstr_to_string` trabajan con cadenas de C."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l03-x1",
+   "prompt": "Toma la dirección de `x = 5` con `addr_mut` y pon su valor a 50 a través del puntero. Imprime `x`.",
+   "starter": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(x)",
+    "        p[0] = 50",
+    "    print(x)"
+   ],
+   "hint": "`p[0] = 50` dentro de un bloque `unsafe:`.",
+   "expected": [
+    "50"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l03-q1",
+   "q": "¿Cuál es la diferencia entre `*mut T` y `*T`?",
+   "options": [
+    "No hay ninguna",
+    "`*mut T` es escribible, `*T` es de solo lectura",
+    "`*T` es más rápido"
+   ],
+   "answer": 1,
+   "why": "`*T` es como el `const T*` de C, `*mut T` como `T*`."
+  }
+ ]
+}

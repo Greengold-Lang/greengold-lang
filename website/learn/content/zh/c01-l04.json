@@ -1,0 +1,72 @@
+{
+ "title": "文本和字符",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "双引号中的文本是**字符串**（`str`）：对 UTF-8 内存的不可变视图，所以可以包含任何语言的文字。单引号中的 `'A'` 是单个字符，它的值是 ASCII 数字（`u8`）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    greeting = \"Hello\"",
+    "    letter = 'A'",
+    "    print(greeting, letter)"
+   ],
+   "run": true,
+   "output": [
+    "Hello 65"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "特殊字符用 `\\` 书写：`\\n` 换行，`\\t` 制表符，`\\\\` 反斜杠，`\\\"` 双引号。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"First\\nSecond\")",
+    "    print(\"Name:\\tAli\")",
+    "    print(\"He said \\\"hello\\\"\")"
+   ],
+   "run": true,
+   "output": [
+    "First",
+    "Second",
+    "Name:\tAli",
+    "He said \"hello\""
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l04-x1",
+   "prompt": "只用一个 `print` 输出两行：`One` 和 `Two`。（使用 `\\n`）",
+   "starter": [
+    "fn main():",
+    "    print(\"Bir İki\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"One\\nTwo\")"
+   ],
+   "hint": "把 `\\n` 放在空格的位置。",
+   "expected": [
+    "One",
+    "Two"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l04-q1",
+   "q": "`'A'` 和 `\"A\"` 是同一个东西吗？",
+   "options": [
+    "是",
+    "不是：一个是字符，另一个是字符串",
+    "不是：其中一个是错误"
+   ],
+   "answer": 1,
+   "why": "单引号产生字符（一个数字），双引号产生字符串。"
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "title": "break, continue, pass",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`break` termina el bucle de inmediato. `continue` salta el resto de esta vuelta y pasa a la siguiente. `pass` no hace nada: Greengold no permite un cuerpo vacío, así que lo escribes donde dejas uno vacío a propósito."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..10:",
+    "        if i == 3:",
+    "            continue",
+    "        if i == 7:",
+    "            break",
+    "        print(i)"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "1",
+    "2",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Arriba se saltó el 3 y el bucle terminó en el 7."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l06-x1",
+   "prompt": "Entre los números del 1 al 20, encuentra el primero divisible por 7, imprímelo y sal del bucle.",
+   "starter": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        pass"
+   ],
+   "solution": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        if i % 7 == 0:",
+    "            print(i)",
+    "            break"
+   ],
+   "hint": "Dentro de `if i % 7 == 0:` escribe `print(i)` y `break`.",
+   "expected": [
+    "7"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l06-q1",
+   "q": "¿Qué hace `continue`?",
+   "options": [
+    "Termina el bucle",
+    "Salta el resto de esta vuelta y pasa a la siguiente",
+    "Detiene el programa"
+   ],
+   "answer": 1,
+   "why": "Es `break` quien termina el bucle."
+  }
+ ]
+}

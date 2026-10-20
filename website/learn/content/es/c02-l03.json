@@ -1,0 +1,68 @@
+{
+ "title": "El bucle while",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`while` repite la parte con sangría mientras la condición sea verdadera. Algo tiene que hacerla falsa tarde o temprano; si no, tienes un bucle infinito."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 5",
+    "    while n > 0:",
+    "        print(\"Countdown:\", n)",
+    "        n -= 1",
+    "    print(\"Fire!\")"
+   ],
+   "run": true,
+   "output": [
+    "Countdown: 5",
+    "Countdown: 4",
+    "Countdown: 3",
+    "Countdown: 2",
+    "Countdown: 1",
+    "Fire!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "La condición se comprueba al **principio** de cada vuelta; si es falsa a primera vista, el cuerpo no se ejecuta nunca."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l03-x1",
+   "prompt": "Empieza `x` en 1 y duplícalo en cada vuelta; para cuando `x` sea mayor que 100 e imprime `x`.",
+   "starter": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        pass",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        x *= 2",
+    "    print(x)"
+   ],
+   "hint": "Sustituye `pass` por `x *= 2`.",
+   "expected": [
+    "128"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l03-q1",
+   "q": "Con `n = 0`, ¿cuántas veces se ejecuta el cuerpo de `while n > 0:`?",
+   "options": [
+    "Una vez",
+    "Nunca",
+    "Para siempre"
+   ],
+   "answer": 1,
+   "why": "La condición es falsa desde el principio, así que el cuerpo no se ejecuta nunca."
+  }
+ ]
+}

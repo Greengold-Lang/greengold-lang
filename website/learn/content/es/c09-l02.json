@@ -1,0 +1,65 @@
+{
+ "title": "Callbacks",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Guardar una función en un campo de un struct es la base de los programas dirigidos por eventos: \"cuando ocurra este evento, llama a esa función\"."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Button:",
+    "    id: i32",
+    "    on_click: fn(i32)",
+    "",
+    "fn notify(id: i32):",
+    "    print(\"button pressed:\", id)",
+    "",
+    "fn main():",
+    "    b = Button{ id: 101, on_click: notify }",
+    "    b.on_click(b.id)"
+   ],
+   "run": true,
+   "output": [
+    "button pressed: 101"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l02-x1",
+   "prompt": "Construye un struct `Timer` (`name: str`, `on_finish: fn(str)`). Usa una función `report(name)` (que imprime `finished: ` y el nombre) como `on_finish` y llámala para `Timer{ name: \"tea\", ... }`.",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Timer:",
+    "    name: str",
+    "    on_finish: fn(str)",
+    "",
+    "fn report(name: str):",
+    "    print(\"finished:\", name)",
+    "",
+    "fn main():",
+    "    t = Timer{ name: \"tea\", on_finish: report }",
+    "    t.on_finish(t.name)"
+   ],
+   "hint": "El tipo del campo es `fn(str)`, la llamada es `t.on_finish(t.name)`.",
+   "expected": [
+    "finished: tea"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l02-q1",
+   "q": "¿Cómo se llama a una función guardada en un campo de un struct?",
+   "options": [
+    "`b.on_click(b.id)`",
+    "`call(b.on_click)`",
+    "No se puede llamar"
+   ],
+   "answer": 0,
+   "why": "El campo es un valor de función, así que se llama con paréntesis."
+  }
+ ]
+}

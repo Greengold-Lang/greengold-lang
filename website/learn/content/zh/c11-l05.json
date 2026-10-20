@@ -1,0 +1,60 @@
+{
+ "title": "文档、API 列表与 REPL",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "你写在函数和结构体定义正上方的 `#` 注释，会被 `gg doc` 转换为 Markdown 格式的 API 文档："
+  },
+  {
+   "t": "code",
+   "code": [
+    "# Adds two numbers.",
+    "# Parameters:",
+    "#   a: the first addend",
+    "#   b: the second addend",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg doc src/                 # print to the screen",
+    "gg doc src/ -o API_DOCS.md  # save to a file"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**`gg api`** 列出标准库的每个公开名字，附带签名和一行说明（`gg api --json` 以机器可读的形式给出；本站的参考就是由它生成的）。**`gg repl`** 打开交互式提示符：你输入声明、绑定和表达式，立刻看到结果。"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg api                      # the whole standard library",
+    "gg repl                     # an interactive prompt",
+    "gg repl -e \"1 + 2\"          # evaluate one snippet"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l05-q1",
+   "q": "`gg doc` 从哪里获取文档内容？",
+   "options": [
+    "从单独的文档文件",
+    "从定义上方的 `#` 注释",
+    "从互联网"
+   ],
+   "answer": 1,
+   "why": "注释与代码放在一起，所以文档不会过时。"
+  }
+ ]
+}

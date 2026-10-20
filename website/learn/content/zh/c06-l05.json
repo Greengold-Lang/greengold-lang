@@ -1,0 +1,100 @@
+{
+ "title": "就地修改：match lend",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "和函数参数一样，`match` 也有模式。默认情况下（`match s:`）它只读取数据。用 `match lend s:` 可以**就地修改变体内部的数据**；模式中的名字会变成 `lend` 引用。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Item:",
+    "    Weapon(i32)",
+    "    Empty",
+    "",
+    "fn upgrade(item: lend Item):",
+    "    match lend item:",
+    "        Item.Weapon(power):",
+    "            power += 10",
+    "        Item.Empty:",
+    "            pass",
+    "",
+    "fn main():",
+    "    sword = Item.Weapon(50)",
+    "    upgrade(sword)",
+    "    match sword:",
+    "        Item.Weapon(p):",
+    "            print(\"power:\", p)",
+    "        Item.Empty:",
+    "            pass"
+   ],
+   "run": true,
+   "output": [
+    "power: 60"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "第三种模式 `match consume s:` 会接管所有权，并把数据移动给新的所有者；用于包含 `String`/`List` 等类型的变体。"
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l05-x1",
+   "prompt": "编写 `double_it(c: lend Cell)`：如果是 `Cell.Number(n)`，就把 `n` 翻倍；如果是 `Cell.Blank`，什么也不做。用 `Number(21)` 试一试并输出结果。",
+   "starter": [
+    "enum Cell:",
+    "    Number(i32)",
+    "    Blank",
+    "",
+    "fn double_it(c: lend Cell):",
+    "    pass",
+    "",
+    "fn main():",
+    "    c = Cell.Number(21)",
+    "    double_it(c)",
+    "    match c:",
+    "        Cell.Number(n):",
+    "            print(n)",
+    "        Cell.Blank:",
+    "            pass"
+   ],
+   "solution": [
+    "enum Cell:",
+    "    Number(i32)",
+    "    Blank",
+    "",
+    "fn double_it(c: lend Cell):",
+    "    match lend c:",
+    "        Cell.Number(n):",
+    "            n *= 2",
+    "        Cell.Blank:",
+    "            pass",
+    "",
+    "fn main():",
+    "    c = Cell.Number(21)",
+    "    double_it(c)",
+    "    match c:",
+    "        Cell.Number(n):",
+    "            print(n)",
+    "        Cell.Blank:",
+    "            pass"
+   ],
+   "hint": "写 `match lend c:`，并在 `Cell.Number(n)` 分支中写 `n *= 2`。",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l05-q1",
+   "q": "哪种 `match` 形式可以就地修改变体内部的数据？",
+   "options": [
+    "`match s:`",
+    "`match lend s:`",
+    "`match read s:`"
+   ],
+   "answer": 1,
+   "why": "`lend` 用于修改；默认的 `match` 只读取。"
+  }
+ ]
+}

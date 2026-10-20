@@ -1,0 +1,86 @@
+{
+ "title": "Práctica: una cuenta bancaria",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Un ejemplo que usa los tres modos: `deposit` cambia la cuenta en el sitio (`lend`), `close_and_transfer` cierra la cuenta y cede su dinero (`consume`), y `defer` garantiza el mensaje de cierre."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Account:",
+    "    id: i32",
+    "    balance: f64",
+    "",
+    "fn deposit(acc: lend Account, amount: f64):",
+    "    acc.balance += amount",
+    "",
+    "fn close_and_transfer(acc: consume Account, target: lend Account):",
+    "    defer print(\"Account\", acc.id, \"closed.\")",
+    "    target.balance += acc.balance",
+    "",
+    "fn main():",
+    "    mine = Account{ id: 101, balance: 500.0 }",
+    "    savings = Account{ id: 202, balance: 1000.0 }",
+    "    deposit(mine, 250.0)",
+    "    print(\"after deposit:\", mine.balance)",
+    "    close_and_transfer(mine, savings)",
+    "    print(\"savings:\", savings.balance)"
+   ],
+   "run": true,
+   "output": [
+    "after deposit: 750",
+    "Account 101 closed.",
+    "savings: 1750"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l07-x1",
+   "prompt": "Escribe `withdraw(acc: lend Account, amount: f64)`: resta cuando el saldo es suficiente; si no, no hace nada. De un saldo de 100 retira 30, luego 90, e imprime el saldo.",
+   "starter": [
+    "struct Account:",
+    "    balance: f64",
+    "",
+    "fn withdraw(acc: lend Account, amount: f64):",
+    "    pass",
+    "",
+    "fn main():",
+    "    a = Account{ balance: 100.0 }",
+    "    withdraw(a, 30.0)",
+    "    withdraw(a, 90.0)",
+    "    print(a.balance)"
+   ],
+   "solution": [
+    "struct Account:",
+    "    balance: f64",
+    "",
+    "fn withdraw(acc: lend Account, amount: f64):",
+    "    if acc.balance >= amount:",
+    "        acc.balance -= amount",
+    "",
+    "fn main():",
+    "    a = Account{ balance: 100.0 }",
+    "    withdraw(a, 30.0)",
+    "    withdraw(a, 90.0)",
+    "    print(a.balance)"
+   ],
+   "hint": "Si `acc.balance >= amount` entonces `acc.balance -= amount`.",
+   "expected": [
+    "70"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l07-q1",
+   "q": "Al cerrar una cuenta y ceder su dinero, ¿qué modo debe usar el parámetro de la cuenta?",
+   "options": [
+    "`read`",
+    "`lend`",
+    "`consume`"
+   ],
+   "answer": 2,
+   "why": "La cuenta cerrada no se volverá a usar, así que se asume la propiedad: `consume`."
+  }
+ ]
+}

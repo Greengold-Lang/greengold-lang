@@ -1,0 +1,87 @@
+{
+ "title": "JSON：std.json",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`json.parse(文本)` 返回 `Result[Json, string]`。`Json` 是一个枚举；`doc.get(\"键\")` 取出子值，`as_i64()`、`as_string()`、`as_bool()` ……把它作为 `Optional` 提取出来。要构建新文档，使用 `json.object()`、`set`、`json.integer`、`json.text`；`to_text()` 把它转换为文本。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"name\\\": \\\"Ada\\\", \\\"age\\\": 36, \\\"tags\\\": [\\\"math\\\", \\\"code\\\"]}\"):",
+    "        Ok(doc):",
+    "            print(doc.get(\"name\").as_string().value_or(\"?\").as_str())",
+    "            print(doc.get(\"age\").as_i64().value_or(0))",
+    "            print(doc.get(\"tags\").len())",
+    "        Err(msg):",
+    "            print(\"bad json:\", msg.as_str())"
+   ],
+   "run": true,
+   "output": [
+    "Ada",
+    "36",
+    "2"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    doc = json.object()",
+    "    doc.set(\"id\", json.integer(7))",
+    "    doc.set(\"ok\", json.text(\"yes\"))",
+    "    print(doc.to_text().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "{\"id\":7,\"ok\":\"yes\"}"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l07-x1",
+   "prompt": "解析 JSON `{\"price\": 12, \"qty\": 3}` 并输出 `price * qty`。",
+   "starter": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"price\\\": 12, \\\"qty\\\": 3}\"):",
+    "        Ok(doc):",
+    "            print(0)",
+    "        Err(msg):",
+    "            print(\"bad json\")"
+   ],
+   "solution": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"price\\\": 12, \\\"qty\\\": 3}\"):",
+    "        Ok(doc):",
+    "            print(doc.get(\"price\").as_i64().value_or(0) * doc.get(\"qty\").as_i64().value_or(0))",
+    "        Err(msg):",
+    "            print(\"bad json\")"
+   ],
+   "hint": "用 `doc.get(\"price\").as_i64().value_or(0)` 取得这些值。",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l07-q1",
+   "q": "`json.parse` 为什么返回 `Result`？",
+   "options": [
+    "文本可能不是有效的 JSON",
+    "它总是失败",
+    "为了速度"
+   ],
+   "answer": 0,
+   "why": "预期之内的失败（坏输入）会通过 `Err` 作为值传递。"
+  }
+ ]
+}

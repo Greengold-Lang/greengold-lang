@@ -1,0 +1,65 @@
+{
+ "title": "Declarar funciones",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Una función se declara con `fn`. Los tipos de los parámetros se escriben con `:`, el tipo de retorno con `->`. Si no hay `-> Tipo`, la función no devuelve ningún valor (`void`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn log_message(msg: str):",
+    "    print(\"[LOG]\", msg)",
+    "",
+    "fn main():",
+    "    result = add(15, 27)",
+    "    log_message(\"addition finished\")",
+    "    print(\"Result:\", result)"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] addition finished",
+    "Result: 42"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Regla: toda función con `-> Tipo` debe terminar en un `return` en **todos los caminos** del código. Si no, el compilador da un error."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l01-x1",
+   "prompt": "Escribe la función `subtract(a, b)`: devuelve `a - b`. `main` la llama e imprime el resultado.",
+   "starter": [
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "solution": [
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "hint": "Escribe `fn subtract(a: i32, b: i32) -> i32:` encima de `main`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l01-q1",
+   "q": "¿Qué devuelve una función sin `-> Tipo`?",
+   "options": [
+    "0",
+    "Ningún valor (void)",
+    "Una cadena vacía"
+   ],
+   "answer": 1,
+   "why": "Sin tipo de retorno, la función no devuelve ningún valor."
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+{
+ "title": "Сортировка и поиск: std.sort",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`sort.sort(список)` сортирует `List` на месте (нужно `T: Ord`); `sort.sort_by(список, правило)` сортирует по вашему правилу; `sort.binary_search(список, x)` быстро ищет в **отсортированном** списке и возвращает `Optional[usize]` (позицию)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(40)",
+    "    v.push(10)",
+    "    v.push(30)",
+    "    v.push(20)",
+    "    sort.sort(v)",
+    "    for x in v:",
+    "        print(x)",
+    "    print(sort.is_sorted(v))",
+    "    match sort.binary_search(v, 30):",
+    "        Valid(i):",
+    "            print(\"30 is at index\", i)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "10",
+    "20",
+    "30",
+    "40",
+    "true",
+    "30 is at index 2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l04-x1",
+   "prompt": "Отсортируйте список и выведите средний элемент (3-й от наименьшего): `[9, 2, 7, 4, 5]`.",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(v[0])"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    sort.sort(v)",
+    "    print(v[2])"
+   ],
+   "hint": "`sort.sort(v)`, затем `v[2]`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l04-q1",
+   "q": "Когда `binary_search` работает правильно?",
+   "options": [
+    "Если список отсортирован",
+    "Если список пуст",
+    "Всегда"
+   ],
+   "answer": 0,
+   "why": "Двоичный поиск опирается на то, что список отсортирован."
+  }
+ ]
+}

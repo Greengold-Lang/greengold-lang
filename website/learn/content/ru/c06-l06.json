@@ -1,0 +1,92 @@
+{
+ "title": "Практика: интерпретатор команд",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Enum, варианты с данными и выражение `match` вместе: небольшой калькулятор."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Subtract(f64, f64)",
+    "    Square(f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Subtract(a, b) => a - b",
+    "        Command.Square(x) => x * x",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    commands: [4]Command = [",
+    "        Command.Add(10.0, 5.0),",
+    "        Command.Square(4.0),",
+    "        Command.Subtract(20.0, 8.0),",
+    "        Command.Reset",
+    "    ]",
+    "    for c in commands:",
+    "        print(\"result:\", evaluate(c))"
+   ],
+   "run": true,
+   "output": [
+    "result: 15",
+    "result: 16",
+    "result: 12",
+    "result: 0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l06-x1",
+   "prompt": "Добавьте в `Command` вариант `Multiply(f64, f64)` и напишите его ветку в `evaluate`. Выведите `Multiply(6.0, 7.0)`.",
+   "starter": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Add(6.0, 7.0)))"
+   ],
+   "solution": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Multiply(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Multiply(a, b) => a * b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Multiply(6.0, 7.0)))"
+   ],
+   "hint": "Добавьте новую ветку и в enum, и в `match`; без одного из них код не скомпилируется.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l06-q1",
+   "q": "Что произойдёт, если добавить вариант в enum и не обновить `match`?",
+   "options": [
+    "Выполнится старая ветка",
+    "Компилятор сообщит о недостающей ветке",
+    "Программа молча будет работать неправильно"
+   ],
+   "answer": 1,
+   "why": "Проверка полноты ловит забытые случаи на этапе компиляции."
+  }
+ ]
+}

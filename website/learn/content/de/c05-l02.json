@@ -1,0 +1,96 @@
+{
+ "title": "lend: ausleihen und ändern",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`lend` erlaubt der Funktion, die Daten eine Weile auszuleihen und **an Ort und Stelle zu ändern**. Die Änderung ist in der Variablen des Aufrufers sichtbar. Beim Aufruf schreibst du kein `lend`; aber die Variable darf nicht `fixed` sein."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn take_damage(p: lend Player, amount: i32):",
+    "    p.health -= amount",
+    "",
+    "fn inc(n: lend i32):",
+    "    n += 1",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    take_damage(hero, 25)",
+    "    print(hero.health)",
+    "",
+    "    score = 10",
+    "    inc(score)",
+    "    print(score)"
+   ],
+   "run": true,
+   "output": [
+    "75",
+    "11"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Bei Typen mit Heap-Besitz musst du `lend` nicht einmal schreiben: Ändert der Rumpf den Parameter, **erkennt der Compiler `lend` automatisch**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add_one(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add_one(v)",
+    "    add_one(v)",
+    "    print(v.len)"
+   ],
+   "run": true,
+   "output": [
+    "2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l02-x1",
+   "prompt": "Lass `reset(n: lend i32)` den Wert von `n` auf 0 setzen. Rufe es für `x = 42` auf und gib `x` aus.",
+   "starter": [
+    "fn reset(n: lend i32):",
+    "    pass",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn reset(n: lend i32):",
+    "    n = 0",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "hint": "Ersetze `pass` durch `n = 0`.",
+   "expected": [
+    "0"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l02-q1",
+   "q": "Kann eine mit `lend` übergebene Variable `fixed` sein?",
+   "options": [
+    "Ja",
+    "Nein, weil sie geändert wird",
+    "Nur wenn es eine Zahl ist"
+   ],
+   "answer": 1,
+   "why": "Einen Wert zu ändern, den du als konstant deklariert hast, ist ein Kompilierfehler."
+  }
+ ]
+}

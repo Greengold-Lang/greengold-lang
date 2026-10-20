@@ -1,0 +1,65 @@
+{
+ "title": "声明函数",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "函数用 `fn` 声明。参数类型用 `:` 书写，返回类型用 `->` 书写。如果没有 `-> 类型`，函数不返回值（`void`）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn log_message(msg: str):",
+    "    print(\"[LOG]\", msg)",
+    "",
+    "fn main():",
+    "    result = add(15, 27)",
+    "    log_message(\"addition finished\")",
+    "    print(\"Result:\", result)"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] addition finished",
+    "Result: 42"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "规则：每个带 `-> 类型` 的函数必须在代码的**每条路径**上都以 `return` 结束。否则编译器会报错。"
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l01-x1",
+   "prompt": "编写函数 `subtract(a, b)`：它返回 `a - b`。`main` 调用它并输出结果。",
+   "starter": [
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "solution": [
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "hint": "把 `fn subtract(a: i32, b: i32) -> i32:` 写在 `main` 上面。",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l01-q1",
+   "q": "没有 `-> 类型` 的函数返回什么？",
+   "options": [
+    "0",
+    "不返回值（void）",
+    "一个空字符串"
+   ],
+   "answer": 1,
+   "why": "没有返回类型时，函数不返回值。"
+  }
+ ]
+}

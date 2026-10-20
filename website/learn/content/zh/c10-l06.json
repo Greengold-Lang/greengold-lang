@@ -1,0 +1,70 @@
+{
+ "title": "随机数：std.rand",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.rand` 提供一个从**种子**（seed）出发的生成器，相同的种子总是产生相同的序列：`rand.rng_new(42)`。`below(n)` 给出 0 到 `n-1` 之间的数，`range(a, b)` 给出从 `a` 到 `b`（不含 `b`）的数，`next_f64()` 给出 0 到 1 之间的数。要真正的随机，可用 `rand.rng_from_entropy()` 或 `secure_u64()`（密码学用途请使用 `secure_*`）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(42)",
+    "    for i in 0..3:",
+    "        print(r.below(100))",
+    "    print(r.range(1, 6))"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "98",
+    "46",
+    "1"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "固定种子是在测试和游戏中获得可复现结果的最简单方法。"
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l06-x1",
+   "prompt": "用种子 7 掷骰子（1–6）三次并输出结果。上界不包含在内，所以使用 `range(1, 7)`。",
+   "starter": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    for i in 0..3:",
+    "        print(r.range(1, 7))"
+   ],
+   "hint": "在循环中输出 `r.range(1, 7)`。",
+   "expected": [
+    "5",
+    "3",
+    "1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l06-q1",
+   "q": "如果用相同的种子运行两次 `rng_new(42)` 会怎样？",
+   "options": [
+    "产生不同的序列",
+    "产生相同的序列",
+    "这是个错误"
+   ],
+   "answer": 1,
+   "why": "这是伪随机生成器：种子决定序列。"
+  }
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "title": "Envoltorios seguros",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "La mejor práctica en programación de sistemas profesional es confinar el código `unsafe` dentro de funciones pequeñas y ofrecer al exterior una API **totalmente segura**. Quien llama nunca tiene que escribir `unsafe`, y las entradas inválidas se filtran en el envoltorio."
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"stdlib.h\" fn rand() -> i32",
+    "extern \"stdlib.h\" fn srand(seed: u32)",
+    "",
+    "fn get_c_random(max: i32) -> i32:",
+    "    if max <= 0:",
+    "        return 0",
+    "    unsafe:",
+    "        raw = rand()",
+    "        return raw % max",
+    "",
+    "fn main():",
+    "    dice = get_c_random(6) + 1",
+    "    print(\"dice:\", dice)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "En el ejemplo de abajo, el `sqrt` de C queda oculto dentro de una función segura que devuelve un `Result`:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sqrt(x: f64) -> f64",
+    "",
+    "fn square_root(x: f64) -> Result[f64, str]:",
+    "    if x < 0.0:",
+    "        return Err(\"negative number\")",
+    "    unsafe:",
+    "        return Ok(sqrt(x))",
+    "",
+    "fn main():",
+    "    match square_root(16.0):",
+    "        Ok(v):",
+    "            print(v)",
+    "        Err(m):",
+    "            print(m)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l04-q1",
+   "q": "¿Cuál es el propósito de un envoltorio seguro?",
+   "options": [
+    "Ralentizar el código",
+    "Reunir el código `unsafe` en un lugar pequeño y mantener seguro a quien llama",
+    "Eliminar `extern`"
+   ],
+   "answer": 1,
+   "why": "Se reduce la superficie `unsafe` que hay que auditar."
+  }
+ ]
+}

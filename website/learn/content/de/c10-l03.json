@@ -1,0 +1,98 @@
+{
+ "title": "HashMap und HashSet",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.collections` bietet das Schlüssel → Wert-Wörterbuch **`HashMap[K, V]`** und die Menge ohne Wiederholungen **`HashSet[K]`**. `hashmap_new[K, V]()` erzeugt ein leeres Wörterbuch; `insert` fügt hinzu, `get` liefert ein `Optional`, `get_or` gibt einen Standardwert, `contains` fragt, ob ein Schlüssel existiert, und `len` sagt, wie viele es gibt."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    ages = collections.hashmap_new[str, i32]()",
+    "    ages.insert(\"ali\", 30)",
+    "    ages.insert(\"ayse\", 25)",
+    "    print(ages.len())",
+    "    print(ages.get_or(\"ali\", 0))",
+    "    print(ages.contains(\"zeynep\"))",
+    "    match ages.get(\"ayse\"):",
+    "        Valid(a):",
+    "            print(\"ayse is\", a)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "2",
+    "30",
+    "false",
+    "ayse is 25"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    seen = collections.hashset_new[i32]()",
+    "    print(seen.insert(3))",
+    "    print(seen.insert(7))",
+    "    print(seen.insert(3))",
+    "    print(seen.len(), seen.contains(7))"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "true",
+    "false",
+    "2 true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`HashSet.insert` gibt `true` zurück, wenn der Schlüssel neu war, und `false`, wenn er schon da war; praktisch, um Wiederholungen zu finden."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l03-x1",
+   "prompt": "Zähle mit einer `HashMap[str, i32]`, wie oft jedes der Wörter `\"a\"`, `\"b\"`, `\"a\"`, `\"c\"`, `\"b\"`, `\"a\"` vorkommt, und gib den Zähler für `\"a\"` aus.",
+   "starter": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    words: [6]str = [\"a\", \"b\", \"a\", \"c\", \"b\", \"a\"]",
+    "    counts = collections.hashmap_new[str, i32]()",
+    "    print(counts.get_or(\"a\", 0))"
+   ],
+   "solution": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    words: [6]str = [\"a\", \"b\", \"a\", \"c\", \"b\", \"a\"]",
+    "    counts = collections.hashmap_new[str, i32]()",
+    "    for w in words:",
+    "        counts.insert(w, counts.get_or(w, 0) + 1)",
+    "    print(counts.get_or(\"a\", 0))"
+   ],
+   "hint": "Führe für jedes Wort `counts.insert(w, counts.get_or(w, 0) + 1)` aus.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l03-q1",
+   "q": "Was liefert `get_or(key, 0)`, wenn der Schlüssel fehlt?",
+   "options": [
+    "Einen Fehler",
+    "0 (den angegebenen Standardwert)",
+    "`None`"
+   ],
+   "answer": 1,
+   "why": "`get_or` nimmt einen Standardwert; `get` liefert ein `Optional`."
+  }
+ ]
+}

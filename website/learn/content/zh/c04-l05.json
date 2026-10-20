@@ -1,0 +1,73 @@
+{
+ "title": "切片",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**切片**（`[]T`）是对数组（或一块内存）的长度可变的视图。如果函数参数是 `[]i32`，它就接受任意大小的数组。想取子范围，写 `array[a..b]`（不含 `b`）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total",
+    "",
+    "fn main():",
+    "    data: [5]i32 = [1, 2, 3, 4, 5]",
+    "    print(\"total:\", sum(data))",
+    "    print(\"part:\", sum(data[1..4]))"
+   ],
+   "run": true,
+   "output": [
+    "total: 15",
+    "part: 9"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "切片是一个视图，所以在切片被使用期间，它所基于的数组不能被修改、移动或消失。编译器会检查这一点，因此切片永远不会“悬空”。"
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l05-x1",
+   "prompt": "编写 `average(items: []i32) -> i32`：元素之和除以元素个数（`items.len` 是 `usize`，用 `i32(items.len)` 转换）。对 `[2, 4, 6, 8]` 输出结果。",
+   "starter": [
+    "fn average(items: []i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "solution": [
+    "fn average(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total / i32(items.len)",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "hint": "先求总和，再除以 `i32(items.len)`。",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l05-q1",
+   "q": "什么可以传给 `[]i32` 参数？",
+   "options": [
+    "只有 5 个元素的数组",
+    "任意大小的 `[N]i32` 数组，或它的子范围",
+    "只有文本"
+   ],
+   "answer": 1,
+   "why": "切片不固定长度，所以适用于任何大小。"
+  }
+ ]
+}

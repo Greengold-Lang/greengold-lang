@@ -1,0 +1,76 @@
+{
+ "title": "Módulos e import",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "La biblioteca estándar está formada por módulos `std.*`. Tomas un módulo con `import std.módulo` al principio del archivo; los nombres se escriben con el nombre del módulo: `math.sqrt(...)`. Para tomar nombres concretos directamente, escribe `import std.math { sqrt }`; para renombrar, `import std.math as m`. El núcleo (prelude) y los elementos integrados no necesitan import (`print`, `List`, `Optional`, `Result`...)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(16.0))",
+    "    print(math.pow(2.0, 10.0))"
+   ],
+   "run": true,
+   "output": [
+    "4",
+    "1024"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math { sqrt, floor }",
+    "",
+    "fn main():",
+    "    print(sqrt(81.0))",
+    "    print(floor(3.99))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "3"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Cada import es válido solo para ese archivo y no pasa a otros archivos. Puedes consultar qué hay en cada módulo en la **referencia de la biblioteca estándar** del menú de la izquierda; en una terminal, `gg api` imprime la misma lista."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l01-x1",
+   "prompt": "Importa `sqrt` y `pow` directamente de `std.math`. Imprime `sqrt(49.0)` y `pow(3.0, 4.0)`.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.math { sqrt, pow }",
+    "",
+    "fn main():",
+    "    print(sqrt(49.0))",
+    "    print(pow(3.0, 4.0))"
+   ],
+   "hint": "Escribe `import std.math { sqrt, pow }`.",
+   "expected": [
+    "7",
+    "81"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l01-q1",
+   "q": "¿Para cuál no hace falta `import`?",
+   "options": [
+    "`math.sqrt`",
+    "`List` y `print`",
+    "`sort.sort`"
+   ],
+   "answer": 1,
+   "why": "El prelude del núcleo y los elementos integrados están siempre en el ámbito."
+  }
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "title": "Closures: äußere Variablen einfangen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Eine Lambda kann Variablen der Funktion verwenden, in der sie geschrieben ist; das heißt **Closure**. Kopierbare Werte (Zahlen, einfache Structs) werden beim Erzeugen der Lambda **kopiert**; Werte mit Heap-Besitz wie `List` werden als `read` **ausgeliehen**. Solange die Closure benutzt wird, darf die ausgeliehene Variable nicht geändert oder verschoben werden; der Compiler prüft das."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn apply(f: fn(i32) -> i32, x: i32) -> i32:",
+    "    return f(x)",
+    "",
+    "fn main():",
+    "    k = 3",
+    "    add_k = fn(x: i32) -> i32 => x + k",
+    "    print(add_k(1), apply(add_k, 10))",
+    "",
+    "    xs = List[i32]()",
+    "    xs.push(7)",
+    "    has = fn(i: i32) -> bool => xs.len > usize(i)",
+    "    print(has(0))",
+    "    xs.push(8)"
+   ],
+   "run": true,
+   "output": [
+    "4 13",
+    "true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Wenn der Rumpf der Lambda die eingefangene Variable **ändert** (`fn(x: i32) => out.push(x)`), leiht die Closure sie als `lend` aus: Die Variable darf nicht `fixed` sein und ist, solange die Closure benutzt wird, von anderswo nicht erreichbar."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l04-x1",
+   "prompt": "Schreibe eine Lambda, die die Variable `factor` einfängt: Sie multipliziert ihre Eingabe mit `factor` (`factor = 4`). Gib `scale(5)` aus.",
+   "starter": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x",
+    "    print(scale(5))"
+   ],
+   "solution": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x * factor",
+    "    print(scale(5))"
+   ],
+   "hint": "Mach den Rumpf zu `x * factor`.",
+   "expected": [
+    "20"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l04-q1",
+   "q": "Was passiert, wenn eine Lambda eine Zahl einfängt?",
+   "options": [
+    "Sie wird kopiert",
+    "Sie wird verschoben",
+    "Sie wird gelöscht"
+   ],
+   "answer": 0,
+   "why": "Copy-Typen werden beim Einfangen kopiert; Move-Typen werden ausgeliehen oder verschoben."
+  }
+ ]
+}

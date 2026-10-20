@@ -1,0 +1,76 @@
+{
+ "title": "Valores compartidos y trabajo en paralelo",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**`Shared[T]`** da un valor inmutable a varios propietarios (`clone()` añade un propietario y el valor se libera cuando el último lo suelta). Sirve para datos que se leen pero no se cambian, como la configuración."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Config:",
+    "    name: string",
+    "    limits: List[i32]",
+    "",
+    "fn limit_sum(c: Shared[Config]) -> i32:",
+    "    t = 0",
+    "    for x in c.value.limits:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn main():",
+    "    limits = List[i32]()",
+    "    limits.push(10)",
+    "    limits.push(20)",
+    "    cfg = Shared[Config](Config{ name: string.from(\"prod\"), limits: limits })",
+    "    other = cfg.clone()",
+    "    print(limit_sum(cfg), other.value.name.as_str())"
+   ],
+   "run": true,
+   "output": [
+    "30 prod"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Para procesar un array grande en todos los núcleos, `std.parallel` ofrece un **pool**: `Pool.new(n)`, `map_i64`, `map_f64`, `reduce_i64`, `reduce_f64` y `cpu_count()`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.parallel",
+    "",
+    "fn square(x: i64) -> i64:",
+    "    return x * x",
+    "",
+    "fn add(a: i64, b: i64) -> i64:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    pool = parallel.Pool.new(parallel.cpu_count())",
+    "    src = List[i64]()",
+    "    for i in 1..=10:",
+    "        src.push(i64(i))",
+    "    dst = List[i64]()",
+    "    for i in 1..=10:",
+    "        dst.push(0)",
+    "    parallel.map_i64(pool, src, dst, square)",
+    "    print(parallel.reduce_i64(pool, dst, 0, add))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l05-q1",
+   "q": "¿Para qué tipo de datos sirve `Shared[T]`?",
+   "options": [
+    "Contadores que cambian constantemente",
+    "Datos compartidos que se leen pero no se cambian",
+    "Solo números"
+   ],
+   "answer": 1,
+   "why": "Para datos que cambian se usan `Locked[T]` o atómicos."
+  }
+ ]
+}

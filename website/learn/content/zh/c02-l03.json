@@ -1,0 +1,68 @@
+{
+ "title": "while 循环",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "只要条件为真，`while` 就重复缩进部分。最终必须有什么让条件变为假，否则就会形成死循环。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 5",
+    "    while n > 0:",
+    "        print(\"Countdown:\", n)",
+    "        n -= 1",
+    "    print(\"Fire!\")"
+   ],
+   "run": true,
+   "output": [
+    "Countdown: 5",
+    "Countdown: 4",
+    "Countdown: 3",
+    "Countdown: 2",
+    "Countdown: 1",
+    "Fire!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "条件在每一轮的**开头**检查；如果一开始就是假，循环体一次都不会运行。"
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l03-x1",
+   "prompt": "让 `x` 从 1 开始，每轮翻一倍；当 `x` 大于 100 时停止，然后输出 `x`。",
+   "starter": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        pass",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        x *= 2",
+    "    print(x)"
+   ],
+   "hint": "把 `pass` 换成 `x *= 2`。",
+   "expected": [
+    "128"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l03-q1",
+   "q": "当 `n = 0` 时，`while n > 0:` 的循环体会运行多少次？",
+   "options": [
+    "一次",
+    "从不",
+    "永远"
+   ],
+   "answer": 1,
+   "why": "条件一开始就是假，所以循环体从不运行。"
+  }
+ ]
+}

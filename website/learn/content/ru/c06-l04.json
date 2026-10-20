@@ -1,0 +1,70 @@
+{
+ "title": "match как выражение",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` тоже может давать значение: каждую ветку связывают с одним выражением через `=>`, а результат присваивают переменной или возвращают через `return`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn error_message(code: i32) -> str:",
+    "    return match code:",
+    "        0 => \"success\"",
+    "        1 => \"file not found\"",
+    "        2 => \"access denied\"",
+    "        _ => \"general error\"",
+    "",
+    "fn main():",
+    "    print(error_message(2))",
+    "    msg = match 0:",
+    "        0 => \"OK\"",
+    "        _ => \"Error!\"",
+    "    print(msg)"
+   ],
+   "run": true,
+   "output": [
+    "access denied",
+    "OK"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l04-x1",
+   "prompt": "Напишите `days_in(month: i32) -> i32` (28 для февраля): 2 => 28; 4, 6, 9, 11 => 30; остальные => 31. Выведите для месяца 9.",
+   "starter": [
+    "fn days_in(month: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "solution": [
+    "fn days_in(month: i32) -> i32:",
+    "    return match month:",
+    "        2 => 28",
+    "        4 | 6 | 9 | 11 => 30",
+    "        _ => 31",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "hint": "Напишите три ветки после `return match month:`.",
+   "expected": [
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l04-q1",
+   "q": "Каким должно быть значение каждой ветки в `match`-выражении?",
+   "options": [
+    "Может быть любого типа",
+    "Должно быть одного типа",
+    "Должно быть строкой"
+   ],
+   "answer": 1,
+   "why": "Результат попадает в одну переменную, поэтому типы должны совпадать."
+  }
+ ]
+}

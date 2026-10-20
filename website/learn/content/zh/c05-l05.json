@@ -1,0 +1,100 @@
+{
+ "title": "编译器找出模式",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "好消息：大多数时候你**不必写**这三种模式。对于拥有堆内存的类型（`List`、`string`、`Box` 以及包含它们的结构体），如果参数上没写模式，编译器会**查看函数体并自己检测出模式**："
+  },
+  {
+   "t": "p",
+   "text": "如果函数体只**读取**参数 → `read`；如果**修改**它 → `lend`；如果把它**移动**给另一个所有者 → `consume`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn add(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn wrap(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add(v)",
+    "    add(v)",
+    "    print(total(v))",
+    "    b = wrap(v)",
+    "    print(b.items.len)"
+   ],
+   "run": true,
+   "output": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "这三个函数都没有写模式。`add` 变成了 `lend`，因为它修改列表；`total` 变成了 `read`，因为它只读取；`wrap` 变成了 `consume`，因为它把列表放进了 `Bag`。在 `wrap(v)` 之后，变量 `v` 不能再使用；如果你试图使用，编译器会报告错误，并告诉你**它检测到的模式以及原因**。"
+  },
+  {
+   "t": "p",
+   "text": "对于数字和普通结构体这类 Copy 类型，如果没有写模式，值会被**复制**，在函数内部不能修改；想就地修改，就要明确写出 `lend`（`n: lend i32`）。你随时可以自己写出模式（为了可读性，或者为了固定这个决定）。"
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l05-x1",
+   "prompt": "不写任何模式，编写 `keep(xs: List[i32]) -> Bag`：它把列表放进一个 `Bag`（编译器会把它检测为 `consume`）。在 `main` 中用一个 3 个元素的列表调用它，并输出 `b.items.len`。",
+   "starter": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn keep(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    b = keep(v)",
+    "    print(b.items.len)"
+   ],
+   "hint": "`return Bag{ items: xs }`；然后 `b = keep(v)` 和 `print(b.items.len)`。",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l05-q1",
+   "q": "你没有给拥有堆内存的 `List` 参数写模式，函数体调用了 `xs.push(1)`。编译器会检测出哪种模式？",
+   "options": [
+    "`read`",
+    "`lend`",
+    "`consume`"
+   ],
+   "answer": 1,
+   "why": "函数体修改了列表，所以模式是 `lend`；你不必写出来。"
+  }
+ ]
+}

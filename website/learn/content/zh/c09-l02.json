@@ -1,0 +1,65 @@
+{
+ "title": "回调",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "把函数存放在结构体字段中是事件驱动程序的基础：“当这个事件发生时，调用那个函数”。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Button:",
+    "    id: i32",
+    "    on_click: fn(i32)",
+    "",
+    "fn notify(id: i32):",
+    "    print(\"button pressed:\", id)",
+    "",
+    "fn main():",
+    "    b = Button{ id: 101, on_click: notify }",
+    "    b.on_click(b.id)"
+   ],
+   "run": true,
+   "output": [
+    "button pressed: 101"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l02-x1",
+   "prompt": "构建一个 `Timer` 结构体（`name: str`，`on_finish: fn(str)`）。用一个 `report(name)` 函数（输出 `finished: ` 和名字）作为 `on_finish`，并对 `Timer{ name: \"tea\", ... }` 调用它。",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Timer:",
+    "    name: str",
+    "    on_finish: fn(str)",
+    "",
+    "fn report(name: str):",
+    "    print(\"finished:\", name)",
+    "",
+    "fn main():",
+    "    t = Timer{ name: \"tea\", on_finish: report }",
+    "    t.on_finish(t.name)"
+   ],
+   "hint": "字段类型是 `fn(str)`，调用方式是 `t.on_finish(t.name)`。",
+   "expected": [
+    "finished: tea"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l02-q1",
+   "q": "如何调用存放在结构体字段中的函数？",
+   "options": [
+    "`b.on_click(b.id)`",
+    "`call(b.on_click)`",
+    "无法调用"
+   ],
+   "answer": 0,
+   "why": "该字段是一个函数值，所以用括号调用。"
+  }
+ ]
+}

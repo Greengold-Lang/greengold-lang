@@ -1,0 +1,62 @@
+{
+ "title": "Точные десятичные числа: std.decimal",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.decimal` предлагает **точные десятичные числа**, заданные 128-битным целым (`mantissa`) и числом знаков после запятой (`scale`). `add`, `sub`, `mul` дают точные результаты и останавливаются, если результат не помещается (никогда не молча неверные). `div` и `round` требуют число знаков и правило округления (`HALF_EVEN`: банковское округление, `HALF_UP`...)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.decimal { Decimal, decimal_parse, decimal_from_int, HALF_EVEN }",
+    "",
+    "fn main():",
+    "    price = decimal_parse(\"19.99\").value_or_panic()",
+    "    total = price.mul(decimal_from_int(3))",
+    "    tax = total.mul(decimal_parse(\"0.0825\").value_or_panic()).round(2, HALF_EVEN)",
+    "    print(total.to_string().as_str())",
+    "    print(total.add(tax).to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "59.97",
+    "64.92"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l02-x1",
+   "prompt": "Прочитайте `0.1` и `0.2` через `decimal_parse`, сложите их и выведите результат (он должен быть ровно `0.3`).",
+   "starter": [
+    "import std.decimal { Decimal, decimal_parse }",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.decimal { Decimal, decimal_parse }",
+    "",
+    "fn main():",
+    "    a = decimal_parse(\"0.1\").value_or_panic()",
+    "    b = decimal_parse(\"0.2\").value_or_panic()",
+    "    print(a.add(b).to_string().as_str())"
+   ],
+   "hint": "`a.add(b).to_string().as_str()`",
+   "expected": [
+    "0.3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l02-q1",
+   "q": "Что произойдёт, если результат `Decimal.add` не помещается?",
+   "options": [
+    "Молча даст неверный результат",
+    "Программа остановится (trap); неверное значение не получится никогда",
+    "Вернёт ноль"
+   ],
+   "answer": 1,
+   "why": "В Greengold переполнение никогда не бывает тихим."
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+{
+ "title": "Eingebettete Systeme: CAN, mmio, hal",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.can` bietet CAN-Bus-Frames (klassisch 8 Bytes, CAN FD 64 Bytes), den 15-Bit-CRC des klassischen CAN und das SAE-J1939-Kennungslayout, das in Lkw, Schiffen und Motoren verwendet wird. Es reserviert keinen Speicher und braucht keine libc."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.can { CanFrame, j1939_id, j1939_parse }",
+    "",
+    "fn main():",
+    "    f = CanFrame.data_frame(0x123, [1, 2, 3])",
+    "    print(f.id, f.len, f.is_valid())",
+    "    id = j1939_id(6, 0xF004, 0)",
+    "    info = j1939_parse(id)",
+    "    print(info.priority, info.pgn, info.source)"
+   ],
+   "run": true,
+   "output": [
+    "291 3 true",
+    "6 61444 0"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**`std.mmio`** liest und schreibt speicherabgebildete Hardware-Register mit `volatile`-Zugriff: Der Compiler lässt die Zugriffe nie weg, verschmilzt oder ordnet sie nie um. **`std.hal`** definiert Treiberschnittstellen, die Boards gemeinsam nutzen (`OutputPin`, `I2c`, `SpiBus`, `Uart`, `Delay`); ein Treiber nimmt die benötigte Schnittstelle als generischen Parameter und läuft auf jedem Board. Zum Testen gibt es `MockPin`, `MockBus`, `MockDelay`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hal { I2c, Delay }",
+    "",
+    "fn read_temperature[B: I2c, D: Delay](bus: lend B, delay: lend D) -> Optional[i32]:",
+    "    if not bus.write(0x48, [0]):",
+    "        return None",
+    "    delay.delay_us(1000)",
+    "    return Valid(25)",
+    "",
+    "fn main():",
+    "    print(\"driver compiles\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Bare-Metal-Programme werden mit `gg build --no-std --target cortex-m4 --linker-script link.ld` gebaut; `gg new --template cortex-m` richtet ein fertiges Gerüst ein. Für die Stack-Grenze gibt es `gg stack-usage` und die Optionen `--forbid-heap --forbid-recursion --max-stack 1024`."
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l05-q1",
+   "q": "Warum verwendet `std.mmio` `volatile`-Zugriff?",
+   "options": [
+    "Weil es schneller ist",
+    "Damit der Compiler Hardwarezugriffe nie weglässt oder umordnet",
+    "Um Speicher zu sparen"
+   ],
+   "answer": 1,
+   "why": "Das Lesen/Schreiben eines Registers hat Nebenwirkungen; Optimierung könnte sie zerstören."
+  }
+ ]
+}

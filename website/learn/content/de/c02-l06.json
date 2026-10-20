@@ -1,0 +1,67 @@
+{
+ "title": "break, continue, pass",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`break` beendet die Schleife sofort. `continue` überspringt den Rest dieser Runde und geht zur nächsten. `pass` tut nichts: Greengold erlaubt keinen leeren Rumpf, also schreibst du es dorthin, wo du absichtlich einen leer lässt."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..10:",
+    "        if i == 3:",
+    "            continue",
+    "        if i == 7:",
+    "            break",
+    "        print(i)"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "1",
+    "2",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Oben wurde die 3 übersprungen, und die Schleife endete bei 7."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l06-x1",
+   "prompt": "Finde unter den Zahlen von 1 bis 20 die erste, die durch 7 teilbar ist, gib sie aus und verlasse dann die Schleife.",
+   "starter": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        pass"
+   ],
+   "solution": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        if i % 7 == 0:",
+    "            print(i)",
+    "            break"
+   ],
+   "hint": "Schreibe innerhalb von `if i % 7 == 0:` `print(i)` und `break`.",
+   "expected": [
+    "7"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l06-q1",
+   "q": "Was bewirkt `continue`?",
+   "options": [
+    "Beendet die Schleife",
+    "Überspringt den Rest dieser Runde und geht zur nächsten",
+    "Hält das Programm an"
+   ],
+   "answer": 1,
+   "why": "`break` ist es, das die Schleife beendet."
+  }
+ ]
+}

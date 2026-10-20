@@ -1,0 +1,79 @@
+{
+ "title": "新项目与 gg.toml",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold 的所有工具都集中在一个命令里：**`gg`**。你不需要外部的包管理器、格式化器或测试库。从这一课开始，你要**在自己电脑的终端里**运行这些命令（它们不能在浏览器编辑器中运行）。创建新项目："
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg new my_project",
+    "cd my_project"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "这会建立标准的文件夹结构："
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "my_project/",
+    "├── gg.toml         # package and dependency manifest",
+    "└── src/",
+    "    └── main.gg     # the entry point with sample code"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "`gg.toml` 保存项目的标识、入口文件和依赖："
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "[package]",
+    "name = \"my_project\"",
+    "version = \"0.1.0\"",
+    "main = \"src/main.gg\"",
+    "",
+    "[dependencies]",
+    "# math_utils = { path = \"../shared/math_utils\" }"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "添加依赖后，你可以在项目的某个文件中写 `import math_utils.matrix`；这会在该文件中绑定名字 `matrix`。`import math_utils.matrix as m` 用来重命名，`import math_utils.matrix { mul }` 直接引入选定的名字。每个文件各自写自己的 `import` 行；`fn main` 只存在于你编译的根文件中。"
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q1",
+   "q": "哪个命令创建新的 Greengold 项目？",
+   "options": [
+    "`gg init`",
+    "`gg new my_project`",
+    "`gg create`"
+   ],
+   "answer": 1,
+   "why": "`gg new` 会创建 `gg.toml` 和 `src/main.gg`。"
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q2",
+   "q": "依赖定义在哪个文件中？",
+   "options": [
+    "`main.gg`",
+    "`gg.toml`",
+    "`README.md`"
+   ],
+   "answer": 1,
+   "why": "项目清单在 `gg.toml` 中。"
+  }
+ ]
+}

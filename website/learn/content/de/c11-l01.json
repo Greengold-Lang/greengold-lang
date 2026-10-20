@@ -1,0 +1,79 @@
+{
+ "title": "Ein neues Projekt und gg.toml",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Alle Werkzeuge von Greengold stecken in einem einzigen Befehl: **`gg`**. Du brauchst keinen externen Paketmanager, Formatierer oder keine Testbibliothek. Ab dieser Lektion führst du die Befehle **in einem Terminal auf deinem eigenen Computer** aus (sie laufen nicht im Editor des Browsers). Für ein neues Projekt:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg new my_project",
+    "cd my_project"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Das richtet die Standard-Ordnerstruktur ein:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "my_project/",
+    "├── gg.toml         # package and dependency manifest",
+    "└── src/",
+    "    └── main.gg     # the entry point with sample code"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "`gg.toml` enthält die Identität des Projekts, seine Einstiegsdatei und seine Abhängigkeiten:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "[package]",
+    "name = \"my_project\"",
+    "version = \"0.1.0\"",
+    "main = \"src/main.gg\"",
+    "",
+    "[dependencies]",
+    "# math_utils = { path = \"../shared/math_utils\" }"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Nachdem du eine Abhängigkeit hinzugefügt hast, kannst du in einer Datei deines Projekts `import math_utils.matrix` schreiben; das bindet den Namen `matrix` in dieser Datei. `import math_utils.matrix as m` benennt um, und `import math_utils.matrix { mul }` holt einen bestimmten Namen direkt. Jede Datei schreibt ihre eigenen `import`-Zeilen; `fn main` gibt es nur in der Wurzeldatei, die du kompilierst."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q1",
+   "q": "Welcher Befehl richtet ein neues Greengold-Projekt ein?",
+   "options": [
+    "`gg init`",
+    "`gg new my_project`",
+    "`gg create`"
+   ],
+   "answer": 1,
+   "why": "`gg new` erstellt `gg.toml` und `src/main.gg`."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q2",
+   "q": "In welcher Datei werden Abhängigkeiten definiert?",
+   "options": [
+    "`main.gg`",
+    "`gg.toml`",
+    "`README.md`"
+   ],
+   "answer": 1,
+   "why": "Das Projektmanifest steht in `gg.toml`."
+  }
+ ]
+}

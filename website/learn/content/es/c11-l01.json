@@ -1,0 +1,79 @@
+{
+ "title": "Un proyecto nuevo y gg.toml",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Todas las herramientas de Greengold viven en un solo comando: **`gg`**. No necesitas un gestor de paquetes, un formateador ni una biblioteca de pruebas externos. A partir de esta lección ejecutas los comandos **en una terminal de tu propio ordenador** (no funcionan en el editor del navegador). Para un proyecto nuevo:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg new my_project",
+    "cd my_project"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Esto crea la estructura de carpetas estándar:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "my_project/",
+    "├── gg.toml         # package and dependency manifest",
+    "└── src/",
+    "    └── main.gg     # the entry point with sample code"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "`gg.toml` contiene la identidad del proyecto, su archivo de entrada y sus dependencias:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "[package]",
+    "name = \"my_project\"",
+    "version = \"0.1.0\"",
+    "main = \"src/main.gg\"",
+    "",
+    "[dependencies]",
+    "# math_utils = { path = \"../shared/math_utils\" }"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Después de añadir una dependencia puedes escribir `import math_utils.matrix` en un archivo de tu proyecto; esto enlaza el nombre `matrix` en ese archivo. `import math_utils.matrix as m` lo renombra e `import math_utils.matrix { mul }` toma un nombre concreto directamente. Cada archivo escribe sus propias líneas `import`; `fn main` existe solo en el archivo raíz que compilas."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q1",
+   "q": "¿Qué comando crea un proyecto nuevo de Greengold?",
+   "options": [
+    "`gg init`",
+    "`gg new my_project`",
+    "`gg create`"
+   ],
+   "answer": 1,
+   "why": "`gg new` crea `gg.toml` y `src/main.gg`."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q2",
+   "q": "¿En qué archivo se definen las dependencias?",
+   "options": [
+    "`main.gg`",
+    "`gg.toml`",
+    "`README.md`"
+   ],
+   "answer": 1,
+   "why": "El manifiesto del proyecto está en `gg.toml`."
+  }
+ ]
+}

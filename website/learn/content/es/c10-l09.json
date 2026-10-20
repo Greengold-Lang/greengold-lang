@@ -1,0 +1,65 @@
+{
+ "title": "Fechas y duraciones: std.time",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.time` ofrece la hora actual (`now_utc()`, `Instant.now()`) y cálculos con fechas. Guarda las fechas como tiempo Unix en milisegundos: `datetime_from_unix_millis(0)` da 1970-01-01. Tiene métodos como `add_days`, `add_months`, `weekday_name`, `to_iso`, `format`. Para lapsos de tiempo usa `Duration`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.time",
+    "",
+    "fn main():",
+    "    d = time.datetime_from_unix_millis(0)",
+    "    print(d.to_iso().as_str())",
+    "    print(d.weekday_name())",
+    "    later = d.add_days(100)",
+    "    print(later.to_iso().as_str())",
+    "    print(time.is_leap_year(2024), time.days_in_month(2024, 2))"
+   ],
+   "run": true,
+   "output": [
+    "1970-01-01T00:00:00Z",
+    "Thursday",
+    "1970-04-11T00:00:00Z",
+    "true 29"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l09-x1",
+   "prompt": "Suma 365 días a 1970-01-01 e imprímelo en formato ISO.",
+   "starter": [
+    "import std.time",
+    "",
+    "fn main():",
+    "    d = time.datetime_from_unix_millis(0)",
+    "    print(d.to_iso().as_str())"
+   ],
+   "solution": [
+    "import std.time",
+    "",
+    "fn main():",
+    "    d = time.datetime_from_unix_millis(0)",
+    "    print(d.add_days(365).to_iso().as_str())"
+   ],
+   "hint": "`d.add_days(365)`",
+   "expected": [
+    "1971-01-01T00:00:00Z"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l09-q1",
+   "q": "¿Qué fecha da `datetime_from_unix_millis(0)`?",
+   "options": [
+    "2000-01-01",
+    "1970-01-01",
+    "La fecha de hoy"
+   ],
+   "answer": 1,
+   "why": "El tiempo Unix empieza el 1 de enero de 1970."
+  }
+ ]
+}

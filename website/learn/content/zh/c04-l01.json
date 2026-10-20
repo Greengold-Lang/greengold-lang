@@ -1,0 +1,89 @@
+{
+ "title": "结构体（Struct）",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "想把相关的值聚在一个名字下，就用 **`struct`**。字段以 `名字: 类型` 列出；创建值时写 `类型{ 字段: 值, ... }`，用 `.` 访问字段。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Point:",
+    "    x: f64",
+    "    y: f64",
+    "",
+    "fn main():",
+    "    p = Point{ x: 1.0, y: 2.5 }",
+    "    print(\"x:\", p.x)",
+    "    print(\"y:\", p.y)",
+    "    p.x = 10.0",
+    "    print(\"new x:\", p.x)"
+   ],
+   "run": true,
+   "output": [
+    "x: 1",
+    "y: 2.5",
+    "new x: 10"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "除非变量是 `fixed`，字段都可以修改。结构体可以作为参数传给函数，也可以从函数返回。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rect:",
+    "    w: i32",
+    "    h: i32",
+    "",
+    "fn area(r: Rect) -> i32:",
+    "    return r.w * r.h",
+    "",
+    "fn main():",
+    "    room = Rect{ w: 4, h: 5 }",
+    "    print(area(room))"
+   ],
+   "run": true,
+   "output": [
+    "20"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l01-x1",
+   "prompt": "定义一个 `Person` 结构体，包含 `name: str` 和 `age: i32`。创建 `Person{ name: \"Ada\", age: 36 }`，先输出名字，再输出年龄。",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Person:",
+    "    name: str",
+    "    age: i32",
+    "",
+    "fn main():",
+    "    p = Person{ name: \"Ada\", age: 36 }",
+    "    print(p.name)",
+    "    print(p.age)"
+   ],
+   "hint": "把 `struct Person:` 和它的两个字段写在 `main` 上面。",
+   "expected": [
+    "Ada",
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l01-q1",
+   "q": "怎样访问结构体的字段 `x`？",
+   "options": [
+    "p->x",
+    "p.x",
+    "p[x]"
+   ],
+   "answer": 1,
+   "why": "字段访问使用点号：`p.x`。"
+  }
+ ]
+}

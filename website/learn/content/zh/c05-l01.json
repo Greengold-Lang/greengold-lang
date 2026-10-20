@@ -1,0 +1,109 @@
+{
+ "title": "参数模式：read",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "在 Greengold 中，内存安全不需要复杂的生命周期语法，而是来自你向函数传递数据时选择的**三种模式**：`read`（只读）、`lend`（借用并就地修改）和 `consume`（接管所有权）。这一课你会看到第一种。"
+  },
+  {
+   "t": "p",
+   "text": "如果不写模式，数字和普通结构体会被**复制**，并且在函数内部不能修改。这类生活在栈上、不拥有堆内存的类型叫做 **Copy 类型**。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn show_health(p: Player):",
+    "    print(\"Current health:\", p.health)",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    show_health(hero)",
+    "    print(\"Still:\", hero.health)"
+   ],
+   "run": true,
+   "output": [
+    "Current health: 100",
+    "Still: 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**通常不需要写模式：编译器会自动检测。** 对于拥有堆内存的类型（例如 `List`），如果没有写模式，编译器会查看函数体：如果参数只被读取，它就是 `read`。可以同时存在许多 `read`；这是安全的，因为没有人修改数据。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(total(v))",
+    "    print(total(v))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l01-x1",
+   "prompt": "编写 `count_positive(xs: List[i32]) -> i32`，返回列表中正数的个数。因为列表仍然可用，所以调用两次并输出两个结果。",
+   "starter": [
+    "fn count_positive(xs: List[i32]) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(-2)",
+    "    v.push(7)",
+    "    print(count_positive(v))",
+    "    print(count_positive(v))"
+   ],
+   "solution": [
+    "fn count_positive(xs: List[i32]) -> i32:",
+    "    n = 0",
+    "    for x in xs:",
+    "        if x > 0:",
+    "            n += 1",
+    "    return n",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(-2)",
+    "    v.push(7)",
+    "    print(count_positive(v))",
+    "    print(count_positive(v))"
+   ],
+   "hint": "当 `x > 0` 时增加计数器 `n`。",
+   "expected": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l01-q1",
+   "q": "`read` 参数在函数内部能做什么？",
+   "options": [
+    "被修改",
+    "只能被读取",
+    "被删除"
+   ],
+   "answer": 1,
+   "why": "`read` 是只读的；试图修改它是编译错误。"
+  }
+ ]
+}

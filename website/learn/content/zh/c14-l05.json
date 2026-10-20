@@ -1,0 +1,64 @@
+{
+ "title": "嵌入式系统：CAN、mmio、hal",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.can` 提供 CAN 总线帧（经典 CAN 8 字节，CAN FD 64 字节）、经典 CAN 的 15 位 CRC，以及卡车、船舶和发动机上使用的 SAE J1939 标识符布局。它不分配内存，也不需要 libc。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.can { CanFrame, j1939_id, j1939_parse }",
+    "",
+    "fn main():",
+    "    f = CanFrame.data_frame(0x123, [1, 2, 3])",
+    "    print(f.id, f.len, f.is_valid())",
+    "    id = j1939_id(6, 0xF004, 0)",
+    "    info = j1939_parse(id)",
+    "    print(info.priority, info.pgn, info.source)"
+   ],
+   "run": true,
+   "output": [
+    "291 3 true",
+    "6 61444 0"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**`std.mmio`** 用 `volatile` 访问来读写内存映射的硬件寄存器：编译器绝不会丢弃、合并或重排这些访问。**`std.hal`** 定义各开发板共用的驱动接口（`OutputPin`、`I2c`、`SpiBus`、`Uart`、`Delay`）；驱动把所需的接口作为泛型参数，在任何开发板上都能运行。测试时可用 `MockPin`、`MockBus`、`MockDelay`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hal { I2c, Delay }",
+    "",
+    "fn read_temperature[B: I2c, D: Delay](bus: lend B, delay: lend D) -> Optional[i32]:",
+    "    if not bus.write(0x48, [0]):",
+    "        return None",
+    "    delay.delay_us(1000)",
+    "    return Valid(25)",
+    "",
+    "fn main():",
+    "    print(\"driver compiles\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "裸机程序用 `gg build --no-std --target cortex-m4 --linker-script link.ld` 构建；`gg new --template cortex-m` 会建立现成的骨架。栈的上限可用 `gg stack-usage` 以及选项 `--forbid-heap --forbid-recursion --max-stack 1024`。"
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l05-q1",
+   "q": "`std.mmio` 为什么使用 `volatile` 访问？",
+   "options": [
+    "因为更快",
+    "这样编译器绝不会丢弃或重排硬件访问",
+    "为了节省内存"
+   ],
+   "answer": 1,
+   "why": "读写寄存器有副作用；优化可能会破坏它们。"
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "title": "Funktionen deklarieren",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Eine Funktion wird mit `fn` deklariert. Parametertypen werden mit `:` geschrieben, der Rückgabetyp mit `->`. Gibt es kein `-> Typ`, liefert die Funktion keinen Wert (`void`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn log_message(msg: str):",
+    "    print(\"[LOG]\", msg)",
+    "",
+    "fn main():",
+    "    result = add(15, 27)",
+    "    log_message(\"addition finished\")",
+    "    print(\"Result:\", result)"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] addition finished",
+    "Result: 42"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Regel: Jede Funktion mit `-> Typ` muss auf **jedem Pfad** des Codes mit einem `return` enden. Sonst meldet der Compiler einen Fehler."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l01-x1",
+   "prompt": "Schreibe die Funktion `subtract(a, b)`: Sie gibt `a - b` zurück. `main` ruft sie auf und gibt das Ergebnis aus.",
+   "starter": [
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "solution": [
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "hint": "Schreibe `fn subtract(a: i32, b: i32) -> i32:` über `main`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l01-q1",
+   "q": "Was liefert eine Funktion ohne `-> Typ` zurück?",
+   "options": [
+    "0",
+    "Keinen Wert (void)",
+    "Eine leere Zeichenkette"
+   ],
+   "answer": 1,
+   "why": "Ohne Rückgabetyp liefert die Funktion keinen Wert."
+  }
+ ]
+}

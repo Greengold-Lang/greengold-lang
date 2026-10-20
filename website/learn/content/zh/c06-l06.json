@@ -1,0 +1,92 @@
+{
+ "title": "实践：命令解释器",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "枚举、携带数据的变体和 `match` 表达式放在一起：一个小计算器。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Subtract(f64, f64)",
+    "    Square(f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Subtract(a, b) => a - b",
+    "        Command.Square(x) => x * x",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    commands: [4]Command = [",
+    "        Command.Add(10.0, 5.0),",
+    "        Command.Square(4.0),",
+    "        Command.Subtract(20.0, 8.0),",
+    "        Command.Reset",
+    "    ]",
+    "    for c in commands:",
+    "        print(\"result:\", evaluate(c))"
+   ],
+   "run": true,
+   "output": [
+    "result: 15",
+    "result: 16",
+    "result: 12",
+    "result: 0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l06-x1",
+   "prompt": "给 `Command` 添加变体 `Multiply(f64, f64)`，并在 `evaluate` 中写它的分支。输出 `Multiply(6.0, 7.0)`。",
+   "starter": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Add(6.0, 7.0)))"
+   ],
+   "solution": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Multiply(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Multiply(a, b) => a * b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Multiply(6.0, 7.0)))"
+   ],
+   "hint": "在枚举和 `match` 两处都添加新分支；缺少任何一处都无法编译。",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l06-q1",
+   "q": "如果给枚举添加了变体但没有更新 `match`，会怎样？",
+   "options": [
+    "旧分支会运行",
+    "编译器会指出缺少的分支",
+    "程序悄悄地出错"
+   ],
+   "answer": 1,
+   "why": "穷尽性检查会在编译时捕捉被遗忘的情况。"
+  }
+ ]
+}

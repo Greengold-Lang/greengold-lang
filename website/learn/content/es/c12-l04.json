@@ -1,0 +1,46 @@
+{
+ "title": "Tareas: async y await",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Para solapar trabajos de espera (temporizadores, red) sin abrir threads existen las **tareas**. `async fn` inicia una tarea y `await` espera su resultado. `sleep` y `yield_now` de `std.tasks` suspenden la tarea. Los tres `sleep` de abajo se **solapan**: el total es de unos 100 ms, no 300."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.tasks",
+    "import std.time",
+    "",
+    "async fn twice(n: i32) -> i32:",
+    "    tasks.sleep(100)",
+    "    return n * 2",
+    "",
+    "fn main():",
+    "    t = time.Instant.now()",
+    "    a = twice(1)",
+    "    b = twice(2)",
+    "    c = twice(3)",
+    "    print(await a + await b + await c)",
+    "    print(t.elapsed_millis() < 250)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "También puedes iniciar una tarea con una lambda: `h = tasks.spawn(fn() -> string => ...)`, y luego `h.is_done()` y `await h`."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l04-q1",
+   "q": "Si tres tareas `async` hacen cada una `sleep` de 100 ms y se inician todas primero, ¿cuánto tardan aproximadamente en total?",
+   "options": [
+    "300 ms",
+    "100 ms (se solapan)",
+    "0 ms"
+   ],
+   "answer": 1,
+   "why": "Las esperas se solapan; ejecutadas una tras otra tardarían 300 ms."
+  }
+ ]
+}

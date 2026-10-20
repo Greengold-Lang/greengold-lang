@@ -1,0 +1,65 @@
+{
+ "title": "日期与时长：std.time",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.time` 提供当前时间（`now_utc()`、`Instant.now()`）和日期计算。它以毫秒为单位的 Unix 时间保存日期：`datetime_from_unix_millis(0)` 得到 1970-01-01。它有 `add_days`、`add_months`、`weekday_name`、`to_iso`、`format` 等方法。时间长度用 `Duration` 表示。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.time",
+    "",
+    "fn main():",
+    "    d = time.datetime_from_unix_millis(0)",
+    "    print(d.to_iso().as_str())",
+    "    print(d.weekday_name())",
+    "    later = d.add_days(100)",
+    "    print(later.to_iso().as_str())",
+    "    print(time.is_leap_year(2024), time.days_in_month(2024, 2))"
+   ],
+   "run": true,
+   "output": [
+    "1970-01-01T00:00:00Z",
+    "Thursday",
+    "1970-04-11T00:00:00Z",
+    "true 29"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l09-x1",
+   "prompt": "给 1970-01-01 加上 365 天，并以 ISO 格式输出。",
+   "starter": [
+    "import std.time",
+    "",
+    "fn main():",
+    "    d = time.datetime_from_unix_millis(0)",
+    "    print(d.to_iso().as_str())"
+   ],
+   "solution": [
+    "import std.time",
+    "",
+    "fn main():",
+    "    d = time.datetime_from_unix_millis(0)",
+    "    print(d.add_days(365).to_iso().as_str())"
+   ],
+   "hint": "`d.add_days(365)`",
+   "expected": [
+    "1971-01-01T00:00:00Z"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l09-q1",
+   "q": "`datetime_from_unix_millis(0)` 给出哪个日期？",
+   "options": [
+    "2000-01-01",
+    "1970-01-01",
+    "今天的日期"
+   ],
+   "answer": 1,
+   "why": "Unix 时间从 1970 年 1 月 1 日开始。"
+  }
+ ]
+}

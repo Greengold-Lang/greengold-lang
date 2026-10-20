@@ -1,0 +1,100 @@
+{
+ "title": "Textverarbeitung: std.string",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Text hat in Greengold zwei Formen: **`str`** (unveränderlich, eine Sicht: `\"hello\"`) und **`string`** (eine UTF-8-Folge, die auf dem Heap wachsen kann). `std.string` bietet Helfer, die mit beiden funktionieren."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    text = \"  apple,pear,banana  \"",
+    "    trimmed = string.str_trim(text)",
+    "    print(trimmed)",
+    "    print(string.str_contains(trimmed, \"pear\"))",
+    "    print(string.str_starts_with(trimmed, \"apple\"))",
+    "    parts = string.str_split(trimmed, ',')",
+    "    print(parts.len)",
+    "    for p in parts:",
+    "        print(p)"
+   ],
+   "run": true,
+   "output": [
+    "apple,pear,banana",
+    "true",
+    "true",
+    "3",
+    "apple",
+    "pear",
+    "banana"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Um einen wachsenden `string` zu bauen, verwende `string.from`, `append_str` und `append_byte`; zum Ausgeben holst du die schreibgeschützte Sicht mit `as_str()`. Zahlenumwandlungen liefern `Optional`: `parse_i64`, `parse_f64`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    msg = string.from(\"Greengold\")",
+    "    msg.append_str(\" Language\")",
+    "    msg.append_byte('!')",
+    "    print(msg.as_str())",
+    "    print(string.parse_i64(\"42\").value_or(0))",
+    "    print(string.parse_i64(\"4x2\").value_or(-1))",
+    "    print(string.to_upper(\"hello\").as_str())"
+   ],
+   "run": true,
+   "output": [
+    "Greengold Language!",
+    "42",
+    "-1",
+    "HELLO"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l02-x1",
+   "prompt": "Teile den Text `\"1,2,3,4\"` an den Kommas, wandle jeden Teil mit `parse_i64` um und gib die Summe aus.",
+   "starter": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    total: i64 = 0",
+    "    print(total)"
+   ],
+   "solution": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    total: i64 = 0",
+    "    parts = string.str_split(\"1,2,3,4\", ',')",
+    "    for p in parts:",
+    "        total += string.parse_i64(p).value_or(0)",
+    "    print(total)"
+   ],
+   "hint": "Teile mit `str_split` und addiere `parse_i64(p).value_or(0)` in einer Schleife.",
+   "expected": [
+    "10"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l02-q1",
+   "q": "Was liefert `string.parse_i64(\"abc\")`?",
+   "options": [
+    "0",
+    "`None` (ein `Optional`)",
+    "Das Programm stürzt ab"
+   ],
+   "answer": 1,
+   "why": "Nicht umwandelbarer Text ergibt `None`; der Misserfolg wird als Wert ausgedrückt."
+  }
+ ]
+}

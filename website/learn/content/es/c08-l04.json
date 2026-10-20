@@ -1,0 +1,104 @@
+{
+ "title": "El operador ?",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Los `match` anidados se complican rápido. El **operador `?`** pasa un error hacia arriba: si la función llamada devolvió `Ok(v)`, `?` extrae el valor `v`; si devolvió `Err(e)`, la función en la que estás se detiene **de inmediato** y devuelve ese mismo error a quien la llamó."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn step_one() -> Result[i32, str]:",
+    "    return Ok(10)",
+    "",
+    "fn step_two(x: i32) -> Result[i32, str]:",
+    "    if x > 5:",
+    "        return Ok(x * 2)",
+    "    return Err(\"x is too small\")",
+    "",
+    "fn workflow() -> Result[i32, str]:",
+    "    val1 = step_one()?",
+    "    val2 = step_two(val1)?",
+    "    return Ok(val2 + 5)",
+    "",
+    "fn main():",
+    "    match workflow():",
+    "        Ok(v):",
+    "            print(\"succeeded:\", v)",
+    "        Err(msg):",
+    "            print(\"failed:\", msg)"
+   ],
+   "run": true,
+   "output": [
+    "succeeded: 25"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Regla: `?` se usa solo en expresiones completas (`x = f()?`, `return f()?`, `f()?`). No se puede usar en subexpresiones como `g(f()?)` o `x += f()?`."
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l04-x1",
+   "prompt": "Escribe `parse_and_double(a: i32) -> Result[i32, str]`: valida con `check(a)?` (`Err(\"negative\")` si es negativo) y luego devuelve `Ok(a * 2)`. Pruébala con 21 y -4.",
+   "starter": [
+    "fn check(a: i32) -> Result[i32, str]:",
+    "    if a < 0:",
+    "        return Err(\"negative\")",
+    "    return Ok(a)",
+    "",
+    "fn parse_and_double(a: i32) -> Result[i32, str]:",
+    "    return Ok(0)",
+    "",
+    "fn show(a: i32):",
+    "    match parse_and_double(a):",
+    "        Ok(v):",
+    "            print(\"ok\", v)",
+    "        Err(m):",
+    "            print(\"error:\", m)",
+    "",
+    "fn main():",
+    "    show(21)",
+    "    show(-4)"
+   ],
+   "solution": [
+    "fn check(a: i32) -> Result[i32, str]:",
+    "    if a < 0:",
+    "        return Err(\"negative\")",
+    "    return Ok(a)",
+    "",
+    "fn parse_and_double(a: i32) -> Result[i32, str]:",
+    "    v = check(a)?",
+    "    return Ok(v * 2)",
+    "",
+    "fn show(a: i32):",
+    "    match parse_and_double(a):",
+    "        Ok(v):",
+    "            print(\"ok\", v)",
+    "        Err(m):",
+    "            print(\"error:\", m)",
+    "",
+    "fn main():",
+    "    show(21)",
+    "    show(-4)"
+   ],
+   "hint": "Escribe `v = check(a)?` y luego devuelve `Ok(v * 2)`.",
+   "expected": [
+    "ok 42",
+    "error: negative"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l04-q1",
+   "q": "En `x = f()?`, ¿qué ocurre si `f()` devuelve `Err`?",
+   "options": [
+    "`x` pasa a ser 0",
+    "La función actual devuelve de inmediato el mismo error",
+    "El programa se cae"
+   ],
+   "answer": 1,
+   "why": "`?` retorna antes de tiempo y pasa el error hacia arriba."
+  }
+ ]
+}

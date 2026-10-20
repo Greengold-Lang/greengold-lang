@@ -1,0 +1,81 @@
+{
+ "title": "Números y tipos",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Todo valor tiene un **tipo**, y el tipo decide cuánta memoria ocupa el valor y qué valores puede contener. Tipos de números enteros: `i8`, `i16`, `i32`, `i64` (con signo, `i` = integer) y `u8`, `u16`, `u32`, `u64` (sin signo, es decir, nunca negativos). El número es el ancho en bits. Para fracciones existen `f32` y `f64`."
+  },
+  {
+   "t": "p",
+   "text": "Si no escribes ningún tipo, los números enteros son `i32` y las fracciones `f64`. Para indicar el tipo tú mismo, escribe `nombre: tipo = valor`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 42",
+    "    pi: f64 = 3.14159",
+    "    age: u8 = 25",
+    "    big: i64 = 5_000_000_000",
+    "    print(a, pi, age, big)"
+   ],
+   "run": true,
+   "output": [
+    "42 3.14159 25 5000000000"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Usa `_` para hacer legibles los números grandes. `0x` inicia un número hexadecimal y `0b` uno binario."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    million = 1_000_000",
+    "    color = 0xFF",
+    "    mask = 0b1100",
+    "    print(million, color, mask)"
+   ],
+   "run": true,
+   "output": [
+    "1000000 255 12"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`usize` es el tipo que se usa para longitudes e índices de arrays; lo verás a menudo más adelante."
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l02-x1",
+   "prompt": "Crea una variable `f64` llamada `radius` igual a 2.0. Imprime `radius * radius * 3.0`.",
+   "starter": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(radius * radius * 3.0)"
+   ],
+   "hint": "Imprime el cálculo en lugar de `0`.",
+   "expected": [
+    "12"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l02-q1",
+   "q": "¿Qué tipo es un número entero de 8 bits que nunca puede ser negativo?",
+   "options": [
+    "i8",
+    "u8",
+    "f32"
+   ],
+   "answer": 1,
+   "why": "`u` significa sin signo (unsigned); `u8` va de 0 a 255."
+  }
+ ]
+}

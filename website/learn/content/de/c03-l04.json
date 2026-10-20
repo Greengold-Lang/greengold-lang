@@ -1,0 +1,71 @@
+{
+ "title": "Praxis: ein Programm aus Funktionen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Eine große Aufgabe in kleine Funktionen aufzuteilen macht Code lesbar und testbar. Unten wird ein Temperatur-Umrechner aus Funktionen gebaut, die jeweils nur eine Sache tun."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const FREEZING_F: f64 = 32.0",
+    "",
+    "fn to_fahrenheit(c: f64) -> f64:",
+    "    return c * 9.0 / 5.0 + FREEZING_F",
+    "",
+    "fn to_celsius(f: f64) -> f64:",
+    "    return (f - FREEZING_F) * 5.0 / 9.0",
+    "",
+    "fn main():",
+    "    print(\"25 C =\", to_fahrenheit(25.0), \"F\")",
+    "    print(\"212 F =\", to_celsius(212.0), \"C\")"
+   ],
+   "run": true,
+   "output": [
+    "25 C = 77 F",
+    "212 F = 100 C"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l04-x1",
+   "prompt": "Schreibe `is_leap(year)`: `true`, wenn das Jahr durch 4, aber nicht durch 100 teilbar ist oder durch 400 teilbar ist. Gib 2024, 1900 und 2000 aus.",
+   "starter": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return false",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "solution": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "hint": "Verbinde die drei Bedingungen mit `and` und `or`; verwende Klammern.",
+   "expected": [
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l04-q1",
+   "q": "Was ist der Hauptvorteil kleiner Funktionen?",
+   "options": [
+    "Das Programm braucht mehr Platz",
+    "Code ist lesbar, wiederverwendbar und testbar",
+    "Der Compiler läuft langsamer"
+   ],
+   "answer": 1,
+   "why": "Wenn jede Funktion nur eine Aufgabe erfüllt, ist sie leicht zu verstehen und einzeln auszuprobieren."
+  }
+ ]
+}

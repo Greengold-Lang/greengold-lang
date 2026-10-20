@@ -1,0 +1,42 @@
+{
+ "title": "Dateien: std.fs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.fs` arbeitet unabhängig vom Betriebssystem mit dem Dateisystem. Schreiben, `fs.write_string_to_file(pfad, text)`, liefert ein `bool`; Lesen, `fs.read_file_to_string(pfad)`, liefert ein `Optional[string]`; außerdem gibt es `fs.file_exists` und `fs.remove_file`. Brauchst du genauere Fehlerinformationen, liefern `File.open`/`File.create` in `std.io` ein `Result`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.fs",
+    "",
+    "fn main():",
+    "    path = \"record.txt\"",
+    "    if fs.write_string_to_file(path, \"First line\\nSecond line\"):",
+    "        print(\"written\")",
+    "    match fs.read_file_to_string(path):",
+    "        Valid(text):",
+    "            print(text.as_str())",
+    "        None:",
+    "            print(\"could not read\")",
+    "    if fs.file_exists(path):",
+    "        fs.remove_file(path)",
+    "        print(\"cleaned up\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l10-q1",
+   "q": "Was liefert `fs.read_file_to_string`, wenn die Datei nicht gefunden wird?",
+   "options": [
+    "`None`",
+    "Eine leere Zeichenkette",
+    "Das Programm stürzt ab"
+   ],
+   "answer": 0,
+   "why": "Der Rückgabetyp ist `Optional[string]`; Abwesenheit wird mit `None` gemeldet."
+  }
+ ]
+}

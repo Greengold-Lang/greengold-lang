@@ -1,0 +1,92 @@
+{
+ "title": "Praxis: ein Befehlsinterpreter",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Enums, Varianten mit Daten und der `match`-Ausdruck zusammen: ein kleiner Taschenrechner."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Subtract(f64, f64)",
+    "    Square(f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Subtract(a, b) => a - b",
+    "        Command.Square(x) => x * x",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    commands: [4]Command = [",
+    "        Command.Add(10.0, 5.0),",
+    "        Command.Square(4.0),",
+    "        Command.Subtract(20.0, 8.0),",
+    "        Command.Reset",
+    "    ]",
+    "    for c in commands:",
+    "        print(\"result:\", evaluate(c))"
+   ],
+   "run": true,
+   "output": [
+    "result: 15",
+    "result: 16",
+    "result: 12",
+    "result: 0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l06-x1",
+   "prompt": "Füge `Command` eine Variante `Multiply(f64, f64)` hinzu und schreibe ihren Zweig in `evaluate`. Gib `Multiply(6.0, 7.0)` aus.",
+   "starter": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Add(6.0, 7.0)))"
+   ],
+   "solution": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Multiply(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Multiply(a, b) => a * b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Multiply(6.0, 7.0)))"
+   ],
+   "hint": "Füge den neuen Zweig sowohl dem Enum als auch dem `match` hinzu; es kompiliert nicht, wenn einer fehlt.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l06-q1",
+   "q": "Was passiert, wenn du dem Enum eine Variante hinzufügst und das `match` nicht aktualisierst?",
+   "options": [
+    "Der alte Zweig läuft",
+    "Der Compiler meldet den fehlenden Zweig",
+    "Das Programm verhält sich stillschweigend falsch"
+   ],
+   "answer": 1,
+   "why": "Die Vollständigkeitsprüfung fängt vergessene Fälle zur Kompilierzeit ab."
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "title": "Text und Zeichen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Text in doppelten Anführungszeichen ist eine **Zeichenkette** (`str`): eine unveränderliche Sicht auf UTF-8-Speicher, sie kann also jede Sprache enthalten. `'A'` in einfachen Anführungszeichen ist ein einzelnes Zeichen, und sein Wert ist die ASCII-Zahl (`u8`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    greeting = \"Hello\"",
+    "    letter = 'A'",
+    "    print(greeting, letter)"
+   ],
+   "run": true,
+   "output": [
+    "Hello 65"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Sonderzeichen werden mit `\\` geschrieben: `\\n` eine neue Zeile, `\\t` ein Tabulator, `\\\\` ein Backslash, `\\\"` ein doppeltes Anführungszeichen."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"First\\nSecond\")",
+    "    print(\"Name:\\tAli\")",
+    "    print(\"He said \\\"hello\\\"\")"
+   ],
+   "run": true,
+   "output": [
+    "First",
+    "Second",
+    "Name:\tAli",
+    "He said \"hello\""
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l04-x1",
+   "prompt": "Gib mit einem einzigen `print` zwei Zeilen aus: `One` und `Two`. (verwende `\\n`)",
+   "starter": [
+    "fn main():",
+    "    print(\"Bir İki\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"One\\nTwo\")"
+   ],
+   "hint": "Setze `\\n` dorthin, wo das Leerzeichen ist.",
+   "expected": [
+    "One",
+    "Two"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l04-q1",
+   "q": "Sind `'A'` und `\"A\"` dasselbe?",
+   "options": [
+    "Ja",
+    "Nein: das eine ist ein Zeichen, das andere eine Zeichenkette",
+    "Nein: das eine ist ein Fehler"
+   ],
+   "answer": 1,
+   "why": "Einfache Anführungszeichen erzeugen ein Zeichen (eine Zahl), doppelte eine Zeichenkette."
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+{
+ "title": "重复做事",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "想多次做同一件事，就用**循环**。`for i in 0..5:` 会运行缩进部分五次，`i` 依次为 0、1、2、3、4（不包含 5）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..5:",
+    "        print(\"Round\", i)"
+   ],
+   "run": true,
+   "output": [
+    "Round 0",
+    "Round 1",
+    "Round 2",
+    "Round 3",
+    "Round 4"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "只要条件为真，`while` 循环就会一直运行。如果你忘了在某个时刻让条件变为假，循环就永远不会结束！"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 3",
+    "    while n > 0:",
+    "        print(n)",
+    "        n -= 1",
+    "    print(\"Go!\")"
+   ],
+   "run": true,
+   "output": [
+    "3",
+    "2",
+    "1",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`n -= 1` 是 `n = n - 1` 的简写；`+=` 同样表示增加。"
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l04-x1",
+   "prompt": "把 1 到 5 的数字加起来并输出总和。（`1..=5` 同时包含 1 和 5。）",
+   "starter": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        pass",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        total += i",
+    "    print(total)"
+   ],
+   "hint": "把 `pass` 换成 `total += i`。",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l04-q1",
+   "q": "`for i in 0..3:` 会运行多少次？",
+   "options": [
+    "2",
+    "3",
+    "4"
+   ],
+   "answer": 1,
+   "why": "`i` 依次是 0、1、2；不包含 3。"
+  }
+ ]
+}

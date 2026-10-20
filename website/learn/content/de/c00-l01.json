@@ -1,0 +1,75 @@
+{
+ "title": "Was ist ein Programm?",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Ein **Programm** ist ein Text, der dem Computer Schritt für Schritt sagt, was er tun soll. In Greengold schreibst du ihn in eine `.gg`-Datei, und der Compiler übersetzt ihn in Code, den der Computer versteht."
+  },
+  {
+   "t": "p",
+   "text": "Jedes Greengold-Programm beginnt mit einer **Funktion** namens `main`. Die Zeilen innerhalb der Funktion sind um 4 Leerzeichen eingerückt. Die Einrückung zeigt, welche Zeilen zur Funktion gehören."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "run": true,
+   "output": [
+    "Hello, world!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`print` schreibt etwas auf den Bildschirm. Text in Anführungszeichen heißt **Zeichenkette** (String). Eine Zeile, die mit `#` beginnt, ist ein **Kommentar**: Der Computer ignoriert sie, sie ist eine Notiz für Menschen."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    # This line is a comment",
+    "    print(\"First line\")",
+    "    print(\"Second line\")"
+   ],
+   "run": true,
+   "output": [
+    "First line",
+    "Second line"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Die Zeilen werden von oben nach unten der Reihe nach ausgeführt."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l01-x1",
+   "prompt": "Ändere das Programm so, dass es `Hello, Greengold!` ausgibt.",
+   "starter": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"Hello, Greengold!\")"
+   ],
+   "hint": "Nur der Text zwischen den Anführungszeichen muss geändert werden.",
+   "expected": [
+    "Hello, Greengold!"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l01-q1",
+   "q": "Mit welcher Funktion beginnt ein Greengold-Programm?",
+   "options": [
+    "start",
+    "main",
+    "begin"
+   ],
+   "answer": 1,
+   "why": "Die Ausführung beginnt immer in `main`."
+  }
+ ]
+}

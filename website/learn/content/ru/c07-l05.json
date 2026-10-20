@@ -1,0 +1,97 @@
+{
+ "title": "Перегрузка операторов",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Операторы `+`, `-`, `*`, `==`, `<` можно использовать со своими типами. В Greengold операторы соответствуют **определённым именам методов**: `+` → `add`, `-` → `sub`, `*` → `mul`, `/` → `div`, `%` → `rem`, `-x` → `neg`, `==` → `eq`, `<` → `lt`. `!=`, `>`, `<=`, `>=` выводятся из них автоматически."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Vec2:",
+    "    x: f64",
+    "    y: f64",
+    "",
+    "impl Vec2:",
+    "    fn add(self, o: Vec2) -> Vec2:",
+    "        return Vec2{ x: self.x + o.x, y: self.y + o.y }",
+    "",
+    "    fn sub(self, o: Vec2) -> Vec2:",
+    "        return Vec2{ x: self.x - o.x, y: self.y - o.y }",
+    "",
+    "    fn neg(self) -> Vec2:",
+    "        return Vec2{ x: -self.x, y: -self.y }",
+    "",
+    "    fn eq(self, o: Vec2) -> bool:",
+    "        return self.x == o.x and self.y == o.y",
+    "",
+    "fn main():",
+    "    v1 = Vec2{ x: 3.0, y: 4.0 }",
+    "    v2 = Vec2{ x: 1.0, y: 2.0 }",
+    "    v3 = v1 + v2",
+    "    v4 = v1 - v2",
+    "    inv = -v1",
+    "    print(v3.x, v3.y)",
+    "    print(v4.x, v4.y)",
+    "    print(inv.x, inv.y)",
+    "    print(v1 == v2, v1 != v2)"
+   ],
+   "run": true,
+   "output": [
+    "4 6",
+    "2 2",
+    "-3 -4",
+    "false true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l05-x1",
+   "prompt": "Дайте структуре `Money` (`cents: i32`) методы `add` и `lt`. Выведите сумму `Money{ cents: 250 } + Money{ cents: 175 }` и то, меньше ли первый `Money`, чем второй.",
+   "starter": [
+    "struct Money:",
+    "    cents: i32",
+    "",
+    "fn main():",
+    "    a = Money{ cents: 250 }",
+    "    b = Money{ cents: 175 }",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Money:",
+    "    cents: i32",
+    "",
+    "impl Money:",
+    "    fn add(self, o: Money) -> Money:",
+    "        return Money{ cents: self.cents + o.cents }",
+    "",
+    "    fn lt(self, o: Money) -> bool:",
+    "        return self.cents < o.cents",
+    "",
+    "fn main():",
+    "    a = Money{ cents: 250 }",
+    "    b = Money{ cents: 175 }",
+    "    total = a + b",
+    "    print(total.cents)",
+    "    print(a < b)"
+   ],
+   "hint": "Напишите `fn add(self, o: Money) -> Money` и `fn lt(self, o: Money) -> bool` в `impl Money:`.",
+   "expected": [
+    "425",
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l05-q1",
+   "q": "Какой метод определяют для `a - b`?",
+   "options": [
+    "`minus`",
+    "`sub`",
+    "`diff`"
+   ],
+   "answer": 1,
+   "why": "Оператор `-` соответствует методу `sub`."
+  }
+ ]
+}

@@ -1,0 +1,62 @@
+{
+ "title": "Decimales exactos: std.decimal",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.decimal` ofrece **números decimales exactos** definidos por un entero de 128 bits (`mantissa`) y un número de dígitos tras la coma (`scale`). `add`, `sub`, `mul` dan resultados exactos y se detienen si no caben (nunca son silenciosamente incorrectos). `div` y `round` necesitan un número de posiciones y una regla de redondeo (`HALF_EVEN`: redondeo bancario, `HALF_UP`...)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.decimal { Decimal, decimal_parse, decimal_from_int, HALF_EVEN }",
+    "",
+    "fn main():",
+    "    price = decimal_parse(\"19.99\").value_or_panic()",
+    "    total = price.mul(decimal_from_int(3))",
+    "    tax = total.mul(decimal_parse(\"0.0825\").value_or_panic()).round(2, HALF_EVEN)",
+    "    print(total.to_string().as_str())",
+    "    print(total.add(tax).to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "59.97",
+    "64.92"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l02-x1",
+   "prompt": "Lee `0.1` y `0.2` con `decimal_parse`, súmalos e imprime el resultado (debe ser exactamente `0.3`).",
+   "starter": [
+    "import std.decimal { Decimal, decimal_parse }",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.decimal { Decimal, decimal_parse }",
+    "",
+    "fn main():",
+    "    a = decimal_parse(\"0.1\").value_or_panic()",
+    "    b = decimal_parse(\"0.2\").value_or_panic()",
+    "    print(a.add(b).to_string().as_str())"
+   ],
+   "hint": "`a.add(b).to_string().as_str()`",
+   "expected": [
+    "0.3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l02-q1",
+   "q": "¿Qué ocurre cuando el resultado de `Decimal.add` no cabe?",
+   "options": [
+    "Da en silencio un resultado erróneo",
+    "El programa se detiene (trap); nunca produce un valor erróneo",
+    "Devuelve cero"
+   ],
+   "answer": 1,
+   "why": "En Greengold el desbordamiento nunca es silencioso."
+  }
+ ]
+}

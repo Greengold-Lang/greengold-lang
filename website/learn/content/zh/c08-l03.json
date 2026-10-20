@@ -1,0 +1,97 @@
+{
+ "title": "携带错误的结果：Result",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "当操作为什么失败很重要时，就使用 `Result[T, E]`。`Ok(值)` 携带成功，`Err(错误)` 携带失败。错误通常用你自己的 `enum` 表示，这样每一种错误都有名字。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum MathError:",
+    "    DivisionByZero",
+    "    NegativeSquareRoot",
+    "",
+    "fn safe_divide(a: f64, b: f64) -> Result[f64, MathError]:",
+    "    if b == 0.0:",
+    "        return Err(MathError.DivisionByZero)",
+    "    return Ok(a / b)",
+    "",
+    "fn main():",
+    "    match safe_divide(10.0, 4.0):",
+    "        Ok(res):",
+    "            print(\"result:\", res)",
+    "        Err(e):",
+    "            print(\"error\")",
+    "    match safe_divide(10.0, 0.0):",
+    "        Ok(res):",
+    "            print(\"result:\", res)",
+    "        Err(e):",
+    "            match e:",
+    "                MathError.DivisionByZero:",
+    "                    print(\"division by zero prevented\")",
+    "                MathError.NegativeSquareRoot:",
+    "                    print(\"negative root\")"
+   ],
+   "run": true,
+   "output": [
+    "result: 2.5",
+    "division by zero prevented"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l03-x1",
+   "prompt": "编写 `validate_age(age: i32) -> Result[i32, str]`：小于 0 或大于 150 时返回 `Err(\"invalid age\")`，否则返回 `Ok(age)`。用 `match` 输出 200 和 30 的结果。",
+   "starter": [
+    "fn validate_age(age: i32) -> Result[i32, str]:",
+    "    return Ok(age)",
+    "",
+    "fn show(age: i32):",
+    "    match validate_age(age):",
+    "        Ok(a):",
+    "            print(\"ok\", a)",
+    "        Err(msg):",
+    "            print(\"error:\", msg)",
+    "",
+    "fn main():",
+    "    show(200)",
+    "    show(30)"
+   ],
+   "solution": [
+    "fn validate_age(age: i32) -> Result[i32, str]:",
+    "    if age < 0 or age > 150:",
+    "        return Err(\"invalid age\")",
+    "    return Ok(age)",
+    "",
+    "fn show(age: i32):",
+    "    match validate_age(age):",
+    "        Ok(a):",
+    "            print(\"ok\", a)",
+    "        Err(msg):",
+    "            print(\"error:\", msg)",
+    "",
+    "fn main():",
+    "    show(200)",
+    "    show(30)"
+   ],
+   "hint": "用 `if age < 0 or age > 150:` 返回 `Err`，然后返回 `Ok(age)`。",
+   "expected": [
+    "error: invalid age",
+    "ok 30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l03-q1",
+   "q": "什么时候优先用 `Result` 而不是 `Optional`？",
+   "options": [
+    "从不",
+    "当失败的原因很重要时",
+    "只用于数字"
+   ],
+   "answer": 1,
+   "why": "`Result` 携带错误信息；`Optional` 只表示“没有”。"
+  }
+ ]
+}

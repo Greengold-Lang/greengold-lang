@@ -1,0 +1,66 @@
+{
+ "title": "递归",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "函数可以调用它自己，这叫做**递归**。每个递归函数都需要一个**基本情形**：在这里它不再调用自己并给出结果；否则会永远运行下去。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn factorial(n: i32) -> i32:",
+    "    if n <= 1:",
+    "        return 1",
+    "    return n * factorial(n - 1)",
+    "",
+    "fn main():",
+    "    print(factorial(5))"
+   ],
+   "run": true,
+   "output": [
+    "120"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`factorial(5)` 就是 `5 * factorial(4)`，一直往下到 `factorial(1)`；然后乘积一路返回：5 · 4 · 3 · 2 · 1 = 120。"
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l03-x1",
+   "prompt": "用递归计算斐波那契数：`fib(0)` = 0，`fib(1)` = 1，其余每一项都是前两项之和。输出 `fib(10)`。",
+   "starter": [
+    "fn fib(n: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "solution": [
+    "fn fib(n: i32) -> i32:",
+    "    if n < 2:",
+    "        return n",
+    "    return fib(n - 1) + fib(n - 2)",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "hint": "如果 `n < 2` 返回 `n`；否则返回 `fib(n - 1) + fib(n - 2)`。",
+   "expected": [
+    "55"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l03-q1",
+   "q": "没有基本情形的递归函数会怎样？",
+   "options": [
+    "它从不运行",
+    "它会永远调用自己（栈溢出）",
+    "它返回 0"
+   ],
+   "answer": 1,
+   "why": "没有停止点，调用不断堆积，栈就会溢出。"
+  }
+ ]
+}

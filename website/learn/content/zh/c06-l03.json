@@ -1,0 +1,108 @@
+{
+ "title": "数字、范围和多选",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` 不限于枚举；它也适用于整数、字符、bool 和字符串。`|` 匹配多个备选，`a..=b` 匹配一个范围。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn classify(code: i32):",
+    "    match code:",
+    "        200 | 201 | 204:",
+    "            print(\"success\")",
+    "        301 | 302:",
+    "            print(\"redirect\")",
+    "        400..=499:",
+    "            print(\"client error\")",
+    "        500..=599:",
+    "            print(\"server error\")",
+    "        _:",
+    "            print(\"unknown\")",
+    "",
+    "fn main():",
+    "    classify(201)",
+    "    classify(404)",
+    "    classify(503)",
+    "    classify(99)"
+   ],
+   "run": true,
+   "output": [
+    "success",
+    "client error",
+    "server error",
+    "unknown"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn kind(c: u8):",
+    "    match c:",
+    "        'a'..='z' | 'A'..='Z':",
+    "            print(\"letter\")",
+    "        '0'..='9':",
+    "            print(\"digit\")",
+    "        _:",
+    "            print(\"other\")",
+    "",
+    "fn main():",
+    "    kind('q')",
+    "    kind('7')",
+    "    kind('!')"
+   ],
+   "run": true,
+   "output": [
+    "letter",
+    "digit",
+    "other"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l03-x1",
+   "prompt": "`grade(score: i32)`：90..=100 输出 `A`，80..=89 输出 `B`，70..=79 输出 `C`，其余输出 `F`。用 85 调用它。",
+   "starter": [
+    "fn grade(score: i32):",
+    "    match score:",
+    "        _:",
+    "            print(\"F\")",
+    "",
+    "fn main():",
+    "    grade(85)"
+   ],
+   "solution": [
+    "fn grade(score: i32):",
+    "    match score:",
+    "        90..=100:",
+    "            print(\"A\")",
+    "        80..=89:",
+    "            print(\"B\")",
+    "        70..=79:",
+    "            print(\"C\")",
+    "        _:",
+    "            print(\"F\")",
+    "",
+    "fn main():",
+    "    grade(85)"
+   ],
+   "hint": "在 `_` 分支上面添加三个范围分支。",
+   "expected": [
+    "B"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l03-q1",
+   "q": "在模式 `200 | 201:` 中，`|` 是什么意思？",
+   "options": [
+    "并且",
+    "或者（备选）",
+    "一个位运算"
+   ],
+   "answer": 1,
+   "why": "在模式中，`|` 表示“这些之一”。"
+  }
+ ]
+}

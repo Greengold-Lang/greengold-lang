@@ -1,0 +1,38 @@
+{
+ "title": "Llamar a funciones de C: extern",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold habla directamente con las bibliotecas de C a través de la ABI de C, sin sobrecarga intermedia. Para declarar una función de C existente se usa **`extern`**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sin(x: f64) -> f64",
+    "extern \"math.h\" fn cos(x: f64) -> f64",
+    "",
+    "fn main():",
+    "    unsafe:",
+    "        print(sin(0.0), cos(0.0))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Llamar a una función de C declarada significa confiar en un contrato que el compilador no puede verificar; por eso la llamada se hace dentro de un bloque **`unsafe:`**. Las funciones de C con un número variable de parámetros (`printf`) se marcan con `...` en la firma."
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l01-q1",
+   "q": "¿Dónde se llama a una función de C `extern`?",
+   "options": [
+    "En cualquier sitio",
+    "En un bloque `unsafe:`",
+    "Solo en `main`"
+   ],
+   "answer": 1,
+   "why": "El compilador no puede verificar el lado de C; la responsabilidad es del programador."
+  }
+ ]
+}

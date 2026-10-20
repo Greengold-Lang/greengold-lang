@@ -1,0 +1,85 @@
+{
+ "title": "编写测试：gg test",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "不需要外部测试库：每个写成 `fn test_*():` 的函数都会自动成为单元测试。测试通过 `panic` 来表示失败。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn test_addition():",
+    "    if add(2, 3) != 5:",
+    "        panic(\"addition failed\")",
+    "",
+    "fn test_negative_numbers():",
+    "    if add(-5, 5) != 0:",
+    "        panic(\"negative numbers failed\")",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "你也可以写 `test` 块；它的函数体是普通代码，如果某个 `require` 为假，测试就失败。该块属于它正上方的函数，`main` 不会调用它。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "test:",
+    "    require add(2, 3) == 5",
+    "",
+    "test negatives:",
+    "    require add(-1, 1) == 0",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg test src/",
+    "gg test src/ --json      # the same result as JSON",
+    "gg test --coverage       # also measure coverage"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l04-q1",
+   "q": "`fn test_*()` 函数如何失败？",
+   "options": [
+    "通过 `panic`",
+    "通过返回",
+    "它从不失败"
+   ],
+   "answer": 0,
+   "why": "一次 `panic` 算作测试失败。"
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l04-q2",
+   "q": "在 `test` 块中，`require false` 会做什么？",
+   "options": [
+    "让测试失败",
+    "什么也不做",
+    "停止构建"
+   ],
+   "answer": 0,
+   "why": "为假的 `require` 会让测试失败。"
+  }
+ ]
+}

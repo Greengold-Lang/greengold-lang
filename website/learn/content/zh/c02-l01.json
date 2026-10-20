@@ -1,0 +1,73 @@
+{
+ "title": "if、elif、else",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "条件周围不需要括号；在末尾写 `:`，下面的行缩进 4 个空格。多种情况用 `elif` 串联；`else` 接住剩下的所有情况。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 85",
+    "    if score >= 90:",
+    "        print(\"Grade: A\")",
+    "    elif score >= 80:",
+    "        print(\"Grade: B\")",
+    "    elif score >= 70:",
+    "        print(\"Grade: C\")",
+    "    else:",
+    "        print(\"Grade: F\")"
+   ],
+   "run": true,
+   "output": [
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "第一个为真的分支会运行，其余的被跳过。所以要把最大的阈值放在前面。"
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l01-x1",
+   "prompt": "补全这条链：`temperature` 低于 10 时输出 `Cold`，高于 25 时输出 `Hot`，其他情况输出 `Mild`。",
+   "starter": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"?\")",
+    "    elif temperature > 25:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"Cold\")",
+    "    elif temperature > 25:",
+    "        print(\"Hot\")",
+    "    else:",
+    "        print(\"Mild\")"
+   ],
+   "hint": "按顺序把三个 `?` 替换成 `Cold`、`Hot`、`Mild`。",
+   "expected": [
+    "Cold"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l01-q1",
+   "q": "如果有多个分支为真，会运行几个？",
+   "options": [
+    "全部",
+    "只有第一个为真的",
+    "只有最后一个"
+   ],
+   "answer": 1,
+   "why": "`if`/`elif` 链会在第一个为真的分支处停止。"
+  }
+ ]
+}
