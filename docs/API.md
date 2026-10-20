@@ -11,9 +11,10 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.audit](#stdaudit) (11)
 - [std.bigint](#stdbigint) (33)
 - [std.bits](#stdbits) (21)
+- [std.can](#stdcan) (19)
 - [std.collections](#stdcollections) (129)
 - [std.compress](#stdcompress) (11)
-- [std.crypto](#stdcrypto) (14)
+- [std.crypto](#stdcrypto) (20)
 - [std.csv](#stdcsv) (5)
 - [std.decimal](#stddecimal) (31)
 - [std.dmath](#stddmath) (23)
@@ -24,7 +25,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.gguf](#stdgguf) (16)
 - [std.hal](#stdhal) (24)
 - [std.hash](#stdhash) (32)
-- [std.heapless](#stdheapless) (66)
+- [std.heapless](#stdheapless) (71)
 - [std.http](#stdhttp) (26)
 - [std.intern](#stdintern) (5)
 - [std.io](#stdio) (40)
@@ -35,6 +36,7 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 - [std.math](#stdmath) (61)
 - [std.mmap](#stdmmap) (5)
 - [std.mmio](#stdmmio) (20)
+- [std.money](#stdmoney) (24)
 - [std.net](#stdnet) (60)
 - [std.nn](#stdnn) (26)
 - [std.packet](#stdpacket) (71)
@@ -851,6 +853,104 @@ fn bits_insert[T: Int](x: T, lo: u32, width: u32, value: u64) -> T
 `x` with the `width` bits at `lo` replaced by the low bits of `value` (a bit-field write).
 
 
+## std.can
+
+### struct
+
+```
+struct CanFrame { id: u32, extended: bool, remote: bool, fd: bool, len: usize, data: [64]u8 }
+```
+
+```
+struct J1939Id { priority: u8, pgn: u32, destination: u8, source: u8, is_pdu1: bool }
+```
+
+### feature
+
+```
+feature CanBus { fn send(self: lend Self, frame: CanFrame) -> bool; fn receive(self: lend Self) -> Optional[CanFrame] }
+```
+What a CAN controller driver provides.
+
+### const
+
+```
+const MAX_STD_ID: u32
+```
+
+```
+const MAX_EXT_ID: u32
+```
+
+```
+const CLASSIC_MAX: usize
+```
+
+```
+const FD_MAX: usize
+```
+
+### fn
+
+```
+fn CanFrame.data_frame(id: u32, data: []u8) -> CanFrame
+```
+A classic data frame with an 11-bit identifier.
+
+```
+fn CanFrame.extended_frame(id: u32, data: []u8) -> CanFrame
+```
+A data frame with a 29-bit identifier.
+
+```
+fn CanFrame.fd_frame(id: u32, extended: bool, data: []u8) -> CanFrame
+```
+A CAN FD frame (up to 64 data bytes;
+
+```
+fn CanFrame.remote_frame(id: u32, extended: bool, len: usize) -> CanFrame
+```
+A remote request for `len` bytes.
+
+```
+fn CanFrame.payload(self: read CanFrame) -> []u8
+```
+The data bytes as a slice.
+
+```
+fn CanFrame.is_valid(self: read CanFrame) -> bool
+```
+True when the frame follows the rules above (identifier range, length, remote frames carry no data).
+
+```
+fn valid_fd_length(n: usize) -> bool
+```
+
+```
+fn dlc_for_length(n: usize) -> u8
+```
+The data length code (0-15) that stands for `n` data bytes in the control field.
+
+```
+fn length_for_dlc(dlc: u8, fd: bool) -> usize
+```
+The number of data bytes a data length code stands for (the codes above 8 mean 8 in classic CAN;
+
+```
+fn frame_crc15(bits: []u8, nbits: usize) -> u16
+```
+The CRC-15 of classic CAN (polynomial x^15 + x^14 + x^10 + x^8 + x^7 + x^4 + x^3 + 1, 0x4599) over `nbits` bits taken from `bits` most significant bit first.
+
+```
+fn j1939_id(priority: u8, pgn: u32, source: u8) -> u32
+```
+The 29-bit identifier for a J1939 message: `priority` 0-7 (lower is more urgent), the 18-bit parameter group number `pgn`, and the sender's `source` address.
+
+```
+fn j1939_parse(id: u32) -> J1939Id
+```
+
+
 ## std.collections
 
 ### struct
@@ -1462,6 +1562,13 @@ fn gzip_decompress(data: []u8, max_out: usize) -> Result[List[u8], string]
 
 ## std.crypto
 
+### struct
+
+```
+struct SecretBytes { bytes: List[u8] }
+```
+Secret bytes that wipe themselves: the contents are overwritten with zeros when the value goes out of scope (a scope left by a panic or `process_exit` does not run `drop`).
+
 ### fn
 
 ```
@@ -1473,6 +1580,27 @@ True when both have the same length and bytes, taking the same time whatever the
 fn zeroize(data: lend []u8)
 ```
 Overwrites the bytes with zeros in a way the optimizer may not remove (volatile stores).
+
+```
+fn SecretBytes.from_list(bytes: consume List[u8]) -> SecretBytes
+```
+
+```
+fn SecretBytes.len(self: read SecretBytes) -> usize
+```
+
+```
+fn SecretBytes.view(self: read SecretBytes) -> []u8
+```
+
+```
+fn SecretBytes.wipe(self: lend SecretBytes)
+```
+Wipes now, without waiting for the end of the scope.
+
+```
+fn SecretBytes.drop(self: lend SecretBytes)
+```
 
 ```
 fn random_bytes(n: usize) -> List[u8]
@@ -2653,6 +2781,11 @@ struct SpscRing[T, N: usize] { items: [N]T, head: u64, tail: u64 }
 ```
 A lock-free queue for exactly one producer and one consumer (an interrupt handler and the main loop, or two threads).
 
+```
+struct MpmcRing[T, N: usize] { items: [N]T, seq: [N]u64, enq: u64, deq: u64 }
+```
+A lock-free bounded queue for any number of producers and consumers (Dmitry Vyukov's design: every slot carries a sequence number that says whose turn it is).
+
 ### fn
 
 ```
@@ -2917,6 +3050,24 @@ Consumer: removes the oldest element;
 fn SpscRing.len(self: read SpscRing[T, N]) -> usize
 ```
 A snapshot of how many elements wait (exact only when the other side is idle).
+
+```
+fn MpmcRing.new(fill: T) -> MpmcRing[T, N]
+```
+
+```
+fn MpmcRing.capacity(self: read MpmcRing[T, N]) -> usize
+```
+
+```
+fn MpmcRing.push(self: read MpmcRing[T, N], value: T) -> bool
+```
+Adds `value`;
+
+```
+fn MpmcRing.pop(self: read MpmcRing[T, N]) -> Optional[T]
+```
+Removes the oldest element;
 
 
 ## std.http
@@ -4045,6 +4196,118 @@ fn Reg.wait_bits_clear(self: read Reg[T], mask: T, max_reads: u32) -> bool
 fn Reg.offset(self: read Reg[T], n: usize) -> Reg[T]
 ```
 The register `n` registers further on (for an array of identical registers, like the ports of a GPIO block).
+
+
+## std.money
+
+### struct
+
+```
+struct Money { minor: i64, code: [3]u8, places: u32 }
+```
+
+### const
+
+```
+const HALF_EVEN: i32
+```
+
+```
+const HALF_UP: i32
+```
+
+```
+const TOWARD_ZERO: i32
+```
+
+```
+const FLOOR: i32
+```
+
+```
+const CEILING: i32
+```
+
+### fn
+
+```
+fn money_new(minor: i64, code: str, places: u32) -> Money
+```
+
+```
+fn usd(cents: i64) -> Money
+```
+
+```
+fn eur(cents: i64) -> Money
+```
+
+```
+fn gbp(pence: i64) -> Money
+```
+
+```
+fn jpy(yen: i64) -> Money
+```
+
+```
+fn parse_money(text: str, code: str, places: u32) -> Result[Money, string]
+```
+Reads a decimal amount such as "12.34", "-0.5" or "7" in a currency with `places` decimals.
+
+```
+fn Money.same_currency(self: read Money, o: Money) -> bool
+```
+
+```
+fn Money.is_zero(self: read Money) -> bool
+```
+
+```
+fn Money.is_negative(self: read Money) -> bool
+```
+
+```
+fn Money.neg(self: read Money) -> Money
+```
+
+```
+fn Money.abs(self: read Money) -> Money
+```
+
+```
+fn Money.plus(self: read Money, o: Money) -> Result[Money, string]
+```
+The sum, or an error when the currencies differ.
+
+```
+fn Money.minus(self: read Money, o: Money) -> Result[Money, string]
+```
+
+```
+fn Money.compare(self: read Money, o: Money) -> Result[i32, string]
+```
+Compares two amounts of the same currency: -1, 0 or 1 (an error for different currencies).
+
+```
+fn Money.times(self: read Money, k: i64) -> Money
+```
+The amount times a whole number.
+
+```
+fn Money.scaled(self: read Money, numerator: i64, denominator: i64, mode: i32) -> Money
+```
+The amount times `numerator / denominator`, rounded to a minor unit under `mode`.
+
+```
+fn Money.allocate(self: read Money, ratios: []i64) -> List[Money]
+```
+Splits the amount in proportion to `ratios` (all non-negative, at least one positive) so that the shares add up to exactly the amount: every share is rounded down, then the left...
+
+```
+fn Money.to_string(self: read Money) -> string
+```
+"12.34 USD".
 
 
 ## std.net

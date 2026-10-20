@@ -45,3 +45,57 @@ fn produce(ring: Arc[SpscRing[u64, 8]]):
 """)
     assert r.returncode == 0, r.stderr
     assert r.stdout.split() == ["0"]
+
+
+def test_mpmc_ring_single_thread_and_full_empty(tmp_path):
+    r = run_gg_source(tmp_path, """import std.heapless { MpmcRing }
+
+fn main():
+    q = MpmcRing[i32, 4].new(0)
+    print(q.push(1), q.push(2), q.push(3), q.push(4), q.push(5))
+    print(q.pop().value_or(-1), q.pop().value_or(-1), q.push(9), q.pop().value_or(-1), q.pop().value_or(-1), q.pop().value_or(-1), q.pop().value_or(-1))
+""")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["true true true true false", "1 2 true 3 4 9 -1"]
+
+
+def test_mpmc_ring_many_producers_and_consumers_lose_nothing(tmp_path):
+    r = run_gg_source(tmp_path, """import std.heapless { MpmcRing }
+import std.thread { Thread, Atomic }
+
+fn produce(q: Arc[MpmcRing[u64, 16]], base: u64):
+    i: u64 = 1
+    while i <= 5000:
+        if q.value.push(base + i):
+            i += 1
+
+fn drain(q: Arc[MpmcRing[u64, 16]], total: Arc[Atomic[u64]], count: Arc[Atomic[u64]]):
+    while count.value.load() < 20000:
+        got = q.value.pop()
+        if got.has_value():
+            total.value.fetch_add(got.value_or(0))
+            count.value.fetch_add(1)
+
+fn main():
+    q = Arc[MpmcRing[u64, 16]](MpmcRing[u64, 16].new(0))
+    total = Arc[Atomic[u64]](Atomic[u64].new(0))
+    count = Arc[Atomic[u64]](Atomic[u64].new(0))
+    workers = List[Thread]()
+    for p in 0..4:
+        qq = q.clone()
+        base = u64(p) * 1000000
+        workers.push(Thread.spawn(fn() =>
+            produce(qq, base)))
+    for _c in 0..3:
+        qq = q.clone()
+        tt = total.clone()
+        cc = count.clone()
+        workers.push(Thread.spawn(fn() =>
+            drain(qq, tt, cc)))
+    for i in 0..workers.len:
+        workers[i].join()
+    print(count.value.load(), total.value.load())
+""")
+    assert r.returncode == 0, r.stderr
+    want = sum(base + i for base in (0, 1000000, 2000000, 3000000) for i in range(1, 5001))
+    assert r.stdout.split() == ["20000", str(want)]

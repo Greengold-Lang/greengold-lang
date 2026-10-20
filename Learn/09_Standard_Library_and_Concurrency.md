@@ -27,6 +27,8 @@ Standard library modules are imported by writing `import std.<module_name>` at t
 | `std.uuid` | RFC 9562 identifiers | `uuid.v4`, `uuid.v7`, `uuid.parse`, `uuid.format` |
 | `std.csv` | CSV (RFC 4180) | `csv.parse`, `csv.format_row` |
 | `std.toml` | TOML documents as a JSON tree | `toml.parse`, `toml.to_text` |
+| `std.can` | CAN bus frames, CRC-15, J1939 | `can.CanFrame.data_frame`, `can.frame_crc15`, `can.j1939_id` |
+| `std.money` | Money in minor units | `money.usd`, `plus`, `scaled`, `allocate` |
 | `std.audit` | Tamper-evident append-only log | `audit.AuditLog.open`, `append`, `audit.verify` |
 | `std.fix` | FIX trading messages | `fix.parse`, `FixBuilder`, `get`, `get_all` |
 | `std.compress` | DEFLATE, zlib, gzip (with an output limit) | `compress.gzip_compress`, `compress.gzip_decompress` |

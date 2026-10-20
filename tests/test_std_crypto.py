@@ -153,3 +153,26 @@ def test_ed25519_rfc8032_vector(tmp_path):
     assert r.returncode == 0, r.stderr
     assert r.stdout.splitlines()[0] == "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
     assert r.stdout.splitlines()[1].startswith("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155")
+
+
+def test_secret_bytes_wipe_and_empty_zeroize(tmp_path):
+    from tests.helpers import run_gg_source
+    r = run_gg_source(tmp_path, """import std.crypto { SecretBytes, zeroize }
+
+fn use_key():
+    k = List[u8]()
+    for i in 0..4:
+        k.push(u8(i + 1))
+    s = SecretBytes.from_list(k)
+    print(s.len(), s.view()[3])
+    s.wipe()
+    print(s.view()[3])
+
+fn main():
+    use_key()
+    e = List[u8]()
+    zeroize(e[..])
+    print("ok")
+""")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.split() == ["4", "4", "0", "ok"]

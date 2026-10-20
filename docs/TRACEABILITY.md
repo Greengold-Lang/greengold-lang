@@ -20,7 +20,7 @@ the docstrings of `tests/test_*.py`. Do not edit by hand. Section level only: th
 | 13. Expressions | 6 | 0 | - |
 | 14. Constants and compile-time functions | 3 | 0 | `tests/test_constants.py`, `tests/test_fn_constants.py`, `tests/test_static.py` |
 | 15. Foreign functions and pointers | 1 | 0 | - |
-| 16. Imports and the library | 11 | 0 | `tests/test_api_nostd.py`, `tests/test_ext_packages.py`, `tests/test_parallel_mapreduce.py`, `tests/test_process_pipes.py`, `tests/test_spsc.py`, `tests/test_std_audit.py`, `tests/test_std_fix.py`, `tests/test_std_unicode.py` |
+| 16. Imports and the library | 11 | 0 | `tests/test_api_nostd.py`, `tests/test_ext_packages.py`, `tests/test_parallel_mapreduce.py`, `tests/test_process_pipes.py`, `tests/test_spsc.py`, `tests/test_std_audit.py`, `tests/test_std_can.py`, `tests/test_std_fix.py`, `tests/test_std_money.py`, `tests/test_std_unicode.py` |
 | 17. Widths, precedence, and rejected forms | 1 | 33 | - |
 | 18. What the tools check | 0 | 0 | `tests/test_assure.py`, `tests/test_coverage.py`, `tests/test_fuzz.py`, `tests/test_profiles.py`, `tests/test_traceability.py` |
 

@@ -87,6 +87,13 @@ _TEMPLATES = {
 }
 
 
+def _write_cortex_m(root: Path, name: str) -> None:
+    from . import templates
+    (root / "src" / "main.gg").write_text(templates.CORTEX_M_MAIN, encoding="utf-8", newline="\n")
+    (root / "link.ld").write_text(templates.CORTEX_M_LINK, encoding="utf-8", newline="\n")
+    (root / "README.md").write_text(templates.CORTEX_M_README.replace("@NAME@", name), encoding="utf-8", newline="\n")
+
+
 def cmd_new(name: str, path: str | None = None, template: str = "bin") -> int:
     root = Path(path or name)
     if root.exists() and any(root.iterdir()):
@@ -96,6 +103,10 @@ def cmd_new(name: str, path: str | None = None, template: str = "bin") -> int:
     (root / MANIFEST).write_text(
         f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2026"\nmain = "src/main.gg"\n\n[dependencies]\n'
         '# mylib = { path = "../mylib" }   # then: import mylib.module\n', encoding="utf-8")
+    if template == "cortex-m":
+        _write_cortex_m(root, name)
+        print(f"Created package `{name}` in {root}\nNext: cd {root}; read README.md (gg build --no-std --target cortex-m4 --linker-script link.ld)")
+        return 0
     (root / "src" / "main.gg").write_text(_TEMPLATES[template].replace("@NAME@", name), encoding="utf-8")
     print(f"Created package `{name}` in {root}\nNext: cd {root}; gg run   (also: gg test, gg fmt, gg doctor)")
     return 0

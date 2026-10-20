@@ -35,6 +35,7 @@ Work toward use in embedded, aerospace, defense, and financial code (the plan is
 
 **Library**
 
+- New: `std.can` (CAN and CAN FD frames, CAN CRC-15, J1939), `std.money` (minor-unit amounts with explicit rounding and exact allocation), `heapless.MpmcRing` (lock-free multi-producer, multi-consumer queue), `crypto.SecretBytes`; `zeroize` no longer panics on an empty slice. `gg new --template cortex-m` writes a bare-metal Cortex-M4 project with a linker script.
 - New: `std.audit` (hash-chained append-only log), `std.fix` (FIX parser and builder), `heapless.SpscRing` (lock-free single-producer single-consumer queue). `thread.Queue.recv` is O(1) instead of O(n). `std.process`: `spawn_read`, `spawn_write` (streams to a child's output or input; `File.wait()` gives the exit code), `process_run_input`. `std.parallel`: `map_i64`, `map_f64`, `reduce_i64`, `reduce_f64` (thread-count independent results).
 - New: `std.mmio`, `std.hal`, `std.dmath` (bit-identical math), `std.unicode`, `std.log`, `std.uuid`, `std.csv`, `std.toml`, `std.compress` (DEFLATE, zlib, gzip with an output limit).
 - New: `std.bits`, `std.heapless` (`FixedVec`, `FixedString`, `RingBuffer`, `FixedMap`, `FixedBitSet`), `std.fixedpoint`, `std.bigint`, `std.decimal`, `std.encoding`, `std.hash`, `std.crypto`.

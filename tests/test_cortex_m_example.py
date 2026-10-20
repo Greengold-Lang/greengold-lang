@@ -35,3 +35,15 @@ def test_cortex_m_firmware_image(tmp_path):
     sp, reset = struct.unpack_from("<II", first, 0)
     assert sp == 0x20010000
     assert reset & 1 == 1 and 0x08000000 <= reset < 0x08040000
+
+
+def test_new_cortex_m_template_matches_the_example_and_checks(tmp_path):
+    from greengold import templates
+    src = ROOT / "examples" / "embedded" / "cortex_m"
+    assert (src / "main.gg").read_text(encoding="utf-8").replace("\r\n", "\n") == templates.CORTEX_M_MAIN
+    assert (src / "link.ld").read_text(encoding="utf-8").replace("\r\n", "\n") == templates.CORTEX_M_LINK
+    r = subprocess.run([sys.executable, "-m", "greengold", "new", "fw", "--path", str(tmp_path / "fw"), "--template", "cortex-m"],
+                       capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stderr
+    assert (tmp_path / "fw" / "link.ld").is_file() and (tmp_path / "fw" / "src" / "main.gg").is_file()
+    assert "cortex-m4" in (tmp_path / "fw" / "README.md").read_text(encoding="utf-8")

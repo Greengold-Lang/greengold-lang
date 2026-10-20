@@ -444,3 +444,67 @@ impl SpscRing[T, N]:
             tail = atomic_load[u64](ptr_cast[*u64](addr(self.tail)), "acquire")
             return usize((tail + u64(N) - head) % u64(N))
         return 0
+
+# A lock-free bounded queue for any number of producers and consumers (Dmitry Vyukov's design: every slot carries a sequence number
+# that says whose turn it is). `push` and `pop` never block and never allocate; a full queue refuses a push, an empty one returns None.
+# Order is first in, first out per the order the pushes claimed their slots. The capacity `N` must be at least 2.
+# Share it by `read` (for example through `Arc`): every change is an atomic operation.
+#
+#     q = MpmcRing[u64, 64].new(0)
+#     q.push(7)              # from any thread
+#     v = q.pop()            # from any thread: Optional[u64]
+struct MpmcRing[T, N: usize]:
+    private
+    items: [N]T
+    seq: [N]u64
+    enq: u64
+    deq: u64
+
+impl MpmcRing[T, N]:
+    public
+    fn new(fill: T) -> MpmcRing[T, N]:
+        if N < 2:
+            panic("MpmcRing: the capacity must be at least 2")
+        s: [N]u64 = [0; N]
+        for i in 0..N:
+            s[usize(i)] = u64(i)
+        return MpmcRing[T, N]{ items: [fill; N], seq: s, enq: 0, deq: 0 }
+
+    fn capacity(self: read Self) -> usize:
+        return N
+
+    # Adds `value`; false when the queue is full.
+    fn push(self: read Self, value: T) -> bool:
+        unsafe:
+            while true:
+                pos = atomic_load[u64](ptr_cast[*u64](addr(self.enq)), "relaxed")
+                idx = usize(pos % u64(N))
+                seqp = ptr_cast[*u64](ptr_offset(ptr_cast[*u64](addr(self.seq)), idx))
+                s = atomic_load[u64](seqp, "acquire")
+                if s == pos:
+                    if atomic_cas[u64](ptr_cast[*mut u64](addr(self.enq)), pos, pos + 1, "relaxed") == pos:
+                        slots = ptr_cast[*mut T](addr(self.items))
+                        ptr_write[T](ptr_cast[*mut u8](ptr_offset(slots, idx)), value)
+                        atomic_store[u64](ptr_cast[*mut u64](seqp), pos + 1, "release")
+                        return true
+                elif s < pos:
+                    return false            # the slot still holds an element from a lap ago: full
+        return false
+
+    # Removes the oldest element; None when the queue is empty.
+    fn pop(self: read Self) -> Optional[T]:
+        unsafe:
+            while true:
+                pos = atomic_load[u64](ptr_cast[*u64](addr(self.deq)), "relaxed")
+                idx = usize(pos % u64(N))
+                seqp = ptr_cast[*u64](ptr_offset(ptr_cast[*u64](addr(self.seq)), idx))
+                s = atomic_load[u64](seqp, "acquire")
+                if s == pos + 1:
+                    if atomic_cas[u64](ptr_cast[*mut u64](addr(self.deq)), pos, pos + 1, "relaxed") == pos:
+                        slots = ptr_cast[*T](addr(self.items))
+                        value = ptr_read[T](ptr_cast[*u8](ptr_offset(slots, idx)))
+                        atomic_store[u64](ptr_cast[*mut u64](seqp), pos + u64(N), "release")
+                        return Valid(value)
+                elif s < pos + 1:
+                    return None             # nothing was written here yet: empty
+        return None

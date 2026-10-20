@@ -1087,8 +1087,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     nw = add("new", help="create a package (gg.toml + src/main.gg)")
     nw.add_argument("name")
     nw.add_argument("--path", help="directory (default: ./<name>)")
-    nw.add_argument("--template", choices=("bin", "lib", "cli"), default="bin",
-                    help="bin: hello world (default); lib: a library with tests; cli: reads arguments and input")
+    nw.add_argument("--template", choices=("bin", "lib", "cli", "cortex-m"), default="bin",
+                    help="bin: hello world (default); lib: a library with tests; cli: reads arguments and input; cortex-m: bare-metal Cortex-M4 firmware with a linker script")
     fm = add("fmt", help="rewrite .gg files into the one canonical layout")
     fm.add_argument("paths", nargs="*", help="files or directories (default: .)")
     fm.add_argument("--check", action="store_true", help="only report files that would change (exit 1)")

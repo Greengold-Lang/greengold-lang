@@ -1,0 +1,249 @@
+# std.money: amounts of money as whole minor units (cents), tied to a currency, so that rounding is explicit and no cent is lost or invented.
+#
+#     import std.money { Money, usd, eur, jpy, parse_money }
+#     price = usd(1999)                                  # 19.99 USD (1999 cents)
+#     total = price.times(3)                             # 59.97 USD
+#     tax = total.scaled(825, 10000, 0)                  # 8.25 %, rounded half-even: 4.95 USD  (mode 0 = half-even, see below)
+#     parts = total.allocate([1, 1, 1])                  # three shares that add up to exactly the total: 19.99 each
+#
+# A `Money` is an `i64` count of minor units, the three letters of an ISO 4217 code, and the number of decimal places of that currency
+# (2 for dollars, 0 for yen, 3 for dinars). Adding two amounts of different currencies is an `Err`, never a silent sum. Arithmetic traps on
+# overflow like every Greengold integer. There is no exchange-rate table: convert with `scaled(numerator, denominator, mode)`.
+#
+# Rounding modes for `scaled`: 0 half-even (banker's), 1 half-up (ties away from zero), 2 down (toward zero), 3 floor, 4 ceiling.
+
+public
+const HALF_EVEN: i32 = 0
+const HALF_UP: i32 = 1
+const TOWARD_ZERO: i32 = 2
+const FLOOR: i32 = 3
+const CEILING: i32 = 4
+
+struct Money:
+    minor: i64
+    code: [3]u8
+    places: u32
+
+private
+fn _pow10(n: u32) -> i64:
+    r: i64 = 1
+    for _i in 0..n:
+        r = r * 10
+    return r
+
+# Integer division of `n` by `d` (d > 0) under a rounding mode, without leaving 128-bit arithmetic.
+fn _div_round(n: i128, d: i128, mode: i32) -> i128:
+    q = n / d
+    r = n - q * d
+    if r == 0:
+        return q
+    neg = n < 0
+    abs_r = r
+    if abs_r < 0:
+        abs_r = -abs_r
+    twice = abs_r * 2
+    if mode == FLOOR:
+        if neg:
+            return q - 1
+        return q
+    if mode == CEILING:
+        if neg:
+            return q
+        return q + 1
+    if mode == TOWARD_ZERO:
+        return q
+    away = q + 1
+    if neg:
+        away = q - 1
+    if twice > d:
+        return away
+    if twice < d:
+        return q
+    if mode == HALF_UP:
+        return away
+    if q % 2 == 0:
+        return q
+    return away
+
+public
+fn money_new(minor: i64, code: str, places: u32) -> Money:
+    if code.len != 3:
+        panic("money: a currency code has three letters")
+    if places > 9:
+        panic("money: at most 9 decimal places")
+    return Money{ minor: minor, code: [code[0], code[1], code[2]], places: places }
+
+fn usd(cents: i64) -> Money:
+    return money_new(cents, "USD", 2)
+
+fn eur(cents: i64) -> Money:
+    return money_new(cents, "EUR", 2)
+
+fn gbp(pence: i64) -> Money:
+    return money_new(pence, "GBP", 2)
+
+fn jpy(yen: i64) -> Money:
+    return money_new(yen, "JPY", 0)
+
+# Reads a decimal amount such as "12.34", "-0.5" or "7" in a currency with `places` decimals. More decimals than the currency has is an
+# error (it would need rounding, which the caller must choose).
+fn parse_money(text: str, code: str, places: u32) -> Result[Money, string]:
+    if text.len == 0:
+        return Err("empty amount")
+    i: usize = 0
+    neg = false
+    if text[0] == '-':
+        neg = true
+        i = 1
+    whole: i64 = 0
+    frac: i64 = 0
+    frac_digits: u32 = 0
+    seen_digit = false
+    seen_dot = false
+    while i < text.len:
+        c = text[i]
+        if c == '.':
+            if seen_dot:
+                return Err("two decimal points")
+            seen_dot = true
+        elif c >= '0' and c <= '9':
+            seen_digit = true
+            d = i64(c - '0')
+            if seen_dot:
+                if frac_digits >= places:
+                    return Err("more decimal places than the currency has")
+                frac = frac * 10 + d
+                frac_digits += 1
+            else:
+                if whole > 900000000000000000 / 10:
+                    return Err("amount too large")
+                whole = whole * 10 + d
+        else:
+            return Err("not a number")
+        i += 1
+    if not seen_digit:
+        return Err("no digits")
+    while frac_digits < places:
+        frac = frac * 10
+        frac_digits += 1
+    scale = _pow10(places)
+    if whole > (9000000000000000000 - frac) / scale:
+        return Err("amount too large")
+    minor = whole * scale + frac
+    if neg:
+        minor = -minor
+    return Ok(money_new(minor, code, places))
+
+impl Money:
+    public
+    fn same_currency(self: read Self, o: Money) -> bool:
+        return self.code[0] == o.code[0] and self.code[1] == o.code[1] and self.code[2] == o.code[2] and self.places == o.places
+
+    fn is_zero(self: read Self) -> bool:
+        return self.minor == 0
+
+    fn is_negative(self: read Self) -> bool:
+        return self.minor < 0
+
+    fn neg(self: read Self) -> Money:
+        return Money{ minor: -self.minor, code: self.code, places: self.places }
+
+    fn abs(self: read Self) -> Money:
+        if self.minor < 0:
+            return self.neg()
+        return Money{ minor: self.minor, code: self.code, places: self.places }
+
+    # The sum, or an error when the currencies differ.
+    fn plus(self: read Self, o: Money) -> Result[Money, string]:
+        if not self.same_currency(o):
+            return Err("cannot add amounts of different currencies")
+        return Ok(Money{ minor: self.minor + o.minor, code: self.code, places: self.places })
+
+    fn minus(self: read Self, o: Money) -> Result[Money, string]:
+        if not self.same_currency(o):
+            return Err("cannot subtract amounts of different currencies")
+        return Ok(Money{ minor: self.minor - o.minor, code: self.code, places: self.places })
+
+    # Compares two amounts of the same currency: -1, 0 or 1 (an error for different currencies).
+    fn compare(self: read Self, o: Money) -> Result[i32, string]:
+        if not self.same_currency(o):
+            return Err("cannot compare amounts of different currencies")
+        if self.minor < o.minor:
+            return Ok(-1)
+        if self.minor > o.minor:
+            return Ok(1)
+        return Ok(0)
+
+    # The amount times a whole number.
+    fn times(self: read Self, k: i64) -> Money:
+        return Money{ minor: self.minor * k, code: self.code, places: self.places }
+
+    # The amount times `numerator / denominator`, rounded to a minor unit under `mode`. Panics when `denominator` is not positive.
+    fn scaled(self: read Self, numerator: i64, denominator: i64, mode: i32) -> Money:
+        if denominator <= 0:
+            panic("money: the denominator must be positive")
+        r = _div_round(i128(self.minor) * i128(numerator), i128(denominator), mode)
+        limit = i128(max_value[i64]())
+        if r > limit or r < -limit:
+            panic("money: the result does not fit")
+        return Money{ minor: i64(r), code: self.code, places: self.places }
+
+    # Splits the amount in proportion to `ratios` (all non-negative, at least one positive) so that the shares add up to exactly the amount:
+    # every share is rounded down, then the leftover minor units go one by one to the shares with the largest remainders (the earlier share first on ties).
+    fn allocate(self: read Self, ratios: []i64) -> List[Money]:
+        total: i128 = 0
+        for r in ratios:
+            if r < 0:
+                panic("money: ratios cannot be negative")
+            total = total + i128(r)
+        if total == 0:
+            panic("money: the ratios add up to zero")
+        sign: i128 = 1
+        amount = i128(self.minor)
+        if amount < 0:
+            sign = -1
+            amount = -amount
+        shares = List[i64]()
+        rems = List[i128]()
+        given: i128 = 0
+        for r in ratios:
+            part = amount * i128(r)
+            q = part / total
+            shares.push(i64(q))
+            rems.push(part - q * total)
+            given = given + q
+        left = amount - given
+        while left > 0:
+            best: usize = 0
+            for i in 0..rems.len:
+                if rems[usize(i)] > rems[best]:
+                    best = usize(i)
+            shares[best] = shares[best] + 1
+            rems[best] = -1
+            left -= 1
+        out = List[Money]()
+        for i in 0..shares.len:
+            out.push(Money{ minor: i64(sign) * shares[usize(i)], code: self.code, places: self.places })
+        return out
+
+    # "12.34 USD".
+    fn to_string(self: read Self) -> string:
+        out = string.new()
+        v = self.minor
+        if v < 0:
+            out.append_byte('-')
+            v = -v
+        scale = _pow10(self.places)
+        out.append(f"{v / scale}")
+        if self.places > 0:
+            out.append_byte('.')
+            frac = v % scale
+            digits = f"{frac}"
+            for _i in 0..(self.places - u32(digits.len)):
+                out.append_byte('0')
+            out.append(digits)
+        out.append_byte(' ')
+        out.append_byte(self.code[0])
+        out.append_byte(self.code[1])
+        out.append_byte(self.code[2])
+        return out

@@ -35,10 +35,39 @@ fn constant_time_eq(a: []u8, b: []u8) -> bool:
 # Overwrites the bytes with zeros in a way the optimizer may not remove (volatile stores). Call it on keys and
 # other secrets when you are done with them.
 fn zeroize(data: lend []u8):
+    if data.len == 0:
+        return
     unsafe:
         p = addr_mut(data[0])
         for i in 0..data.len:
             volatile_write[u8](ptr_offset(p, isize(i)), 0)
+
+# Secret bytes that wipe themselves: the contents are overwritten with zeros when the value goes out of scope (a scope
+# left by a panic or `process_exit` does not run `drop`). Read them with `view()`.
+#
+#     key = SecretBytes.from_list(random_bytes(32))
+#     tag = hmac_sha256(key.view(), message)         # `key` is wiped at the end of the scope
+struct SecretBytes:
+    private
+    bytes: List[u8]
+
+impl SecretBytes:
+    public
+    fn from_list(bytes: consume List[u8]) -> SecretBytes:
+        return SecretBytes{ bytes: bytes }
+
+    fn len(self: read Self) -> usize:
+        return self.bytes.len
+
+    fn view(self: read Self) -> []u8:
+        return self.bytes[..]
+
+    # Wipes now, without waiting for the end of the scope.
+    fn wipe(self: lend Self):
+        zeroize(self.bytes[..])
+
+    fn drop(self: lend Self):
+        zeroize(self.bytes[..])
 
 # `n` random bytes from the operating system's cryptographic source.
 fn random_bytes(n: usize) -> List[u8]:

@@ -1,0 +1,170 @@
+# std.can: CAN bus frames, the CRC the bus uses, and SAE J1939 identifiers. No allocation, no libc.
+#
+#     import std.can { CanFrame, frame_crc15, j1939_id, j1939_parse }
+#     f = CanFrame.data_frame(0x123, [1, 2, 3])          # 11-bit identifier, 3 data bytes
+#     id = j1939_id(6, 0xF004, 0x00)                      # priority 6, PGN 61444 (engine speed), source address 0
+#
+# `CanFrame` holds a classic CAN frame (up to 8 data bytes) or a CAN FD frame (up to 64). Hardware drivers implement `CanBus`, so a protocol
+# stack written against it runs on any controller. This module does not drive hardware and does not do bit stuffing or arbitration:
+# the controller does that. It gives the pieces software needs: the frame model, the 15-bit CRC of classic CAN (to check a frame
+# captured from a bit stream or to test a controller), and the J1939 identifier layout of trucks, ships and engines.
+
+
+public
+const MAX_STD_ID: u32 = 0x7FF
+const MAX_EXT_ID: u32 = 0x1FFFFFFF
+const CLASSIC_MAX: usize = 8
+const FD_MAX: usize = 64
+
+struct CanFrame:
+    id: u32
+    extended: bool        # 29-bit identifier
+    remote: bool          # remote transmission request: no data, the length says how much is asked for
+    fd: bool              # CAN FD frame
+    len: usize
+    data: [64]u8
+
+# What a CAN controller driver provides.
+feature CanBus:
+    # Queues a frame for sending; false when the transmit queue is full.
+    fn send(self: lend Self, frame: CanFrame) -> bool
+
+    # Takes the oldest received frame, or None.
+    fn receive(self: lend Self) -> Optional[CanFrame]
+
+impl CanFrame:
+    public
+    # A classic data frame with an 11-bit identifier. Panics when `data` has more than 8 bytes or the identifier does not fit.
+    fn data_frame(id: u32, data: []u8) -> CanFrame:
+        return CanFrame._build(id, false, false, false, data)
+
+    # A data frame with a 29-bit identifier.
+    fn extended_frame(id: u32, data: []u8) -> CanFrame:
+        return CanFrame._build(id, true, false, false, data)
+
+    # A CAN FD frame (up to 64 data bytes; the lengths between 9 and 64 must be one of the sizes FD can send: 12, 16, 20, 24, 32, 48, 64).
+    fn fd_frame(id: u32, extended: bool, data: []u8) -> CanFrame:
+        return CanFrame._build(id, extended, false, true, data)
+
+    # A remote request for `len` bytes.
+    fn remote_frame(id: u32, extended: bool, len: usize) -> CanFrame:
+        empty: [1]u8 = [0]
+        f = CanFrame._build(id, extended, true, false, empty[0..0])
+        f.len = len
+        return f
+
+    fn _build(id: u32, extended: bool, remote: bool, fd: bool, data: []u8) -> CanFrame:
+        if extended:
+            if id > MAX_EXT_ID:
+                panic("CanFrame: a 29-bit identifier is at most 0x1FFFFFFF")
+        elif id > MAX_STD_ID:
+            panic("CanFrame: an 11-bit identifier is at most 0x7FF")
+        limit = CLASSIC_MAX
+        if fd:
+            limit = FD_MAX
+        if data.len > limit:
+            panic("CanFrame: too many data bytes")
+        if fd and data.len > 8 and not valid_fd_length(data.len):
+            panic("CanFrame: a CAN FD frame has 0-8, 12, 16, 20, 24, 32, 48 or 64 data bytes")
+        f = CanFrame{ id: id, extended: extended, remote: remote, fd: fd, len: data.len, data: [0; 64] }
+        for i in 0..data.len:
+            f.data[usize(i)] = data[usize(i)]
+        return f
+
+    # The data bytes as a slice.
+    fn payload(self: read Self) -> []u8:
+        return self.data[0..self.len]
+
+    # True when the frame follows the rules above (identifier range, length, remote frames carry no data).
+    fn is_valid(self: read Self) -> bool:
+        if self.extended:
+            if self.id > MAX_EXT_ID:
+                return false
+        elif self.id > MAX_STD_ID:
+            return false
+        if self.remote and (self.fd or self.len > CLASSIC_MAX):
+            return false
+        if self.fd:
+            return self.len <= 8 or valid_fd_length(self.len)
+        return self.len <= CLASSIC_MAX
+
+public
+fn valid_fd_length(n: usize) -> bool:
+    return n <= 8 or n == 12 or n == 16 or n == 20 or n == 24 or n == 32 or n == 48 or n == 64
+
+# The data length code (0-15) that stands for `n` data bytes in the control field. FD lengths above 8 map to codes 9-15.
+fn dlc_for_length(n: usize) -> u8:
+    if n <= 8:
+        return u8(n)
+    if n <= 12:
+        return 9
+    if n <= 16:
+        return 10
+    if n <= 20:
+        return 11
+    if n <= 24:
+        return 12
+    if n <= 32:
+        return 13
+    if n <= 48:
+        return 14
+    return 15
+
+# The number of data bytes a data length code stands for (the codes above 8 mean 8 in classic CAN; pass `fd` for FD lengths).
+fn length_for_dlc(dlc: u8, fd: bool) -> usize:
+    if dlc <= 8:
+        return usize(dlc)
+    if not fd:
+        return 8
+    if dlc == 9:
+        return 12
+    if dlc == 10:
+        return 16
+    if dlc == 11:
+        return 20
+    if dlc == 12:
+        return 24
+    if dlc == 13:
+        return 32
+    if dlc == 14:
+        return 48
+    return 64
+
+# The CRC-15 of classic CAN (polynomial x^15 + x^14 + x^10 + x^8 + x^7 + x^4 + x^3 + 1, 0x4599) over `nbits` bits taken from
+# `bits` most significant bit first. The bit stream is the frame from the start-of-frame bit up to the end of the data field,
+# before stuffing; the result is what goes in the CRC field.
+fn frame_crc15(bits: []u8, nbits: usize) -> u16:
+    crc: u16 = 0
+    for i in 0..nbits:
+        byte = bits[usize(i) / 8]
+        bit: u16 = u16((byte >> u8(7 - usize(i) % 8)) & 1)
+        top: u16 = (crc >> 14) & 1
+        crc = (crc << 1) & 0x7FFF
+        if (top ^ bit) != 0:
+            crc = crc ^ 0x4599
+    return crc
+
+# -- SAE J1939 -----------------------------------------------------------------------------------------------------------------
+
+# The 29-bit identifier for a J1939 message: `priority` 0-7 (lower is more urgent), the 18-bit parameter group number `pgn`, and the
+# sender's `source` address. For a destination-specific PGN (PDU1, PF below 240) the low byte of `pgn` is the destination address and
+# must be given as part of `pgn`.
+fn j1939_id(priority: u8, pgn: u32, source: u8) -> u32:
+    if priority > 7 or pgn > 0x3FFFF:
+        panic("j1939_id: priority is 0-7 and the PGN has 18 bits")
+    return (u32(priority) << 26) | (pgn << 8) | u32(source)
+
+struct J1939Id:
+    priority: u8
+    pgn: u32              # for PDU1 (peer-to-peer) the destination byte is cleared here and given in `destination`
+    destination: u8       # 0xFF (global) for PDU2 messages
+    source: u8
+    is_pdu1: bool
+
+fn j1939_parse(id: u32) -> J1939Id:
+    pf: u32 = (id >> 16) & 255
+    ps: u32 = (id >> 8) & 255
+    base: u32 = (id >> 8) & 0x3FFFF
+    if pf < 240:
+        return J1939Id{ priority: u8((id >> 26) & 7), pgn: base & 0x3FF00, destination: u8(ps), source: u8(id & 255), is_pdu1: true }
+    return J1939Id{ priority: u8((id >> 26) & 7), pgn: base, destination: 255, source: u8(id & 255), is_pdu1: false }
