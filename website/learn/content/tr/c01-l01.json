@@ -1,0 +1,10 @@
+{
+  "title": "Değişkenler",
+  "blocks": [
+    {"t": "p", "text": "Bir **değişken**, bir değere verilen isimdir. Greengold'da `=` ile tanımlanır; tipi derleyici değerden çıkarır."},
+    {"t": "code", "run": true, "code": ["fn main():", "    x = 42", "    name = \"Ahmet\"", "    x = 50", "    print(x, name)"], "output": ["50 Ahmet"]},
+    {"t": "p", "text": "Değişkenler varsayılan olarak değiştirilebilir. Hiç değişmeyecek bir değer için `fixed` yazılır; sonradan değiştirmeye çalışmak derleme hatasıdır."},
+    {"t": "exercise", "id": "c01-l01-x1", "prompt": "`sayac` değişkenini 0'dan başlatıp `+= 1` ile iki kez artır ve sonucu yazdır.", "starter": ["fn main():", "    sayac = 0", "    print(sayac)"], "expected": ["2"], "hint": "`sayac += 1` satırını iki kez yaz.", "solution": ["fn main():", "    sayac = 0", "    sayac += 1", "    sayac += 1", "    print(sayac)"]},
+    {"t": "quiz", "id": "c01-l01-q1", "q": "Hiç değişmeyecek bir değişken hangi anahtar sözcükle tanımlanır?", "options": ["const", "fixed", "let"], "answer": 1, "why": "Fonksiyon içinde `fixed` kullanılır; `const` dosya düzeyindeki sabitler içindir."}
+  ]
+}

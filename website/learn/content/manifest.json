@@ -1,0 +1,6 @@
+{
+  "chapters": [
+    {"id": "c00", "only": "beginner", "title": {"tr": "Programlamaya giriş", "en": "Introduction to programming"}, "lessons": ["c00-l01"]},
+    {"id": "c01", "title": {"tr": "Temeller ve tipler", "en": "Basics and types"}, "lessons": ["c01-l01"]}
+  ]
+}
