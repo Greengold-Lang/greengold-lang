@@ -1,0 +1,462 @@
+# std.compress: DEFLATE, zlib and gzip.
+#
+#     import std.compress
+#     packed = compress.gzip_compress(data)
+#     back = compress.gzip_decompress(packed.as_slice(), 100000000).value_or_panic()    # at most 100 MB out
+#
+# `inflate` (decompression) handles every kind of DEFLATE block (stored, fixed and dynamic Huffman codes), so it reads what other
+# programs write. `deflate` (compression) finds repeated strings (LZ77 with a 32 KiB window and hash chains) and writes them with the
+# fixed Huffman code: it is fast and always valid, but packs a little less than a compressor that builds its own codes.
+#
+# Every decompression call takes `max_out`, the most bytes it will produce, so that a small hostile file cannot fill the memory
+# (a "zip bomb"). Truncated, corrupted, and checksum-failing input is an `Err`, never a crash. No libc; works with `--no-std`
+# plus an allocator.
+
+import std.encoding
+
+# -- bit input and output --------------------------------------------------------------------------------------------
+
+struct _In:
+    data: List[u8]
+    pos: usize
+    bitbuf: u32
+    bitcnt: u32
+    error: string
+
+fn _need(s: lend _In, n: u32) -> u32:
+    # n bits, least significant first (n <= 16)
+    while s.bitcnt < n:
+        if s.pos >= s.data.len:
+            if s.error.len() == 0:
+                s.error = string.from("the data ends too soon")
+            return 0
+        s.bitbuf = s.bitbuf | (u32(s.data[s.pos]) << s.bitcnt)
+        s.pos += 1
+        s.bitcnt += 8
+    v = s.bitbuf & ((u32(1) << n) - 1)
+    s.bitbuf = s.bitbuf >> n
+    s.bitcnt -= n
+    return v
+
+struct _Huff:
+    count: [16]u16
+    symbol: List[u16]
+
+fn _build(lengths: read List[u8], n: usize) -> _Huff:
+    h = _Huff{ count: [0; 16], symbol: List[u16]() }
+    for i in 0..n:
+        h.count[lengths[i]] += 1
+    h.count[0] = 0
+    offs: [16]u16 = [0; 16]
+    for len in 1..15:
+        offs[len + 1] = offs[len] + h.count[len]
+    for i in 0..n:
+        h.symbol.push(0)
+    for i in 0..n:
+        if lengths[i] != 0:
+            h.symbol[usize(offs[lengths[i]])] = u16(i)
+            offs[lengths[i]] += 1
+    return h
+
+# One symbol, or -1 on bad data.
+fn _decode(s: lend _In, h: read _Huff) -> i32:
+    code: i32 = 0
+    first: i32 = 0
+    index: i32 = 0
+    for len in 1..16:
+        code = code | i32(_need(s, 1))
+        if s.error.len() > 0:
+            return -1
+        count = i32(h.count[len])
+        if code - count < first:
+            return i32(h.symbol[usize(index + (code - first))])
+        index += count
+        first += count
+        first = first << 1
+        code = code << 1
+    return -1
+
+const LEN_BASE: [29]u16 = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258]
+const LEN_EXTRA: [29]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0]
+const DIST_BASE: [30]u16 = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577]
+const DIST_EXTRA: [30]u8 = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]
+const CODE_ORDER: [19]u8 = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
+
+fn _codes(s: lend _In, out: lend List[u8], lit: read _Huff, dist: read _Huff, max_out: usize) -> bool:
+    while true:
+        sym = _decode(s, lit)
+        if sym < 0:
+            if s.error.len() == 0:
+                s.error = string.from("a bad Huffman code")
+            return false
+        if sym < 256:
+            if out.len >= max_out:
+                s.error = string.from("the output is larger than the limit")
+                return false
+            out.push(u8(sym))
+        elif sym == 256:
+            return true
+        else:
+            sym -= 257
+            if sym >= 29:
+                s.error = string.from("a bad length code")
+                return false
+            length = i32(LEN_BASE[sym]) + i32(_need(s, u32(LEN_EXTRA[sym])))
+            ds = _decode(s, dist)
+            if ds < 0 or ds >= 30:
+                if s.error.len() == 0:
+                    s.error = string.from("a bad distance code")
+                return false
+            distance = usize(DIST_BASE[ds]) + usize(_need(s, u32(DIST_EXTRA[ds])))
+            if s.error.len() > 0:
+                return false
+            if distance > out.len:
+                s.error = string.from("a distance reaches before the start of the data")
+                return false
+            if out.len + usize(length) > max_out:
+                s.error = string.from("the output is larger than the limit")
+                return false
+            for _ in 0..length:
+                out.push(out[out.len - distance])
+    return true
+
+fn _fixed_tables() -> Tuple2[_Huff, _Huff]:
+    l = List[u8]()
+    for i in 0..288:
+        if i < 144:
+            l.push(8)
+        elif i < 256:
+            l.push(9)
+        elif i < 280:
+            l.push(7)
+        else:
+            l.push(8)
+    d = List[u8]()
+    for _ in 0..30:
+        d.push(5)
+    return Tuple2{ f0: _build(l, 288), f1: _build(d, 30) }
+
+fn _dynamic(s: lend _In, out: lend List[u8], max_out: usize) -> bool:
+    nlen = usize(_need(s, 5)) + 257
+    ndist = usize(_need(s, 5)) + 1
+    ncode = usize(_need(s, 4)) + 4
+    if nlen > 286 or ndist > 30:
+        s.error = string.from("too many length or distance codes")
+        return false
+    lengths = List[u8]()
+    for _ in 0..19:
+        lengths.push(0)
+    for i in 0..ncode:
+        lengths[usize(CODE_ORDER[i])] = u8(_need(s, 3))
+    lencode = _build(lengths, 19)
+    all = List[u8]()
+    while all.len < nlen + ndist:
+        sym = _decode(s, lencode)
+        if sym < 0:
+            if s.error.len() == 0:
+                s.error = string.from("a bad code length code")
+            return false
+        if sym < 16:
+            all.push(u8(sym))
+        else:
+            prev: u8 = 0
+            rep = 0
+            if sym == 16:
+                if all.len == 0:
+                    s.error = string.from("a repeat with nothing before it")
+                    return false
+                prev = all[all.len - 1]
+                rep = 3 + i32(_need(s, 2))
+            elif sym == 17:
+                rep = 3 + i32(_need(s, 3))
+            else:
+                rep = 11 + i32(_need(s, 7))
+            if all.len + usize(rep) > nlen + ndist:
+                s.error = string.from("too many code lengths")
+                return false
+            for _ in 0..rep:
+                all.push(prev)
+        if s.error.len() > 0:
+            return false
+    ll = List[u8]()
+    dl = List[u8]()
+    for i in 0..nlen:
+        ll.push(all[i])
+    for i in 0..ndist:
+        dl.push(all[nlen + i])
+    if ll[256] == 0:
+        s.error = string.from("a block without an end code")
+        return false
+    return _codes(s, out, _build(ll, nlen), _build(dl, ndist), max_out)
+
+fn _inflate_core(s: lend _In, max_out: usize) -> Result[List[u8], string]:
+    out = List[u8]()
+    last = false
+    while not last:
+        last = _need(s, 1) == 1
+        kind = _need(s, 2)
+        if s.error.len() > 0:
+            return Err(s.error.clone())
+        ok = false
+        if kind == 0:
+            s.bitbuf = 0
+            s.bitcnt = 0
+            if s.pos + 4 > s.data.len:
+                return Err(string.from("the data ends too soon"))
+            n = usize(s.data[s.pos]) | (usize(s.data[s.pos + 1]) << 8)
+            nn = usize(s.data[s.pos + 2]) | (usize(s.data[s.pos + 3]) << 8)
+            if n != (nn ^ 65535):
+                return Err(string.from("a stored block with a bad length"))
+            s.pos += 4
+            if s.pos + n > s.data.len:
+                return Err(string.from("the data ends too soon"))
+            if out.len + n > max_out:
+                return Err(string.from("the output is larger than the limit"))
+            for i in 0..n:
+                out.push(s.data[s.pos + i])
+            s.pos += n
+            ok = true
+        elif kind == 1:
+            t = _fixed_tables()
+            ok = _codes(s, out, t.f0, t.f1, max_out)
+        elif kind == 2:
+            ok = _dynamic(s, out, max_out)
+        else:
+            return Err(string.from("a bad block type"))
+        if not ok:
+            if s.error.len() > 0:
+                return Err(s.error.clone())
+            return Err(string.from("bad data"))
+    return Ok(out)
+
+public
+# Decompresses raw DEFLATE data. `max_out` bounds the result.
+fn inflate(data: []u8, max_out: usize) -> Result[List[u8], string]:
+    s = _In{ data: List[u8](), pos: 0, bitbuf: 0, bitcnt: 0, error: string.new() }
+    for b in data:
+        s.data.push(b)
+    return _inflate_core(s, max_out)
+
+# -- compression ------------------------------------------------------------------------------------------------------
+
+private
+struct _Out:
+    bytes: List[u8]
+    bitbuf: u64
+    bitcnt: u32
+
+fn _put(o: lend _Out, value: u32, n: u32):
+    o.bitbuf = o.bitbuf | (u64(value) << o.bitcnt)
+    o.bitcnt += n
+    while o.bitcnt >= 8:
+        o.bytes.push(u8(o.bitbuf & 255))
+        o.bitbuf = o.bitbuf >> 8
+        o.bitcnt -= 8
+
+fn _reverse(code: u32, n: u32) -> u32:
+    r: u32 = 0
+    for i in 0..n:
+        r = (r << 1) | ((code >> i) & 1)
+    return r
+
+# Writes a literal/length symbol with the fixed Huffman code.
+fn _put_fixed(o: lend _Out, sym: u32):
+    if sym < 144:
+        _put(o, _reverse(48 + sym, 8), 8)
+    elif sym < 256:
+        _put(o, _reverse(400 + sym - 144, 9), 9)
+    elif sym < 280:
+        _put(o, _reverse(sym - 256, 7), 7)
+    else:
+        _put(o, _reverse(192 + sym - 280, 8), 8)
+
+fn _length_symbol(length: usize) -> usize:
+    i: usize = 28
+    while LEN_BASE[i] > u16(length):
+        i -= 1
+    return i
+
+fn _dist_symbol(distance: usize) -> usize:
+    i: usize = 29
+    while DIST_BASE[i] > u16(distance):
+        i -= 1
+    return i
+
+public
+# Compresses to raw DEFLATE data. `level` 0 stores the bytes unchanged; 1 to 9 searches harder for repeats (1 is fastest).
+fn deflate(data: []u8, level: i32) -> List[u8]:
+    o = _Out{ bytes: List[u8](), bitbuf: 0, bitcnt: 0 }
+    n = data.len
+    if level <= 0 or n == 0:
+        if n == 0:
+            _put(o, 1, 1)
+            _put(o, 1, 2)
+            _put_fixed(o, 256)
+        else:
+            pos: usize = 0
+            while pos < n:
+                chunk = n - pos
+                if chunk > 65535:
+                    chunk = 65535
+                final = pos + chunk >= n
+                _put(o, if final then 1 else 0, 1)
+                _put(o, 0, 2)
+                if o.bitcnt > 0:
+                    _put(o, 0, 8 - o.bitcnt)
+                o.bytes.push(u8(chunk & 255))
+                o.bytes.push(u8(chunk >> 8))
+                o.bytes.push(u8((chunk ^ 65535) & 255))
+                o.bytes.push(u8((chunk ^ 65535) >> 8))
+                for i in 0..chunk:
+                    o.bytes.push(data[pos + i])
+                pos += chunk
+        if o.bitcnt > 0:
+            _put(o, 0, 8 - o.bitcnt)
+        return o.bytes.clone()
+    depth = 4
+    if level >= 3:
+        depth = 16
+    if level >= 6:
+        depth = 64
+    if level >= 9:
+        depth = 256
+    _put(o, 1, 1)
+    _put(o, 1, 2)
+    head = List[i32]()
+    for _ in 0..32768:
+        head.push(-1)
+    prev = List[i32]()
+    for _ in 0..n:
+        prev.push(-1)
+    i: usize = 0
+    while i < n:
+        best_len: usize = 0
+        best_dist: usize = 0
+        if i + 2 < n:
+            h = ((usize(data[i]) << 10) ^ (usize(data[i + 1]) << 5) ^ usize(data[i + 2])) & 32767
+            cand = head[h]
+            tries = 0
+            while cand >= 0 and tries < depth:
+                c = usize(cand)
+                if i - c > 32768:
+                    break
+                k: usize = 0
+                while k < 258 and i + k < n and data[c + k] == data[i + k]:
+                    k += 1
+                if k > best_len:
+                    best_len = k
+                    best_dist = i - c
+                    if k >= 258:
+                        break
+                cand = prev[c]
+                tries += 1
+        take: usize = 1
+        if best_len >= 3:
+            take = best_len
+            ls = _length_symbol(best_len)
+            _put_fixed(o, u32(257 + ls))
+            _put(o, u32(best_len) - u32(LEN_BASE[ls]), u32(LEN_EXTRA[ls]))
+            ds = _dist_symbol(best_dist)
+            _put(o, _reverse(u32(ds), 5), 5)
+            _put(o, u32(best_dist) - u32(DIST_BASE[ds]), u32(DIST_EXTRA[ds]))
+        else:
+            _put_fixed(o, u32(data[i]))
+        # index every position the match covers
+        for j in 0..take:
+            p = i + j
+            if p + 2 < n:
+                hh = ((usize(data[p]) << 10) ^ (usize(data[p + 1]) << 5) ^ usize(data[p + 2])) & 32767
+                prev[p] = head[hh]
+                head[hh] = i32(p)
+        i += take
+    _put_fixed(o, 256)
+    if o.bitcnt > 0:
+        _put(o, 0, 8 - o.bitcnt)
+    return o.bytes.clone()
+
+# -- zlib and gzip containers ---------------------------------------------------------------------------------------
+
+public
+# zlib (RFC 1950): a two-byte header, DEFLATE data, and an Adler-32 of the original bytes.
+fn zlib_compress(data: []u8, level: i32) -> List[u8]:
+    out = List[u8]()
+    out.push(0x78)
+    out.push(if level <= 0 then 0x01 elif level >= 7 then 0xDA else 0x9C)
+    for b in deflate(data, level):
+        out.push(b)
+    a = encoding.adler32(data)
+    out.push(u8(a >> 24))
+    out.push(u8((a >> 16) & 255))
+    out.push(u8((a >> 8) & 255))
+    out.push(u8(a & 255))
+    return out
+
+fn zlib_decompress(data: []u8, max_out: usize) -> Result[List[u8], string]:
+    if data.len < 6:
+        return Err(string.from("too short for zlib data"))
+    if (data[0] & 15) != 8 or ((u32(data[0]) << 8) | u32(data[1])) % 31 != 0:
+        return Err(string.from("not zlib data"))
+    if (data[1] & 32) != 0:
+        return Err(string.from("a preset dictionary is not supported"))
+    s = _In{ data: List[u8](), pos: 0, bitbuf: 0, bitcnt: 0, error: string.new() }
+    for i in 2..data.len:
+        s.data.push(data[i])
+    out = _inflate_core(s, max_out)?
+    if s.pos + 4 > s.data.len:
+        return Err(string.from("the checksum is missing"))
+    want = (u32(s.data[s.pos]) << 24) | (u32(s.data[s.pos + 1]) << 16) | (u32(s.data[s.pos + 2]) << 8) | u32(s.data[s.pos + 3])
+    if encoding.adler32(out) != want:
+        return Err(string.from("the checksum does not match"))
+    return Ok(out)
+
+# gzip (RFC 1952): a ten-byte header, DEFLATE data, then the CRC-32 and the length of the original bytes.
+fn gzip_compress(data: []u8, level: i32) -> List[u8]:
+    out = List[u8]()
+    out.push(0x1F)
+    out.push(0x8B)
+    out.push(8)
+    for _ in 0..6:
+        out.push(0)
+    out.push(255)
+    for b in deflate(data, level):
+        out.push(b)
+    c = encoding.crc32(data)
+    for i in 0..4:
+        out.push(u8((c >> u32(8 * i)) & 255))
+    n = u32(data.len & 0xFFFFFFFF)
+    for i in 0..4:
+        out.push(u8((n >> u32(8 * i)) & 255))
+    return out
+
+fn gzip_decompress(data: []u8, max_out: usize) -> Result[List[u8], string]:
+    if data.len < 18 or data[0] != 0x1F or data[1] != 0x8B or data[2] != 8:
+        return Err(string.from("not gzip data"))
+    flags = data[3]
+    pos: usize = 10
+    if (flags & 4) != 0:
+        if pos + 2 > data.len:
+            return Err(string.from("the header is cut off"))
+        pos += 2 + (usize(data[pos]) | (usize(data[pos + 1]) << 8))
+    if (flags & 8) != 0:
+        while pos < data.len and data[pos] != 0:
+            pos += 1
+        pos += 1
+    if (flags & 16) != 0:
+        while pos < data.len and data[pos] != 0:
+            pos += 1
+        pos += 1
+    if (flags & 2) != 0:
+        pos += 2
+    if pos >= data.len:
+        return Err(string.from("the header is cut off"))
+    s = _In{ data: List[u8](), pos: 0, bitbuf: 0, bitcnt: 0, error: string.new() }
+    for i in pos..data.len:
+        s.data.push(data[i])
+    out = _inflate_core(s, max_out)?
+    if s.pos + 8 > s.data.len:
+        return Err(string.from("the trailer is missing"))
+    crc = u32(s.data[s.pos]) | (u32(s.data[s.pos + 1]) << 8) | (u32(s.data[s.pos + 2]) << 16) | (u32(s.data[s.pos + 3]) << 24)
+    size = u32(s.data[s.pos + 4]) | (u32(s.data[s.pos + 5]) << 8) | (u32(s.data[s.pos + 6]) << 16) | (u32(s.data[s.pos + 7]) << 24)
+    if encoding.crc32(out) != crc or u32(out.len & 0xFFFFFFFF) != size:
+        return Err(string.from("the checksum does not match"))
+    return Ok(out)

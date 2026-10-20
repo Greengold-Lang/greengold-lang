@@ -1,0 +1,389 @@
+# std.dmath: math functions that give the same bits on every machine.
+#
+# `std.math` calls the C library, and C libraries differ in the last bit or two of `sin`, `exp`, `pow` and the rest (and even one
+# library changes between versions). That is fine for graphics and a problem for replays, lock-step simulation, distributed ledgers,
+# flight software that must be re-run and compared, and tests that want exact answers. These functions use only `+ - * /`, `sqrt`
+# (which IEEE 754 requires to be correctly rounded) and bit moves, with fixed polynomials, so any IEEE 754 binary64 machine
+# that does not contract multiply-adds (Greengold never emits a fused multiply-add on its own) produces identical results.
+#
+#     import std.dmath
+#     print(dmath.exp(1.0), dmath.sin(0.5), dmath.pow(2.0, 0.5))
+#
+# Accuracy is within about 2 units in the last place on the normal range (`tests/test_std_dmath.py` compares against Python's
+# libm), which is not the correctly-rounded last bit that CORE-MATH gives; what you get is *sameness*. Limits: `sin`, `cos` and `tan`
+# return NaN for |x| >= 1e6 (a reduction for huge arguments needs a long table of digits of pi); `pow` with a non-whole exponent loses
+# about log2(|y * ln x|) bits. `floor`, `ceil`, `round` and `trunc` are exact in `std.math` already.
+
+import std.math
+
+const SIN_C: [13]f64 = [-0.16666666666666666, 0.008333333333333333, -0.0001984126984126984, 2.7557319223985893e-06, -2.505210838544172e-08, 1.6059043836821613e-10, -7.647163731819816e-13, 2.8114572543455206e-15, -8.22063524662433e-18, 1.9572941063391263e-20, -3.868170170630684e-23, 6.446950284384474e-26, -9.183689863795546e-29]
+const COS_C: [12]f64 = [0.041666666666666664, -0.001388888888888889, 2.48015873015873e-05, -2.755731922398589e-07, 2.08767569878681e-09, -1.1470745597729725e-11, 4.779477332387385e-14, -1.5619206968586225e-16, 4.110317623312165e-19, -8.896791392450574e-22, 1.6117375710961184e-24, -2.4795962632247976e-27]
+const EXP_C: [17]f64 = [1.0, 1.0, 0.5, 0.16666666666666666, 0.041666666666666664, 0.008333333333333333, 0.001388888888888889, 0.0001984126984126984, 2.48015873015873e-05, 2.7557319223985893e-06, 2.755731922398589e-07, 2.505210838544172e-08, 2.08767569878681e-09, 1.6059043836821613e-10, 1.1470745597729725e-11, 7.647163731819816e-13, 4.779477332387385e-14]
+const ATAN_C: [14]f64 = [1.0, -0.3333333333333333, 0.2, -0.14285714285714285, 0.1111111111111111, -0.09090909090909091, 0.07692307692307693, -0.06666666666666667, 0.058823529411764705, -0.05263157894736842, 0.047619047619047616, -0.043478260869565216, 0.04, -0.037037037037037035]
+const LN_C: [14]f64 = [1.0, 0.3333333333333333, 0.2, 0.14285714285714285, 0.1111111111111111, 0.09090909090909091, 0.07692307692307693, 0.06666666666666667, 0.058823529411764705, 0.05263157894736842, 0.047619047619047616, 0.043478260869565216, 0.04, 0.037037037037037035]
+
+# -- bits ---------------------------------------------------------------------------------------------------------
+
+private
+fn _bits(x: f64) -> u64:
+    v: f64 = x
+    unsafe:
+        return ptr_cast[*u64](addr(v))[0]
+
+fn _from_bits(b: u64) -> f64:
+    v: u64 = b
+    unsafe:
+        return ptr_cast[*f64](addr(v))[0]
+
+fn _nan() -> f64:
+    return _from_bits(0x7FF8000000000000)
+
+fn _inf() -> f64:
+    return _from_bits(0x7FF0000000000000)
+
+fn _is_nan(x: f64) -> bool:
+    return x != x
+
+fn _is_inf(x: f64) -> bool:
+    return x - x != 0.0 and x == x
+
+# 2^n for -1022 <= n <= 1023, exactly.
+fn _pow2(n: i32) -> f64:
+    return _from_bits(u64(n + 1023) << 52)
+
+# x * 2^n, exactly (unless the result is subnormal, where it rounds once like any IEEE operation).
+fn _ldexp(x: f64, n: i32) -> f64:
+    r = x
+    k = n
+    while k > 1000:
+        r = r * _pow2(1000)
+        k -= 1000
+    while k < -1000:
+        r = r * _pow2(-1000)
+        k += 1000
+    return r * _pow2(k)
+
+const LN2_HI: f64 = 6.93147180369123816490e-01
+const LN2_LO: f64 = 1.90821492927058770002e-10
+const INV_LN2: f64 = 1.44269504088896338700e+00
+const PI_2_HI: f64 = 1.57079632679489655800e+00
+const PI_2_LO: f64 = 6.12323399573676603587e-17
+const TWO_OVER_PI: f64 = 6.36619772367581382433e-01
+const PIO2_1: f64 = 1.57079632673412561417e+00
+const PIO2_1T: f64 = 6.07710050650619224932e-11
+const PIO2_2: f64 = 6.07710050630396597660e-11
+const PIO2_2T: f64 = 2.02226624879595063154e-21
+const PIO2_3: f64 = 2.02226624871116645580e-21
+const PIO2_3T: f64 = 8.47842766036889956997e-32
+
+public
+# e^x. Accurate to about 1 unit in the last place.
+fn exp(x: f64) -> f64:
+    if _is_nan(x):
+        return x
+    if x > 709.782712893384:
+        return _inf()
+    if x < -745.1332191019411:
+        return 0.0
+    n = floor_f(x * INV_LN2 + 0.5)
+    r = (x - n * LN2_HI) - n * LN2_LO
+    p: f64 = EXP_C[16]
+    i = 16
+    while i > 0:
+        i -= 1
+        p = p * r + EXP_C[i]
+    return _ldexp(p, i32(n))
+
+public
+# e^x - 1, without the loss of digits that `exp(x) - 1.0` has for small x.
+fn expm1(x: f64) -> f64:
+    if _is_nan(x):
+        return x
+    if x > 0.5 or x < -0.5:
+        return exp(x) - 1.0
+    p: f64 = EXP_C[16]
+    i = 16
+    while i > 1:
+        i -= 1
+        p = p * x + EXP_C[i]
+    return x * p
+
+private
+fn floor_f(x: f64) -> f64:
+    t = f64(i64(x))
+    if t > x:
+        return t - 1.0
+    return t
+
+public
+# The natural logarithm. Accurate to about 1 unit in the last place; 0 gives -inf, negative numbers NaN.
+fn ln(x: f64) -> f64:
+    if _is_nan(x) or x < 0.0:
+        return _nan()
+    if x == 0.0:
+        return 0.0 - _inf()
+    if _is_inf(x):
+        return x
+    v = x
+    k: i32 = 0
+    if v < 2.2250738585072014e-308:
+        v = v * 18014398509481984.0
+        k = -54
+    b = _bits(v)
+    k += i32((b >> 52) & 2047) - 1023
+    m = _from_bits((b & 0x000FFFFFFFFFFFFF) | 0x3FF0000000000000)
+    if m > 1.4142135623730951:
+        m = m * 0.5
+        k += 1
+    f = m - 1.0
+    s = f / (2.0 + f)
+    z = s * s
+    p: f64 = LN_C[13]
+    i = 13
+    while i > 0:
+        i -= 1
+        p = p * z + LN_C[i]
+    dk = f64(k)
+    return dk * LN2_HI + (dk * LN2_LO + 2.0 * s * p)
+
+fn log2(x: f64) -> f64:
+    return ln(x) * INV_LN2
+
+fn log10(x: f64) -> f64:
+    return ln(x) * 0.4342944819032518
+
+# The sine and cosine kernels on |r| <= pi/4.
+private
+fn _sin_k(r: f64) -> f64:
+    z = r * r
+    p: f64 = SIN_C[12]
+    i = 12
+    while i > 0:
+        i -= 1
+        p = p * z + SIN_C[i]
+    return r + r * z * p
+
+fn _cos_k(r: f64) -> f64:
+    z = r * r
+    p: f64 = COS_C[11]
+    i = 11
+    while i > 0:
+        i -= 1
+        p = p * z + COS_C[i]
+    return 1.0 - 0.5 * z + z * z * p
+
+# Reduces x to r in [-pi/4, pi/4] and the quadrant n mod 4. NaN for |x| >= 1e6 (see the module comment).
+fn _reduce(x: f64) -> Tuple2[f64, i32]:
+    n = floor_f(x * TWO_OVER_PI + 0.5)
+    r = x - n * PIO2_1
+    r = r - n * PIO2_2
+    r = r - n * PIO2_3
+    q = i64(n) % 4
+    if q < 0:
+        q += 4
+    return Tuple2{ f0: r, f1: i32(q) }
+
+public
+fn sin(x: f64) -> f64:
+    if _is_nan(x) or _is_inf(x) or x > 1.0e6 or x < -1.0e6:
+        return _nan()
+    t = _reduce(x)
+    if t.f1 == 0:
+        return _sin_k(t.f0)
+    if t.f1 == 1:
+        return _cos_k(t.f0)
+    if t.f1 == 2:
+        return 0.0 - _sin_k(t.f0)
+    return 0.0 - _cos_k(t.f0)
+
+fn cos(x: f64) -> f64:
+    if _is_nan(x) or _is_inf(x) or x > 1.0e6 or x < -1.0e6:
+        return _nan()
+    t = _reduce(x)
+    if t.f1 == 0:
+        return _cos_k(t.f0)
+    if t.f1 == 1:
+        return 0.0 - _sin_k(t.f0)
+    if t.f1 == 2:
+        return 0.0 - _cos_k(t.f0)
+    return _sin_k(t.f0)
+
+fn tan(x: f64) -> f64:
+    if _is_nan(x) or _is_inf(x) or x > 1.0e6 or x < -1.0e6:
+        return _nan()
+    t = _reduce(x)
+    s = _sin_k(t.f0)
+    c = _cos_k(t.f0)
+    if t.f1 % 2 == 0:
+        return s / c
+    return 0.0 - c / s
+
+private
+fn _sqrt(x: f64) -> f64:
+    return math.sqrt(x)
+
+public
+fn atan(x: f64) -> f64:
+    if _is_nan(x):
+        return x
+    neg = x < 0.0
+    a = x
+    if neg:
+        a = 0.0 - x
+    inv = a > 1.0
+    if inv:
+        a = 1.0 / a
+    # halve the angle twice: atan(a) = 2 atan(a / (1 + sqrt(1 + a^2)))
+    a = a / (1.0 + _sqrt(1.0 + a * a))
+    a = a / (1.0 + _sqrt(1.0 + a * a))
+    z = a * a
+    p: f64 = ATAN_C[13]
+    i = 13
+    while i > 0:
+        i -= 1
+        p = p * z + ATAN_C[i]
+    r = 4.0 * (a * p)
+    if inv:
+        r = (PI_2_HI - r) + PI_2_LO
+    if neg:
+        return 0.0 - r
+    return r
+
+fn atan2(y: f64, x: f64) -> f64:
+    if _is_nan(x) or _is_nan(y):
+        return _nan()
+    pi = 2.0 * PI_2_HI
+    if x == 0.0:
+        if y > 0.0:
+            return PI_2_HI
+        if y < 0.0:
+            return 0.0 - PI_2_HI
+        return 0.0
+    if _is_inf(x) or _is_inf(y):
+        if _is_inf(x) and not _is_inf(y):
+            if x > 0.0:
+                return if y >= 0.0 then 0.0 else -0.0
+            return if y >= 0.0 then pi else 0.0 - pi
+        if y > 0.0:
+            if _is_inf(x):
+                return if x > 0.0 then pi / 4.0 else 3.0 * pi / 4.0
+            return PI_2_HI
+        if _is_inf(x):
+            return if x > 0.0 then 0.0 - pi / 4.0 else 0.0 - 3.0 * pi / 4.0
+        return 0.0 - PI_2_HI
+    r = atan(y / x)
+    if x < 0.0:
+        if y >= 0.0:
+            return r + pi
+        return r - pi
+    return r
+
+fn asin(x: f64) -> f64:
+    if _is_nan(x) or x > 1.0 or x < -1.0:
+        return _nan()
+    return atan2(x, _sqrt((1.0 - x) * (1.0 + x)))
+
+fn acos(x: f64) -> f64:
+    if _is_nan(x) or x > 1.0 or x < -1.0:
+        return _nan()
+    return atan2(_sqrt((1.0 - x) * (1.0 + x)), x)
+
+fn sinh(x: f64) -> f64:
+    a = x
+    if a < 0.0:
+        a = 0.0 - a
+    r: f64 = 0.0
+    if a < 0.1:
+        a2 = a * a
+        r = a * (1.0 + a2 * (1.0 / 6.0 + a2 * (1.0 / 120.0 + a2 * (1.0 / 5040.0 + a2 * (1.0 / 362880.0)))))
+    else:
+        e = exp(a)
+        r = 0.5 * (e - 1.0 / e)
+    if x < 0.0:
+        return 0.0 - r
+    return r
+
+fn cosh(x: f64) -> f64:
+    a = x
+    if a < 0.0:
+        a = 0.0 - a
+    e = exp(a)
+    return 0.5 * (e + 1.0 / e)
+
+fn tanh(x: f64) -> f64:
+    if x > 20.0:
+        return 1.0
+    if x < -20.0:
+        return -1.0
+    a = x
+    if a < 0.0:
+        a = 0.0 - a
+    em = expm1(2.0 * a)
+    r = em / (em + 2.0)
+    if x < 0.0:
+        return 0.0 - r
+    return r
+
+# x raised to y. For a whole-number y up to 1024 in size the result comes from repeated multiplication; otherwise from
+# exp(y * ln(x)), which loses about log2(|y * ln x|) bits.
+fn pow(x: f64, y: f64) -> f64:
+    if y == 0.0:
+        return 1.0
+    if _is_nan(x) or _is_nan(y):
+        return _nan()
+    whole = y == f64(i64(y)) and y >= -1024.0 and y <= 1024.0
+    if whole:
+        n = i64(y)
+        neg_exp = n < 0
+        if neg_exp:
+            n = 0 - n
+        base = x
+        r = 1.0
+        while n > 0:
+            if n % 2 == 1:
+                r = r * base
+            base = base * base
+            n = n / 2
+        if neg_exp:
+            return 1.0 / r
+        return r
+    if x == 0.0:
+        if y > 0.0:
+            return 0.0
+        return _inf()
+    if x < 0.0:
+        return _nan()
+    return exp(y * ln(x))
+
+fn cbrt(x: f64) -> f64:
+    if x == 0.0 or _is_nan(x) or _is_inf(x):
+        return x
+    a = x
+    if a < 0.0:
+        a = 0.0 - a
+    e = ln(a) / 3.0
+    r = exp(e)
+    # two Newton steps clean up the last bits
+    r = r - (r * r * r - a) / (3.0 * r * r)
+    r = r - (r * r * r - a) / (3.0 * r * r)
+    if x < 0.0:
+        return 0.0 - r
+    return r
+
+fn hypot(x: f64, y: f64) -> f64:
+    a = x
+    b = y
+    if a < 0.0:
+        a = 0.0 - a
+    if b < 0.0:
+        b = 0.0 - b
+    if _is_inf(a) or _is_inf(b):
+        return _inf()
+    if a < b:
+        t = a
+        a = b
+        b = t
+    if a == 0.0:
+        return 0.0
+    q = b / a
+    return a * _sqrt(1.0 + q * q)

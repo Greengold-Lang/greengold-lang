@@ -1,0 +1,18 @@
+# conformance: SPEC section 14 (Constants and compile-time functions), example 3
+# expect-output:
+#   tick
+#   reset
+
+fn on_reset():
+    print("reset")
+
+fn on_tick():
+    print("tick")
+
+const TABLE: [2]fn() = [on_reset, on_tick]
+
+fn main():
+    f = TABLE[1]
+    f()
+    g = TABLE[0]
+    g()

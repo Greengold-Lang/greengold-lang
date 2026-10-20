@@ -1,0 +1,168 @@
+# std.audit: an append-only log whose entries are chained by SHA-256, so that changing, deleting or reordering a past entry is detected.
+#
+#     import std.audit
+#     log = audit.AuditLog.open("events.audit").value_or_panic()
+#     log.append("operator 7 armed the pump").value_or_panic()
+#     n = audit.verify("events.audit").value_or_panic()          # number of entries, or Err("entry 12: hash does not match")
+#     print(log.head())                                          # the hash of the newest entry: keep it somewhere else
+#
+# One entry is one line: `seq TAB unix_millis TAB previous_hash TAB message TAB hash`, where `hash` is the SHA-256 of the first four
+# fields and the first entry's previous hash is 64 zeros. A newline, tab or backslash in a message is written as `\n`, `\t`, `\\`.
+# Each `append` is written and put on the disk (`fsync`) before it returns, so an entry that was reported as written survives a crash.
+#
+# What it promises and what it does not. A change inside the file is found by `verify`, and so is a removed or swapped entry in the
+# middle. The chain alone cannot show that the *last* entries were cut off, or that the whole file was replaced by a fresh chain:
+# keep `head()` and the entry count in a place the writer cannot rewrite (another machine, a write-once store, a signed receipt) and
+# pass them to `verify_anchored`. The file is not secret; for a keyed chain that outsiders cannot forge, use `AuditLog.open_keyed`.
+
+import std.fs
+import std.io
+import std.hash
+import std.encoding
+import std.time
+
+const ZERO_HASH: str = "0000000000000000000000000000000000000000000000000000000000000000"
+
+public
+struct AuditLog:
+    private
+    path: string
+    seq: u64
+    last: string
+    key: List[u8]       # empty: plain SHA-256; otherwise HMAC-SHA-256 with this key
+
+private
+fn _escape(message: str) -> string:
+    out = string.new()
+    for b in message.as_bytes():
+        if b == 10:
+            out.append_byte(92)
+            out.append_byte(110)
+        elif b == 9:
+            out.append_byte(92)
+            out.append_byte(116)
+        elif b == 13:
+            out.append_byte(92)
+            out.append_byte(114)
+        elif b == 92:
+            out.append_byte(92)
+            out.append_byte(92)
+        else:
+            out.append_byte(b)
+    return out
+
+struct _Chain:
+    count: u64
+    last: string
+    anchor: string
+
+fn _io[T](r: Result[T, io.IoError]) -> Result[T, string]:
+    match consume r:
+        Ok(v):
+            return Ok(v)
+        Err(e):
+            return Err(e.message.clone())
+
+fn _digest(key: []u8, body: str) -> string:
+    if key.len == 0:
+        h = hash.sha256(body.as_bytes())
+        return encoding.hex_encode(h)
+    mac = hash.hmac_sha256(key, body.as_bytes())
+    return encoding.hex_encode(mac)
+
+fn _body(seq: u64, millis: i64, prev: str, escaped: str) -> string:
+    return f"{seq}\t{millis}\t{prev}\t{escaped}"
+
+# Checks the chain in `text`; returns the entry count, the last hash, and the hash after entry `at` (64 zeros when `at` is 0).
+fn _check(text: str, key: []u8, at: u64) -> Result[_Chain, string]:
+    prev = string.from(ZERO_HASH)
+    anchor = string.from(ZERO_HASH)
+    count: u64 = 0
+    for line in text.lines():
+        if line.len == 0:
+            continue
+        parts = line.split("\t")
+        if parts.len != 5:
+            return Err(f"entry {count + 1}: malformed line")
+        seq = parts[0].parse_int().value_or(-1)
+        if seq != i64(count + 1):
+            return Err(f"entry {count + 1}: sequence number is {parts[0]}, expected {count + 1}")
+        if parts[2] != prev.as_str():
+            return Err(f"entry {count + 1}: previous hash does not match")
+        want = _digest(key, f"{parts[0]}\t{parts[1]}\t{parts[2]}\t{parts[3]}".as_str())
+        if parts[4] != want.as_str():
+            return Err(f"entry {count + 1}: hash does not match")
+        prev = string.from(parts[4])
+        count += 1
+        if count == at:
+            anchor = string.from(parts[4])
+    return Ok(_Chain{ count: count, last: prev, anchor: anchor })
+
+# Reads the chain at `path`, if any, and checks it. A damaged log is an `Err`: it is never silently continued.
+fn _open_with(path: str, key: List[u8]) -> Result[AuditLog, string]:
+    text = string.new()
+    if fs.file_exists(path):
+        text = _io(fs.read_text(path))?
+    r = _check(text.as_str(), key, 0)?
+    return Ok(AuditLog{ path: string.from(path), seq: r.count, last: r.last.clone(), key: key })
+
+impl AuditLog:
+    public
+    # Opens or creates the log at `path` (SHA-256 chain).
+    fn open(path: str) -> Result[AuditLog, string]:
+        return _open_with(path, List[u8]())
+
+    # Opens or creates a log whose hashes are HMAC-SHA-256 under `key`: without the key nobody can rebuild a valid chain.
+    fn open_keyed(path: str, key: []u8) -> Result[AuditLog, string]:
+        k = List[u8]()
+        for b in key:
+            k.push(b)
+        return _open_with(path, k)
+
+    # Adds an entry stamped with the current time; returns its sequence number (first is 1).
+    fn append(self: lend Self, message: str) -> Result[u64, string]:
+        return self.append_at(message, time.unix_millis())
+
+    # Adds an entry with an explicit time (milliseconds since 1970).
+    fn append_at(self: lend Self, message: str, millis: i64) -> Result[u64, string]:
+        escaped = _escape(message)
+        next = self.seq + 1
+        body = _body(next, millis, self.last.as_str(), escaped.as_str())
+        h = _digest(self.key, body.as_str())
+        line = f"{body}\t{h}\n"
+        file = _io(io.File.append(self.path.as_str()))?
+        _io(file.write(line.as_str()))?
+        _io(file.sync_all())?
+        self.seq = next
+        self.last = h
+        return Ok(next)
+
+    # The hash of the newest entry (64 zeros while the log is empty). Store it outside this file.
+    fn head(self: read Self) -> string:
+        return self.last.clone()
+
+    # The number of entries.
+    fn len(self: read Self) -> u64:
+        return self.seq
+
+public
+# Checks the whole file; returns the number of entries.
+fn verify(path: str) -> Result[u64, string]:
+    return verify_keyed(path, "".as_bytes())
+
+# Like `verify` for a log written with `open_keyed`.
+fn verify_keyed(path: str, key: []u8) -> Result[u64, string]:
+    text = _io(fs.read_text(path))?
+    r = _check(text.as_str(), key, 0)?
+    return Ok(r.count)
+
+# Checks the file and also that its first `count` entries end with `head` (the values `len()` and `head()` gave earlier),
+# which catches cut-off or replaced logs that `verify` alone cannot see. Later entries are allowed.
+fn verify_anchored(path: str, count: u64, head: str) -> Result[u64, string]:
+    text = _io(fs.read_text(path))?
+    r = _check(text.as_str(), "".as_bytes(), count)?
+    if r.count < count:
+        return Err(f"the log has {r.count} entries, {count} were expected: entries were removed")
+    if r.anchor.as_str() != head:
+        return Err("the anchored entry does not match: the log was altered or replaced")
+    return Ok(r.count)

@@ -562,6 +562,7 @@ class ConstDecl(Node):
     is_pub: bool = field(default=False, kw_only=True)
     # `static NAME: T = value`: one mutable global; reading or writing it needs `unsafe:`.
     is_static: bool = field(default=False, kw_only=True)
+    attrs: list = field(default_factory=list, kw_only=True)  # `@name(...)` lines above a `static`
 
 
 @dataclass(eq=False)

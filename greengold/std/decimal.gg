@@ -1,0 +1,318 @@
+# std.decimal: exact decimal numbers, for money and anything else where 0.1 + 0.2 must be 0.3.
+#
+#     import std.decimal { Decimal, decimal_parse, decimal_from_int, HALF_EVEN }
+#     price = decimal_parse("19.99").value_or_panic()
+#     total = price.mul(decimal_from_int(3))                      # 59.97
+#     tax   = total.mul(decimal_parse("0.0825").value_or_panic()).round(2, HALF_EVEN)
+#     print(total.add(tax).to_string())                           # 64.92
+#
+# A `Decimal` is a 128-bit integer (`mantissa`) and a count of digits after the point (`scale`, 0 to 28): the value
+# is `mantissa / 10^scale`, so up to 38 significant digits. `add`, `sub` and `mul` are exact and trap when the result
+# does not fit (never silently wrong). `div` and `round` take a number of places and a rounding rule. Scales are kept
+# as computed (`1.50` stays `1.50`); `normalize()` strips trailing zeros and `equals` / `compare` ignore scale.
+# The 128-bit division needs the compiler runtime (libgcc / compiler-rt): hosted targets have it.
+
+import std.string
+
+# Rounding rules (pass as `HALF_EVEN`, `HALF_UP`, ...). Banker's rounding is HALF_EVEN.
+const HALF_EVEN: i32 = 0     # to the nearest; a tie goes to the even neighbor
+const HALF_UP: i32 = 1       # to the nearest; a tie goes away from zero
+const HALF_DOWN: i32 = 2     # to the nearest; a tie goes toward zero
+const UP: i32 = 3            # away from zero
+const DOWN: i32 = 4          # toward zero (truncate)
+const FLOOR: i32 = 5         # toward minus infinity
+const CEILING: i32 = 6       # toward plus infinity
+
+const MAX_SCALE: u32 = 28
+
+struct Decimal:
+    mantissa: i128
+    scale: u32
+
+fn decimal_from_int(n: i64) -> Decimal:
+    return Decimal{ mantissa: i128(n), scale: 0 }
+
+# `mantissa / 10^scale`: `decimal_new(1999, 2)` is 19.99.
+fn decimal_new(mantissa: i128, scale: u32) -> Decimal:
+    if scale > MAX_SCALE:
+        panic("Decimal: scale is at most 28")
+    return Decimal{ mantissa: mantissa, scale: scale }
+
+fn decimal_zero() -> Decimal:
+    return Decimal{ mantissa: 0, scale: 0 }
+
+# Reads `-12.340`, `+5`, `.5`, `1_000.25`, or `1.5e3`.
+fn decimal_parse(text: str) -> Result[Decimal, string]:
+    i: usize = 0
+    neg = false
+    if i < text.len and (text[i] == '-' or text[i] == '+'):
+        neg = text[i] == '-'
+        i += 1
+    mant: i128 = 0
+    scale: u32 = 0
+    seen_digit = false
+    seen_point = false
+    while i < text.len:
+        c = text[i]
+        if c == '_':
+            i += 1
+            continue
+        if c == '.':
+            if seen_point:
+                return Err(string.from("two decimal points"))
+            seen_point = true
+            i += 1
+            continue
+        if c == 'e' or c == 'E':
+            break
+        if c < '0' or c > '9':
+            return Err(string.from("unexpected character in number"))
+        if mant > 17014118346046923173168730371588410572:
+            return Err(string.from("number has more than 38 digits"))
+        mant = mant * 10 + i128(c - '0')
+        seen_digit = true
+        if seen_point:
+            scale += 1
+        i += 1
+    if not seen_digit:
+        return Err(string.from("no digits"))
+    if i < text.len:  # exponent
+        i += 1
+        eneg = false
+        if i < text.len and (text[i] == '-' or text[i] == '+'):
+            eneg = text[i] == '-'
+            i += 1
+        if i >= text.len:
+            return Err(string.from("missing exponent digits"))
+        e: i64 = 0
+        while i < text.len:
+            c2 = text[i]
+            if c2 < '0' or c2 > '9':
+                return Err(string.from("unexpected character in exponent"))
+            e = e * 10 + i64(c2 - '0')
+            if e > 100:
+                return Err(string.from("exponent too large"))
+            i += 1
+        if eneg:
+            scale += u32(e)
+        else:
+            if i64(scale) >= e:
+                scale -= u32(e)
+            else:
+                shift = u32(e - i64(scale))
+                scale = 0
+                if shift > 38:
+                    return Err(string.from("number too large"))
+                p = _pow10(shift)
+                if mant > max_value[i128]() / p:
+                    return Err(string.from("number too large"))
+                mant = mant * p
+    if scale > MAX_SCALE:
+        return Err(string.from("more than 28 digits after the point"))
+    if neg:
+        mant = 0 - mant
+    return Ok(Decimal{ mantissa: mant, scale: scale })
+
+fn _pow10(n: u32) -> i128:
+    r: i128 = 1
+    for _ in 0..n:
+        r = r * 10
+    return r
+
+# `a` brought to `scale` digits after the point by multiplying (exact); the caller makes sure `scale >= a.scale`.
+fn _up(a: read Decimal, scale: u32) -> i128:
+    d = scale - a.scale
+    if d == 0:
+        return a.mantissa
+    if d > 38:
+        panic("Decimal: overflow")
+    p = _pow10(d)
+    if a.mantissa > max_value[i128]() / p or a.mantissa < min_value[i128]() / p:
+        panic("Decimal: overflow")
+    return a.mantissa * p
+
+# Divides `n` by `d` (d > 0) with the rounding rule.
+fn _div_round(n: i128, d: i128, mode: i32) -> i128:
+    q = n / d
+    r = n % d
+    if r == 0:
+        return q
+    neg = n < 0
+    # compare 2*|r| with d without overflow: |r| < d, so test |r| against d - |r|
+    ar = r
+    if ar < 0:
+        ar = 0 - ar
+    other = d - ar
+    up = false
+    if mode == DOWN:
+        up = false
+    elif mode == UP:
+        up = true
+    elif mode == FLOOR:
+        up = neg
+    elif mode == CEILING:
+        up = not neg
+    elif ar > other:
+        up = true
+    elif ar < other:
+        up = false
+    elif mode == HALF_UP:
+        up = true
+    elif mode == HALF_DOWN:
+        up = false
+    else:
+        up = (q % 2) != 0
+    if up:
+        if neg:
+            return q - 1
+        return q + 1
+    return q
+
+impl Decimal:
+    fn is_zero(self: read Self) -> bool:
+        return self.mantissa == 0
+
+    fn is_negative(self: read Self) -> bool:
+        return self.mantissa < 0
+
+    fn neg(self: read Self) -> Decimal:
+        return Decimal{ mantissa: 0 - self.mantissa, scale: self.scale }
+
+    fn abs(self: read Self) -> Decimal:
+        if self.mantissa < 0:
+            return Decimal{ mantissa: 0 - self.mantissa, scale: self.scale }
+        return Decimal{ mantissa: self.mantissa, scale: self.scale }
+
+    fn add(self: read Self, other: read Decimal) -> Decimal:
+        s = self.scale
+        if other.scale > s:
+            s = other.scale
+        return Decimal{ mantissa: _up(self, s) + _up(other, s), scale: s }
+
+    fn sub(self: read Self, other: read Decimal) -> Decimal:
+        s = self.scale
+        if other.scale > s:
+            s = other.scale
+        return Decimal{ mantissa: _up(self, s) - _up(other, s), scale: s }
+
+    # The exact product. When the scales add up past 28, the result is rounded to 28 places (half even).
+    fn mul(self: read Self, other: read Decimal) -> Decimal:
+        m = self.mantissa * other.mantissa
+        s = self.scale + other.scale
+        if s > MAX_SCALE:
+            m = _div_round(m, _pow10(s - MAX_SCALE), HALF_EVEN)
+            s = MAX_SCALE
+        return Decimal{ mantissa: m, scale: s }
+
+    # `self / other` rounded to `places` digits after the point. Panics on division by zero.
+    fn div(self: read Self, other: read Decimal, places: u32, mode: i32) -> Decimal:
+        if other.mantissa == 0:
+            panic("Decimal: division by zero")
+        if places > MAX_SCALE:
+            panic("Decimal: scale is at most 28")
+        # self/other = (a / 10^sa) / (b / 10^sb); result mantissa = a * 10^(places + sb - sa) / b
+        e = i64(places) + i64(other.scale) - i64(self.scale)
+        n = self.mantissa
+        d = other.mantissa
+        if d < 0:
+            d = 0 - d
+            n = 0 - n
+        if e >= 0:
+            if e > 38:
+                panic("Decimal: overflow")
+            p = _pow10(u32(e))
+            if n > max_value[i128]() / p or n < min_value[i128]() / p:
+                panic("Decimal: overflow")
+            return Decimal{ mantissa: _div_round(n * p, d, mode), scale: places }
+        if 0 - e > 38:
+            return Decimal{ mantissa: 0, scale: places }
+        return Decimal{ mantissa: _div_round(n, d * _pow10(u32(0 - e)), mode), scale: places }
+
+    # The remainder of the truncated quotient: `self - other * trunc(self / other)`.
+    fn rem(self: read Self, other: read Decimal) -> Decimal:
+        if other.mantissa == 0:
+            panic("Decimal: division by zero")
+        s = self.scale
+        if other.scale > s:
+            s = other.scale
+        return Decimal{ mantissa: _up(self, s) % _up(other, s), scale: s }
+
+    # Rounds to `places` digits after the point (more places than `scale` add zeros).
+    fn round(self: read Self, places: u32, mode: i32) -> Decimal:
+        if places > MAX_SCALE:
+            panic("Decimal: scale is at most 28")
+        if places >= self.scale:
+            return Decimal{ mantissa: _up(self, places), scale: places }
+        return Decimal{ mantissa: _div_round(self.mantissa, _pow10(self.scale - places), mode), scale: places }
+
+    # Removes trailing zeros after the point (`1.50` becomes `1.5`, `2.00` becomes `2`).
+    fn normalize(self: read Self) -> Decimal:
+        m = self.mantissa
+        s = self.scale
+        while s > 0 and m % 10 == 0:
+            m = m / 10
+            s -= 1
+        return Decimal{ mantissa: m, scale: s }
+
+    # -1, 0 or 1; `1.50` and `1.5` are equal.
+    fn compare(self: read Self, other: read Decimal) -> i64:
+        s = self.scale
+        if other.scale > s:
+            s = other.scale
+        a = _up(self, s)
+        b = _up(other, s)
+        if a < b:
+            return -1
+        if a > b:
+            return 1
+        return 0
+
+    fn equals(self: read Self, other: read Decimal) -> bool:
+        return self.compare(other) == 0
+
+    fn min(self: read Self, other: read Decimal) -> Decimal:
+        if other.compare(self) < 0:
+            return Decimal{ mantissa: other.mantissa, scale: other.scale }
+        return Decimal{ mantissa: self.mantissa, scale: self.scale }
+
+    fn max(self: read Self, other: read Decimal) -> Decimal:
+        if other.compare(self) > 0:
+            return Decimal{ mantissa: other.mantissa, scale: other.scale }
+        return Decimal{ mantissa: self.mantissa, scale: self.scale }
+
+    # Whole part, rounded toward zero.
+    fn to_i64(self: read Self) -> Optional[i64]:
+        v = self.mantissa / _pow10(self.scale)
+        if v > i128(max_value[i64]()) or v < i128(min_value[i64]()):
+            return None
+        return Valid(i64(v))
+
+    fn to_f64(self: read Self) -> f64:
+        return f64(self.mantissa) / f64(_pow10(self.scale))
+
+    # `-12.340`: all `scale` digits are written.
+    fn to_string(self: read Self) -> string:
+        out = string.new()
+        m = self.mantissa
+        if m < 0:
+            out.append_byte('-')
+            if m == min_value[i128]():
+                out.append_str("170141183460469231731687303715884105728")
+                return out
+            m = 0 - m
+        digits = string.new()
+        out_digits = List[u8]()
+        if m == 0:
+            out_digits.push('0')
+        while m > 0:
+            out_digits.push(u8(48 + m % 10))
+            m = m / 10
+        while out_digits.len <= self.scale:
+            out_digits.push('0')
+        i = out_digits.len
+        while i > 0:
+            i -= 1
+            out.append_byte(out_digits[i])
+            if i == self.scale and self.scale > 0:
+                out.append_byte('.')
+        return out

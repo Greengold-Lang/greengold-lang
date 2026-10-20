@@ -1,0 +1,596 @@
+# std.toml: TOML 1.0 documents read into the `std.json` value tree.
+#
+#     import std.toml
+#     import std.json { Json }
+#     doc = toml.parse("[server]\nport = 8080\nhosts = [\"a\", \"b\"]\n").value_or_panic()
+#     print(doc.get("server").get("port").as_i64().value_or(0))
+#
+# Tables and inline tables become `Json.Obj` (in the order written), arrays and arrays of tables `Json.Arr`, strings `Str`, integers
+# `Int` (decimal, `0x`, `0o`, `0b`, `_` separators), floats `Num` (including `inf` and `nan` as the text `inf` / `nan` in a `Dec`),
+# booleans `Bool`. Dates and times (`1979-05-27T07:32:00Z`) become `Str` with the text as written: read them with
+# `time.parse_iso`. `to_text` writes the tree back as TOML (tables and arrays of tables; it does not keep comments or layout).
+# Errors say the line: `line 3: expected `=` after a key`.
+
+import std.json
+import std.json { Json, Member }
+import std.string
+
+struct _Toml:
+    text: string
+    pos: usize
+    line: i32
+    error: string
+
+fn parse(input: str) -> Result[Json, string]:
+    t = _Toml{ text: string.from(input), pos: 0, line: 1, error: string.new() }
+    root = json.object()
+    path = List[string]()
+    _document(t, root, path)
+    if t.error.len() > 0:
+        return Err(f"line {t.line}: {t.error.as_str()}")
+    return Ok(root)
+
+private
+fn _fail(t: lend _Toml, msg: str):
+    if t.error.len() == 0:
+        t.error = string.from(msg)
+
+fn _peek(t: read _Toml) -> u8:
+    if t.pos >= t.text.len():
+        return 0
+    return t.text.as_str()[t.pos]
+
+fn _at(t: read _Toml, k: usize) -> u8:
+    if t.pos + k >= t.text.len():
+        return 0
+    return t.text.as_str()[t.pos + k]
+
+fn _starts(t: read _Toml, s: str) -> bool:
+    for k in 0..s.len:
+        if _at(t, k) != s[k]:
+            return false
+    return true
+
+fn _skip_ws(t: lend _Toml):
+    while _peek(t) == ' ' or _peek(t) == '\t':
+        t.pos += 1
+
+fn _skip_comment(t: lend _Toml):
+    if _peek(t) == '#':
+        while t.pos < t.text.len() and _peek(t) != '\n':
+            t.pos += 1
+
+# Spaces, comments and line breaks (inside arrays).
+fn _skip_all(t: lend _Toml):
+    while true:
+        c = _peek(t)
+        if c == ' ' or c == '\t' or c == '\r':
+            t.pos += 1
+        elif c == '\n':
+            t.line += 1
+            t.pos += 1
+        elif c == '#':
+            _skip_comment(t)
+        else:
+            return
+
+fn _is_bare(c: u8) -> bool:
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_' or c == '-'
+
+fn _hex(c: u8) -> i32:
+    if c >= '0' and c <= '9':
+        return i32(c - '0')
+    if c >= 'a' and c <= 'f':
+        return i32(c - 'a') + 10
+    if c >= 'A' and c <= 'F':
+        return i32(c - 'A') + 10
+    return -1
+
+fn _put_cp(out: lend string, cp: u32):
+    if cp < 0x80:
+        out.append_byte(u8(cp))
+    elif cp < 0x800:
+        out.append_byte(u8(0xC0 | (cp >> 6)))
+        out.append_byte(u8(0x80 | (cp & 0x3F)))
+    elif cp < 0x10000:
+        out.append_byte(u8(0xE0 | (cp >> 12)))
+        out.append_byte(u8(0x80 | ((cp >> 6) & 0x3F)))
+        out.append_byte(u8(0x80 | (cp & 0x3F)))
+    else:
+        out.append_byte(u8(0xF0 | (cp >> 18)))
+        out.append_byte(u8(0x80 | ((cp >> 12) & 0x3F)))
+        out.append_byte(u8(0x80 | ((cp >> 6) & 0x3F)))
+        out.append_byte(u8(0x80 | (cp & 0x3F)))
+
+# A basic (escaped) string body up to the closing quote(s); `multi` for the triple-quoted form.
+fn _basic_string(t: lend _Toml, multi: bool) -> string:
+    out = string.new()
+    if multi and _peek(t) == '\n':
+        t.pos += 1
+        t.line += 1
+    while true:
+        if t.pos >= t.text.len():
+            _fail(t, "a string is never closed")
+            return out
+        c = _peek(t)
+        if multi:
+            if c == '"' and _at(t, 1) == '"' and _at(t, 2) == '"':
+                t.pos += 3
+                while _peek(t) == '"' and out.len() < 1000000:
+                    out.append_byte('"')
+                    t.pos += 1
+                return out
+        elif c == '"':
+            t.pos += 1
+            return out
+        if c == '\n':
+            if not multi:
+                _fail(t, "a line break inside a string")
+                return out
+            t.line += 1
+        if c == '\\':
+            t.pos += 1
+            e = _peek(t)
+            t.pos += 1
+            if e == 'n':
+                out.append_byte('\n')
+            elif e == 't':
+                out.append_byte('\t')
+            elif e == 'r':
+                out.append_byte('\r')
+            elif e == 'b':
+                out.append_byte(8)
+            elif e == 'f':
+                out.append_byte(12)
+            elif e == 'e':
+                out.append_byte(27)
+            elif e == '"':
+                out.append_byte('"')
+            elif e == '\\':
+                out.append_byte('\\')
+            elif e == 'u' or e == 'U':
+                digits = 4
+                if e == 'U':
+                    digits = 8
+                cp: u32 = 0
+                for _ in 0..digits:
+                    h = _hex(_peek(t))
+                    if h < 0:
+                        _fail(t, "a bad \\u escape")
+                        return out
+                    cp = (cp << 4) | u32(h)
+                    t.pos += 1
+                _put_cp(out, cp)
+            elif multi and (e == '\n' or e == ' ' or e == '\t' or e == '\r'):
+                # a backslash at the end of a line trims the white space up to the next text
+                t.pos -= 1
+                while _peek(t) == ' ' or _peek(t) == '\t' or _peek(t) == '\r' or _peek(t) == '\n':
+                    if _peek(t) == '\n':
+                        t.line += 1
+                    t.pos += 1
+            else:
+                _fail(t, "an unknown escape")
+                return out
+            continue
+        out.append_byte(c)
+        t.pos += 1
+    return out
+
+fn _literal_string(t: lend _Toml, multi: bool) -> string:
+    out = string.new()
+    if multi and _peek(t) == '\n':
+        t.pos += 1
+        t.line += 1
+    while true:
+        if t.pos >= t.text.len():
+            _fail(t, "a string is never closed")
+            return out
+        c = _peek(t)
+        if multi:
+            if c == '\'' and _at(t, 1) == '\'' and _at(t, 2) == '\'':
+                t.pos += 3
+                return out
+        elif c == '\'':
+            t.pos += 1
+            return out
+        if c == '\n':
+            if not multi:
+                _fail(t, "a line break inside a string")
+                return out
+            t.line += 1
+        out.append_byte(c)
+        t.pos += 1
+    return out
+
+fn _key_part(t: lend _Toml) -> string:
+    _skip_ws(t)
+    c = _peek(t)
+    if c == '"':
+        t.pos += 1
+        return _basic_string(t, false)
+    if c == '\'':
+        t.pos += 1
+        return _literal_string(t, false)
+    out = string.new()
+    while _is_bare(_peek(t)):
+        out.append_byte(_peek(t))
+        t.pos += 1
+    if out.len() == 0:
+        _fail(t, "expected a key")
+    return out
+
+# A dotted key `a.b."c d"` as its parts.
+fn _key_path(t: lend _Toml) -> List[string]:
+    parts = List[string]()
+    while true:
+        parts.push(_key_part(t))
+        _skip_ws(t)
+        if _peek(t) == '.':
+            t.pos += 1
+        else:
+            return parts
+    return parts
+
+fn _number_or_date(t: lend _Toml) -> Json:
+    start = t.pos
+    while t.pos < t.text.len():
+        c = _peek(t)
+        if c == ',' or c == ']' or c == '}' or c == '\n' or c == '#' or c == '\r':
+            break
+        if c == ' ' and not (_at(t, 1) >= '0' and _at(t, 1) <= '9' and t.pos > start and _at(t, 3) == ':'):
+            break
+        t.pos += 1
+    raw = string.from(string.substr(t.text.as_str(), start, t.pos)).trim()
+    if raw.len == 0:
+        _fail(t, "expected a value")
+        return Json.Null
+    if raw == "true":
+        return Json.Bool(true)
+    if raw == "false":
+        return Json.Bool(false)
+    clean = string.new()
+    for i in 0..raw.len:
+        if raw[i] != '_':
+            clean.append_byte(raw[i])
+    c0 = clean.as_str()
+    # dates and times stay text
+    if c0.len >= 8 and ((c0[4] == '-' and c0[7] == '-') or (c0.len > 2 and c0[2] == ':')):
+        return Json.Str(string.from(raw))
+    if c0 == "inf" or c0 == "+inf":
+        return Json.Dec(string.from("inf"))
+    if c0 == "-inf":
+        return Json.Dec(string.from("-inf"))
+    if c0 == "nan" or c0 == "+nan" or c0 == "-nan":
+        return Json.Dec(string.from("nan"))
+    if c0.len > 2 and c0[0] == '0' and (c0[1] == 'x' or c0[1] == 'o' or c0[1] == 'b'):
+        base: i64 = 16
+        if c0[1] == 'o':
+            base = 8
+        elif c0[1] == 'b':
+            base = 2
+        v: i64 = 0
+        for i in 2..c0.len:
+            h = i64(_hex(c0[i]))
+            if h < 0 or h >= base:
+                _fail(t, "a bad number")
+                return Json.Null
+            v = v * base + h
+        return Json.Int(v)
+    r = json.number_from_text(if c0.len > 0 and c0[0] == '+' then string.substr(c0, 1, c0.len) else c0)
+    if r.is_null():
+        _fail(t, "a value that is not a string, number, date, array or table")
+    return r
+
+fn _value(t: lend _Toml) -> Json:
+    _skip_ws(t)
+    c = _peek(t)
+    if c == '"':
+        if _at(t, 1) == '"' and _at(t, 2) == '"':
+            t.pos += 3
+            return Json.Str(_basic_string(t, true))
+        t.pos += 1
+        return Json.Str(_basic_string(t, false))
+    if c == '\'':
+        if _at(t, 1) == '\'' and _at(t, 2) == '\'':
+            t.pos += 3
+            return Json.Str(_literal_string(t, true))
+        t.pos += 1
+        return Json.Str(_literal_string(t, false))
+    if c == '[':
+        t.pos += 1
+        items = List[Json]()
+        while true:
+            _skip_all(t)
+            if _peek(t) == ']':
+                t.pos += 1
+                break
+            if t.error.len() > 0 or t.pos >= t.text.len():
+                _fail(t, "an array is never closed")
+                break
+            items.push(_value(t))
+            _skip_all(t)
+            if _peek(t) == ',':
+                t.pos += 1
+            elif _peek(t) != ']':
+                _fail(t, "expected `,` or `]` in an array")
+                break
+        return Json.Arr(items)
+    if c == '{':
+        t.pos += 1
+        obj = json.object()
+        _skip_ws(t)
+        if _peek(t) == '}':
+            t.pos += 1
+            return obj
+        while true:
+            path = _key_path(t)
+            _skip_ws(t)
+            if _peek(t) != '=':
+                _fail(t, "expected `=` after a key")
+                break
+            t.pos += 1
+            v = _value(t)
+            if t.error.len() > 0:
+                break
+            if not _set_path(obj, path, 0, v):
+                _fail(t, "a key is defined twice")
+                break
+            _skip_ws(t)
+            if _peek(t) == ',':
+                t.pos += 1
+            elif _peek(t) == '}':
+                t.pos += 1
+                break
+            else:
+                _fail(t, "expected `,` or `}` in an inline table")
+                break
+        return obj
+    return _number_or_date(t)
+
+# Sets `path[idx..]` below `node` (an object) to `value`, making the tables on the way. A path through an array goes into
+# the array's last table. False when the key is already set to a plain value.
+fn _set_path(node: lend Json, path: read List[string], idx: usize, value: Json) -> bool:
+    key = path[idx].as_str()
+    last = idx + 1 == path.len
+    match lend node:
+        Obj(members):
+            for i in 0..members.len:
+                if members[i].key.as_str() == key:
+                    if last:
+                        return false
+                    return _descend(members[i].value, path, idx + 1, value)
+            if last:
+                members.push(Member{ key: string.from(key), value: value })
+                return true
+            members.push(Member{ key: string.from(key), value: json.object() })
+            return _descend(members[members.len - 1].value, path, idx + 1, value)
+        _: return false
+    return false
+
+fn _descend(node: lend Json, path: read List[string], idx: usize, value: Json) -> bool:
+    match lend node:
+        Arr(items):
+            if items.len == 0:
+                return false
+            return _set_path(items[items.len - 1], path, idx, value)
+        Obj(members):
+            return _set_path(node, path, idx, value)
+        _: return false
+    return false
+
+# Makes sure the table at `path` exists (for `[a.b]`); for `[[a.b]]` appends a new table to the array at `path`.
+fn _open_table(root: lend Json, path: read List[string], idx: usize, array: bool) -> bool:
+    key = path[idx].as_str()
+    last = idx + 1 == path.len
+    match lend root:
+        Obj(members):
+            for i in 0..members.len:
+                if members[i].key.as_str() == key:
+                    if last:
+                        if not array:
+                            return true
+                        match lend members[i].value:
+                            Arr(items):
+                                items.push(json.object())
+                                return true
+                            _: return false
+                        return false
+                    return _open_below(members[i].value, path, idx + 1, array)
+            if last:
+                if array:
+                    items = List[Json]()
+                    items.push(json.object())
+                    members.push(Member{ key: string.from(key), value: Json.Arr(items) })
+                else:
+                    members.push(Member{ key: string.from(key), value: json.object() })
+                return true
+            members.push(Member{ key: string.from(key), value: json.object() })
+            return _open_below(members[members.len - 1].value, path, idx + 1, array)
+        _: return false
+    return false
+
+fn _open_below(node: lend Json, path: read List[string], idx: usize, array: bool) -> bool:
+    match lend node:
+        Arr(items):
+            if items.len == 0:
+                return false
+            return _open_table(items[items.len - 1], path, idx, array)
+        Obj(members):
+            return _open_table(node, path, idx, array)
+        _: return false
+    return false
+
+fn _document(t: lend _Toml, root: lend Json, current: lend List[string]):
+    while true:
+        _skip_all(t)
+        if t.pos >= t.text.len() or t.error.len() > 0:
+            return
+        c = _peek(t)
+        if c == '[':
+            array = _at(t, 1) == '['
+            t.pos += 1
+            if array:
+                t.pos += 1
+            path = _key_path(t)
+            _skip_ws(t)
+            if _peek(t) != ']':
+                _fail(t, "expected `]` after a table name")
+                return
+            t.pos += 1
+            if array:
+                if _peek(t) != ']':
+                    _fail(t, "expected `]]` after an array of tables name")
+                    return
+                t.pos += 1
+            if t.error.len() > 0:
+                return
+            if not _open_table(root, path, 0, array):
+                _fail(t, "that table name is already used for a value")
+                return
+            current.clear()
+            for p in path:
+                current.push(p.clone())
+        else:
+            keys = _key_path(t)
+            _skip_ws(t)
+            if _peek(t) != '=':
+                _fail(t, "expected `=` after a key")
+                return
+            t.pos += 1
+            v = _value(t)
+            if t.error.len() > 0:
+                return
+            full = List[string]()
+            for p in current:
+                full.push(p.clone())
+            for k in keys:
+                full.push(k.clone())
+            if not _set_path(root, full, 0, v):
+                _fail(t, "a key is defined twice")
+                return
+        _skip_ws(t)
+        _skip_comment(t)
+        d = _peek(t)
+        if d == '\r':
+            t.pos += 1
+            d = _peek(t)
+        if d == '\n':
+            t.pos += 1
+            t.line += 1
+        elif d != 0:
+            _fail(t, "unexpected text after a value")
+            return
+
+# -- writing ------------------------------------------------------------------------------------------------------------
+
+fn _key_text(k: str) -> string:
+    ok = k.len > 0
+    for i in 0..k.len:
+        if not _is_bare(k[i]):
+            ok = false
+    if ok:
+        return string.from(k)
+    out = string.new()
+    out.append_byte('"')
+    for i in 0..k.len:
+        if k[i] == '"' or k[i] == '\\':
+            out.append_byte('\\')
+        out.append_byte(k[i])
+    out.append_byte('"')
+    return out
+
+fn _scalar(j: read Json) -> string:
+    out = string.new()
+    match j:
+        Str(s):
+            out.append_byte('"')
+            for i in 0..s.len():
+                c = s.as_str()[i]
+                if c == '"' or c == '\\':
+                    out.append_byte('\\')
+                    out.append_byte(c)
+                elif c == '\n':
+                    out.append_str("\\n")
+                elif c == '\t':
+                    out.append_str("\\t")
+                elif c == '\r':
+                    out.append_str("\\r")
+                else:
+                    out.append_byte(c)
+            out.append_byte('"')
+        Bool(b): out.append_str(if b then "true" else "false")
+        Null: out.append_str("\"\"")
+        Arr(items):
+            out.append_byte('[')
+            for i in 0..items.len:
+                if i > 0:
+                    out.append_str(", ")
+                out.append_str(_scalar(items[i]).as_str())
+            out.append_byte(']')
+        Obj(members):
+            out.append_byte('{')
+            for i in 0..members.len:
+                if i > 0:
+                    out.append_str(", ")
+                out.append_str(_key_text(members[i].key.as_str()).as_str())
+                out.append_str(" = ")
+                out.append_str(_scalar(members[i].value).as_str())
+            out.append_byte('}')
+        _: out.append_str(j.number_text().value_or(string.from("0")).as_str())
+    return out
+
+fn _is_table_array(j: read Json) -> bool:
+    match j:
+        Arr(items):
+            if items.len == 0:
+                return false
+            for it in items:
+                match it:
+                    Obj(m): pass
+                    _: return false
+            return true
+        _: return false
+
+fn _write(j: read Json, prefix: str, out: lend string):
+    match j:
+        Obj(members):
+            # plain values first, then sub-tables, as TOML requires
+            for m in members:
+                is_table = false
+                match m.value:
+                    Obj(inner): is_table = true
+                    _: pass
+                if not is_table and not _is_table_array(m.value):
+                    out.append_str(_key_text(m.key.as_str()).as_str())
+                    out.append_str(" = ")
+                    out.append_str(_scalar(m.value).as_str())
+                    out.append_byte('\n')
+            for m in members:
+                name = string.from(prefix)
+                if name.len() > 0:
+                    name.append_byte('.')
+                name.append_str(_key_text(m.key.as_str()).as_str())
+                match m.value:
+                    Obj(inner):
+                        out.append_str("\n[")
+                        out.append_str(name.as_str())
+                        out.append_str("]\n")
+                        _write(m.value, name.as_str(), out)
+                    _:
+                        if _is_table_array(m.value):
+                            match m.value:
+                                Arr(items):
+                                    for it in items:
+                                        out.append_str("\n[[")
+                                        out.append_str(name.as_str())
+                                        out.append_str("]]\n")
+                                        _write(it, name.as_str(), out)
+                                _: pass
+        _: pass
+
+public
+# The tree as TOML text (an object at the top; tables become `[name]` sections). Comments and layout are not kept.
+fn to_text(doc: read Json) -> string:
+    out = string.new()
+    _write(doc, "", out)
+    return out

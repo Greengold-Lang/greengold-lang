@@ -1,0 +1,153 @@
+# protocols.mavlink: MAVLink 1 and 2 framing, the link layer of drones and ground stations.
+#
+#     import protocols.mavlink { Frame, build_v2, parse }
+#     f = Frame{ sysid: 1, compid: 1, msgid: 0, seq: 0, payload: heartbeat_bytes, incompat_flags: 0, compat_flags: 0 }
+#     wire = build_v2(f, 50)                    # 50 is the CRC_EXTRA of HEARTBEAT in the common dialect
+#     g = parse(wire[..], extra_of).value_or_panic()
+#
+# This module handles the frame and its checksum. The meaning of a message (which fields a payload has, how they are ordered and
+# which `crc_extra` byte belongs to a message id) comes from the dialect XML files of the MAVLink project, and a code generator turns them into
+# message types; none are bundled here. `parse` therefore takes a function that returns the CRC_EXTRA for a message id (or None
+# for an id the caller does not know, which is an error: an unknown id cannot be verified).
+#
+# MAVLink 2 frame: 0xFD, payload length, incompat flags, compat flags, sequence, system id, component id, message id (3 bytes, little-endian),
+# payload (trailing zero bytes may be cut, never the first), checksum (2 bytes, little-endian), and, when incompat flag 0x01 is set, a
+# 13-byte signature. The checksum is CRC-16/MCRF4XX over everything after the start byte up to the payload, then the message's CRC_EXTRA.
+# MAVLink 1 frame: 0xFE, length, sequence, system id, component id, message id (1 byte), payload, checksum. Signatures are carried
+# (as raw bytes) but not verified here.
+
+public
+const STX_V1: u8 = 0xFE
+const STX_V2: u8 = 0xFD
+const FLAG_SIGNED: u8 = 1
+
+struct Frame:
+    sysid: u8
+    compid: u8
+    msgid: u32
+    seq: u8
+    payload: List[u8]            # as sent: for v2 without its trailing zero bytes
+    incompat_flags: u8
+    compat_flags: u8
+
+# One step of the MAVLink checksum, CRC-16/MCRF4XX (X.25 without the final inversion).
+fn crc_accumulate(crc: u16, b: u8) -> u16:
+    tmp = b ^ u8(crc & 255)
+    tmp = tmp ^ (tmp << 4)
+    t = u16(tmp)
+    return (crc >> 8) ^ (t << 8) ^ (t << 3) ^ (t >> 4)
+
+# The checksum of `data` starting from `crc` (use 0xFFFF to begin).
+fn crc_update(crc: u16, data: []u8) -> u16:
+    c = crc
+    for b in data:
+        c = crc_accumulate(c, b)
+    return c
+
+# Removes the trailing zero bytes of a v2 payload (at least one byte stays).
+fn truncate_payload(payload: []u8) -> List[u8]:
+    n = payload.len
+    while n > 1 and payload[n - 1] == 0:
+        n -= 1
+    out = List[u8]()
+    for i in 0..n:
+        out.push(payload[usize(i)])
+    return out
+
+# The wire bytes of a MAVLink 2 frame. The payload is sent as given (call `truncate_payload` first if you want the shortened form).
+fn build_v2(f: Frame, crc_extra: u8) -> List[u8]:
+    if f.payload.len > 255:
+        panic("build_v2: a payload has at most 255 bytes")
+    out = List[u8]()
+    out.push(STX_V2)
+    out.push(u8(f.payload.len))
+    out.push(f.incompat_flags)
+    out.push(f.compat_flags)
+    out.push(f.seq)
+    out.push(f.sysid)
+    out.push(f.compid)
+    out.push(u8(f.msgid & 255))
+    out.push(u8((f.msgid >> 8) & 255))
+    out.push(u8((f.msgid >> 16) & 255))
+    for b in f.payload:
+        out.push(b)
+    c = crc_update(0xFFFF, out[1..out.len])
+    c = crc_accumulate(c, crc_extra)
+    out.push(u8(c & 255))
+    out.push(u8(c >> 8))
+    return out
+
+# The wire bytes of a MAVLink 1 frame (message ids up to 255).
+fn build_v1(f: Frame, crc_extra: u8) -> List[u8]:
+    if f.payload.len > 255 or f.msgid > 255:
+        panic("build_v1: a payload has at most 255 bytes and the message id must fit one byte")
+    out = List[u8]()
+    out.push(STX_V1)
+    out.push(u8(f.payload.len))
+    out.push(f.seq)
+    out.push(f.sysid)
+    out.push(f.compid)
+    out.push(u8(f.msgid))
+    for b in f.payload:
+        out.push(b)
+    c = crc_update(0xFFFF, out[1..out.len])
+    c = crc_accumulate(c, crc_extra)
+    out.push(u8(c & 255))
+    out.push(u8(c >> 8))
+    return out
+
+# The number of bytes of the frame that starts `data`, or None when more bytes are needed or `data` does not start with a start byte.
+fn frame_len(data: []u8) -> Optional[usize]:
+    if data.len < 2:
+        return None
+    if data[0] == STX_V1:
+        return Valid(8 + usize(data[1]))
+    if data[0] == STX_V2:
+        if data.len < 3:
+            return None
+        n = 12 + usize(data[1])
+        if (data[2] & FLAG_SIGNED) != 0:
+            n += 13
+        return Valid(n)
+    return None
+
+# Reads the frame at the start of `data`, checking the checksum with the CRC_EXTRA that `extra_of(msgid)` gives. Bytes after the frame
+# are ignored. A frame with a wrong checksum, an unknown message id, or not enough bytes is an `Err`.
+fn parse(data: []u8, extra_of: fn(u32) -> Optional[u8]) -> Result[Frame, string]:
+    total = match_len(frame_len(data))?
+    if data.len < total:
+        return Err("the buffer ends inside the frame")
+    f = Frame{ sysid: 0, compid: 0, msgid: 0, seq: 0, payload: List[u8](), incompat_flags: 0, compat_flags: 0 }
+    body_start: usize = 0
+    body_len = usize(data[1])
+    if data[0] == STX_V2:
+        f.incompat_flags = data[2]
+        f.compat_flags = data[3]
+        f.seq = data[4]
+        f.sysid = data[5]
+        f.compid = data[6]
+        f.msgid = u32(data[7]) | (u32(data[8]) << 8) | (u32(data[9]) << 16)
+        body_start = 10
+    else:
+        f.seq = data[2]
+        f.sysid = data[3]
+        f.compid = data[4]
+        f.msgid = u32(data[5])
+        body_start = 6
+    extra = extra_of(f.msgid)
+    if not extra.has_value():
+        return Err("unknown message id: its CRC_EXTRA is not known")
+    crc_end = body_start + body_len
+    c = crc_update(0xFFFF, data[1..crc_end])
+    c = crc_accumulate(c, extra.value_or_panic())
+    want = u16(data[crc_end]) | (u16(data[crc_end + 1]) << 8)
+    if c != want:
+        return Err("checksum mismatch")
+    for i in 0..body_len:
+        f.payload.push(data[body_start + usize(i)])
+    return Ok(f)
+
+fn match_len(n: Optional[usize]) -> Result[usize, string]:
+    if n.has_value():
+        return Ok(n.value_or_panic())
+    return Err("not a MAVLink frame (or the length is not available yet)")

@@ -7,35 +7,54 @@ Import a module with `import std.math`, then call `math.sqrt(4.0)`, or bring nam
 ## Modules
 
 - [Compiler builtins](#compiler-builtins) (36)
-- [Core prelude (always in scope)](#core-prelude-always-in-scope) (69)
-- [std.collections](#stdcollections) (101)
-- [std.fs](#stdfs) (12)
+- [Core prelude (always in scope)](#core-prelude-always-in-scope) (72)
+- [std.audit](#stdaudit) (11)
+- [std.bigint](#stdbigint) (33)
+- [std.bits](#stdbits) (21)
+- [std.collections](#stdcollections) (129)
+- [std.compress](#stdcompress) (11)
+- [std.crypto](#stdcrypto) (14)
+- [std.csv](#stdcsv) (5)
+- [std.decimal](#stddecimal) (31)
+- [std.dmath](#stddmath) (23)
+- [std.encoding](#stdencoding) (21)
+- [std.fix](#stdfix) (13)
+- [std.fixedpoint](#stdfixedpoint) (27)
+- [std.fs](#stdfs) (33)
 - [std.gguf](#stdgguf) (16)
+- [std.hal](#stdhal) (24)
+- [std.hash](#stdhash) (32)
+- [std.heapless](#stdheapless) (66)
 - [std.http](#stdhttp) (26)
 - [std.intern](#stdintern) (5)
-- [std.io](#stdio) (11)
-- [std.json](#stdjson) (23)
+- [std.io](#stdio) (40)
+- [std.json](#stdjson) (26)
 - [std.kquant](#stdkquant) (16)
 - [std.llama](#stdllama) (20)
-- [std.math](#stdmath) (22)
+- [std.log](#stdlog) (18)
+- [std.math](#stdmath) (61)
 - [std.mmap](#stdmmap) (5)
-- [std.net](#stdnet) (59)
+- [std.mmio](#stdmmio) (20)
+- [std.net](#stdnet) (60)
 - [std.nn](#stdnn) (26)
-- [std.packet](#stdpacket) (44)
-- [std.parallel](#stdparallel) (7)
-- [std.process](#stdprocess) (6)
+- [std.packet](#stdpacket) (71)
+- [std.parallel](#stdparallel) (12)
+- [std.process](#stdprocess) (9)
 - [std.rand](#stdrand) (10)
 - [std.regex](#stdregex) (13)
 - [std.sampler](#stdsampler) (4)
 - [std.sock](#stdsock) (8)
-- [std.sort](#stdsort) (3)
+- [std.sort](#stdsort) (6)
 - [std.string](#stdstring) (25)
 - [std.tasks](#stdtasks) (9)
 - [std.tensor](#stdtensor) (43)
-- [std.thread](#stdthread) (49)
-- [std.time](#stdtime) (22)
+- [std.thread](#stdthread) (90)
+- [std.time](#stdtime) (78)
 - [std.tls](#stdtls) (5)
 - [std.tokenizer](#stdtokenizer) (7)
+- [std.toml](#stdtoml) (2)
+- [std.unicode](#stdunicode) (23)
+- [std.uuid](#stduuid) (15)
 - [Not in the catalog](#not-in-the-catalog): attributes, intrinsics, JSON output formats
 
 ## Compiler builtins
@@ -337,6 +356,14 @@ fn string.append_i64(self: lend string, n: i64)
 ```
 
 ```
+fn string.append_u128(self: lend string, n: u128)
+```
+
+```
+fn string.append_i128(self: lend string, n: i128)
+```
+
+```
 fn string.append_bool(self: lend string, b: bool)
 ```
 
@@ -403,6 +430,11 @@ fn saturating_mul[T: Int](a: T, b: T) -> T
 ```
 fn str.is_empty(self: str) -> bool
 ```
+
+```
+fn str.as_bytes(self: str) -> []u8
+```
+The bytes of the text as a `[]u8` view (for hashes, ciphers, and other byte-oriented code).
 
 ```
 fn str.starts_with(self: str, prefix: str) -> bool
@@ -512,6 +544,313 @@ fn str.parse_float(self: str) -> Optional[f64]
 ```
 
 
+## std.audit
+
+### struct
+
+```
+struct AuditLog { path: string, seq: u64, last: string, key: List[u8] }
+```
+
+### const
+
+```
+const ZERO_HASH: str
+```
+
+### fn
+
+```
+fn AuditLog.open(path: str) -> Result[AuditLog, string]
+```
+Opens or creates the log at `path` (SHA-256 chain).
+
+```
+fn AuditLog.open_keyed(path: str, key: []u8) -> Result[AuditLog, string]
+```
+Opens or creates a log whose hashes are HMAC-SHA-256 under `key`: without the key nobody can rebuild a valid chain.
+
+```
+fn AuditLog.append(self: lend AuditLog, message: str) -> Result[u64, string]
+```
+Adds an entry stamped with the current time;
+
+```
+fn AuditLog.append_at(self: lend AuditLog, message: str, millis: i64) -> Result[u64, string]
+```
+Adds an entry with an explicit time (milliseconds since 1970).
+
+```
+fn AuditLog.head(self: read AuditLog) -> string
+```
+The hash of the newest entry (64 zeros while the log is empty).
+
+```
+fn AuditLog.len(self: read AuditLog) -> u64
+```
+The number of entries.
+
+```
+fn verify(path: str) -> Result[u64, string]
+```
+Checks the whole file;
+
+```
+fn verify_keyed(path: str, key: []u8) -> Result[u64, string]
+```
+Like `verify` for a log written with `open_keyed`.
+
+```
+fn verify_anchored(path: str, count: u64, head: str) -> Result[u64, string]
+```
+Checks the file and also that its first `count` entries end with `head` (the values `len()` and `head()` gave earlier), which catches cut-off or replaced logs that `verify` alon...
+
+
+## std.bigint
+
+### struct
+
+```
+struct BigInt { neg: bool, mag: List[u32] }
+```
+
+### fn
+
+```
+fn bigint_zero() -> BigInt
+```
+
+```
+fn bigint_from_u64(n: u64) -> BigInt
+```
+
+```
+fn bigint_from_i64(n: i64) -> BigInt
+```
+
+```
+fn bigint_parse(text: str) -> Result[BigInt, string]
+```
+Reads decimal digits with an optional sign (`-123`), or hexadecimal with a `0x` prefix.
+
+```
+fn bigint_from_bytes_be(bytes: read List[u8]) -> BigInt
+```
+Big-endian bytes (as in keys and hashes) to a non-negative number.
+
+```
+fn BigInt.is_zero(self: read BigInt) -> bool
+```
+
+```
+fn BigInt.is_negative(self: read BigInt) -> bool
+```
+
+```
+fn BigInt.is_even(self: read BigInt) -> bool
+```
+
+```
+fn BigInt.neg(self: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.abs(self: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.compare(self: read BigInt, other: read BigInt) -> i64
+```
+-1, 0 or 1.
+
+```
+fn BigInt.equals(self: read BigInt, other: read BigInt) -> bool
+```
+
+```
+fn BigInt.add(self: read BigInt, other: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.sub(self: read BigInt, other: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.mul(self: read BigInt, other: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.div_rem(self: read BigInt, other: read BigInt) -> Tuple2[BigInt, BigInt]
+```
+Quotient and remainder, truncated toward zero: `self == q * other + r`, `r` has the sign of `self`.
+
+```
+fn BigInt.div(self: read BigInt, other: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.rem(self: read BigInt, other: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.modulo(self: read BigInt, m: read BigInt) -> BigInt
+```
+The remainder in `0 ..
+
+```
+fn BigInt.pow(self: read BigInt, exponent: u32) -> BigInt
+```
+
+```
+fn BigInt.pow_mod(self: read BigInt, exponent: read BigInt, m: read BigInt) -> BigInt
+```
+`self ** exponent mod m` for a non-negative exponent, by repeated squaring.
+
+```
+fn BigInt.bit_length(self: read BigInt) -> usize
+```
+
+```
+fn BigInt.bit(self: read BigInt, i: usize) -> bool
+```
+Bit `i` of the magnitude (0 is the least significant).
+
+```
+fn BigInt.shl(self: read BigInt, bits: usize) -> BigInt
+```
+
+```
+fn BigInt.shr(self: read BigInt, bits: usize) -> BigInt
+```
+Shifts the magnitude right (toward zero).
+
+```
+fn BigInt.gcd(self: read BigInt, other: read BigInt) -> BigInt
+```
+
+```
+fn BigInt.mod_inverse(self: read BigInt, m: read BigInt) -> Optional[BigInt]
+```
+The inverse of `self` modulo `m` (`self * x mod m == 1`), or `None` when they share a factor.
+
+```
+fn BigInt.to_i64(self: read BigInt) -> Optional[i64]
+```
+The value as an `i64`, or `None` when it does not fit.
+
+```
+fn BigInt.to_f64(self: read BigInt) -> f64
+```
+
+```
+fn BigInt.to_string(self: read BigInt) -> string
+```
+
+```
+fn BigInt.to_hex(self: read BigInt) -> string
+```
+
+```
+fn BigInt.to_bytes_be(self: read BigInt) -> List[u8]
+```
+The magnitude as big-endian bytes without leading zeros (empty for zero).
+
+
+## std.bits
+
+### fn
+
+```
+fn bit_width[T: Int]() -> u32
+```
+
+```
+fn to_bits[T: Int](x: T) -> u64
+```
+The bits of `x` as a `u64`, without sign extension.
+
+```
+fn from_bits[T: Int](v: u64) -> T
+```
+
+```
+fn popcount[T: Int](x: T) -> u32
+```
+
+```
+fn leading_zeros[T: Int](x: T) -> u32
+```
+
+```
+fn trailing_zeros[T: Int](x: T) -> u32
+```
+
+```
+fn leading_ones[T: Int](x: T) -> u32
+```
+
+```
+fn trailing_ones[T: Int](x: T) -> u32
+```
+
+```
+fn rotate_left[T: Int](x: T, n: u32) -> T
+```
+
+```
+fn rotate_right[T: Int](x: T, n: u32) -> T
+```
+
+```
+fn reverse_bits[T: Int](x: T) -> T
+```
+
+```
+fn swap_bytes[T: Int](x: T) -> T
+```
+Reverses the byte order (big-endian <-> little-endian).
+
+```
+fn is_power_of_two[T: Int](x: T) -> bool
+```
+
+```
+fn next_power_of_two[T: Int](x: T) -> T
+```
+Smallest power of two that is >= x (1 for x <= 1).
+
+```
+fn ilog2[T: Int](x: T) -> u32
+```
+Position of the highest set bit (floor of log2);
+
+```
+fn bit_get[T: Int](x: T, i: u32) -> bool
+```
+
+```
+fn bit_set[T: Int](x: T, i: u32) -> T
+```
+
+```
+fn bit_clear[T: Int](x: T, i: u32) -> T
+```
+
+```
+fn bit_toggle[T: Int](x: T, i: u32) -> T
+```
+
+```
+fn bits_extract[T: Int](x: T, lo: u32, width: u32) -> u64
+```
+`width` bits of `x` starting at bit `lo`, as an unsigned value (a bit-field read).
+
+```
+fn bits_insert[T: Int](x: T, lo: u32, width: u32, value: u64) -> T
+```
+`x` with the `width` bits at `lo` replaced by the low bits of `value` (a bit-field write).
+
+
 ## std.collections
 
 ### struct
@@ -542,6 +881,14 @@ struct PriorityQueue[P: Ord, V] { prios: List[P], vals: List[V] }
 
 ```
 struct SortedMap[K: Ord, V] { ks: List[K], vs: List[V] }
+```
+
+```
+struct SortedSet[K: Ord] { items: List[K] }
+```
+
+```
+struct BitSet { words: List[u64] }
 ```
 
 ### fn
@@ -940,26 +1287,973 @@ fn SortedMap.values(self: read SortedMap[K, V]) -> List[V]
 fn SortedMap.clear(self: lend SortedMap[K, V])
 ```
 
+```
+fn sorted_set[K: Ord]() -> SortedSet[K]
+```
 
-## std.fs
+```
+fn SortedSet.len(self: read SortedSet[K]) -> usize
+```
+
+```
+fn SortedSet.is_empty(self: read SortedSet[K]) -> bool
+```
+
+```
+fn SortedSet.contains(self: read SortedSet[K], key: K) -> bool
+```
+
+```
+fn SortedSet.insert(self: lend SortedSet[K], key: K) -> bool
+```
+Adds `key`;
+
+```
+fn SortedSet.remove(self: lend SortedSet[K], key: K) -> bool
+```
+
+```
+fn SortedSet.first(self: read SortedSet[K]) -> Optional[K]
+```
+
+```
+fn SortedSet.last(self: read SortedSet[K]) -> Optional[K]
+```
+
+```
+fn SortedSet.floor(self: read SortedSet[K], key: K) -> Optional[K]
+```
+The largest member `<= key`.
+
+```
+fn SortedSet.ceiling(self: read SortedSet[K], key: K) -> Optional[K]
+```
+The smallest member `>= key`.
+
+```
+fn SortedSet.between(self: read SortedSet[K], lo: K, hi: K) -> List[K]
+```
+Copies of the members `k` with `lo <= k < hi`, in order.
+
+```
+fn SortedSet.to_list(self: read SortedSet[K]) -> List[K]
+```
+Copies of the members, in order.
+
+```
+fn SortedSet.clear(self: lend SortedSet[K])
+```
+
+```
+fn bitset_new() -> BitSet
+```
+
+```
+fn bitset_with_capacity(n: usize) -> BitSet
+```
+A set that already has room for the numbers `0 ..
+
+```
+fn BitSet.insert(self: lend BitSet, i: usize) -> bool
+```
+Adds `i`;
+
+```
+fn BitSet.remove(self: lend BitSet, i: usize) -> bool
+```
+
+```
+fn BitSet.contains(self: read BitSet, i: usize) -> bool
+```
+
+```
+fn BitSet.count(self: read BitSet) -> usize
+```
+How many numbers are in the set.
+
+```
+fn BitSet.is_empty(self: read BitSet) -> bool
+```
+
+```
+fn BitSet.clear(self: lend BitSet)
+```
+
+```
+fn BitSet.next_from(self: read BitSet, from: usize) -> Optional[usize]
+```
+The smallest member that is at least `from`, or `None`.
+
+```
+fn BitSet.union_with(self: lend BitSet, other: read BitSet)
+```
+Adds every member of `other`.
+
+```
+fn BitSet.intersect_with(self: lend BitSet, other: read BitSet)
+```
+Keeps only the members that `other` also has.
+
+```
+fn BitSet.subtract(self: lend BitSet, other: read BitSet)
+```
+Removes every member of `other`.
+
+```
+fn BitSet.to_list(self: read BitSet) -> List[usize]
+```
+The members, smallest first.
+
+
+## std.compress
+
+### const
+
+```
+const LEN_BASE: [29]u16
+```
+
+```
+const LEN_EXTRA: [29]u8
+```
+
+```
+const DIST_BASE: [30]u16
+```
+
+```
+const DIST_EXTRA: [30]u8
+```
+
+```
+const CODE_ORDER: [19]u8
+```
 
 ### fn
 
 ```
-fn read_file_to_string(path: str) -> Optional[string]
+fn inflate(data: []u8, max_out: usize) -> Result[List[u8], string]
+```
+Decompresses raw DEFLATE data.
+
+```
+fn deflate(data: []u8, level: i32) -> List[u8]
+```
+Compresses to raw DEFLATE data.
+
+```
+fn zlib_compress(data: []u8, level: i32) -> List[u8]
+```
+zlib (RFC 1950): a two-byte header, DEFLATE data, and an Adler-32 of the original bytes.
+
+```
+fn zlib_decompress(data: []u8, max_out: usize) -> Result[List[u8], string]
 ```
 
 ```
-fn write_string_to_file(path: str, data: str) -> bool
+fn gzip_compress(data: []u8, level: i32) -> List[u8]
 ```
+gzip (RFC 1952): a ten-byte header, DEFLATE data, then the CRC-32 and the length of the original bytes.
+
+```
+fn gzip_decompress(data: []u8, max_out: usize) -> Result[List[u8], string]
+```
+
+
+## std.crypto
+
+### fn
+
+```
+fn constant_time_eq(a: []u8, b: []u8) -> bool
+```
+True when both have the same length and bytes, taking the same time whatever the bytes are.
+
+```
+fn zeroize(data: lend []u8)
+```
+Overwrites the bytes with zeros in a way the optimizer may not remove (volatile stores).
+
+```
+fn random_bytes(n: usize) -> List[u8]
+```
+`n` random bytes from the operating system's cryptographic source.
+
+```
+fn chacha20_xor(key: []u8, nonce: []u8, counter: u32, data: []u8) -> List[u8]
+```
+XORs `data` with the ChaCha20 keystream (encrypting and decrypting are the same).
+
+```
+fn chacha20poly1305_seal(key: []u8, nonce: []u8, aad: []u8, plaintext: []u8) -> List[u8]
+```
+Encrypts and authenticates: returns the ciphertext followed by the 16-byte tag.
+
+```
+fn chacha20poly1305_open(key: []u8, nonce: []u8, aad: []u8, sealed: []u8) -> Optional[List[u8]]
+```
+Checks the tag and decrypts.
+
+```
+fn aes_gcm_seal(key: []u8, nonce: []u8, aad: []u8, plaintext: []u8) -> List[u8]
+```
+AES-GCM with a 16-, 24-, or 32-byte key and a 12-byte nonce.
+
+```
+fn aes_gcm_open(key: []u8, nonce: []u8, aad: []u8, sealed: []u8) -> Optional[List[u8]]
+```
+Checks the tag and decrypts;
+
+```
+fn aes_encrypt_block(key: []u8, block: []u8) -> List[u8]
+```
+Encrypts one 16-byte block with AES (ECB for a single block: building block for other modes, not a mode by itself).
+
+```
+fn x25519(scalar: []u8, point: []u8) -> List[u8]
+```
+X25519 (RFC 7748): `scalar` and `point` are 32 bytes; returns the 32-byte shared secret.
+
+```
+fn x25519_base(scalar: []u8) -> List[u8]
+```
+The public key for a 32-byte secret: X25519 with the base point (u = 9).
+
+```
+fn ed25519_public_key(seed: []u8) -> List[u8]
+```
+The 32-byte public key for a 32-byte secret seed (RFC 8032, Ed25519).
+
+```
+fn ed25519_sign(seed: []u8, message: []u8) -> List[u8]
+```
+The 64-byte signature of `message` under the seed.
+
+```
+fn ed25519_verify(public_key: []u8, message: []u8, signature: []u8) -> bool
+```
+True when `signature` (64 bytes) is a valid Ed25519 signature of `message` under `public_key` (32 bytes).
+
+
+## std.csv
+
+### fn
+
+```
+fn parse(text: str, sep: u8) -> Result[List[List[string]], string]
+```
+
+```
+fn parse_lenient(text: str, sep: u8) -> Result[List[List[string]], string]
+```
+
+```
+fn format_row(fields: read List[string], sep: u8) -> string
+```
+One row as text, quoting the fields that need it.
+
+```
+fn format(rows: read List[List[string]], sep: u8) -> string
+```
+All rows, each ending in `\n`.
+
+```
+fn column(rows: read List[List[string]], name: str) -> Optional[usize]
+```
+The column index of a header name in the first row, or `None`.
+
+
+## std.decimal
+
+### struct
+
+```
+struct Decimal { mantissa: i128, scale: u32 }
+```
+
+### const
+
+```
+const HALF_EVEN: i32
+```
+Rounding rules (pass as `HALF_EVEN`, `HALF_UP`, ...).
+
+```
+const HALF_UP: i32
+```
+
+```
+const HALF_DOWN: i32
+```
+
+```
+const UP: i32
+```
+
+```
+const DOWN: i32
+```
+
+```
+const FLOOR: i32
+```
+
+```
+const CEILING: i32
+```
+
+```
+const MAX_SCALE: u32
+```
+
+### fn
+
+```
+fn decimal_from_int(n: i64) -> Decimal
+```
+
+```
+fn decimal_new(mantissa: i128, scale: u32) -> Decimal
+```
+`mantissa / 10^scale`: `decimal_new(1999, 2)` is 19.99.
+
+```
+fn decimal_zero() -> Decimal
+```
+
+```
+fn decimal_parse(text: str) -> Result[Decimal, string]
+```
+Reads `-12.340`, `+5`, `.5`, `1_000.25`, or `1.5e3`.
+
+```
+fn Decimal.is_zero(self: read Decimal) -> bool
+```
+
+```
+fn Decimal.is_negative(self: read Decimal) -> bool
+```
+
+```
+fn Decimal.neg(self: read Decimal) -> Decimal
+```
+
+```
+fn Decimal.abs(self: read Decimal) -> Decimal
+```
+
+```
+fn Decimal.add(self: read Decimal, other: read Decimal) -> Decimal
+```
+
+```
+fn Decimal.sub(self: read Decimal, other: read Decimal) -> Decimal
+```
+
+```
+fn Decimal.mul(self: read Decimal, other: read Decimal) -> Decimal
+```
+The exact product.
+
+```
+fn Decimal.div(self: read Decimal, other: read Decimal, places: u32, mode: i32) -> Decimal
+```
+`self / other` rounded to `places` digits after the point.
+
+```
+fn Decimal.rem(self: read Decimal, other: read Decimal) -> Decimal
+```
+The remainder of the truncated quotient: `self - other * trunc(self / other)`.
+
+```
+fn Decimal.round(self: read Decimal, places: u32, mode: i32) -> Decimal
+```
+Rounds to `places` digits after the point (more places than `scale` add zeros).
+
+```
+fn Decimal.normalize(self: read Decimal) -> Decimal
+```
+Removes trailing zeros after the point (`1.50` becomes `1.5`, `2.00` becomes `2`).
+
+```
+fn Decimal.compare(self: read Decimal, other: read Decimal) -> i64
+```
+-1, 0 or 1;
+
+```
+fn Decimal.equals(self: read Decimal, other: read Decimal) -> bool
+```
+
+```
+fn Decimal.min(self: read Decimal, other: read Decimal) -> Decimal
+```
+
+```
+fn Decimal.max(self: read Decimal, other: read Decimal) -> Decimal
+```
+
+```
+fn Decimal.to_i64(self: read Decimal) -> Optional[i64]
+```
+Whole part, rounded toward zero.
+
+```
+fn Decimal.to_f64(self: read Decimal) -> f64
+```
+
+```
+fn Decimal.to_string(self: read Decimal) -> string
+```
+`-12.340`: all `scale` digits are written.
+
+
+## std.dmath
+
+### const
+
+```
+const SIN_C: [13]f64
+```
+
+```
+const COS_C: [12]f64
+```
+
+```
+const EXP_C: [17]f64
+```
+
+```
+const ATAN_C: [14]f64
+```
+
+```
+const LN_C: [14]f64
+```
+
+### fn
+
+```
+fn exp(x: f64) -> f64
+```
+e^x.
+
+```
+fn expm1(x: f64) -> f64
+```
+e^x - 1, without the loss of digits that `exp(x) - 1.0` has for small x.
+
+```
+fn ln(x: f64) -> f64
+```
+The natural logarithm.
+
+```
+fn log2(x: f64) -> f64
+```
+
+```
+fn log10(x: f64) -> f64
+```
+
+```
+fn sin(x: f64) -> f64
+```
+
+```
+fn cos(x: f64) -> f64
+```
+
+```
+fn tan(x: f64) -> f64
+```
+
+```
+fn atan(x: f64) -> f64
+```
+
+```
+fn atan2(y: f64, x: f64) -> f64
+```
+
+```
+fn asin(x: f64) -> f64
+```
+
+```
+fn acos(x: f64) -> f64
+```
+
+```
+fn sinh(x: f64) -> f64
+```
+
+```
+fn cosh(x: f64) -> f64
+```
+
+```
+fn tanh(x: f64) -> f64
+```
+
+```
+fn pow(x: f64, y: f64) -> f64
+```
+x raised to y.
+
+```
+fn cbrt(x: f64) -> f64
+```
+
+```
+fn hypot(x: f64, y: f64) -> f64
+```
+
+
+## std.encoding
+
+### const
+
+```
+const CRC32_TABLE: [16]u32
+```
+
+```
+const CRC32C_TABLE: [16]u32
+```
+
+```
+const CRC16_MODBUS_TABLE: [16]u16
+```
+
+```
+const CRC16_CCITT_TABLE: [16]u16
+```
+
+### fn
+
+```
+fn crc32(data: []u8) -> u32
+```
+CRC-32 (IEEE 802.3, as in zip, PNG, Ethernet).
+
+```
+fn crc32_update(crc: u32, data: []u8) -> u32
+```
+
+```
+fn crc32c(data: []u8) -> u32
+```
+CRC-32C (Castagnoli, as in iSCSI, ext4, SCTP).
+
+```
+fn crc32c_update(crc: u32, data: []u8) -> u32
+```
+
+```
+fn crc16_modbus(data: []u8) -> u16
+```
+CRC-16/MODBUS (polynomial 0xA001 reflected, initial value 0xFFFF;
+
+```
+fn crc16_ccitt(data: []u8) -> u16
+```
+CRC-16/CCITT-FALSE (polynomial 0x1021, initial value 0xFFFF, no reflection; used by CCSDS packets, Bluetooth, AUTOSAR).
+
+```
+fn crc16_ccitt_update(crc: u16, data: []u8) -> u16
+```
+
+```
+fn crc8(data: []u8) -> u8
+```
+CRC-8 (polynomial 0x07, initial value 0).
+
+```
+fn adler32(data: []u8) -> u32
+```
+
+```
+fn fletcher16(data: []u8) -> u16
+```
+
+```
+fn hex_encode(data: []u8) -> string
+```
+
+```
+fn hex_decode(text: str) -> Result[List[u8], string]
+```
+Reads pairs of hex digits (either case).
+
+```
+fn base64_encode(data: []u8) -> string
+```
+Standard base64 (`+` and `/`) with `=` padding.
+
+```
+fn base64url_encode(data: []u8) -> string
+```
+URL- and filename-safe base64 (`-` and `_`) without padding, as in JWTs.
+
+```
+fn base64_decode(text: str) -> Result[List[u8], string]
+```
+Reads either alphabet, with or without `=` padding; whitespace is skipped.
+
+```
+fn base32_encode(data: []u8) -> string
+```
+RFC 4648 base32 (`A`-`Z`, `2`-`7`) with `=` padding.
+
+```
+fn base32_decode(text: str) -> Result[List[u8], string]
+```
+
+
+## std.fix
+
+### struct
+
+```
+struct FixField { tag: i64, value: string }
+```
+
+```
+struct FixMessage { fields: List[FixField] }
+```
+
+```
+struct FixBuilder { begin: string, body: string }
+```
+Builds a message and fills in BodyLength (9) and CheckSum (10).
+
+### const
+
+```
+const SOH: u8
+```
+
+```
+const MAX_FIELDS: usize
+```
+
+### fn
+
+```
+fn parse(text: str) -> Result[FixMessage, string]
+```
+Reads one message.
+
+```
+fn FixMessage.get(self: read FixMessage, tag: i64) -> Optional[string]
+```
+The first value of `tag`, or None.
+
+```
+fn FixMessage.get_all(self: read FixMessage, tag: i64) -> List[string]
+```
+Every value of `tag`, in order (a repeating group repeats its tags).
+
+```
+fn FixMessage.get_i64(self: read FixMessage, tag: i64) -> Optional[i64]
+```
+The first value of `tag` as an integer, or None when it is missing or not a number.
+
+```
+fn FixMessage.len(self: read FixMessage) -> usize
+```
+The number of fields, the frame fields (8, 9, 10) included.
+
+```
+fn FixBuilder.new(begin_string: str) -> FixBuilder
+```
+`begin_string` is the protocol version text, e.g.
+
+```
+fn FixBuilder.add(self: lend FixBuilder, tag: i64, value: str)
+```
+Adds `tag=value`.
+
+```
+fn FixBuilder.finish(self: read FixBuilder) -> string
+```
+The wire form of the message.
+
+
+## std.fixedpoint
+
+### struct
+
+```
+struct Fx[S: usize] { raw: i64 }
+```
+
+### fn
+
+```
+fn Fx.from_raw(raw: i64) -> Fx[S]
+```
+
+```
+fn Fx.from_int(n: i64) -> Fx[S]
+```
+
+```
+fn Fx.from_f64(x: f64) -> Fx[S]
+```
+The nearest fixed-point number (ties away from zero).
+
+```
+fn Fx.to_f64(self: read Fx[S]) -> f64
+```
+
+```
+fn Fx.zero() -> Fx[S]
+```
+
+```
+fn Fx.one() -> Fx[S]
+```
+
+```
+fn Fx.add(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.sub(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.neg(self: read Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.abs(self: read Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.mul(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+The product, rounded toward zero.
+
+```
+fn Fx.div(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+The quotient, rounded toward zero.
+
+```
+fn Fx.saturating_add(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.saturating_sub(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.saturating_mul(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.compare(self: read Fx[S], other: Fx[S]) -> i64
+```
+-1, 0, or 1.
+
+```
+fn Fx.lt(self: read Fx[S], other: Fx[S]) -> bool
+```
+
+```
+fn Fx.le(self: read Fx[S], other: Fx[S]) -> bool
+```
+
+```
+fn Fx.min(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.max(self: read Fx[S], other: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.clamp(self: read Fx[S], lo: Fx[S], hi: Fx[S]) -> Fx[S]
+```
+
+```
+fn Fx.floor_int(self: read Fx[S]) -> i64
+```
+The whole part, rounded toward minus infinity.
+
+```
+fn Fx.round_int(self: read Fx[S]) -> i64
+```
+The whole part, rounded to nearest (ties away from zero).
+
+```
+fn Fx.trunc_int(self: read Fx[S]) -> i64
+```
+The whole part, rounded toward zero.
+
+```
+fn Fx.sqrt(self: read Fx[S]) -> Fx[S]
+```
+The square root (Newton's method in fixed point;
+
+```
+fn Fx.format(self: read Fx[S], digits: usize) -> string
+```
+Text like `3.14159` with `digits` places after the point (truncated, not rounded).
+
+
+## std.fs
+
+### struct
+
+```
+struct DirEntry { name: string, is_dir: bool }
+```
+One name in a directory.
+
+```
+struct Metadata { size: u64, is_dir: bool, is_file: bool, modified: Optional[i64] }
+```
+What is known about a file or directory.
+
+### fn
+
+```
+fn is_dir(path: str) -> bool
+```
+True when `path` is an existing directory.
+
+```
+fn path_exists(path: str) -> bool
+```
+True when `path` is an existing file or directory.
 
 ```
 fn file_exists(path: str) -> bool
 ```
+True when `path` is a file that can be opened for reading.
+
+```
+fn metadata(path: str) -> Result[Metadata, IoError]
+```
+Size, kind and modification time of `path`.
+
+```
+fn read_text(path: str) -> Result[string, IoError]
+```
+The whole file as text (bytes).
+
+```
+fn write_text(path: str, data: str) -> Result[usize, IoError]
+```
+Replaces the contents of `path` (or creates it).
+
+```
+fn append_text(path: str, data: str) -> Result[usize, IoError]
+```
+Adds `data` to the end of `path`, creating it when needed.
+
+```
+fn write_atomic(path: str, data: str) -> Result[usize, IoError]
+```
+Writes `data` to a temporary file next to `path`, puts it on the disk, and renames it over `path`: a reader (or a crash) sees the old contents or the new, never half of the new.
+
+```
+fn copy_file(from_path: str, to_path: str) -> Result[u64, IoError]
+```
+Copies a file;
+
+```
+fn delete_file(path: str) -> Result[bool, IoError]
+```
+Deletes a file.
+
+```
+fn replace_file(from_path: str, to_path: str) -> Result[bool, IoError]
+```
+Renames `from_path` to `to_path`.
+
+```
+fn create_dir(path: str) -> Result[bool, IoError]
+```
+Creates one directory;
+
+```
+fn create_dir_all(path: str) -> Result[bool, IoError]
+```
+Creates a directory and every missing parent.
+
+```
+fn remove_dir(path: str) -> Result[bool, IoError]
+```
+Removes an empty directory.
+
+```
+fn remove_dir_all(path: str) -> Result[bool, IoError]
+```
+Removes a directory and everything in it.
+
+```
+fn read_dir(path: str) -> Result[List[DirEntry], IoError]
+```
+The entries of a directory, sorted by name, without `.` and `..`.
+
+```
+fn walk(path: str) -> Result[List[string], IoError]
+```
+Every file below `path` (not directories), as paths that start with `path`, sorted.
+
+```
+fn temp_dir() -> string
+```
+The directory for temporary files: `TMPDIR`, `TEMP`, `TMP`, or `/tmp`.
+
+```
+fn current_dir() -> Result[string, IoError]
+```
+The current directory.
+
+```
+fn set_current_dir(path: str) -> Result[bool, IoError]
+```
+
+```
+fn absolute_path(path: str) -> Result[string, IoError]
+```
+The absolute path of `path` with `.` and `..` resolved (on Linux and macOS the path must exist).
+
+```
+fn read_file_to_string(path: str) -> Optional[string]
+```
+The file's contents, or `None` when it cannot be read.
+
+```
+fn write_string_to_file(path: str, data: str) -> bool
+```
+True when the file was written.
 
 ```
 fn remove_file(path: str) -> bool
 ```
+True when the file was deleted.
+
+```
+fn make_dir(path: str) -> bool
+```
+True when the directory was created (its parent must exist).
+
+```
+fn list_dir(path: str) -> Optional[string]
+```
+Names in `path`, one per line, sorted by bytes.
+
+```
+fn rename_file(old_path: str, new_path: str) -> bool
+```
+Rename `old_path` to `new_path`.
 
 ```
 fn path_join(dir: str, name: str) -> string
@@ -980,26 +2274,6 @@ Final component of `path`, after a trailing separator is removed.
 fn path_ext(path: str) -> string
 ```
 Extension including the dot, taken from the last dot of the file name.
-
-```
-fn is_dir(path: str) -> bool
-```
-True when `path` is an existing directory.
-
-```
-fn make_dir(path: str) -> bool
-```
-Create one directory.
-
-```
-fn list_dir(path: str) -> Optional[string]
-```
-Names in `path`, one per line, sorted by bytes.
-
-```
-fn rename_file(old_path: str, new_path: str) -> bool
-```
-Rename `old_path` to `new_path`.
 
 
 ## std.gguf
@@ -1085,6 +2359,564 @@ An array of f32 numbers (such as `tokenizer.ggml.scores`) as a list;
 fn Gguf.array_i32(self: read Gguf, key: str) -> List[i32]
 ```
 An array of integers of any width (such as `tokenizer.ggml.token_type`) as a list of i32.
+
+
+## std.hal
+
+### struct
+
+```
+struct MockPin { level: bool, changes: usize }
+```
+A pin whose history is kept: `level` now, and `changes` since the start.
+
+```
+struct MockDelay { total_us: u64 }
+```
+A delay that only adds up how long it was asked to wait.
+
+```
+struct MockBus { present: u8, reply: List[u8], written: List[u8] }
+```
+An I2C device that answers every read with the bytes in `reply`, and remembers what it was sent.
+
+```
+struct MockUart { queue: List[u8], head: usize }
+```
+A serial port connected to itself: what is written can be read back.
+
+### feature
+
+```
+feature OutputPin { fn set_high(self: lend Self); fn set_low(self: lend Self); fn is_set_high(self: read Self) -> bool; fn set(self: lend Self, high: bool); fn toggle(self: lend Self) }
+```
+A pin that can be driven.
+
+```
+feature InputPin { fn is_high(self: read Self) -> bool; fn is_low(self: read Self) -> bool }
+```
+A pin that can be read.
+
+```
+feature Delay { fn delay_us(self: lend Self, us: u32); fn delay_ms(self: lend Self, ms: u32) }
+```
+Waiting.
+
+```
+feature I2c { fn write(self: lend Self, address: u8, bytes: []u8) -> bool; fn write_read(self: lend Self, address: u8, bytes: []u8, read_len: usize) -> Optional[List[u8]] }
+```
+An I2C bus controller.
+
+```
+feature SpiBus { fn transfer(self: lend Self, bytes: []u8) -> List[u8] }
+```
+An SPI bus (full duplex, one chip select handled by the caller).
+
+```
+feature Uart { fn write_byte(self: lend Self, b: u8) -> bool; fn read_byte(self: lend Self, timeout_us: u32) -> Optional[u8] }
+```
+A serial port.
+
+### fn
+
+```
+fn mock_pin(initial: bool) -> MockPin
+```
+
+```
+fn MockPin.set_high(self: lend MockPin)
+```
+
+```
+fn MockPin.set_low(self: lend MockPin)
+```
+
+```
+fn MockPin.is_set_high(self: read MockPin) -> bool
+```
+
+```
+fn MockPin.is_high(self: read MockPin) -> bool
+```
+
+```
+fn mock_delay() -> MockDelay
+```
+
+```
+fn MockDelay.delay_us(self: lend MockDelay, us: u32)
+```
+
+```
+fn mock_bus(present_address: u8, reply: []u8) -> MockBus
+```
+
+```
+fn MockBus.write(self: lend MockBus, address: u8, bytes: []u8) -> bool
+```
+
+```
+fn MockBus.write_read(self: lend MockBus, address: u8, bytes: []u8, read_len: usize) -> Optional[List[u8]]
+```
+
+```
+fn MockBus.transfer(self: lend MockBus, bytes: []u8) -> List[u8]
+```
+
+```
+fn mock_uart() -> MockUart
+```
+
+```
+fn MockUart.write_byte(self: lend MockUart, b: u8) -> bool
+```
+
+```
+fn MockUart.read_byte(self: lend MockUart, timeout_us: u32) -> Optional[u8]
+```
+
+
+## std.hash
+
+### struct
+
+```
+struct Sha256 { state: [8]u32, block: [64]u8, filled: usize, total: u64 }
+```
+Incremental SHA-256: `update` with any pieces, then `finish`.
+
+```
+struct Sha512 { state: [8]u64, block: [128]u8, filled: usize, total: u64, digest_len: usize }
+```
+
+### const
+
+```
+const SHA256_K: [64]u32
+```
+
+```
+const SHA256_H0: [8]u32
+```
+
+```
+const SHA512_K: [80]u64
+```
+
+```
+const SHA512_H0: [8]u64
+```
+
+```
+const SHA384_H0: [8]u64
+```
+
+```
+const KECCAK_RC: [24]u64
+```
+
+```
+const KECCAK_ROT: [25]u32
+```
+
+### fn
+
+```
+fn sha256_new() -> Sha256
+```
+
+```
+fn Sha256.update(self: lend Sha256, data: []u8)
+```
+
+```
+fn Sha256.finish(self: lend Sha256) -> [32]u8
+```
+The 32-byte digest.
+
+```
+fn sha256(data: []u8) -> [32]u8
+```
+
+```
+fn sha512_new() -> Sha512
+```
+
+```
+fn sha384_new() -> Sha512
+```
+
+```
+fn Sha512.update(self: lend Sha512, data: []u8)
+```
+
+```
+fn Sha512.finish(self: lend Sha512) -> List[u8]
+```
+The digest: 64 bytes for SHA-512, 48 for SHA-384 (the list has that length).
+
+```
+fn sha512(data: []u8) -> List[u8]
+```
+
+```
+fn sha384(data: []u8) -> List[u8]
+```
+
+```
+fn sha1(data: []u8) -> [20]u8
+```
+
+```
+fn sha3_256(data: []u8) -> List[u8]
+```
+
+```
+fn sha3_384(data: []u8) -> List[u8]
+```
+
+```
+fn sha3_512(data: []u8) -> List[u8]
+```
+
+```
+fn shake128(data: []u8, out_len: usize) -> List[u8]
+```
+SHAKE128 / SHAKE256: hashes with an output of any length.
+
+```
+fn shake256(data: []u8, out_len: usize) -> List[u8]
+```
+
+```
+fn hmac_sha1(key: []u8, data: []u8) -> List[u8]
+```
+
+```
+fn hmac_sha256(key: []u8, data: []u8) -> List[u8]
+```
+
+```
+fn hmac_sha384(key: []u8, data: []u8) -> List[u8]
+```
+
+```
+fn hmac_sha512(key: []u8, data: []u8) -> List[u8]
+```
+
+```
+fn hkdf_sha256(secret: []u8, salt: []u8, info: []u8, length: usize) -> List[u8]
+```
+HKDF (RFC 5869) with HMAC-SHA-256: `length` bytes of key material from `secret`, a `salt` (may be empty) and `info`.
+
+```
+fn pbkdf2_sha256(password: []u8, salt: []u8, iterations: u32, length: usize) -> List[u8]
+```
+PBKDF2 (RFC 8018) with HMAC-SHA-256 or HMAC-SHA-512: stretches a password into `length` bytes of key.
+
+```
+fn pbkdf2_sha512(password: []u8, salt: []u8, iterations: u32, length: usize) -> List[u8]
+```
+
+
+## std.heapless
+
+### struct
+
+```
+struct FixedVec[T, N: usize] { items: [N]T, count: usize }
+```
+A list of at most `N` elements.
+
+```
+struct FixedString[N: usize] { bytes: [N]u8, count: usize }
+```
+Text of at most `N` bytes.
+
+```
+struct RingBuffer[T, N: usize] { items: [N]T, head: usize, count: usize }
+```
+A queue of at most `N` elements: `push` at the back, `pop` from the front, both in constant time.
+
+```
+struct FixedMap[K: Eq, V, N: usize] { keys: [N]K, values: [N]V, count: usize }
+```
+A map of at most `N` entries with a plain linear search: `N` steps at most, no hashing, and the same time on every run.
+
+```
+struct FixedBitSet[W: usize] { words: [W]u64 }
+```
+A set of the numbers `0 ..
+
+```
+struct SpscRing[T, N: usize] { items: [N]T, head: u64, tail: u64 }
+```
+A lock-free queue for exactly one producer and one consumer (an interrupt handler and the main loop, or two threads).
+
+### fn
+
+```
+fn FixedVec.new(fill: T) -> FixedVec[T, N]
+```
+
+```
+fn FixedVec.len(self: read FixedVec[T, N]) -> usize
+```
+
+```
+fn FixedVec.capacity(self: read FixedVec[T, N]) -> usize
+```
+
+```
+fn FixedVec.is_empty(self: read FixedVec[T, N]) -> bool
+```
+
+```
+fn FixedVec.is_full(self: read FixedVec[T, N]) -> bool
+```
+
+```
+fn FixedVec.push(self: lend FixedVec[T, N], value: T) -> bool
+```
+Adds at the end;
+
+```
+fn FixedVec.pop(self: lend FixedVec[T, N]) -> Optional[T]
+```
+
+```
+fn FixedVec.get(self: read FixedVec[T, N], i: usize) -> Optional[T]
+```
+The element at `i`, or `None` when `i` is past the end.
+
+```
+fn FixedVec.set(self: lend FixedVec[T, N], i: usize, value: T) -> bool
+```
+Replaces the element at `i`;
+
+```
+fn FixedVec.insert(self: lend FixedVec[T, N], i: usize, value: T) -> bool
+```
+Inserts before position `i` (`i <= len`), shifting the rest up;
+
+```
+fn FixedVec.remove(self: lend FixedVec[T, N], i: usize) -> Optional[T]
+```
+Removes position `i`, shifting the rest down.
+
+```
+fn FixedVec.swap_remove(self: lend FixedVec[T, N], i: usize) -> Optional[T]
+```
+Removes position `i` by moving the last element into its place (O(1), order not kept).
+
+```
+fn FixedVec.clear(self: lend FixedVec[T, N])
+```
+
+```
+fn FixedVec.as_slice(self: read FixedVec[T, N]) -> []T
+```
+The elements in use, as a view.
+
+```
+fn FixedString.new() -> FixedString[N]
+```
+
+```
+fn FixedString.len(self: read FixedString[N]) -> usize
+```
+
+```
+fn FixedString.capacity(self: read FixedString[N]) -> usize
+```
+
+```
+fn FixedString.is_empty(self: read FixedString[N]) -> bool
+```
+
+```
+fn FixedString.push_byte(self: lend FixedString[N], b: u8) -> bool
+```
+
+```
+fn FixedString.push_str(self: lend FixedString[N], text: str) -> bool
+```
+Adds all of `text`, or nothing when it does not fit.
+
+```
+fn FixedString.push_i64(self: lend FixedString[N], n: i64) -> bool
+```
+Adds the decimal digits of `n` (with a minus sign), or nothing when they do not fit.
+
+```
+fn FixedString.byte_at(self: read FixedString[N], i: usize) -> Optional[u8]
+```
+
+```
+fn FixedString.clear(self: lend FixedString[N])
+```
+
+```
+fn FixedString.equals(self: read FixedString[N], text: str) -> bool
+```
+Equal to `text`?
+
+```
+fn FixedString.as_str(self: read FixedString[N]) -> str
+```
+The text as a view;
+
+```
+fn RingBuffer.new(fill: T) -> RingBuffer[T, N]
+```
+
+```
+fn RingBuffer.len(self: read RingBuffer[T, N]) -> usize
+```
+
+```
+fn RingBuffer.capacity(self: read RingBuffer[T, N]) -> usize
+```
+
+```
+fn RingBuffer.is_empty(self: read RingBuffer[T, N]) -> bool
+```
+
+```
+fn RingBuffer.is_full(self: read RingBuffer[T, N]) -> bool
+```
+
+```
+fn RingBuffer.push(self: lend RingBuffer[T, N], value: T) -> bool
+```
+Adds at the back;
+
+```
+fn RingBuffer.push_overwrite(self: lend RingBuffer[T, N], value: T) -> bool
+```
+Adds at the back; when full the oldest element is dropped to make room.
+
+```
+fn RingBuffer.pop(self: lend RingBuffer[T, N]) -> Optional[T]
+```
+
+```
+fn RingBuffer.peek(self: read RingBuffer[T, N]) -> Optional[T]
+```
+The oldest element without removing it.
+
+```
+fn RingBuffer.get(self: read RingBuffer[T, N], i: usize) -> Optional[T]
+```
+The element `i` places from the front (0 is the oldest).
+
+```
+fn RingBuffer.clear(self: lend RingBuffer[T, N])
+```
+
+```
+fn FixedMap.new(key_fill: K, value_fill: V) -> FixedMap[K, V, N]
+```
+
+```
+fn FixedMap.len(self: read FixedMap[K, V, N]) -> usize
+```
+
+```
+fn FixedMap.capacity(self: read FixedMap[K, V, N]) -> usize
+```
+
+```
+fn FixedMap.is_full(self: read FixedMap[K, V, N]) -> bool
+```
+
+```
+fn FixedMap.contains(self: read FixedMap[K, V, N], key: K) -> bool
+```
+
+```
+fn FixedMap.get(self: read FixedMap[K, V, N], key: K) -> Optional[V]
+```
+
+```
+fn FixedMap.insert(self: lend FixedMap[K, V, N], key: K, value: V) -> bool
+```
+Adds or replaces.
+
+```
+fn FixedMap.remove(self: lend FixedMap[K, V, N], key: K) -> Optional[V]
+```
+
+```
+fn FixedMap.key_at(self: read FixedMap[K, V, N], i: usize) -> Optional[K]
+```
+The key at position `i` in insertion-ish order (removals move the last entry into the gap).
+
+```
+fn FixedMap.value_at(self: read FixedMap[K, V, N], i: usize) -> Optional[V]
+```
+
+```
+fn FixedMap.clear(self: lend FixedMap[K, V, N])
+```
+
+```
+fn FixedBitSet.new() -> FixedBitSet[W]
+```
+
+```
+fn FixedBitSet.capacity(self: read FixedBitSet[W]) -> usize
+```
+How many numbers fit (`64 * W`).
+
+```
+fn FixedBitSet.insert(self: lend FixedBitSet[W], i: usize) -> bool
+```
+Adds `i`;
+
+```
+fn FixedBitSet.remove(self: lend FixedBitSet[W], i: usize) -> bool
+```
+
+```
+fn FixedBitSet.contains(self: read FixedBitSet[W], i: usize) -> bool
+```
+
+```
+fn FixedBitSet.count(self: read FixedBitSet[W]) -> usize
+```
+
+```
+fn FixedBitSet.clear(self: lend FixedBitSet[W])
+```
+
+```
+fn FixedBitSet.next_from(self: read FixedBitSet[W], from: usize) -> Optional[usize]
+```
+The smallest member that is at least `from`, or `None`.
+
+```
+fn SpscRing.new(fill: T) -> SpscRing[T, N]
+```
+
+```
+fn SpscRing.capacity(self: read SpscRing[T, N]) -> usize
+```
+
+```
+fn SpscRing.push(self: read SpscRing[T, N], value: T) -> bool
+```
+Producer: adds `value` at the back;
+
+```
+fn SpscRing.pop(self: read SpscRing[T, N]) -> Optional[T]
+```
+Consumer: removes the oldest element;
+
+```
+fn SpscRing.len(self: read SpscRing[T, N]) -> usize
+```
+A snapshot of how many elements wait (exact only when the other side is idle).
 
 
 ## std.http
@@ -1255,59 +3087,195 @@ fn Intern.len(self: read Intern) -> usize
 ### struct
 
 ```
-struct File { handle: *mut u8 }
+struct IoError { kind: IoErrorKind, code: i32, message: string }
 ```
-An open file.
+What went wrong.
+
+```
+struct File { handle: *mut u8, owned: bool, autoflush: bool, pipe: bool }
+```
+An open file or standard stream.
+
+```
+struct Cursor { data: string, pos: usize }
+```
+An in-memory stream: reads take bytes from `data` starting at `pos`, writes append to `data`.
+
+### enum
+
+```
+enum IoErrorKind { NotFound, PermissionDenied, AlreadyExists, NotADirectory, IsADirectory, DirectoryNotEmpty, InvalidInput, UnexpectedEof, TimedOut, Interrupted, Other }
+```
+
+### feature
+
+```
+feature Reader { fn read_some(self: lend Self, max: usize) -> Result[string, IoError]; fn read_rest(self: lend Self) -> Result[string, IoError] }
+```
+Something that bytes can be read from.
+
+```
+feature Writer { fn write(self: lend Self, data: str) -> Result[usize, IoError]; fn flush(self: lend Self) -> Result[bool, IoError]; fn write_line(self: lend Self, data: str) -> Result[usize, IoError] }
+```
+Something that bytes can be written to.
 
 ### fn
 
 ```
-fn File.open(path: str) -> Result[File, string]
+fn IoError.is_not_found(self: read IoError) -> bool
+```
+
+```
+fn IoError.describe(self: read IoError) -> string
+```
+
+```
+fn error_new(kind: IoErrorKind, message: str) -> IoError
+```
+
+```
+fn kind_of_errno(code: i32) -> IoErrorKind
+```
+The kind that an `errno` value stands for.
+
+```
+fn last_errno() -> i32
+```
+The C library's current `errno`.
+
+```
+fn last_error(context: str) -> IoError
+```
+An error built from the current `errno`, with `context` (usually the operation and the path) in front.
+
+```
+fn windows_error(context: str, code: i32) -> IoError
+```
+An error for a Windows API failure (a `GetLastError` code), with `context` in front.
+
+```
+fn stdin() -> File
+```
+The process's standard input, output and error as streams.
+
+```
+fn stdout() -> File
+```
+
+```
+fn stderr() -> File
+```
+
+```
+fn File.open(path: str) -> Result[File, IoError]
 ```
 Opens `path` for reading.
 
 ```
-fn File.create(path: str) -> Result[File, string]
+fn File.create(path: str) -> Result[File, IoError]
 ```
 Creates `path` (or empties it) for writing.
 
 ```
-fn File.append(path: str) -> Result[File, string]
+fn File.append(path: str) -> Result[File, IoError]
 ```
 Opens `path` for writing at its end, creating it when it does not exist.
 
 ```
-fn File.write(self: read File, data: str) -> Result[usize, string]
+fn File.write(self: lend File, data: str) -> Result[usize, IoError]
 ```
 Writes every byte of `data`.
 
 ```
-fn File.write_line(self: read File, data: str) -> Result[usize, string]
+fn File.write_line(self: lend File, data: str) -> Result[usize, IoError]
 ```
 Writes `data` and a newline.
 
 ```
-fn File.read_some(self: read File, max: usize) -> string
+fn File.read_some(self: lend File, max: usize) -> Result[string, IoError]
 ```
 Reads up to `max` bytes;
 
 ```
-fn File.read_rest(self: read File) -> string
+fn File.read_rest(self: lend File) -> Result[string, IoError]
 ```
 Reads the rest of the file.
 
 ```
-fn File.read_line(self: read File) -> Optional[string]
+fn File.read_exact(self: lend File, n: usize) -> Result[string, IoError]
+```
+Reads exactly `n` bytes;
+
+```
+fn File.read_line(self: lend File) -> Result[Optional[string], IoError]
 ```
 The next line without its line break, or None at the end of the file.
 
 ```
-fn File.flush(self: read File)
+fn File.flush(self: lend File) -> Result[bool, IoError]
 ```
 Hands what was written to the operating system now.
 
 ```
+fn File.sync_all(self: lend File) -> Result[bool, IoError]
+```
+Writes what is buffered and asks the operating system to put it on the disk (fsync).
+
+```
+fn File.seek(self: lend File, offset: i64) -> Result[bool, IoError]
+```
+Moves the read/write position to `offset` bytes from the start.
+
+```
+fn File.size(self: lend File) -> Result[u64, IoError]
+```
+The size of the file in bytes;
+
+```
+fn File.position(self: lend File) -> Result[u64, IoError]
+```
+The current position, in bytes from the start.
+
+```
+fn File.from_pipe(raw: *mut u8) -> File
+```
+Wraps the `FILE*` that `popen` returned (what `std.process.spawn_read` and `spawn_write` do).
+
+```
+fn File.wait(self: lend File) -> i32
+```
+Closes a child-process stream, waits for the child, and returns its exit code (-1 when it cannot be known).
+
+```
 fn File.drop(self: lend File)
+```
+
+```
+fn cursor_new(text: str) -> Cursor
+```
+
+```
+fn Cursor.read_some(self: lend Cursor, max: usize) -> Result[string, IoError]
+```
+
+```
+fn Cursor.write(self: lend Cursor, data: str) -> Result[usize, IoError]
+```
+
+```
+fn Cursor.flush(self: lend Cursor) -> Result[bool, IoError]
+```
+
+```
+fn Cursor.text(self: read Cursor) -> str
+```
+
+```
+fn IoErrorKind.to_int(self: IoErrorKind) -> i64
+```
+
+```
+fn IoErrorKind.from_int(n: i64) -> Optional[IoErrorKind]
 ```
 
 
@@ -1323,7 +3291,7 @@ One `"key": value` pair of an object, in the order of the text.
 ### enum
 
 ```
-enum Json { Null, Bool(bool), Num(f64), Str(string), Arr(List[Json]), Obj(List[Member]) }
+enum Json { Null, Bool(bool), Int(i64), Num(f64), Dec(string), Str(string), Arr(List[Json]), Obj(List[Member]) }
 ```
 
 ### fn
@@ -1335,6 +3303,15 @@ fn object() -> Json
 ```
 fn array() -> Json
 ```
+
+```
+fn integer(n: i64) -> Json
+```
+
+```
+fn number_from_text(t: str) -> Json
+```
+A number given as exact digits (`"19.99"`, `"12345678901234567890"`);
 
 ```
 fn text(s: str) -> Json
@@ -1376,6 +3353,11 @@ fn Json.is_null(self: read Json) -> bool
 ```
 fn Json.as_f64(self: read Json) -> Optional[f64]
 ```
+
+```
+fn Json.number_text(self: read Json) -> Optional[string]
+```
+The number as written: exact for `Int` and `Dec`, the printed value for `Num`;
 
 ```
 fn Json.as_i64(self: read Json) -> Optional[i64]
@@ -1607,6 +3589,87 @@ fn forward_batch(model: read Model, st: lend State, pool: lend Pool, tokens: []i
 Runs the tokens `tokens` (at most `st.bt.n` of them) at the positions `pos0`, `pos0 + 1`, ...
 
 
+## std.log
+
+### const
+
+```
+const ERROR: i32
+```
+
+```
+const WARN: i32
+```
+
+```
+const INFO: i32
+```
+
+```
+const DEBUG: i32
+```
+
+```
+const TRACE: i32
+```
+
+```
+const level: i32
+```
+
+```
+const json_mode: bool
+```
+
+```
+const started: bool
+```
+
+### fn
+
+```
+fn set_level(lvl: i32)
+```
+
+```
+fn get_level() -> i32
+```
+
+```
+fn set_json(on: bool)
+```
+
+```
+fn error(msg: str)
+```
+
+```
+fn warn(msg: str)
+```
+
+```
+fn info(msg: str)
+```
+
+```
+fn debug(msg: str)
+```
+
+```
+fn trace(msg: str)
+```
+
+```
+fn kv(lvl: i32, msg: str, key: str, value: str)
+```
+A message with one `key=value` pair (`lvl` is `log.ERROR` ...
+
+```
+fn enabled(lvl: i32) -> bool
+```
+True when messages of this level would be written (to skip building an expensive message).
+
+
 ## std.math
 
 ### fn
@@ -1664,40 +3727,201 @@ fn fmod(x: f64, y: f64) -> f64
 ```
 
 ```
-fn abs_f64(x: f64) -> f64
-```
-
-```
-fn abs_i64(x: i64) -> i64
-```
-
-```
-fn min_i64(a: i64, b: i64) -> i64
-```
-
-```
-fn max_i64(a: i64, b: i64) -> i64
-```
-
-```
-fn min_f64(a: f64, b: f64) -> f64
-```
-
-```
-fn max_f64(a: f64, b: f64) -> f64
-```
-
-```
-fn clamp_i64(x: i64, lo: i64, hi: i64) -> i64
-```
-
-```
 fn gcd_u64(a: u64, b: u64) -> u64
 ```
 
 ```
 fn pow_i64(base: i64, exp_: u32) -> i64
 ```
+
+```
+fn asin(x: f64) -> f64
+```
+
+```
+fn acos(x: f64) -> f64
+```
+
+```
+fn atan(x: f64) -> f64
+```
+
+```
+fn sinh(x: f64) -> f64
+```
+
+```
+fn cosh(x: f64) -> f64
+```
+
+```
+fn tanh(x: f64) -> f64
+```
+
+```
+fn log2(x: f64) -> f64
+```
+
+```
+fn log10(x: f64) -> f64
+```
+
+```
+fn round(x: f64) -> f64
+```
+
+```
+fn trunc(x: f64) -> f64
+```
+
+```
+fn cbrt(x: f64) -> f64
+```
+
+```
+fn log1p(x: f64) -> f64
+```
+
+```
+fn expm1(x: f64) -> f64
+```
+
+```
+fn exp2(x: f64) -> f64
+```
+
+```
+fn hypot(x: f64, y: f64) -> f64
+```
+
+```
+fn copysign(x: f64, y: f64) -> f64
+```
+
+```
+fn sqrt_f32(x: f32) -> f32
+```
+
+```
+fn sin_f32(x: f32) -> f32
+```
+
+```
+fn cos_f32(x: f32) -> f32
+```
+
+```
+fn tan_f32(x: f32) -> f32
+```
+
+```
+fn atan2_f32(x: f32, y: f32) -> f32
+```
+
+```
+fn pow_f32(x: f32, y: f32) -> f32
+```
+
+```
+fn exp_f32(x: f32) -> f32
+```
+
+```
+fn floor_f32(x: f32) -> f32
+```
+
+```
+fn ceil_f32(x: f32) -> f32
+```
+
+```
+fn abs_f32(x: f32) -> f32
+```
+
+```
+fn ln_f32(x: f32) -> f32
+```
+
+```
+fn tau() -> f64
+```
+
+```
+fn is_nan(x: f64) -> bool
+```
+
+```
+fn is_inf(x: f64) -> bool
+```
+
+```
+fn is_finite(x: f64) -> bool
+```
+
+```
+fn is_nan_f32(x: f32) -> bool
+```
+
+```
+fn is_finite_f32(x: f32) -> bool
+```
+
+```
+fn to_radians(deg: f64) -> f64
+```
+
+```
+fn to_degrees(rad: f64) -> f64
+```
+
+```
+fn min[T: Ord](a: T, b: T) -> T
+```
+Generic helpers.
+
+```
+fn max[T: Ord](a: T, b: T) -> T
+```
+
+```
+fn clamp[T: Ord](x: T, lo: T, hi: T) -> T
+```
+
+```
+fn abs[T: Num](x: T) -> T
+```
+
+```
+fn signum[T: Num](x: T) -> T
+```
+
+```
+fn lcm_u64(a: u64, b: u64) -> u64
+```
+
+```
+fn isqrt(n0: u64) -> u64
+```
+Floor of the square root, exact for every u64.
+
+```
+fn rem_euclid(a: i64, b: i64) -> i64
+```
+Euclidean (always non-negative) remainder.
+
+```
+fn checked_pow_i64(base: i64, exp_: u32) -> Optional[i64]
+```
+`base ** exp` that returns None when it does not fit.
+
+```
+fn saturating_pow_i64(base: i64, exp_: u32) -> i64
+```
+
+```
+fn lerp(a: f64, b: f64, t: f64) -> f64
+```
+Fused multiply-add in plain arithmetic (two roundings);
 
 
 ## std.mmap
@@ -1727,6 +3951,100 @@ The whole file as bytes.
 ```
 fn MappedFile.drop(self: lend MappedFile)
 ```
+
+
+## std.mmio
+
+### struct
+
+```
+struct Reg[T: Int] { addr: usize }
+```
+A register of type `T` (`u8`, `u16`, `u32`, or `u64`) at a fixed address.
+
+```
+struct Field { shift: u32, width: u32 }
+```
+A run of `width` bits starting at bit `shift` of a register.
+
+### fn
+
+```
+fn reg8(addr: usize) -> Reg[u8]
+```
+
+```
+fn reg16(addr: usize) -> Reg[u16]
+```
+
+```
+fn reg32(addr: usize) -> Reg[u32]
+```
+
+```
+fn reg64(addr: usize) -> Reg[u64]
+```
+
+```
+fn Field.new(shift: u32, width: u32) -> Field
+```
+
+```
+fn Field.mask(self: read Field) -> u64
+```
+The bits of the field, in place, as a mask (`Field.new(8, 12).mask()` is 0xFFF00).
+
+```
+fn Reg.get(self: read Reg[T]) -> T
+```
+
+```
+fn Reg.set(self: read Reg[T], value: T)
+```
+
+```
+fn Reg.modify(self: read Reg[T], mask: T, value: T)
+```
+Replaces the bits selected by `mask` with the same bits of `value`, leaving the others as they are.
+
+```
+fn Reg.set_bits(self: read Reg[T], mask: T)
+```
+
+```
+fn Reg.clear_bits(self: read Reg[T], mask: T)
+```
+
+```
+fn Reg.toggle_bits(self: read Reg[T], mask: T)
+```
+
+```
+fn Reg.bits_set(self: read Reg[T], mask: T) -> bool
+```
+True when every bit of `mask` is set.
+
+```
+fn Reg.get_field(self: read Reg[T], f: Field) -> u64
+```
+
+```
+fn Reg.set_field(self: read Reg[T], f: Field, value: u64)
+```
+
+```
+fn Reg.wait_bits_set(self: read Reg[T], mask: T, max_reads: u32) -> bool
+```
+Reads the register up to `max_reads` times until every bit of `mask` is set.
+
+```
+fn Reg.wait_bits_clear(self: read Reg[T], mask: T, max_reads: u32) -> bool
+```
+
+```
+fn Reg.offset(self: read Reg[T], n: usize) -> Reg[T]
+```
+The register `n` registers further on (for an array of identical registers, like the ports of a GPIO block).
 
 
 ## std.net
@@ -2000,6 +4318,11 @@ fn UdpSocket.send_to_ip(self: read UdpSocket, data: str, ip: [4]u8, port: u16) -
 ```
 
 ```
+fn UdpSocket.send_to_ip6(self: read UdpSocket, data: str, ip: [16]u8, port: u16) -> Result[usize, string]
+```
+Like `send_to_ip` for an IPv6 address given as sixteen bytes.
+
+```
 fn UdpSocket.receive_from_async(self: read UdpSocket, max: usize) -> Result[Datagram, string]
 ```
 Like `receive_from`, but other tasks run while it waits (std.tasks).
@@ -2171,6 +4494,14 @@ Reads a message from the front.
 struct FrameBuffer { buf: string, start: usize }
 ```
 Cuts a stream of bytes into length-prefixed messages.
+
+```
+struct BitWriter { buf: string, cur: u8, used: u32 }
+```
+
+```
+struct BitReader { data: string, pos: usize }
+```
 
 ### fn
 
@@ -2348,6 +4679,115 @@ fn FrameBuffer.next(self: lend FrameBuffer, max_len: usize) -> Result[Optional[s
 ```
 The next whole message, or None when more bytes are needed.
 
+```
+fn ByteWriter.put_i16_be(self: lend ByteWriter, v: i16)
+```
+
+```
+fn ByteWriter.put_i32_be(self: lend ByteWriter, v: i32)
+```
+
+```
+fn ByteWriter.put_i64_be(self: lend ByteWriter, v: i64)
+```
+
+```
+fn ByteWriter.put_f32_be(self: lend ByteWriter, v: f32)
+```
+
+```
+fn ByteWriter.put_f64_be(self: lend ByteWriter, v: f64)
+```
+
+```
+fn ByteWriter.put_crc16(self: lend ByteWriter)
+```
+Appends the CRC-16/CCITT-FALSE of everything written so far, big endian (as most serial and avionics protocols do).
+
+```
+fn ByteWriter.put_crc32(self: lend ByteWriter)
+```
+Appends the CRC-32 of everything written so far, big endian.
+
+```
+fn ByteReader.get_i16_be(self: lend ByteReader) -> Result[i16, string]
+```
+
+```
+fn ByteReader.get_i32_be(self: lend ByteReader) -> Result[i32, string]
+```
+
+```
+fn ByteReader.get_i64_be(self: lend ByteReader) -> Result[i64, string]
+```
+
+```
+fn ByteReader.get_f32_be(self: lend ByteReader) -> Result[f32, string]
+```
+
+```
+fn ByteReader.get_f64_be(self: lend ByteReader) -> Result[f64, string]
+```
+
+```
+fn check_crc16(message: str) -> bool
+```
+True when `message` (bytes, then a big endian CRC-16/CCITT-FALSE written by `put_crc16`) is intact.
+
+```
+fn check_crc32(message: str) -> bool
+```
+True when `message` (bytes, then a big endian CRC-32 written by `put_crc32`) is intact.
+
+```
+fn BitWriter.new() -> BitWriter
+```
+
+```
+fn BitWriter.put_bits(self: lend BitWriter, value: u64, n: u32)
+```
+Adds the low `n` bits of `value`.
+
+```
+fn BitWriter.put_bool(self: lend BitWriter, v: bool)
+```
+
+```
+fn BitWriter.bit_len(self: read BitWriter) -> usize
+```
+How many bits have been written.
+
+```
+fn BitWriter.finish(self: lend BitWriter) -> string
+```
+The bytes, with the last one padded with zero bits.
+
+```
+fn BitReader.new(data: str) -> BitReader
+```
+
+```
+fn BitReader.bits_left(self: read BitReader) -> usize
+```
+
+```
+fn BitReader.get_bits(self: lend BitReader, n: u32) -> Result[u64, string]
+```
+
+```
+fn BitReader.get_bool(self: lend BitReader) -> Result[bool, string]
+```
+
+```
+fn BitReader.get_signed(self: lend BitReader, n: u32) -> Result[i64, string]
+```
+Reads `n` bits as a two's complement number.
+
+```
+fn BitReader.align(self: lend BitReader)
+```
+Skips to the next byte boundary.
+
 
 ## std.parallel
 
@@ -2357,6 +4797,12 @@ The next whole message, or None when more bytes are needed.
 struct Pool { cell: *mut u8, threads: List[Thread], size: usize }
 ```
 Worker threads that run `for_range` jobs.
+
+### const
+
+```
+const REDUCE_CHUNK: usize
+```
 
 ### fn
 
@@ -2386,6 +4832,24 @@ The same with pieces of `chunk` items (the last one may be shorter).
 
 ```
 fn Pool.drop(self: lend Pool)
+```
+
+```
+fn map_i64(pool: lend Pool, src: []i64, dst: lend []i64, f: fn(i64) -> i64)
+```
+`dst[i] = f(src[i])` for every `i`, the work shared between the threads of `pool`.
+
+```
+fn map_f64(pool: lend Pool, src: []f64, dst: lend []f64, f: fn(f64) -> f64)
+```
+
+```
+fn reduce_i64(pool: lend Pool, src: []i64, init: i64, op: fn(i64, i64) -> i64) -> i64
+```
+`init op src[0] op src[1] ...`, folded in pieces as described at the top.
+
+```
+fn reduce_f64(pool: lend Pool, src: []f64, init: f64, op: fn(f64, f64) -> f64) -> f64
 ```
 
 
@@ -2422,6 +4886,21 @@ Arguments of this process.
 fn process_run(argv: read List[str]) -> Optional[ProcessResult]
 ```
 Run `argv` through the system shell.
+
+```
+fn spawn_read(argv: []str) -> Result[File, IoError]
+```
+Starts `argv` and returns a stream that reads what the program writes to its standard output (its standard error goes to this process's).
+
+```
+fn spawn_write(argv: []str) -> Result[File, IoError]
+```
+Starts `argv` and returns a stream that feeds its standard input.
+
+```
+fn process_run_input(argv: []str, input: str) -> Optional[ProcessResult]
+```
+Runs `argv` with `input` as its standard input and captures what it writes, like `process_run`.
 
 
 ## std.rand
@@ -2624,6 +5103,19 @@ fn sort[T: Ord](v: lend List[T])
 
 ```
 fn binary_search[T: Ord](v: read List[T], x: T) -> Optional[usize]
+```
+
+```
+fn is_sorted[T: Ord](v: read List[T]) -> bool
+```
+
+```
+fn sort_stable_by[T](v: lend List[T], before: fn(T, T) -> bool)
+```
+A stable sort (equal elements keep their order): merge sort, O(n log n) steps, one extra buffer of `n` elements.
+
+```
+fn sort_stable[T: Ord](v: lend List[T])
 ```
 
 
@@ -2998,7 +5490,7 @@ fn Q8Matrix.matvec_parallel(self: read Q8Matrix, pool: lend Pool, x: read Q8Vec,
 ```
 struct Thread { handle: u64, joined: bool }
 ```
-Thread, Mutex, Cond, AtomicI64 and Channel are OS handles: they are moved, never copied or cloned (GG0323).
+Thread, Mutex, Cond, AtomicI64 and ChannelI64 are OS handles: they are moved, never copied or cloned (GG0323).
 
 ```
 struct Mutex { storage: [8]u64 }
@@ -3018,7 +5510,7 @@ struct AtomicI64 { value: i64 }
 ```
 
 ```
-struct Channel { words: [276]i64 }
+struct ChannelI64 { words: [276]i64 }
 ```
 words: [0..8) mutex, [8..16) cond, 16 head, 17 tail, 18 count, 19 closed, [20..276) ring buffer
 
@@ -3033,6 +5525,38 @@ struct Locked[T] { sync: [8]u64, cell: *mut u8 }
 
 ```
 struct Guard[T] { owner: read Locked[T] tied to self }
+```
+
+```
+struct Semaphore { words: [24]i64 }
+```
+
+```
+struct Barrier { words: [24]i64 }
+```
+
+```
+struct RwLock { words: [24]i64 }
+```
+
+```
+struct ReadGuard { owner: read RwLock tied to self }
+```
+
+```
+struct WriteGuard { owner: read RwLock tied to self }
+```
+
+```
+struct Once { words: [24]i64 }
+```
+
+```
+struct ThreadLocal { key: u64, initial: i64 }
+```
+
+```
+struct Channel[T] { sync: [16]u64, cell: *mut u8 }
 ```
 
 ### fn
@@ -3076,6 +5600,11 @@ fn Mutex.unlock(self: read Mutex)
 Releases the mutex lock.
 
 ```
+fn Mutex.try_lock(self: read Mutex) -> bool
+```
+Takes the lock if it is free right now;
+
+```
 fn Cond.new() -> Cond
 ```
 Creates a new condition variable.
@@ -3089,6 +5618,16 @@ Waits on condition variable until broadcast/signaled.
 fn Cond.broadcast(self: read Cond)
 ```
 Wakes all threads waiting on this condition variable.
+
+```
+fn Cond.signal(self: read Cond)
+```
+Wakes one thread waiting on this condition variable.
+
+```
+fn Cond.wait_timeout(self: read Cond, m: read Mutex, ms: i64) -> bool
+```
+Like `wait`, but gives up after `ms` milliseconds.
 
 ```
 fn Atomic.new(initial: T) -> Atomic[T]
@@ -3149,21 +5688,21 @@ fn AtomicI64.compare_and_swap(self: read AtomicI64, expected: i64, new: i64) -> 
 Sets value to `new` if equal to `expected`.
 
 ```
-fn Channel.new() -> Channel
+fn ChannelI64.new() -> ChannelI64
 ```
 
 ```
-fn Channel.send(self: read Channel, value: i64)
+fn ChannelI64.send(self: read ChannelI64, value: i64)
 ```
 Blocks while buffer is full.
 
 ```
-fn Channel.recv(self: read Channel) -> Optional[i64]
+fn ChannelI64.recv(self: read ChannelI64) -> Optional[i64]
 ```
 Blocks while empty; returns None when channel is closed and drained.
 
 ```
-fn Channel.close(self: read Channel)
+fn ChannelI64.close(self: read ChannelI64)
 ```
 Closes the channel.
 
@@ -3226,6 +5765,141 @@ fn Guard.value(self: lend Guard[T]) -> lend T
 fn Guard.drop(self: lend Guard[T])
 ```
 
+```
+fn Semaphore.new(permits: i64) -> Semaphore
+```
+
+```
+fn Semaphore.acquire(self: read Semaphore)
+```
+Takes a permit, waiting while none is left.
+
+```
+fn Semaphore.try_acquire(self: read Semaphore) -> bool
+```
+Takes a permit if one is free right now.
+
+```
+fn Semaphore.acquire_timeout(self: read Semaphore, ms: i64) -> bool
+```
+Takes a permit, waiting at most `ms` milliseconds.
+
+```
+fn Semaphore.release(self: read Semaphore)
+```
+Gives a permit back and wakes a waiting thread.
+
+```
+fn Semaphore.available(self: read Semaphore) -> i64
+```
+The permits free right now.
+
+```
+fn Barrier.new(size: i64) -> Barrier
+```
+
+```
+fn Barrier.wait(self: read Barrier) -> bool
+```
+
+```
+fn RwLock.new() -> RwLock
+```
+
+```
+fn RwLock.read_lock(self: read RwLock) -> ReadGuard
+```
+Waits for the lock to be free of writers, then shares it.
+
+```
+fn RwLock.write_lock(self: read RwLock) -> WriteGuard
+```
+Waits until nobody holds the lock, then holds it alone.
+
+```
+fn RwLock.can_read(self: read RwLock) -> bool
+```
+True when a reader could take the lock right now (no writer active or waiting).
+
+```
+fn RwLock.readers(self: read RwLock) -> i64
+```
+How many readers hold the lock now.
+
+```
+fn ReadGuard.drop(self: lend ReadGuard)
+```
+
+```
+fn WriteGuard.drop(self: lend WriteGuard)
+```
+
+```
+fn Once.new() -> Once
+```
+
+```
+fn Once.run(self: read Once, f: fn()) -> bool
+```
+
+```
+fn Once.is_done(self: read Once) -> bool
+```
+
+```
+fn ThreadLocal.new(initial: i64) -> ThreadLocal
+```
+
+```
+fn ThreadLocal.get(self: read ThreadLocal) -> i64
+```
+
+```
+fn ThreadLocal.set(self: read ThreadLocal, value: i64)
+```
+
+```
+fn Channel.new(capacity: usize) -> Channel[T]
+```
+
+```
+fn Channel.unbounded() -> Channel[T]
+```
+
+```
+fn Channel.send(self: read Channel[T], value: T) -> bool
+```
+Adds `value`, waiting while the channel is full.
+
+```
+fn Channel.recv(self: read Channel[T]) -> Optional[T]
+```
+Takes the oldest value, waiting while the channel is empty.
+
+```
+fn Channel.try_recv(self: read Channel[T]) -> Optional[T]
+```
+Takes a value if one is waiting right now.
+
+```
+fn Channel.recv_timeout(self: read Channel[T], ms: i64) -> Optional[T]
+```
+Takes a value, waiting at most `ms` milliseconds.
+
+```
+fn Channel.len(self: read Channel[T]) -> usize
+```
+How many values are waiting.
+
+```
+fn Channel.close(self: read Channel[T])
+```
+Closes the channel: senders get false, receivers drain what is left and then get `None`.
+
+```
+fn Channel.drop(self: lend Channel[T])
+```
+
 
 ## std.time
 
@@ -3239,6 +5913,26 @@ A reading of the monotonic clock, for measuring how long something takes.
 ```
 struct DateTime { year: i64, month: i64, day: i64, hour: i64, minute: i64, second: i64, millis: i64 }
 ```
+
+```
+struct Duration { nanos: i64 }
+```
+A length of time in nanoseconds (about 292 years either way).
+
+```
+struct ZoneRule { month: i64, week: i64, weekday: i64, minutes: i64, utc: bool }
+```
+When a daylight-saving change happens: the `week`-th `weekday` (0 Monday ..
+
+```
+struct Zone { name: string, std_minutes: i64, dst_extra: i64, start: ZoneRule, end: ZoneRule }
+```
+A time zone: a standard offset from UTC in minutes, plus an optional daylight-saving rule.
+
+```
+struct ZonedDateTime { local: DateTime, offset_minutes: i64, zone: string, is_dst: bool }
+```
+A date and time as the people in a zone read it.
 
 ### fn
 
@@ -3329,6 +6023,234 @@ fn parse_iso(text: str) -> Result[DateTime, string]
 ```
 Reads `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, optional `.fff` fraction, and an optional `Z` or `+HH:MM` / `-HH:MM` offset (the result is in UTC).
 
+```
+fn DateTime.unix_day(self: read DateTime) -> i64
+```
+Days since 1970-01-01 of this date.
+
+```
+fn DateTime.day_of_year(self: read DateTime) -> i64
+```
+1 for January 1st.
+
+```
+fn DateTime.is_weekend(self: read DateTime) -> bool
+```
+
+```
+fn DateTime.add_days(self: read DateTime, n: i64) -> DateTime
+```
+
+```
+fn DateTime.add_months(self: read DateTime, n: i64) -> DateTime
+```
+Moves by whole months;
+
+```
+fn DateTime.add_years(self: read DateTime, n: i64) -> DateTime
+```
+
+```
+fn DateTime.start_of_day(self: read DateTime) -> DateTime
+```
+Midnight at the start of this day.
+
+```
+fn DateTime.days_until(self: read DateTime, other: DateTime) -> i64
+```
+Whole days from this date to `other` (negative when `other` is earlier);
+
+```
+fn DateTime.add_business_days(self: read DateTime, n: i64, holidays: read List[i64]) -> DateTime
+```
+The date that is `n` business days later (earlier for negative `n`), skipping Saturdays and Sundays and the days in `holidays` (each a `days_from_civil` number).
+
+```
+fn DateTime.month_name(self: read DateTime) -> str
+```
+
+```
+fn DateTime.weekday_name(self: read DateTime) -> str
+```
+
+```
+fn DateTime.format(self: read DateTime, pattern: str) -> string
+```
+Fills in a pattern: `YYYY`, `YY`, `MM`, `DD`, `HH`, `mm`, `ss`, `SSS` (milliseconds), `MMMM` and `MMM` (month name, full or short), `dddd` and `ddd` (weekday name).
+
+```
+fn parse_format(text: str, pattern: str) -> Result[DateTime, string]
+```
+Reads a date and time written the way `DateTime.format` writes it: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss`, `SSS`; every other character must match.
+
+```
+fn duration_nanos(n: i64) -> Duration
+```
+
+```
+fn duration_micros(n: i64) -> Duration
+```
+
+```
+fn duration_millis(n: i64) -> Duration
+```
+
+```
+fn duration_secs(n: i64) -> Duration
+```
+
+```
+fn duration_minutes(n: i64) -> Duration
+```
+
+```
+fn duration_hours(n: i64) -> Duration
+```
+
+```
+fn duration_from_secs_f64(s: f64) -> Duration
+```
+
+```
+fn Duration.as_nanos(self: read Duration) -> i64
+```
+
+```
+fn Duration.as_micros(self: read Duration) -> i64
+```
+
+```
+fn Duration.as_millis(self: read Duration) -> i64
+```
+
+```
+fn Duration.as_secs(self: read Duration) -> i64
+```
+
+```
+fn Duration.as_secs_f64(self: read Duration) -> f64
+```
+
+```
+fn Duration.add(self: read Duration, other: Duration) -> Duration
+```
+
+```
+fn Duration.sub(self: read Duration, other: Duration) -> Duration
+```
+
+```
+fn Duration.scale(self: read Duration, factor: i64) -> Duration
+```
+
+```
+fn Duration.is_negative(self: read Duration) -> bool
+```
+
+```
+fn Duration.is_zero(self: read Duration) -> bool
+```
+
+```
+fn Duration.compare(self: read Duration, other: Duration) -> i64
+```
+-1, 0 or 1.
+
+```
+fn Duration.describe(self: read Duration) -> string
+```
+`1h02m03.5s`, `250ms`, `42us`, `7ns`: the largest unit that fits.
+
+```
+fn Instant.elapsed(self: read Instant) -> Duration
+```
+
+```
+fn Instant.duration_since(self: read Instant, earlier: Instant) -> Duration
+```
+The time from `earlier` to this reading.
+
+```
+fn Instant.plus(self: read Instant, d: Duration) -> Instant
+```
+
+```
+fn sleep(d: Duration)
+```
+
+```
+fn zone_fixed(name: str, offset_minutes: i64) -> Zone
+```
+
+```
+fn zone_utc() -> Zone
+```
+
+```
+fn zone_with_rules(name: str, std_minutes: i64, dst_extra: i64, start: ZoneRule, end: ZoneRule) -> Zone
+```
+
+```
+fn Zone.is_dst_at(self: read Zone, unix_ms: i64) -> bool
+```
+True when daylight saving is in force at the instant `unix_ms`.
+
+```
+fn Zone.offset_at(self: read Zone, unix_ms: i64) -> i64
+```
+Minutes east of UTC at the instant `unix_ms`.
+
+```
+fn Zone.to_local(self: read Zone, unix_ms: i64) -> ZonedDateTime
+```
+The wall-clock reading in this zone at the instant `unix_ms`.
+
+```
+fn Zone.from_local(self: read Zone, local: DateTime) -> i64
+```
+The instant for a wall-clock reading in this zone.
+
+```
+fn ZonedDateTime.to_iso(self: read ZonedDateTime) -> string
+```
+`2026-03-08T09:30:00-04:00`, with `.123` before the offset when there are milliseconds.
+
+```
+fn ZonedDateTime.to_unix_millis(self: read ZonedDateTime) -> i64
+```
+
+```
+fn zone_by_name(name: str) -> Optional[Zone]
+```
+A zone by its IANA name.
+
+```
+fn tai_minus_utc(unix_ms: i64) -> i64
+```
+TAI minus UTC, in seconds, at the UTC instant `unix_ms`.
+
+```
+fn unix_to_tai_millis(unix_ms: i64) -> i64
+```
+
+```
+fn tai_to_unix_millis(tai_ms: i64) -> i64
+```
+
+```
+fn unix_to_gps_millis(unix_ms: i64) -> i64
+```
+Milliseconds of GPS time (since 1980-01-06 00:00:00 UTC, no leap seconds) at the UTC instant `unix_ms`.
+
+```
+fn gps_to_unix_millis(gps_ms: i64) -> i64
+```
+
+```
+fn gps_week_and_seconds(unix_ms: i64) -> Tuple2[i64, f64]
+```
+GPS week number and the seconds into that week, as navigation messages carry them.
+
 
 ## std.tls
 
@@ -3398,6 +6320,206 @@ The bytes of token `id` appended to `out` (a byte-level BPE token or a SentenceP
 fn Tokenizer.decode(self: read Tokenizer, ids: []i32) -> string
 ```
 The text of a list of ids.
+
+
+## std.toml
+
+### fn
+
+```
+fn parse(input: str) -> Result[Json, string]
+```
+
+```
+fn to_text(doc: read Json) -> string
+```
+The tree as TOML text (an object at the top; tables become `[name]` sections).
+
+
+## std.unicode
+
+### fn
+
+```
+fn encode_utf8(cp0: u32) -> string
+```
+The UTF-8 bytes of a code point.
+
+```
+fn from_code_points(cps: read List[u32]) -> string
+```
+Text from code points.
+
+```
+fn is_whitespace(cp: u32) -> bool
+```
+
+```
+fn is_numeric(cp: u32) -> bool
+```
+
+```
+fn is_alphabetic(cp: u32) -> bool
+```
+
+```
+fn is_alphanumeric(cp: u32) -> bool
+```
+
+```
+fn is_combining(cp: u32) -> bool
+```
+A mark that combines with the character before it (accents, variation selectors, skin tones, zero-width joiner).
+
+```
+fn char_width(cp: u32) -> u32
+```
+Columns a character takes in a terminal: 0 for a combining mark, 2 for East Asian wide characters and emoji, else 1.
+
+```
+fn is_uppercase(cp: u32) -> bool
+```
+
+```
+fn is_lowercase(cp: u32) -> bool
+```
+
+```
+fn to_lower_cp(cp: u32) -> u32
+```
+The lowercase of a code point (one character;
+
+```
+fn to_upper_cp(cp: u32) -> u32
+```
+The uppercase of a code point (one character;
+
+```
+fn to_upper(text: str) -> string
+```
+Every character in uppercase (`ß` becomes `SS`).
+
+```
+fn to_lower(text: str) -> string
+```
+
+```
+fn to_upper_tr(text: str) -> string
+```
+Turkish and Azeri: `i` -> `İ` and `I` -> `ı`.
+
+```
+fn to_lower_tr(text: str) -> string
+```
+
+```
+fn case_fold(text: str) -> string
+```
+The text in a form where letters that differ only in case are equal: lowercase, `ß` as `ss`, final sigma as sigma.
+
+```
+fn eq_ignore_case(a: str, b: str) -> bool
+```
+True when the two texts are equal ignoring case (`Straße` equals `STRASSE`).
+
+```
+fn width(text: str) -> usize
+```
+Columns the text takes in a terminal.
+
+```
+fn grapheme_count(text: str) -> usize
+```
+Characters as a person counts them: a base character with the marks that follow it (accents, variation selectors, skin tones, joined emoji) is one.
+
+```
+fn reverse(text: str) -> string
+```
+The text reversed by code point (marks stay with nothing special: use on text without combining marks).
+
+```
+fn take_chars(text: str, n: usize) -> string
+```
+The first `n` characters (code points), never cutting inside one.
+
+```
+fn truncate_width(text: str, columns: usize, ellipsis: str) -> string
+```
+The text cut so that it fits in `columns` terminal columns, with `ellipsis` appended when something was cut.
+
+
+## std.uuid
+
+### struct
+
+```
+struct Uuid { bytes: [16]u8 }
+```
+
+### fn
+
+```
+fn nil() -> Uuid
+```
+
+```
+fn v4() -> Uuid
+```
+A random (version 4) identifier.
+
+```
+fn v7() -> Uuid
+```
+A time-ordered (version 7) identifier: 48 bits of Unix milliseconds, then random bits.
+
+```
+fn v7_at(unix_ms: i64) -> Uuid
+```
+
+```
+fn v5(namespace: read Uuid, name: []u8) -> Uuid
+```
+A name-based (version 5, SHA-1) identifier: the same namespace and name always give the same id.
+
+```
+fn namespace_dns() -> Uuid
+```
+The well-known namespaces for `v5`.
+
+```
+fn namespace_url() -> Uuid
+```
+
+```
+fn Uuid.to_string(self: read Uuid) -> string
+```
+`7f3c2a1e-9b04-4c5d-8e21-3a6b0d9c4f12`
+
+```
+fn Uuid.version(self: read Uuid) -> u8
+```
+
+```
+fn Uuid.is_nil(self: read Uuid) -> bool
+```
+
+```
+fn Uuid.equals(self: read Uuid, other: read Uuid) -> bool
+```
+
+```
+fn Uuid.unix_millis(self: read Uuid) -> i64
+```
+For a version 7 id, the Unix milliseconds in it.
+
+```
+fn format(id: read Uuid) -> string
+```
+
+```
+fn parse(text: str) -> Result[Uuid, string]
+```
+Reads the 36-character form with dashes, either case;
 
 ## Not in the catalog above
 

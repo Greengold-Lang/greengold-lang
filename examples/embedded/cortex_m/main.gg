@@ -1,0 +1,80 @@
+# A bare-metal Cortex-M4 program: reset handler, interrupt handlers, memory-mapped I/O, initialized statics.
+#
+#   gg build main.gg --no-std --target cortex-m4 --linker-script link.ld -o firmware.elf
+#
+# Nothing here needs libc: `--no-std` leaves out `print` and the heap. `link.ld` builds the vector table at the start
+# of flash from the exported names below (`reset`, `NMI`, `HardFault`, `SysTick`, ...: any it does not find falls back to
+# `DefaultHandler`), and defines the stack top and the `.data` / `.bss` boundaries that `reset` initializes.
+
+static ticks: u32 = 0
+static greeting: u32 = 0xC0FFEE
+
+# GPIO output register of a typical Cortex-M part (an address from the chip's reference manual).
+const GPIO_ODR: usize = 0x40020014
+
+fn gpio_write(value: u32):
+    unsafe:
+        volatile_write[u32](int_to_ptr[*mut u32](GPIO_ODR), value)
+
+# The addresses the linker script defines. `ldr r, =symbol` loads one.
+fn data_load_start() -> usize:
+    unsafe:
+        return asm[usize]("ldr $0, =_sidata", "=r")
+
+fn data_start() -> usize:
+    unsafe:
+        return asm[usize]("ldr $0, =_sdata", "=r")
+
+fn data_end() -> usize:
+    unsafe:
+        return asm[usize]("ldr $0, =_edata", "=r")
+
+fn bss_start() -> usize:
+    unsafe:
+        return asm[usize]("ldr $0, =_sbss", "=r")
+
+fn bss_end() -> usize:
+    unsafe:
+        return asm[usize]("ldr $0, =_ebss", "=r")
+
+@export("reset")
+fn reset():
+    unsafe:
+        # copy the initial values of statics from flash to RAM, then clear the zero-initialized ones
+        src = int_to_ptr[*u32](data_load_start())
+        dst = int_to_ptr[*mut u32](data_start())
+        words = (data_end() - data_start()) / 4
+        for i in 0..words:
+            dst[i] = src[i]
+        zero = int_to_ptr[*mut u32](bss_start())
+        zwords = (bss_end() - bss_start()) / 4
+        for i in 0..zwords:
+            zero[i] = 0
+    main()
+    while true:
+        pass
+
+@interrupt
+fn SysTick():
+    unsafe:
+        ticks = ticks + 1
+
+@interrupt
+fn DefaultHandler():
+    while true:
+        pass
+
+@panic_handler
+fn on_panic():
+    gpio_write(0xFFFF)
+    while true:
+        pass
+
+fn main():
+    unsafe:
+        gpio_write(greeting & 1)
+    n: u32 = 0
+    while true:
+        n += 1
+        unsafe:
+            gpio_write(n & ticks)

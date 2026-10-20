@@ -1,0 +1,108 @@
+# std.mmio: memory-mapped hardware registers, and bit fields inside them.
+#
+#     import std.mmio { reg32, Field }
+#     uart_ctrl = reg32(0x40011000)
+#     uart_ctrl.set_bits(1 << 3)                       # enable transmit
+#     baud = Field.new(8, 12)                          # 12 bits starting at bit 8
+#     uart_ctrl.set_field(baud, 0x1A0)
+#     while not uart_ctrl.wait_bits_set(1 << 7, 10000):    # status flag, with a time limit
+#         handle_timeout()
+#
+# A register is read and written with volatile accesses, so the compiler never drops, merges, or reorders them. `Reg[T]`
+# is generic over the width (`reg8`, `reg16`, `reg32`, `reg64`). Everything here is safe to call: the unsafe address
+# arithmetic is inside, so check the address against the chip's reference manual (or against an `svd2gg` file, which
+# writes these addresses from the vendor's SVD description). On a host without such registers, point a `Reg` at the
+# address of an array element to test code that uses it.
+#
+# `read_modify_write` style operations (`set_bits`, `clear_bits`, `modify`, `set_field`) are not atomic: an interrupt that
+# changes the same register between the read and the write loses its change. Mask interrupts around them, or use the
+# chip's set/clear alias registers with plain `write`.
+
+import std.bits
+
+# A register of type `T` (`u8`, `u16`, `u32`, or `u64`) at a fixed address.
+struct Reg[T: Int]:
+    addr: usize
+
+# A run of `width` bits starting at bit `shift` of a register.
+struct Field:
+    shift: u32
+    width: u32
+
+fn reg8(addr: usize) -> Reg[u8]:
+    return Reg[u8]{ addr: addr }
+
+fn reg16(addr: usize) -> Reg[u16]:
+    return Reg[u16]{ addr: addr }
+
+fn reg32(addr: usize) -> Reg[u32]:
+    return Reg[u32]{ addr: addr }
+
+fn reg64(addr: usize) -> Reg[u64]:
+    return Reg[u64]{ addr: addr }
+
+impl Field:
+    public
+    fn new(shift: u32, width: u32) -> Field:
+        if width == 0 or width > 64:
+            panic("Field.new: the width is 1 to 64 bits")
+        return Field{ shift: shift, width: width }
+
+    # The bits of the field, in place, as a mask (`Field.new(8, 12).mask()` is 0xFFF00).
+    fn mask(self: read Self) -> u64:
+        if self.width == 64:
+            return ~u64(0)
+        return ((u64(1) << self.width) - 1) << self.shift
+
+impl Reg[T]:
+    # Reads the register (`read` and `write` are keywords, so the methods are `get` and `set`).
+    public
+    fn get(self: read Self) -> T:
+        unsafe:
+            return volatile_read[T](int_to_ptr[*T](self.addr))
+
+    fn set(self: read Self, value: T):
+        unsafe:
+            volatile_write[T](int_to_ptr[*mut T](self.addr), value)
+
+    # Replaces the bits selected by `mask` with the same bits of `value`, leaving the others as they are.
+    fn modify(self: read Self, mask: T, value: T):
+        cur = self.get()
+        self.set((cur & ~mask) | (value & mask))
+
+    fn set_bits(self: read Self, mask: T):
+        self.set(self.get() | mask)
+
+    fn clear_bits(self: read Self, mask: T):
+        self.set(self.get() & ~mask)
+
+    fn toggle_bits(self: read Self, mask: T):
+        self.set(self.get() ^ mask)
+
+    # True when every bit of `mask` is set.
+    fn bits_set(self: read Self, mask: T) -> bool:
+        return (self.get() & mask) == mask
+
+    fn get_field(self: read Self, f: Field) -> u64:
+        return bits.bits_extract(self.get(), f.shift, f.width)
+
+    fn set_field(self: read Self, f: Field, value: u64):
+        self.set(bits.bits_insert(self.get(), f.shift, f.width, value))
+
+    # Reads the register up to `max_reads` times until every bit of `mask` is set. Returns false when it never was (a
+    # peripheral that does not answer must not hang the program).
+    fn wait_bits_set(self: read Self, mask: T, max_reads: u32) -> bool:
+        for _ in 0..max_reads:
+            if self.bits_set(mask):
+                return true
+        return false
+
+    fn wait_bits_clear(self: read Self, mask: T, max_reads: u32) -> bool:
+        for _ in 0..max_reads:
+            if (self.get() & mask) == 0:
+                return true
+        return false
+
+    # The register `n` registers further on (for an array of identical registers, like the ports of a GPIO block).
+    fn offset(self: read Self, n: usize) -> Reg[T]:
+        return Reg[T]{ addr: self.addr + n * size_of[T]() }

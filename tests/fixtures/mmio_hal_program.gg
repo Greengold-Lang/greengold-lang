@@ -1,0 +1,54 @@
+import std.mmio { reg32, reg8, Field }
+import std.hal { OutputPin, InputPin, Delay, I2c, SpiBus, Uart, mock_pin, mock_delay, mock_bus, mock_uart }
+
+fn blink[P: OutputPin, D: Delay](pin: lend P, delay: lend D, times: i32):
+    for _ in 0..times:
+        pin.toggle()
+        delay.delay_ms(10)
+
+fn read_temp[B: I2c](bus: lend B) -> i32:
+    got = bus.write_read(0x48, [0], 2)
+    if got.is_none():
+        return -1
+    v = got.value_or_panic()
+    return i32(v[0]) * 256 + i32(v[1])
+
+fn echo[U: Uart](port: lend U) -> i32:
+    n = 0
+    port.write_byte(65)
+    port.write_byte(66)
+    while true:
+        b = port.read_byte(100)
+        if b.is_none():
+            break
+        n += i32(b.value_or_panic())
+    return n
+
+fn main():
+    cells: [4]u32 = [0, 0, 0, 0]
+    unsafe:
+        base = ptr_to_int(addr(cells[0]))
+        r = reg32(base)
+        r.set(0xF0)
+        r.set_bits(0x0F)
+        r.clear_bits(0x30)
+        print(r.get(), r.bits_set(0x0F), r.bits_set(0x30))
+        f = Field.new(8, 12)
+        r.set_field(f, 0xABC)
+        print(r.get_field(f), r.get(), f.mask())
+        r.offset(1).set(7)
+        print(cells[1], r.offset(1).get())
+        print(r.wait_bits_set(0x1, 5), r.wait_bits_clear(0x1, 5))
+        b = reg8(base)
+        b.modify(0xF0, 0x55)
+        print(b.get())
+    pin = mock_pin(false)
+    d = mock_delay()
+    blink(pin, d, 5)
+    print(pin.is_high(), pin.changes, d.total_us)
+    bus = mock_bus(0x48, [1, 44])
+    print(read_temp(bus), bus.written.len)
+    absent = mock_bus(0x10, [1])
+    print(read_temp(absent))
+    u = mock_uart()
+    print(echo(u))

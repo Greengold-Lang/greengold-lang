@@ -15,11 +15,12 @@ from .ast_nodes import (
     CopyExpr, BorrowExpr, Expr, ExprStmt, FieldAccess, FloatLit, For, ForIn, FormatStr, FuncDecl, If, IndexAccess, IntLit, Name, Pass,
     Program, Return, SoaExpr, Stmt, StrLit, StructLit, Unary, VarDecl, While, Yield, Match, MethodCall, RangePat,
 )
-from .typeinfo import array_info, is_array_type
+from .typeinfo import array_info, is_array_type, is_fn_type
 
-BITS = {"i8": 8, "i16": 16, "i32": 32, "i64": 64, "isize": 64, "u8": 8, "u16": 16, "u32": 32, "u64": 64, "usize": 64}
-SIGNED = {"i8", "i16", "i32", "i64", "isize"}
-FLOATS = {"f32", "f64"}
+BITS = {"i8": 8, "i16": 16, "i32": 32, "i64": 64, "i128": 128, "isize": 64, "u8": 8, "u16": 16, "u32": 32, "u64": 64,
+        "u128": 128, "usize": 64}
+SIGNED = {"i8", "i16", "i32", "i64", "i128", "isize"}
+FLOATS = {"f16", "f32", "f64"}
 STEP_LIMIT = 20_000_000
 # `str` methods usable at compile time: name -> (argument count, implementation)
 _STR_METHODS = {
@@ -33,6 +34,19 @@ _STR_METHODS = {
 
 class ComptimeError(Exception):
     pass
+
+
+class FnRef:
+    """A function used as a constant (its address is known at link time)."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, FnRef) and other.key == self.key
+
+    def __hash__(self) -> int:
+        return hash(self.key)
 
 
 class EnumVal:
@@ -72,6 +86,13 @@ def wrap_int(v: int, ty: str) -> int:
     if ty in SIGNED and v >= 1 << (bits - 1):
         v -= 1 << bits
     return v
+
+
+def round_f16(v: float) -> float:
+    try:
+        return _struct.unpack("e", _struct.pack("e", v))[0]
+    except OverflowError:
+        return float("inf") if v > 0 else float("-inf")
 
 
 def round_f32(v: float) -> float:
@@ -137,7 +158,7 @@ class Interp:
                 r = float("nan") if b == 0 else a - b * int(a / b)
             else:
                 raise ComptimeError(f"'{op}' is not supported for float")
-            return round_f32(r) if ty == "f32" else r
+            return round_f16(r) if ty == "f16" else round_f32(r) if ty == "f32" else r
         if ty == "bool":
             return {"&": a and b, "|": a or b, "^": a != b}[op]
         if op == "+": r = a + b
@@ -177,7 +198,7 @@ class Interp:
         if isinstance(e, IntLit):
             return float(e.value) if e.ty in FLOATS else e.value
         if isinstance(e, FloatLit):
-            return round_f32(float(e.text)) if e.ty == "f32" else float(e.text)
+            return round_f16(float(e.text)) if e.ty == "f16" else round_f32(float(e.text)) if e.ty == "f32" else float(e.text)
         if isinstance(e, BoolLit):
             return e.value
         if isinstance(e, CharLit):
@@ -185,6 +206,8 @@ class Interp:
         if isinstance(e, StrLit):
             return e.value
         if isinstance(e, Name):
+            if getattr(e, "func_ref", False) and e.name not in env:
+                return FnRef(getattr(e, "func_key", e.name))
             if e.name in env:
                 return env[e.name]
             if e.name in self.const_decls:
@@ -275,6 +298,8 @@ class Interp:
             return 0
         if ty == "str":
             return ""
+        if is_fn_type(ty):
+            return None                 # a function address is filled in by the initializer
         if is_array_type(ty):
             n, el = array_info(ty)
             return [self.zero(el) for _ in range(n)]
@@ -286,7 +311,7 @@ class Interp:
     def _cast(self, v: Any, src: str, dst: str) -> Any:
         if dst in FLOATS:
             r = float(v)
-            return round_f32(r) if dst == "f32" else r
+            return round_f16(r) if dst == "f16" else round_f32(r) if dst == "f32" else r
         if dst == "bool":
             return bool(v)
         if dst in BITS:

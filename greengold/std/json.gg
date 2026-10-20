@@ -7,12 +7,19 @@
 #     out = json.object()
 #     out.set("ok", Json.Bool(true))
 #     print(out.to_text())                                # {"ok":true}
+#
+# Numbers keep their exactness. A whole number that fits 64 bits is `Int` (so a 64-bit id or a timestamp in nanoseconds
+# survives). A number with a fraction or exponent is `Num`, an `f64`, when that holds it and prints back as written. Any
+# other number (a longer integer, a decimal with more digits, or digits that print differently, like `0.10` or `1.5e3`) is `Dec`,
+# kept as the exact text: read it with `number_text()` and pass that to `std.decimal` or `std.bigint`. Writing a `Dec` writes the text back.
 
 public
 enum Json:
     Null
     Bool(bool)
+    Int(i64)
     Num(f64)
+    Dec(string)
     Str(string)
     Arr(List[Json])
     Obj(List[Member])
@@ -27,6 +34,17 @@ fn object() -> Json:
 
 fn array() -> Json:
     return Json.Arr(List[Json]())
+
+fn integer(n: i64) -> Json:
+    return Json.Int(n)
+
+# A number given as exact digits (`"19.99"`, `"12345678901234567890"`); anything but a JSON number is `Null`.
+fn number_from_text(t: str) -> Json:
+    r = _JsonReader.new(t)
+    v = _read_number(r)
+    if not r.finish():
+        return Json.Null
+    return v
 
 fn text(s: str) -> Json:
     return Json.Str(string.from(s))
@@ -93,11 +111,29 @@ impl Json:
     fn as_f64(self: read Self) -> Optional[f64]:
         match self:
             Num(x): return Valid(x)
+            Int(n): return Valid(f64(n))
+            Dec(t): return t.as_str().parse_float()
+            _: return None
+
+    # The number as written: exact for `Int` and `Dec`, the printed value for `Num`; `None` for anything but a number.
+    fn number_text(self: read Self) -> Optional[string]:
+        match self:
+            Int(n):
+                out = string.new()
+                out.append_i64(n)
+                return Valid(out)
+            Num(x):
+                out = string.new()
+                _json_number(out, x)
+                return Valid(out)
+            Dec(t): return Valid(t.clone())
             _: return None
 
     # The number when it is a whole number that fits in `i64`.
     fn as_i64(self: read Self) -> Optional[i64]:
         match self:
+            Int(n): return Valid(n)
+            Dec(t): return t.as_str().parse_int()
             Num(x):
                 if x == f64(i64(x)) and x >= -9.2e18 and x <= 9.2e18:
                     return Valid(i64(x))
@@ -117,6 +153,8 @@ impl Json:
     fn as_f64_or(self: read Self, fallback: f64) -> f64:
         match self:
             Num(x): return x
+            Int(n): return f64(n)
+            Dec(t): return t.as_str().parse_float().value_or(fallback)
             _: return fallback
 
     fn as_str_or(self: read Self, fallback: str) -> string:
@@ -198,9 +236,39 @@ fn _read(r: lend _JsonReader, depth: i32) -> Json:
             r.fail("expected a value")
         return Json.Null
     if c == '-' or (c >= '0' and c <= '9'):
-        return Json.Num(r.read_f64())
+        return _read_number(r)
     r.fail("expected a value")
     return Json.Null
+
+fn _read_number(r: lend _JsonReader) -> Json:
+    t = r.number_text()
+    if t.len == 0:
+        r.fail("malformed number")
+        return Json.Null
+    whole = true
+    digits = 0
+    for i in 0..t.len:
+        c = t[i]
+        if c == '.' or c == 'e' or c == 'E':
+            whole = false
+        if c >= '0' and c <= '9' and (digits > 0 or c != '0'):
+            digits += 1
+    if whole:
+        match t.parse_int():
+            Valid(v): return Json.Int(v)
+            None: return Json.Dec(string.from(t))
+    if digits > 15:
+        return Json.Dec(string.from(t))
+    match t.parse_float():
+        Valid(v):
+            shown = string.new()
+            _json_number(shown, v)
+            if shown.as_str() != t:
+                return Json.Dec(string.from(t))   # `0.10`, `1.5e3`: the digits as written matter
+            return Json.Num(v)
+        None:
+            r.fail("malformed number")
+            return Json.Null
 
 fn _indent(out: lend string, pretty: bool, depth: i32):
     if pretty:
@@ -212,7 +280,9 @@ fn _write(j: read Json, out: lend string, pretty: bool, depth: i32):
     match j:
         Null: out.append_str("null")
         Bool(b): out.append_str(if b then "true" else "false")
+        Int(n): out.append_i64(n)
         Num(x): _json_number(out, x)
+        Dec(t): out.append_str(t.as_str())
         Str(s): _json_escape(out, s.as_str())
         Arr(items):
             out.append_byte('[')

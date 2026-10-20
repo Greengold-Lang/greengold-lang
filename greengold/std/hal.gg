@@ -1,0 +1,169 @@
+# std.hal: the interfaces that drivers and applications share, so that a sensor driver written once runs on any board.
+#
+# A driver takes the interface it needs as a generic parameter:
+#
+#     import std.hal { I2c, Delay }
+#     fn read_temperature[B: I2c, D: Delay](bus: lend B, delay: lend D) -> Optional[i32]:
+#         if not bus.write(0x48, [0]):
+#             return None
+#         delay.delay_us(1000)
+#         ...
+#
+# A board support package implements these features for its peripherals (a type has the methods; no `impl ... for`). The
+# types `MockPin`, `MockBus` and `MockDelay` here record what was done, for testing a driver on a desktop.
+#
+# Every call that can fail reports it (`false`, or `None`); none of them panics or blocks forever by itself.
+
+# A pin that can be driven.
+feature OutputPin:
+    fn set_high(self: lend Self)
+    fn set_low(self: lend Self)
+    fn is_set_high(self: read Self) -> bool
+
+    fn set(self: lend Self, high: bool):
+        if high:
+            self.set_high()
+        else:
+            self.set_low()
+
+    fn toggle(self: lend Self):
+        if self.is_set_high():
+            self.set_low()
+        else:
+            self.set_high()
+
+# A pin that can be read.
+feature InputPin:
+    fn is_high(self: read Self) -> bool
+
+    fn is_low(self: read Self) -> bool:
+        return not self.is_high()
+
+# Waiting.
+feature Delay:
+    fn delay_us(self: lend Self, us: u32)
+
+    fn delay_ms(self: lend Self, ms: u32):
+        for _ in 0..ms:
+            self.delay_us(1000)
+
+# An I2C bus controller. `address` is the 7-bit device address.
+feature I2c:
+    # Writes `bytes` to the device. False if the device did not acknowledge.
+    fn write(self: lend Self, address: u8, bytes: []u8) -> bool
+
+    # Writes `bytes`, then reads `read_len` bytes with a repeated start. `None` if the device did not answer.
+    fn write_read(self: lend Self, address: u8, bytes: []u8, read_len: usize) -> Optional[List[u8]]
+
+# An SPI bus (full duplex, one chip select handled by the caller).
+feature SpiBus:
+    # Sends `bytes` and returns the bytes that came back in the same clock cycles (same length).
+    fn transfer(self: lend Self, bytes: []u8) -> List[u8]
+
+# A serial port.
+feature Uart:
+    fn write_byte(self: lend Self, b: u8) -> bool
+
+    # The next received byte, or `None` if none arrives within `timeout_us`.
+    fn read_byte(self: lend Self, timeout_us: u32) -> Optional[u8]
+
+# -- test doubles ---------------------------------------------------------------------------------------------------
+
+# A pin whose history is kept: `level` now, and `changes` since the start.
+struct MockPin:
+    level: bool
+    changes: usize
+
+fn mock_pin(initial: bool) -> MockPin:
+    return MockPin{ level: initial, changes: 0 }
+
+impl MockPin:
+    fn set_high(self: lend Self):
+        if not self.level:
+            self.changes += 1
+        self.level = true
+
+    fn set_low(self: lend Self):
+        if self.level:
+            self.changes += 1
+        self.level = false
+
+    fn is_set_high(self: read Self) -> bool:
+        return self.level
+
+    fn is_high(self: read Self) -> bool:
+        return self.level
+
+# A delay that only adds up how long it was asked to wait.
+struct MockDelay:
+    total_us: u64
+
+fn mock_delay() -> MockDelay:
+    return MockDelay{ total_us: 0 }
+
+impl MockDelay:
+    fn delay_us(self: lend Self, us: u32):
+        self.total_us += u64(us)
+
+# An I2C device that answers every read with the bytes in `reply`, and remembers what it was sent.
+struct MockBus:
+    present: u8
+    reply: List[u8]
+    written: List[u8]
+
+fn mock_bus(present_address: u8, reply: []u8) -> MockBus:
+    r = List[u8]()
+    for b in reply:
+        r.push(b)
+    return MockBus{ present: present_address, reply: r, written: List[u8]() }
+
+impl MockBus:
+    fn write(self: lend Self, address: u8, bytes: []u8) -> bool:
+        if address != self.present:
+            return false
+        for b in bytes:
+            self.written.push(b)
+        return true
+
+    fn write_read(self: lend Self, address: u8, bytes: []u8, read_len: usize) -> Optional[List[u8]]:
+        if address != self.present:
+            return None
+        for b in bytes:
+            self.written.push(b)
+        out = List[u8]()
+        for i in 0..read_len:
+            if i < self.reply.len:
+                out.push(self.reply[i])
+            else:
+                out.push(0)
+        return Valid(out)
+
+    fn transfer(self: lend Self, bytes: []u8) -> List[u8]:
+        out = List[u8]()
+        for i in 0..bytes.len:
+            self.written.push(bytes[i])
+            if i < self.reply.len:
+                out.push(self.reply[i])
+            else:
+                out.push(0)
+        return out
+
+# A serial port connected to itself: what is written can be read back.
+struct MockUart:
+    queue: List[u8]
+    head: usize
+
+fn mock_uart() -> MockUart:
+    return MockUart{ queue: List[u8](), head: 0 }
+
+impl MockUart:
+    fn write_byte(self: lend Self, b: u8) -> bool:
+        self.queue.push(b)
+        return true
+
+    fn read_byte(self: lend Self, timeout_us: u32) -> Optional[u8]:
+        if self.head >= self.queue.len:
+            return None
+        b = self.queue[self.head]
+        self.head += 1
+        return Valid(b)

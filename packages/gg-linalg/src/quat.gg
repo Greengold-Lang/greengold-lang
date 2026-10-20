@@ -1,0 +1,118 @@
+# linalg.quat: unit quaternions for attitude. A rotation is four numbers, has no gimbal lock, and composes with `*`.
+#
+#     import linalg.quat { Quat }
+#     import linalg.vec3 { Vec3 }
+#     q = Quat.from_euler(0.0, 0.0, 1.5707963267948966)        # roll, pitch, yaw in radians (aerospace ZYX order)
+#     v = q.rotate(Vec3{ x: 1.0, y: 0.0, z: 0.0 })             # about (0, 1, 0)
+#     q = q.integrate(Vec3{ x: 0.0, y: 0.0, z: 0.1 }, 0.01)    # advance by a gyro rate (rad/s, body frame) for 10 ms
+#
+# `q * r` applies `r` first, then `q` (the Hamilton product). `rotate` turns a body-frame vector into the reference frame;
+# `rotate_inverse` goes the other way. After many `integrate` steps call `normalized` to remove the rounding drift.
+
+import "vec3.gg" { Vec3 }
+import std.math
+
+public
+struct Quat:
+    w: f64
+    x: f64
+    y: f64
+    z: f64
+
+impl Quat:
+    public
+    fn identity() -> Quat:
+        return Quat{ w: 1.0, x: 0.0, y: 0.0, z: 0.0 }
+
+    # A rotation of `angle` radians about `axis` (the axis need not have length 1; a zero axis gives the identity).
+    fn from_axis_angle(axis: Vec3, angle: f64) -> Quat:
+        n = axis.norm()
+        if n == 0.0:
+            return Quat.identity()
+        s = math.sin(angle / 2.0) / n
+        return Quat{ w: math.cos(angle / 2.0), x: axis.x * s, y: axis.y * s, z: axis.z * s }
+
+    # From roll (about x), pitch (about y), yaw (about z), applied in the order yaw, pitch, roll.
+    fn from_euler(roll: f64, pitch: f64, yaw: f64) -> Quat:
+        cr = math.cos(roll / 2.0)
+        sr = math.sin(roll / 2.0)
+        cp = math.cos(pitch / 2.0)
+        sp = math.sin(pitch / 2.0)
+        cy = math.cos(yaw / 2.0)
+        sy = math.sin(yaw / 2.0)
+        return Quat{ w: cr * cp * cy + sr * sp * sy, x: sr * cp * cy - cr * sp * sy,
+                     y: cr * sp * cy + sr * cp * sy, z: cr * cp * sy - sr * sp * cy }
+
+    # (roll, pitch, yaw) in radians as a vector. Pitch is clamped to +-pi/2 at the poles.
+    fn to_euler(self: read Self) -> Vec3:
+        roll = math.atan2(2.0 * (self.w * self.x + self.y * self.z), 1.0 - 2.0 * (self.x * self.x + self.y * self.y))
+        sinp = 2.0 * (self.w * self.y - self.z * self.x)
+        if sinp > 1.0:
+            sinp = 1.0
+        if sinp < -1.0:
+            sinp = -1.0
+        pitch = math.asin(sinp)
+        yaw = math.atan2(2.0 * (self.w * self.z + self.x * self.y), 1.0 - 2.0 * (self.y * self.y + self.z * self.z))
+        return Vec3{ x: roll, y: pitch, z: yaw }
+
+    # The Hamilton product: the rotation `o` followed by this one.
+    fn mul(self: read Self, o: Quat) -> Quat:
+        return Quat{
+            w: self.w * o.w - self.x * o.x - self.y * o.y - self.z * o.z,
+            x: self.w * o.x + self.x * o.w + self.y * o.z - self.z * o.y,
+            y: self.w * o.y - self.x * o.z + self.y * o.w + self.z * o.x,
+            z: self.w * o.z + self.x * o.y - self.y * o.x + self.z * o.w }
+
+    fn conj(self: read Self) -> Quat:
+        return Quat{ w: self.w, x: -self.x, y: -self.y, z: -self.z }
+
+    fn dot(self: read Self, o: Quat) -> f64:
+        return self.w * o.w + self.x * o.x + self.y * o.y + self.z * o.z
+
+    fn norm(self: read Self) -> f64:
+        return math.sqrt(self.dot(self))
+
+    # The quaternion of length 1 (the identity when the length is 0).
+    fn normalized(self: read Self) -> Quat:
+        n = self.norm()
+        if n == 0.0:
+            return Quat.identity()
+        return Quat{ w: self.w / n, x: self.x / n, y: self.y / n, z: self.z / n }
+
+    fn eq(self: read Self, o: Quat) -> bool:
+        return self.w == o.w and self.x == o.x and self.y == o.y and self.z == o.z
+
+    # Rotates `v` by this (unit) quaternion.
+    fn rotate(self: read Self, v: Vec3) -> Vec3:
+        u = Vec3{ x: self.x, y: self.y, z: self.z }
+        t = u.cross(v).scale(2.0)
+        return v.add(t.scale(self.w)).add(u.cross(t))
+
+    # Rotates `v` by the opposite rotation.
+    fn rotate_inverse(self: read Self, v: Vec3) -> Vec3:
+        return self.conj().rotate(v)
+
+    # The rotation after turning at body rate `omega` (rad/s) for `dt` seconds. Exact for a constant rate over the step.
+    fn integrate(self: read Self, omega: Vec3, dt: f64) -> Quat:
+        n = omega.norm()
+        if n == 0.0:
+            return Quat{ w: self.w, x: self.x, y: self.y, z: self.z }
+        step = Quat.from_axis_angle(omega, n * dt)
+        return self.mul(step)
+
+    # Spherical interpolation along the shortest arc: t = 0 gives this rotation, t = 1 gives `o`.
+    fn slerp(self: read Self, o: Quat, t: f64) -> Quat:
+        c = self.dot(o)
+        b = Quat{ w: o.w, x: o.x, y: o.y, z: o.z }
+        if c < 0.0:
+            c = -c
+            b = Quat{ w: -o.w, x: -o.x, y: -o.y, z: -o.z }
+        if c > 0.9995:
+            r = Quat{ w: self.w + (b.w - self.w) * t, x: self.x + (b.x - self.x) * t,
+                      y: self.y + (b.y - self.y) * t, z: self.z + (b.z - self.z) * t }
+            return r.normalized()
+        theta = math.acos(c)
+        s = math.sin(theta)
+        wa = math.sin((1.0 - t) * theta) / s
+        wb = math.sin(t * theta) / s
+        return Quat{ w: self.w * wa + b.w * wb, x: self.x * wa + b.x * wb, y: self.y * wa + b.y * wb, z: self.z * wa + b.z * wb }

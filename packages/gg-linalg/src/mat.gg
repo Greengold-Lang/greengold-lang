@@ -1,0 +1,188 @@
+# linalg.mat: matrices whose size is part of the type. `Mat[3, 2]` times `Mat[2, 4]` is a `Mat[3, 4]`, and a product with the wrong
+# inner size does not compile. The storage is a plain array: no heap, no allocation, usable with `--no-std` and `--forbid-heap`.
+#
+#     import linalg.mat { Mat }
+#     a = Mat[2, 2].identity()
+#     b = Mat[2, 2].from_rows([[1.0, 2.0], [3.0, 4.0]])
+#     c = mat.matmul(a, b)               # Mat[2, 2]
+#     inv = b.inverse().value_or_panic() # Optional: None when singular
+#
+# Import the type by name, as above (`import m { Type }`): a type with two size arguments cannot be written through the module name.
+# The elements are `f64`. `inverse` and `solve` use Gauss-Jordan elimination with partial pivoting and report a singular matrix
+# (a pivot with magnitude under `SINGULAR_LIMIT` times the largest entry) as `None` instead of dividing by zero.
+
+import std.math
+
+public
+const SINGULAR_LIMIT: f64 = 1.0e-12
+
+struct Mat[R: usize, C: usize]:
+    a: [R][C]f64
+
+impl Mat[R, C]:
+    # All zeros.
+    public
+    fn zero() -> Mat[R, C]:
+        return Mat[R, C]{ a: [[0.0; C]; R] }
+
+    # The identity (for a square matrix; a rectangular one gets ones on the main diagonal).
+    fn identity() -> Mat[R, C]:
+        m = Mat[R, C]{ a: [[0.0; C]; R] }
+        n = R
+        if C < R:
+            n = C
+        for i in 0..n:
+            m.a[usize(i)][usize(i)] = 1.0
+        return m
+
+    # Builds a matrix from rows written as an array of arrays.
+    fn from_rows(rows: [R][C]f64) -> Mat[R, C]:
+        return Mat[R, C]{ a: rows }
+
+    fn rows(self: read Self) -> usize:
+        return R
+
+    fn cols(self: read Self) -> usize:
+        return C
+
+    fn get(self: read Self, i: usize, j: usize) -> f64:
+        return self.a[i][j]
+
+    fn set(self: lend Self, i: usize, j: usize, v: f64):
+        self.a[i][j] = v
+
+    fn add(self: read Self, o: Mat[R, C]) -> Mat[R, C]:
+        m = Mat[R, C]{ a: [[0.0; C]; R] }
+        for i in 0..R:
+            for j in 0..C:
+                m.a[usize(i)][usize(j)] = self.a[usize(i)][usize(j)] + o.a[usize(i)][usize(j)]
+        return m
+
+    fn sub(self: read Self, o: Mat[R, C]) -> Mat[R, C]:
+        m = Mat[R, C]{ a: [[0.0; C]; R] }
+        for i in 0..R:
+            for j in 0..C:
+                m.a[usize(i)][usize(j)] = self.a[usize(i)][usize(j)] - o.a[usize(i)][usize(j)]
+        return m
+
+    fn scale(self: read Self, k: f64) -> Mat[R, C]:
+        m = Mat[R, C]{ a: [[0.0; C]; R] }
+        for i in 0..R:
+            for j in 0..C:
+                m.a[usize(i)][usize(j)] = self.a[usize(i)][usize(j)] * k
+        return m
+
+    fn transpose(self: read Self) -> Mat[C, R]:
+        m = Mat[C, R]{ a: [[0.0; R]; C] }
+        for i in 0..R:
+            for j in 0..C:
+                m.a[usize(j)][usize(i)] = self.a[usize(i)][usize(j)]
+        return m
+
+    # The sum of the diagonal.
+    fn trace(self: read Self) -> f64:
+        n = R
+        if C < R:
+            n = C
+        s = 0.0
+        for i in 0..n:
+            s = s + self.a[usize(i)][usize(i)]
+        return s
+
+    # The largest absolute value of an element.
+    fn max_abs(self: read Self) -> f64:
+        best = 0.0
+        for i in 0..R:
+            for j in 0..C:
+                v = math.abs(self.a[usize(i)][usize(j)])
+                if v > best:
+                    best = v
+        return best
+
+    fn eq(self: read Self, o: Mat[R, C]) -> bool:
+        for i in 0..R:
+            for j in 0..C:
+                if self.a[usize(i)][usize(j)] != o.a[usize(i)][usize(j)]:
+                    return false
+        return true
+
+    # True when every element is within `tol` of the same element of `o`.
+    fn near(self: read Self, o: Mat[R, C], tol: f64) -> bool:
+        for i in 0..R:
+            for j in 0..C:
+                if math.abs(self.a[usize(i)][usize(j)] - o.a[usize(i)][usize(j)]) > tol:
+                    return false
+        return true
+
+    # The inverse of a square matrix, or None when it is singular. (A non-square matrix is a mistake: it panics.)
+    fn inverse(self: read Self) -> Optional[Mat[R, C]]:
+        if R != C:
+            panic("Mat.inverse: the matrix is not square")
+        work = self.a
+        inv = Mat[R, C].identity().a
+        limit = SINGULAR_LIMIT * self.max_abs()
+        for col in 0..R:
+            c = usize(col)
+            pivot = c
+            for r in (c + 1)..R:
+                if math.abs(work[usize(r)][c]) > math.abs(work[pivot][c]):
+                    pivot = usize(r)
+            if math.abs(work[pivot][c]) <= limit:
+                return None
+            if pivot != c:
+                tmp_w = work[pivot]
+                work[pivot] = work[c]
+                work[c] = tmp_w
+                tmp_i = inv[pivot]
+                inv[pivot] = inv[c]
+                inv[c] = tmp_i
+            d = work[c][c]
+            for j in 0..C:
+                work[c][usize(j)] = work[c][usize(j)] / d
+                inv[c][usize(j)] = inv[c][usize(j)] / d
+            for r in 0..R:
+                if usize(r) != c:
+                    f = work[usize(r)][c]
+                    if f != 0.0:
+                        for j in 0..C:
+                            work[usize(r)][usize(j)] = work[usize(r)][usize(j)] - f * work[c][usize(j)]
+                            inv[usize(r)][usize(j)] = inv[usize(r)][usize(j)] - f * inv[c][usize(j)]
+        return Valid(Mat[R, C]{ a: inv })
+
+    # The determinant of a square matrix (Gaussian elimination with partial pivoting).
+    fn det(self: read Self) -> f64:
+        if R != C:
+            panic("Mat.det: the matrix is not square")
+        work = self.a
+        d = 1.0
+        for col in 0..R:
+            c = usize(col)
+            pivot = c
+            for r in (c + 1)..R:
+                if math.abs(work[usize(r)][c]) > math.abs(work[pivot][c]):
+                    pivot = usize(r)
+            if work[pivot][c] == 0.0:
+                return 0.0
+            if pivot != c:
+                tmp = work[pivot]
+                work[pivot] = work[c]
+                work[c] = tmp
+                d = -d
+            d = d * work[c][c]
+            for r in (c + 1)..R:
+                f = work[usize(r)][c] / work[c][c]
+                for j in c..C:
+                    work[usize(r)][j] = work[usize(r)][j] - f * work[c][j]
+        return d
+
+public
+# The matrix product: (R x C) times (C x K) is (R x K). A method cannot have type parameters of its own, so this is a function.
+fn matmul[R: usize, C: usize, K: usize](a: Mat[R, C], b: Mat[C, K]) -> Mat[R, K]:
+    m = Mat[R, K]{ a: [[0.0; K]; R] }
+    for i in 0..R:
+        for j in 0..K:
+            s = 0.0
+            for k in 0..C:
+                s = s + a.a[usize(i)][usize(k)] * b.a[usize(k)][usize(j)]
+            m.a[usize(i)][usize(j)] = s
+    return m

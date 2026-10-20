@@ -197,8 +197,13 @@ def _test_document(results: list[dict]) -> dict:
     }
 
 
-def cmd_test(paths: list[str], release: bool = False, as_json: bool = False) -> int:
+def cmd_test(paths: list[str], release: bool = False, as_json: bool = False, coverage: bool = False) -> int:
     files = collect_gg_files(paths)
+    cov_out = None
+    if coverage:
+        import os
+        cov_out = os.path.abspath(os.environ.get('GG_COV_OUT', '.gg-coverage'))
+        Path(cov_out).unlink(missing_ok=True)
     results: list[dict] = []
     for f in files:
         source = f.read_text(encoding="utf-8-sig")
@@ -213,7 +218,11 @@ def cmd_test(paths: list[str], release: bool = False, as_json: bool = False) -> 
                 cmd = [sys.executable, "-m", "greengold", "run", str(tmp)]
                 if release:
                     cmd.append("--release")
-                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=300)
+                env = None
+                if coverage:
+                    import os
+                    env = dict(os.environ, GG_COVERAGE="1", GG_COV_OUT=cov_out, GG_COV_REMAP=f"{tmp.resolve()}|{f.resolve()}")
+                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=300, env=env)
             finally:
                 tmp.unlink(missing_ok=True)
             message = "" if r.returncode == 0 else ((r.stderr or r.stdout).strip() or "failed")
@@ -240,6 +249,10 @@ def cmd_test(paths: list[str], release: bool = False, as_json: bool = False) -> 
         sys.stdout.write("\n")
     else:
         print(f"\ntest result: {'ok' if not failed else 'FAILED'}. {passed} passed; {failed} failed")
+    if coverage and cov_out and Path(cov_out).is_file() and not as_json:
+        from .coverage import run_report
+        print()
+        run_report(cov_out, False, None)
     return 1 if failed else 0
 
 

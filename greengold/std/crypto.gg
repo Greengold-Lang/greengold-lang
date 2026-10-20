@@ -1,0 +1,1085 @@
+# std.crypto: authenticated encryption, key exchange, and the small tools around them.
+#
+#     import std.crypto
+#     sealed = crypto.chacha20poly1305_seal(key, nonce, aad, message)      # ciphertext + 16-byte tag
+#     plain = crypto.chacha20poly1305_open(key, nonce, aad, sealed.as_slice())   # Optional: None if it was altered
+#     shared = crypto.x25519(my_secret, their_public)
+#
+# What is here: ChaCha20-Poly1305 (RFC 8439), AES-128/192/256-GCM (SP 800-38D), X25519 (RFC 7748), Ed25519 signatures
+# (RFC 8032), `constant_time_eq`,
+# `zeroize`, and random bytes from the operating system. Hashes, HMAC and key derivation are in `std.hash`.
+#
+# About side channels. Nothing here branches on a secret value or indexes memory with one: the AES S-box is computed
+# (GF(2^8) inversion), not looked up, GHASH multiplies bit by bit with masks, Poly1305 and X25519 use fixed-width limb
+# arithmetic. The price is speed: AES-GCM runs at about a megabyte per second. This is portable Greengold, not a
+# vetted library: it has no FIPS 140 validation, and no assurance against power or fault attacks. Use it where a
+# reviewed implementation is not available, and treat the test vectors in `tests/test_std_crypto.py` as the floor.
+#
+# Keys, nonces and tags are plain `[]u8` / `List[u8]`. NEVER reuse a (key, nonce) pair with ChaCha20-Poly1305 or AES-GCM.
+
+import std.rand
+import std.hash
+
+# -- tools ---------------------------------------------------------------------------------------------------
+
+# True when both have the same length and bytes, taking the same time whatever the bytes are. Use it to compare
+# MACs, tags, hashes, and passwords' derived keys.
+fn constant_time_eq(a: []u8, b: []u8) -> bool:
+    if a.len != b.len:
+        return false
+    diff: u8 = 0
+    for i in 0..a.len:
+        diff = diff | (a[i] ^ b[i])
+    return diff == 0
+
+# Overwrites the bytes with zeros in a way the optimizer may not remove (volatile stores). Call it on keys and
+# other secrets when you are done with them.
+fn zeroize(data: lend []u8):
+    unsafe:
+        p = addr_mut(data[0])
+        for i in 0..data.len:
+            volatile_write[u8](ptr_offset(p, isize(i)), 0)
+
+# `n` random bytes from the operating system's cryptographic source.
+fn random_bytes(n: usize) -> List[u8]:
+    return rand.secure_bytes(n)
+
+private
+fn _le32(d: []u8, at: usize) -> u32:
+    return u32(d[at]) | (u32(d[at + 1]) << 8) | (u32(d[at + 2]) << 16) | (u32(d[at + 3]) << 24)
+
+fn _put_le32(out: lend List[u8], v: u32):
+    out.push(u8(v & 255))
+    out.push(u8((v >> 8) & 255))
+    out.push(u8((v >> 16) & 255))
+    out.push(u8(v >> 24))
+
+fn _put_le64(out: lend List[u8], v: u64):
+    for i in 0..8:
+        out.push(u8((v >> u32(8 * i)) & 255))
+
+# -- ChaCha20 ----------------------------------------------------------------------------------------------------
+
+fn _rotl32(x: u32, n: u32) -> u32:
+    return (x << n) | (x >> (32 - n))
+
+fn _quarter(s: lend [16]u32, a: usize, b: usize, c: usize, d: usize):
+    overflow: wrap
+    s[a] = s[a] + s[b]
+    s[d] = _rotl32(s[d] ^ s[a], 16)
+    s[c] = s[c] + s[d]
+    s[b] = _rotl32(s[b] ^ s[c], 12)
+    s[a] = s[a] + s[b]
+    s[d] = _rotl32(s[d] ^ s[a], 8)
+    s[c] = s[c] + s[d]
+    s[b] = _rotl32(s[b] ^ s[c], 7)
+
+# One 64-byte block of the ChaCha20 keystream.
+fn _chacha_block(key: []u8, counter: u32, nonce: []u8) -> [64]u8:
+    overflow: wrap
+    init: [16]u32 = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    for i in 0..8:
+        init[4 + i] = _le32(key, usize(i) * 4)
+    init[12] = counter
+    for i in 0..3:
+        init[13 + i] = _le32(nonce, usize(i) * 4)
+    s = init
+    for _ in 0..10:
+        _quarter(s, 0, 4, 8, 12)
+        _quarter(s, 1, 5, 9, 13)
+        _quarter(s, 2, 6, 10, 14)
+        _quarter(s, 3, 7, 11, 15)
+        _quarter(s, 0, 5, 10, 15)
+        _quarter(s, 1, 6, 11, 12)
+        _quarter(s, 2, 7, 8, 13)
+        _quarter(s, 3, 4, 9, 14)
+    out: [64]u8 = [0; 64]
+    for i in 0..16:
+        v = s[i] + init[i]
+        out[i * 4] = u8(v & 255)
+        out[i * 4 + 1] = u8((v >> 8) & 255)
+        out[i * 4 + 2] = u8((v >> 16) & 255)
+        out[i * 4 + 3] = u8(v >> 24)
+    return out
+
+public
+# XORs `data` with the ChaCha20 keystream (encrypting and decrypting are the same). `key` is 32 bytes, `nonce` 12.
+fn chacha20_xor(key: []u8, nonce: []u8, counter: u32, data: []u8) -> List[u8]:
+    if key.len != 32 or nonce.len != 12:
+        panic("chacha20: the key is 32 bytes and the nonce 12")
+    out = List[u8]()
+    block: u32 = counter
+    pos: usize = 0
+    while pos < data.len:
+        ks = _chacha_block(key, block, nonce)
+        for i in 0..64:
+            if pos + usize(i) < data.len:
+                out.push(data[pos + usize(i)] ^ ks[i])
+        pos += 64
+        block = wrapping_add[u32](block, 1)
+    return out
+
+# -- Poly1305 ----------------------------------------------------------------------------------------------------
+
+private
+fn _poly1305(key: []u8, msg: []u8) -> [16]u8:
+    # 130-bit arithmetic in five 26-bit limbs (the "donna" layout); every product fits in a u64
+    mask: u64 = 0x3ffffff
+    r0: u64 = u64(_le32(key, 0)) & 0x3ffffff
+    r1: u64 = (u64(_le32(key, 3)) >> 2) & 0x3ffff03
+    r2: u64 = (u64(_le32(key, 6)) >> 4) & 0x3ffc0ff
+    r3: u64 = (u64(_le32(key, 9)) >> 6) & 0x3f03fff
+    r4: u64 = (u64(_le32(key, 12)) >> 8) & 0x00fffff
+    s1: u64 = r1 * 5
+    s2: u64 = r2 * 5
+    s3: u64 = r3 * 5
+    s4: u64 = r4 * 5
+    h0: u64 = 0
+    h1: u64 = 0
+    h2: u64 = 0
+    h3: u64 = 0
+    h4: u64 = 0
+    pos: usize = 0
+    while pos < msg.len:
+        chunk: [17]u8 = [0; 17]
+        n = msg.len - pos
+        if n > 16:
+            n = 16
+        for i in 0..n:
+            chunk[i] = msg[pos + i]
+        hibit: u64 = 1 << 24
+        if n < 16:
+            chunk[n] = 1
+            hibit = 0
+        h0 += u64(_le32(chunk, 0)) & mask
+        h1 += (u64(_le32(chunk, 3)) >> 2) & mask
+        h2 += (u64(_le32(chunk, 6)) >> 4) & mask
+        h3 += (u64(_le32(chunk, 9)) >> 6) & mask
+        h4 += (u64(_le32(chunk, 12)) >> 8) | hibit
+        d0 = h0 * r0 + h1 * s4 + h2 * s3 + h3 * s2 + h4 * s1
+        d1 = h0 * r1 + h1 * r0 + h2 * s4 + h3 * s3 + h4 * s2
+        d2 = h0 * r2 + h1 * r1 + h2 * r0 + h3 * s4 + h4 * s3
+        d3 = h0 * r3 + h1 * r2 + h2 * r1 + h3 * r0 + h4 * s4
+        d4 = h0 * r4 + h1 * r3 + h2 * r2 + h3 * r1 + h4 * r0
+        c = d0 >> 26
+        h0 = d0 & mask
+        d1 += c
+        c = d1 >> 26
+        h1 = d1 & mask
+        d2 += c
+        c = d2 >> 26
+        h2 = d2 & mask
+        d3 += c
+        c = d3 >> 26
+        h3 = d3 & mask
+        d4 += c
+        c = d4 >> 26
+        h4 = d4 & mask
+        h0 += c * 5
+        c = h0 >> 26
+        h0 = h0 & mask
+        h1 += c
+        pos += 16
+    # full carry
+    c2 = h1 >> 26
+    h1 = h1 & mask
+    h2 += c2
+    c2 = h2 >> 26
+    h2 = h2 & mask
+    h3 += c2
+    c2 = h3 >> 26
+    h3 = h3 & mask
+    h4 += c2
+    c2 = h4 >> 26
+    h4 = h4 & mask
+    h0 += c2 * 5
+    c2 = h0 >> 26
+    h0 = h0 & mask
+    h1 += c2
+    # compute h - p and select it when h >= p
+    g0 = h0 + 5
+    c2 = g0 >> 26
+    g0 = g0 & mask
+    g1 = h1 + c2
+    c2 = g1 >> 26
+    g1 = g1 & mask
+    g2 = h2 + c2
+    c2 = g2 >> 26
+    g2 = g2 & mask
+    g3 = h3 + c2
+    c2 = g3 >> 26
+    g3 = g3 & mask
+    g4 = wrapping_sub[u64](h4 + c2, 1 << 26)
+    sel = wrapping_sub[u64](g4 >> 63, 1)       # all ones when g4 did not go negative (h >= p)
+    nsel = ~sel
+    h0 = (h0 & nsel) | (g0 & sel)
+    h1 = (h1 & nsel) | (g1 & sel)
+    h2 = (h2 & nsel) | (g2 & sel)
+    h3 = (h3 & nsel) | (g3 & sel)
+    h4 = (h4 & nsel) | (g4 & sel & mask)
+    # h = h mod 2^128, as four 32-bit words
+    w0: u64 = (h0 | (h1 << 26)) & 0xffffffff
+    w1: u64 = ((h1 >> 6) | (h2 << 20)) & 0xffffffff
+    w2: u64 = ((h2 >> 12) | (h3 << 14)) & 0xffffffff
+    w3: u64 = ((h3 >> 18) | (h4 << 8)) & 0xffffffff
+    # add the pad (key[16..32])
+    f: u64 = w0 + u64(_le32(key, 16))
+    w0 = f & 0xffffffff
+    f = w1 + u64(_le32(key, 20)) + (f >> 32)
+    w1 = f & 0xffffffff
+    f = w2 + u64(_le32(key, 24)) + (f >> 32)
+    w2 = f & 0xffffffff
+    f = w3 + u64(_le32(key, 28)) + (f >> 32)
+    w3 = f & 0xffffffff
+    out: [16]u8 = [0; 16]
+    for i in 0..4:
+        out[i] = u8((w0 >> u32(8 * i)) & 255)
+        out[4 + i] = u8((w1 >> u32(8 * i)) & 255)
+        out[8 + i] = u8((w2 >> u32(8 * i)) & 255)
+        out[12 + i] = u8((w3 >> u32(8 * i)) & 255)
+    return out
+
+fn _pad16(out: lend List[u8]):
+    while out.len % 16 != 0:
+        out.push(0)
+
+fn _aead_mac_data(aad: []u8, ct: []u8) -> List[u8]:
+    m = List[u8]()
+    for b in aad:
+        m.push(b)
+    _pad16(m)
+    for b in ct:
+        m.push(b)
+    _pad16(m)
+    _put_le64(m, u64(aad.len))
+    _put_le64(m, u64(ct.len))
+    return m
+
+public
+# Encrypts and authenticates: returns the ciphertext followed by the 16-byte tag. `key` is 32 bytes, `nonce` 12.
+fn chacha20poly1305_seal(key: []u8, nonce: []u8, aad: []u8, plaintext: []u8) -> List[u8]:
+    if key.len != 32 or nonce.len != 12:
+        panic("chacha20poly1305: the key is 32 bytes and the nonce 12")
+    otk = _chacha_block(key, 0, nonce)
+    ct = chacha20_xor(key, nonce, 1, plaintext)
+    tag = _poly1305(otk, _aead_mac_data(aad, ct))
+    for b in tag:
+        ct.push(b)
+    return ct
+
+# Checks the tag and decrypts. `None` when the message, the associated data, the key, or the nonce is not the one that
+# was sealed (nothing is decrypted before the tag is checked).
+fn chacha20poly1305_open(key: []u8, nonce: []u8, aad: []u8, sealed: []u8) -> Optional[List[u8]]:
+    if key.len != 32 or nonce.len != 12:
+        panic("chacha20poly1305: the key is 32 bytes and the nonce 12")
+    if sealed.len < 16:
+        return None
+    n = sealed.len - 16
+    ct = sealed[0..n]
+    otk = _chacha_block(key, 0, nonce)
+    want = _poly1305(otk, _aead_mac_data(aad, ct))
+    if not constant_time_eq(want, sealed[n..sealed.len]):
+        return None
+    return Valid(chacha20_xor(key, nonce, 1, ct))
+
+# -- AES ----------------------------------------------------------------------------------------------------------
+
+private
+# GF(2^8) multiplication modulo x^8 + x^4 + x^3 + x + 1, with no branches on the operands.
+fn _gmul(a0: u8, b0: u8) -> u8:
+    a = a0
+    b = b0
+    p: u8 = 0
+    for _ in 0..8:
+        p = p ^ (a & (255 * (b & 1)))
+        hi = a >> 7
+        a = (a << 1) ^ (27 * hi)
+        b = b >> 1
+    return p
+
+# The AES S-box computed instead of looked up: the inverse x^254 in GF(2^8), then the affine map.
+fn _sbox(x: u8) -> u8:
+    r: u8 = 1
+    b = x
+    for i in 0..8:
+        if i >= 1:
+            r = _gmul(r, b)
+        b = _gmul(b, b)
+    s = r ^ ((r << 1) | (r >> 7)) ^ ((r << 2) | (r >> 6)) ^ ((r << 3) | (r >> 5)) ^ ((r << 4) | (r >> 4)) ^ 99
+    return s
+
+fn _xtime(a: u8) -> u8:
+    return (a << 1) ^ (27 * (a >> 7))
+
+# The expanded key: (rounds + 1) * 16 bytes.
+fn _aes_expand(key: []u8) -> List[u8]:
+    nk = key.len / 4
+    rounds = nk + 6
+    w = List[u8]()
+    for b in key:
+        w.push(b)
+    total = (rounds + 1) * 16
+    rcon: u8 = 1
+    i = nk
+    while i * 4 < total:
+        t0 = w[(i - 1) * 4]
+        t1 = w[(i - 1) * 4 + 1]
+        t2 = w[(i - 1) * 4 + 2]
+        t3 = w[(i - 1) * 4 + 3]
+        if i % nk == 0:
+            n0 = _sbox(t1) ^ rcon
+            n1 = _sbox(t2)
+            n2 = _sbox(t3)
+            n3 = _sbox(t0)
+            t0 = n0
+            t1 = n1
+            t2 = n2
+            t3 = n3
+            rcon = _xtime(rcon)
+        elif nk > 6 and i % nk == 4:
+            t0 = _sbox(t0)
+            t1 = _sbox(t1)
+            t2 = _sbox(t2)
+            t3 = _sbox(t3)
+        w.push(w[(i - nk) * 4] ^ t0)
+        w.push(w[(i - nk) * 4 + 1] ^ t1)
+        w.push(w[(i - nk) * 4 + 2] ^ t2)
+        w.push(w[(i - nk) * 4 + 3] ^ t3)
+        i += 1
+    return w
+
+fn _aes_encrypt_block(rk: []u8, rounds: usize, input: [16]u8) -> [16]u8:
+    s = input
+    for i in 0..16:
+        s[i] = s[i] ^ rk[i]
+    for round in 1..rounds + 1:
+        # SubBytes
+        for i in 0..16:
+            s[i] = _sbox(s[i])
+        # ShiftRows (state is column-major: s[c*4 + r])
+        t = s
+        for c in 0..4:
+            for r in 0..4:
+                s[c * 4 + r] = t[((c + r) % 4) * 4 + r]
+        # MixColumns, except in the last round
+        if round != rounds:
+            for c in 0..4:
+                a0 = s[c * 4]
+                a1 = s[c * 4 + 1]
+                a2 = s[c * 4 + 2]
+                a3 = s[c * 4 + 3]
+                s[c * 4] = _xtime(a0) ^ (_xtime(a1) ^ a1) ^ a2 ^ a3
+                s[c * 4 + 1] = a0 ^ _xtime(a1) ^ (_xtime(a2) ^ a2) ^ a3
+                s[c * 4 + 2] = a0 ^ a1 ^ _xtime(a2) ^ (_xtime(a3) ^ a3)
+                s[c * 4 + 3] = (_xtime(a0) ^ a0) ^ a1 ^ a2 ^ _xtime(a3)
+        for i in 0..16:
+            s[i] = s[i] ^ rk[round * 16 + usize(i)]
+    return s
+
+fn _be64(d: []u8, at: usize) -> u64:
+    r: u64 = 0
+    for i in 0..8:
+        r = (r << 8) | u64(d[at + i])
+    return r
+
+# GHASH multiplication in GF(2^128): x * h, with the bit-reflected convention of GCM. No branches on x or h.
+fn _ghash_mul(xh: u64, xl: u64, hh: u64, hl: u64) -> Tuple2[u64, u64]:
+    zh: u64 = 0
+    zl: u64 = 0
+    vh = hh
+    vl = hl
+    for i in 0..128:
+        bit: u64 = 0
+        if i < 64:
+            bit = (xh >> u32(63 - i)) & 1
+        else:
+            bit = (xl >> u32(127 - i)) & 1
+        m = wrapping_sub[u64](0, bit)
+        zh = zh ^ (vh & m)
+        zl = zl ^ (vl & m)
+        lsb = vl & 1
+        vl = (vl >> 1) | (vh << 63)
+        vh = vh >> 1
+        vh = vh ^ (0xE100000000000000 & wrapping_sub[u64](0, lsb))
+    return Tuple2{ f0: zh, f1: zl }
+
+fn _ghash(hh: u64, hl: u64, aad: []u8, ct: []u8) -> Tuple2[u64, u64]:
+    yh: u64 = 0
+    yl: u64 = 0
+    for part in 0..2:
+        data = aad
+        if part == 1:
+            data = ct
+        pos: usize = 0
+        while pos < data.len:
+            blk: [16]u8 = [0; 16]
+            n = data.len - pos
+            if n > 16:
+                n = 16
+            for i in 0..n:
+                blk[i] = data[pos + i]
+            yh = yh ^ _be64(blk, 0)
+            yl = yl ^ _be64(blk, 8)
+            m = _ghash_mul(yh, yl, hh, hl)
+            yh = m.f0
+            yl = m.f1
+            pos += 16
+    yh = yh ^ (u64(aad.len) * 8)
+    yl = yl ^ (u64(ct.len) * 8)
+    return _ghash_mul(yh, yl, hh, hl)
+
+fn _inc32(counter: lend [16]u8):
+    carry: u16 = 1
+    i = 15
+    while i >= 12:
+        v = u16(counter[i]) + carry
+        counter[i] = u8(v & 255)
+        carry = v >> 8
+        i -= 1
+
+fn _aes_ctr(rk: []u8, rounds: usize, j0: [16]u8, data: []u8) -> List[u8]:
+    ctr = j0
+    out = List[u8]()
+    pos: usize = 0
+    while pos < data.len:
+        _inc32(ctr)
+        ks = _aes_encrypt_block(rk, rounds, ctr)
+        for i in 0..16:
+            if pos + usize(i) < data.len:
+                out.push(data[pos + usize(i)] ^ ks[i])
+        pos += 16
+    return out
+
+fn _gcm_tag(rk: []u8, rounds: usize, j0: [16]u8, hh: u64, hl: u64, aad: []u8, ct: []u8) -> [16]u8:
+    g = _ghash(hh, hl, aad, ct)
+    ek = _aes_encrypt_block(rk, rounds, j0)
+    tag: [16]u8 = [0; 16]
+    for i in 0..8:
+        tag[i] = u8((g.f0 >> u32(56 - 8 * i)) & 255) ^ ek[i]
+        tag[8 + i] = u8((g.f1 >> u32(56 - 8 * i)) & 255) ^ ek[8 + i]
+    return tag
+
+public
+# AES-GCM with a 16-, 24-, or 32-byte key and a 12-byte nonce. Returns the ciphertext followed by the 16-byte tag.
+fn aes_gcm_seal(key: []u8, nonce: []u8, aad: []u8, plaintext: []u8) -> List[u8]:
+    if (key.len != 16 and key.len != 24 and key.len != 32) or nonce.len != 12:
+        panic("aes_gcm: the key is 16, 24 or 32 bytes and the nonce 12")
+    rk = _aes_expand(key)
+    rounds = key.len / 4 + 6
+    zero: [16]u8 = [0; 16]
+    h = _aes_encrypt_block(rk, rounds, zero)
+    hh = _be64(h, 0)
+    hl = _be64(h, 8)
+    j0: [16]u8 = [0; 16]
+    for i in 0..12:
+        j0[i] = nonce[i]
+    j0[15] = 1
+    ct = _aes_ctr(rk, rounds, j0, plaintext)
+    tag = _gcm_tag(rk, rounds, j0, hh, hl, aad, ct)
+    for b in tag:
+        ct.push(b)
+    return ct
+
+# Checks the tag and decrypts; `None` when anything differs from what was sealed.
+fn aes_gcm_open(key: []u8, nonce: []u8, aad: []u8, sealed: []u8) -> Optional[List[u8]]:
+    if (key.len != 16 and key.len != 24 and key.len != 32) or nonce.len != 12:
+        panic("aes_gcm: the key is 16, 24 or 32 bytes and the nonce 12")
+    if sealed.len < 16:
+        return None
+    n = sealed.len - 16
+    rk = _aes_expand(key)
+    rounds = key.len / 4 + 6
+    zero: [16]u8 = [0; 16]
+    h = _aes_encrypt_block(rk, rounds, zero)
+    hh = _be64(h, 0)
+    hl = _be64(h, 8)
+    j0: [16]u8 = [0; 16]
+    for i in 0..12:
+        j0[i] = nonce[i]
+    j0[15] = 1
+    ct = sealed[0..n]
+    want = _gcm_tag(rk, rounds, j0, hh, hl, aad, ct)
+    if not constant_time_eq(want, sealed[n..sealed.len]):
+        return None
+    return Valid(_aes_ctr(rk, rounds, j0, ct))
+
+public
+# Encrypts one 16-byte block with AES (ECB for a single block: building block for other modes, not a mode by itself).
+fn aes_encrypt_block(key: []u8, block: []u8) -> List[u8]:
+    if (key.len != 16 and key.len != 24 and key.len != 32) or block.len != 16:
+        panic("aes_encrypt_block: the key is 16, 24 or 32 bytes and the block 16")
+    rk = _aes_expand(key)
+    inp: [16]u8 = [0; 16]
+    for i in 0..16:
+        inp[i] = block[i]
+    out = _aes_encrypt_block(rk, key.len / 4 + 6, inp)
+    r = List[u8]()
+    for b in out:
+        r.push(b)
+    return r
+
+# -- X25519 -------------------------------------------------------------------------------------------------------
+
+private
+# Field elements of GF(2^255 - 19): five limbs of 51 bits (a little more between operations). Products go through u128.
+fn _fe_carry(a: [5]u64) -> [5]u64:
+    m: u64 = 0x7ffffffffffff
+    r = a
+    c = r[0] >> 51
+    r[0] = r[0] & m
+    r[1] += c
+    c = r[1] >> 51
+    r[1] = r[1] & m
+    r[2] += c
+    c = r[2] >> 51
+    r[2] = r[2] & m
+    r[3] += c
+    c = r[3] >> 51
+    r[3] = r[3] & m
+    r[4] += c
+    c = r[4] >> 51
+    r[4] = r[4] & m
+    r[0] += c * 19
+    c = r[0] >> 51
+    r[0] = r[0] & m
+    r[1] += c
+    return r
+
+fn _fe_add(a: [5]u64, b: [5]u64) -> [5]u64:
+    r: [5]u64 = [0; 5]
+    for i in 0..5:
+        r[i] = a[i] + b[i]
+    return r
+
+# a - b, with 2p added first so no limb goes negative.
+fn _fe_sub(a: [5]u64, b: [5]u64) -> [5]u64:
+    r: [5]u64 = [0; 5]
+    r[0] = a[0] + 0xfffffffffffda - b[0]
+    for i in 1..5:
+        r[i] = a[i] + 0xffffffffffffe - b[i]
+    return _fe_carry(r)
+
+fn _fe_mul(a: [5]u64, b: [5]u64) -> [5]u64:
+    a0 = u128(a[0])
+    a1 = u128(a[1])
+    a2 = u128(a[2])
+    a3 = u128(a[3])
+    a4 = u128(a[4])
+    b0 = u128(b[0])
+    b1 = u128(b[1])
+    b2 = u128(b[2])
+    b3 = u128(b[3])
+    b4 = u128(b[4])
+    t0 = a0 * b0 + 19 * (a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1)
+    t1 = a0 * b1 + a1 * b0 + 19 * (a2 * b4 + a3 * b3 + a4 * b2)
+    t2 = a0 * b2 + a1 * b1 + a2 * b0 + 19 * (a3 * b4 + a4 * b3)
+    t3 = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0 + 19 * (a4 * b4)
+    t4 = a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0
+    m: u128 = 0x7ffffffffffff
+    r: [5]u64 = [0; 5]
+    c = t0 >> 51
+    r[0] = u64(t0 & m)
+    t1 += c
+    c = t1 >> 51
+    r[1] = u64(t1 & m)
+    t2 += c
+    c = t2 >> 51
+    r[2] = u64(t2 & m)
+    t3 += c
+    c = t3 >> 51
+    r[3] = u64(t3 & m)
+    t4 += c
+    c = t4 >> 51
+    r[4] = u64(t4 & m)
+    r[0] += u64(c) * 19
+    c2 = r[0] >> 51
+    r[0] = r[0] & 0x7ffffffffffff
+    r[1] += c2
+    return r
+
+fn _fe_sq(a: [5]u64) -> [5]u64:
+    return _fe_mul(a, a)
+
+fn _fe_sq_n(a: [5]u64, n: u32) -> [5]u64:
+    r = a
+    for _ in 0..n:
+        r = _fe_sq(r)
+    return r
+
+fn _fe_mul_small(a: [5]u64, k: u64) -> [5]u64:
+    return _fe_mul(a, [k, 0, 0, 0, 0])
+
+# z^(p-2): the inverse, by the standard chain of squarings and multiplications.
+fn _fe_invert(z: [5]u64) -> [5]u64:
+    t0 = _fe_sq(z)
+    t1 = _fe_sq_n(t0, 2)
+    t1 = _fe_mul(z, t1)
+    t0 = _fe_mul(t0, t1)
+    t2 = _fe_sq(t0)
+    t1 = _fe_mul(t1, t2)
+    t2 = _fe_sq_n(t1, 5)
+    t1 = _fe_mul(t2, t1)
+    t2 = _fe_sq_n(t1, 10)
+    t2 = _fe_mul(t2, t1)
+    t3 = _fe_sq_n(t2, 20)
+    t2 = _fe_mul(t3, t2)
+    t2 = _fe_sq_n(t2, 10)
+    t1 = _fe_mul(t2, t1)
+    t2 = _fe_sq_n(t1, 50)
+    t2 = _fe_mul(t2, t1)
+    t3 = _fe_sq_n(t2, 100)
+    t2 = _fe_mul(t3, t2)
+    t2 = _fe_sq_n(t2, 50)
+    t1 = _fe_mul(t2, t1)
+    t1 = _fe_sq_n(t1, 5)
+    return _fe_mul(t1, t0)
+
+# Swaps a and b when `swap` is 1, with no branch.
+fn _fe_cswap(swap: u64, a: lend [5]u64, b: lend [5]u64):
+    mask = wrapping_sub[u64](0, swap)
+    for i in 0..5:
+        x = mask & (a[i] ^ b[i])
+        a[i] = a[i] ^ x
+        b[i] = b[i] ^ x
+
+fn _fe_from_bytes(b: []u8) -> [5]u64:
+    # 32 little-endian bytes, the top bit ignored
+    words: [4]u64 = [0; 4]
+    for i in 0..4:
+        for j in 0..8:
+            words[i] = words[i] | (u64(b[i * 8 + j]) << u32(8 * j))
+    words[3] = words[3] & 0x7fffffffffffffff
+    m: u64 = 0x7ffffffffffff
+    r: [5]u64 = [0; 5]
+    r[0] = words[0] & m
+    r[1] = ((words[0] >> 51) | (words[1] << 13)) & m
+    r[2] = ((words[1] >> 38) | (words[2] << 26)) & m
+    r[3] = ((words[2] >> 25) | (words[3] << 39)) & m
+    r[4] = (words[3] >> 12) & m
+    return r
+
+fn _fe_to_bytes(a: [5]u64) -> List[u8]:
+    m: u64 = 0x7ffffffffffff
+    h = _fe_carry(_fe_carry(a))
+    # h is now below 2p; subtract p once when h >= p
+    q = (h[0] + 19) >> 51
+    q = (h[1] + q) >> 51
+    q = (h[2] + q) >> 51
+    q = (h[3] + q) >> 51
+    q = (h[4] + q) >> 51
+    h[0] += 19 * q
+    c = h[0] >> 51
+    h[0] = h[0] & m
+    h[1] += c
+    c = h[1] >> 51
+    h[1] = h[1] & m
+    h[2] += c
+    c = h[2] >> 51
+    h[2] = h[2] & m
+    h[3] += c
+    c = h[3] >> 51
+    h[3] = h[3] & m
+    h[4] += c
+    h[4] = h[4] & m
+    words: [4]u64 = [0; 4]
+    words[0] = h[0] | (h[1] << 51)
+    words[1] = (h[1] >> 13) | (h[2] << 38)
+    words[2] = (h[2] >> 26) | (h[3] << 25)
+    words[3] = (h[3] >> 39) | (h[4] << 12)
+    out = List[u8]()
+    for i in 0..4:
+        for j in 0..8:
+            out.push(u8((words[i] >> u32(8 * j)) & 255))
+    return out
+
+public
+# X25519 (RFC 7748): `scalar` and `point` are 32 bytes; returns the 32-byte shared secret. Use `x25519_base` for the
+# public key. Panics when the result is all zeros (a low-order point, which no honest peer sends).
+fn x25519(scalar: []u8, point: []u8) -> List[u8]:
+    if scalar.len != 32 or point.len != 32:
+        panic("x25519: scalar and point are 32 bytes")
+    k: [32]u8 = [0; 32]
+    for i in 0..32:
+        k[i] = scalar[i]
+    k[0] = k[0] & 248
+    k[31] = k[31] & 127
+    k[31] = k[31] | 64
+    x1 = _fe_from_bytes(point)
+    x2: [5]u64 = [1, 0, 0, 0, 0]
+    z2: [5]u64 = [0; 5]
+    x3 = x1
+    z3: [5]u64 = [1, 0, 0, 0, 0]
+    swap: u64 = 0
+    t = 255
+    while t > 0:
+        t -= 1
+        kt = u64((k[t / 8] >> u32(t % 8)) & 1)
+        swap = swap ^ kt
+        _fe_cswap(swap, x2, x3)
+        _fe_cswap(swap, z2, z3)
+        swap = kt
+        a = _fe_add(x2, z2)
+        aa = _fe_sq(a)
+        b = _fe_sub(x2, z2)
+        bb = _fe_sq(b)
+        e = _fe_sub(aa, bb)
+        c = _fe_add(x3, z3)
+        d = _fe_sub(x3, z3)
+        da = _fe_mul(d, a)
+        cb = _fe_mul(c, b)
+        x3 = _fe_sq(_fe_add(da, cb))
+        z3 = _fe_mul(x1, _fe_sq(_fe_sub(da, cb)))
+        x2 = _fe_mul(aa, bb)
+        z2 = _fe_mul(e, _fe_add(aa, _fe_mul_small(e, 121665)))
+    _fe_cswap(swap, x2, x3)
+    _fe_cswap(swap, z2, z3)
+    out = _fe_to_bytes(_fe_mul(x2, _fe_invert(z2)))
+    acc: u8 = 0
+    for b in out:
+        acc = acc | b
+    if acc == 0:
+        panic("x25519: the result is all zeros (a low-order point)")
+    return out
+
+# The public key for a 32-byte secret: X25519 with the base point (u = 9).
+fn x25519_base(scalar: []u8) -> List[u8]:
+    base = List[u8]()
+    base.push(9)
+    for _ in 0..31:
+        base.push(0)
+    return x25519(scalar, base)
+
+# -- Ed25519 ------------------------------------------------------------------------------------------------------
+
+private
+struct _Point:
+    x: [5]u64
+    y: [5]u64
+    z: [5]u64
+    t: [5]u64
+
+fn _fe_small(k: u64) -> [5]u64:
+    return [k, 0, 0, 0, 0]
+
+fn _fe_neg(a: [5]u64) -> [5]u64:
+    return _fe_sub(_fe_small(0), a)
+
+# Is the element zero (as a number mod p)? Compares the canonical bytes without branching on them.
+fn _fe_is_zero(a: [5]u64) -> bool:
+    b = _fe_to_bytes(a)
+    acc: u8 = 0
+    for x in b:
+        acc = acc | x
+    return acc == 0
+
+fn _fe_equal(a: [5]u64, b: [5]u64) -> bool:
+    return _fe_is_zero(_fe_sub(a, b))
+
+fn _fe_is_odd(a: [5]u64) -> u64:
+    b = _fe_to_bytes(a)
+    return u64(b[0] & 1)
+
+# z^((p-5)/8) = z^(2^252 - 3)
+fn _fe_pow22523(z: [5]u64) -> [5]u64:
+    t0 = _fe_sq(z)
+    t1 = _fe_sq_n(t0, 2)
+    t1 = _fe_mul(z, t1)
+    t0 = _fe_mul(t0, t1)
+    t0 = _fe_sq(t0)
+    t0 = _fe_mul(t1, t0)
+    t1 = _fe_sq_n(t0, 5)
+    t0 = _fe_mul(t1, t0)
+    t1 = _fe_sq_n(t0, 10)
+    t1 = _fe_mul(t1, t0)
+    t2 = _fe_sq_n(t1, 20)
+    t1 = _fe_mul(t2, t1)
+    t1 = _fe_sq_n(t1, 10)
+    t0 = _fe_mul(t1, t0)
+    t1 = _fe_sq_n(t0, 50)
+    t1 = _fe_mul(t1, t0)
+    t2 = _fe_sq_n(t1, 100)
+    t1 = _fe_mul(t2, t1)
+    t1 = _fe_sq_n(t1, 50)
+    t0 = _fe_mul(t1, t0)
+    t0 = _fe_sq_n(t0, 2)
+    return _fe_mul(t0, z)
+
+# d = -121665 / 121666 and 2d, sqrt(-1) = 2^((p-1)/4): computed once per call from their definitions.
+fn _ed_d() -> [5]u64:
+    return _fe_mul(_fe_neg(_fe_small(121665)), _fe_invert(_fe_small(121666)))
+
+fn _ed_sqrt_m1() -> [5]u64:
+    # 2^((p-1)/4) with (p-1)/4 = 2^253 - 5
+    r = _fe_small(1)
+    base = _fe_small(2)
+    # exponent bits from the top: 252..3 are ones, bit 2 is zero, bits 1 and 0 are ones
+    i = 253
+    while i > 0:
+        i -= 1
+        r = _fe_sq(r)
+        bit = true
+        if i == 2:
+            bit = false
+        if bit:
+            r = _fe_mul(r, base)
+    return r
+
+fn _pt_identity() -> _Point:
+    return _Point{ x: _fe_small(0), y: _fe_small(1), z: _fe_small(1), t: _fe_small(0) }
+
+# Complete addition on the twisted Edwards curve (a = -1), valid for doubling and for the identity.
+fn _pt_add(p: _Point, q: _Point, d2: [5]u64) -> _Point:
+    a = _fe_mul(_fe_sub(p.y, p.x), _fe_sub(q.y, q.x))
+    b = _fe_mul(_fe_add(p.y, p.x), _fe_add(q.y, q.x))
+    c = _fe_mul(_fe_mul(p.t, q.t), d2)
+    dd = _fe_mul(_fe_add(p.z, p.z), q.z)
+    e = _fe_sub(b, a)
+    f = _fe_sub(dd, c)
+    g = _fe_add(dd, c)
+    h = _fe_add(b, a)
+    return _Point{ x: _fe_mul(e, f), y: _fe_mul(g, h), z: _fe_mul(f, g), t: _fe_mul(e, h) }
+
+fn _pt_neg(p: _Point) -> _Point:
+    return _Point{ x: _fe_neg(p.x), y: p.y, z: p.z, t: _fe_neg(p.t) }
+
+# bit ? a : b, with no branch.
+fn _pt_select(bit: u64, a: _Point, b: _Point) -> _Point:
+    m = wrapping_sub[u64](0, bit)
+    out = b
+    for i in 0..5:
+        out.x[i] = b.x[i] ^ (m & (a.x[i] ^ b.x[i]))
+        out.y[i] = b.y[i] ^ (m & (a.y[i] ^ b.y[i]))
+        out.z[i] = b.z[i] ^ (m & (a.z[i] ^ b.z[i]))
+        out.t[i] = b.t[i] ^ (m & (a.t[i] ^ b.t[i]))
+    return out
+
+# scalar * point, 256 bits, always the same sequence of operations. `scalar` is 32 little-endian bytes.
+fn _pt_scalar_mul(scalar: []u8, p: _Point, d2: [5]u64) -> _Point:
+    q = _pt_identity()
+    i = 256
+    while i > 0:
+        i -= 1
+        q = _pt_add(q, q, d2)
+        sum = _pt_add(q, p, d2)
+        bit = u64((scalar[i / 8] >> u32(i % 8)) & 1)
+        q = _pt_select(bit, sum, q)
+    return q
+
+fn _pt_encode(p: _Point) -> List[u8]:
+    zi = _fe_invert(p.z)
+    x = _fe_mul(p.x, zi)
+    y = _fe_mul(p.y, zi)
+    out = _fe_to_bytes(y)
+    out[31] = out[31] | u8(_fe_is_odd(x) << 7)
+    return out
+
+fn _pt_decode(enc: []u8, d: [5]u64) -> Optional[_Point]:
+    sign = u64(enc[31] >> 7)
+    y = _fe_from_bytes(enc)
+    # the encoding must be canonical: y < p
+    yb = _fe_to_bytes(y)
+    for i in 0..32:
+        want = enc[i]
+        if i == 31:
+            want = want & 127
+        if yb[i] != want:
+            return None
+    y2 = _fe_sq(y)
+    u = _fe_sub(y2, _fe_small(1))
+    v = _fe_add(_fe_mul(d, y2), _fe_small(1))
+    v3 = _fe_mul(_fe_sq(v), v)
+    v7 = _fe_mul(_fe_sq(v3), v)
+    x = _fe_mul(_fe_mul(u, v3), _fe_pow22523(_fe_mul(u, v7)))
+    vx2 = _fe_mul(v, _fe_sq(x))
+    if not _fe_equal(vx2, u):
+        if _fe_equal(vx2, _fe_neg(u)):
+            x = _fe_mul(x, _ed_sqrt_m1())
+        else:
+            return None
+    if _fe_is_zero(x) and sign == 1:
+        return None
+    if _fe_is_odd(x) != sign:
+        x = _fe_neg(x)
+    return Valid(_Point{ x: x, y: y, z: _fe_small(1), t: _fe_mul(x, y) })
+
+fn _ed_base(d: [5]u64) -> _Point:
+    enc = List[u8]()
+    enc.push(0x58)
+    for _ in 0..31:
+        enc.push(0x66)
+    return _pt_decode(enc, d).value_or_panic()
+
+# -- scalars modulo L = 2^252 + 27742317777372353535851937790883648493 ---------------------------------------------
+
+fn _l_limbs() -> [4]u64:
+    return [0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0, 0x1000000000000000]
+
+# r - L, and whether it borrowed (1 when r < L)
+fn _sub_l(r: [4]u64) -> Tuple2[[4]u64, u64]:
+    l = _l_limbs()
+    out: [4]u64 = [0; 4]
+    borrow: u64 = 0
+    for i in 0..4:
+        d = wrapping_sub[u64](r[i], l[i])
+        b1: u64 = 0
+        if r[i] < l[i]:
+            b1 = 1
+        d2 = wrapping_sub[u64](d, borrow)
+        b2: u64 = 0
+        if d < borrow:
+            b2 = 1
+        out[i] = d2
+        borrow = b1 | b2
+    return Tuple2{ f0: out, f1: borrow }
+
+# x mod L for a 512-bit x (eight little-endian 64-bit limbs), one bit at a time with masks.
+fn _sc_reduce(x: [8]u64) -> [4]u64:
+    r: [4]u64 = [0; 4]
+    i = 512
+    while i > 0:
+        i -= 1
+        bit: u64 = (x[i / 64] >> u32(i % 64)) & 1
+        # r = r * 2 + bit
+        carry: u64 = bit
+        for k in 0..4:
+            cout = r[k] >> 63
+            r[k] = (r[k] << 1) | carry
+            carry = cout
+        s = _sub_l(r)
+        keep_old = wrapping_sub[u64](0, s.f1)       # all ones when r < L (the subtraction borrowed)
+        for k in 0..4:
+            r[k] = (r[k] & keep_old) | (s.f0[k] & ~keep_old)
+    return r
+
+fn _sc_from_bytes(b: []u8) -> [8]u64:
+    x: [8]u64 = [0; 8]
+    for i in 0..b.len:
+        x[i / 8] = x[i / 8] | (u64(b[i]) << u32(8 * (i % 8)))
+    return x
+
+fn _sc_to_bytes(r: [4]u64) -> List[u8]:
+    out = List[u8]()
+    for i in 0..4:
+        for j in 0..8:
+            out.push(u8((r[i] >> u32(8 * j)) & 255))
+    return out
+
+# (a * b + c) mod L
+fn _sc_mul_add(a: [4]u64, b: [4]u64, c: [4]u64) -> [4]u64:
+    prod: [8]u64 = [0; 8]
+    for i in 0..4:
+        carry: u128 = 0
+        for j in 0..4:
+            cur = u128(prod[i + j]) + u128(a[i]) * u128(b[j]) + carry
+            prod[i + j] = u64(cur & 0xffffffffffffffff)
+            carry = cur >> 64
+        prod[i + 4] = u64(carry)
+    carry2: u64 = 0
+    for k in 0..8:
+        add: u64 = 0
+        if k < 4:
+            add = c[k]
+        s1 = wrapping_add[u64](prod[k], add)
+        o1: u64 = 0
+        if s1 < prod[k]:
+            o1 = 1
+        s2 = wrapping_add[u64](s1, carry2)
+        o2: u64 = 0
+        if s2 < s1:
+            o2 = 1
+        prod[k] = s2
+        carry2 = o1 | o2
+    return _sc_reduce(prod)
+
+fn _sc_small(b: []u8) -> [4]u64:
+    r: [4]u64 = [0; 4]
+    for i in 0..32:
+        r[i / 8] = r[i / 8] | (u64(b[i]) << u32(8 * (i % 8)))
+    return r
+
+public
+# The 32-byte public key for a 32-byte secret seed (RFC 8032, Ed25519).
+fn ed25519_public_key(seed: []u8) -> List[u8]:
+    if seed.len != 32:
+        panic("ed25519: the seed is 32 bytes")
+    d = _ed_d()
+    h = hash.sha512(seed)
+    a = _clamped(h)
+    return _pt_encode(_pt_scalar_mul(a, _ed_base(d), _fe_add(d, d)))
+
+private
+fn _clamped(h: List[u8]) -> List[u8]:
+    a = List[u8]()
+    for i in 0..32:
+        a.push(h[i])
+    a[0] = a[0] & 248
+    a[31] = a[31] & 127
+    a[31] = a[31] | 64
+    return a
+
+public
+# The 64-byte signature of `message` under the seed. Deterministic: the same seed and message give the same signature.
+fn ed25519_sign(seed: []u8, message: []u8) -> List[u8]:
+    if seed.len != 32:
+        panic("ed25519: the seed is 32 bytes")
+    d = _ed_d()
+    d2 = _fe_add(d, d)
+    base = _ed_base(d)
+    h = hash.sha512(seed)
+    a = _clamped(h)
+    pk = _pt_encode(_pt_scalar_mul(a, base, d2))
+    # r = H(prefix || M) mod L
+    m1 = List[u8]()
+    for i in 32..64:
+        m1.push(h[i])
+    for b in message:
+        m1.push(b)
+    r = _sc_reduce(_sc_from_bytes(hash.sha512(m1)))
+    rb = _sc_to_bytes(r)
+    rpt = _pt_encode(_pt_scalar_mul(rb, base, d2))
+    # k = H(R || A || M) mod L
+    m2 = List[u8]()
+    for b in rpt:
+        m2.push(b)
+    for b in pk:
+        m2.push(b)
+    for b in message:
+        m2.push(b)
+    k = _sc_reduce(_sc_from_bytes(hash.sha512(m2)))
+    s = _sc_mul_add(k, _sc_small(a), r)
+    out = rpt.clone()
+    for b in _sc_to_bytes(s):
+        out.push(b)
+    return out
+
+# True when `signature` (64 bytes) is a valid Ed25519 signature of `message` under `public_key` (32 bytes).
+fn ed25519_verify(public_key: []u8, message: []u8, signature: []u8) -> bool:
+    if public_key.len != 32 or signature.len != 64:
+        return false
+    d = _ed_d()
+    d2 = _fe_add(d, d)
+    a_pt = _pt_decode(public_key, d)
+    if a_pt.is_none():
+        return false
+    r_enc = signature[0..32]
+    if _pt_decode(r_enc, d).is_none():
+        return false
+    s_bytes = signature[32..64]
+    # S must be below L
+    s_limbs = _sc_small(s_bytes)
+    below = _sub_l(s_limbs)
+    if below.f1 == 0:
+        return false
+    m2 = List[u8]()
+    for b in r_enc:
+        m2.push(b)
+    for b in public_key:
+        m2.push(b)
+    for b in message:
+        m2.push(b)
+    k = _sc_reduce(_sc_from_bytes(hash.sha512(m2)))
+    base = _ed_base(d)
+    sb = _pt_scalar_mul(s_bytes, base, d2)
+    ka = _pt_scalar_mul(_sc_to_bytes(k), a_pt.value_or_panic(), d2)
+    check = _pt_add(sb, _pt_neg(ka), d2)
+    return constant_time_eq(_pt_encode(check), r_enc)

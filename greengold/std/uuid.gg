@@ -1,0 +1,152 @@
+# std.uuid: universally unique identifiers (RFC 9562).
+#
+#     import std.uuid
+#     id = uuid.v4()                              # random: 7f3c2a1e-9b04-4c5d-8e21-3a6b0d9c4f12
+#     print(uuid.format(id))
+#     ts = uuid.v7()                              # starts with the time, so ids sort by creation
+#     parsed = uuid.parse("7f3c2a1e-9b04-4c5d-8e21-3a6b0d9c4f12")     # Result[Uuid, string]
+#
+# A `Uuid` is 16 bytes. `v4` draws 122 random bits from the operating system's source (`std.rand.secure_bytes`); `v7` puts the
+# millisecond Unix time in front and 74 random bits behind; `v5` and `v3`-style name based ids come from SHA-1 (`v5`).
+
+import std.rand
+import std.time
+import std.hash
+
+struct Uuid:
+    bytes: [16]u8
+
+fn nil() -> Uuid:
+    return Uuid{ bytes: [0; 16] }
+
+private
+fn _stamp_version(b: lend [16]u8, version: u8):
+    b[6] = (b[6] & 15) | (version << 4)
+    b[8] = (b[8] & 63) | 128
+
+public
+# A random (version 4) identifier.
+fn v4() -> Uuid:
+    r = rand.secure_bytes(16)
+    b: [16]u8 = [0; 16]
+    for i in 0..16:
+        b[i] = r[i]
+    _stamp_version(b, 4)
+    return Uuid{ bytes: b }
+
+# A time-ordered (version 7) identifier: 48 bits of Unix milliseconds, then random bits.
+fn v7() -> Uuid:
+    return v7_at(time.unix_millis())
+
+fn v7_at(unix_ms: i64) -> Uuid:
+    r = rand.secure_bytes(16)
+    b: [16]u8 = [0; 16]
+    ms = u64(unix_ms)
+    for i in 0..6:
+        b[i] = u8((ms >> u32(40 - 8 * i)) & 255)
+    for i in 6..16:
+        b[i] = r[i]
+    _stamp_version(b, 7)
+    return Uuid{ bytes: b }
+
+# A name-based (version 5, SHA-1) identifier: the same namespace and name always give the same id.
+fn v5(namespace: read Uuid, name: []u8) -> Uuid:
+    data = List[u8]()
+    for b in namespace.bytes:
+        data.push(b)
+    for b in name:
+        data.push(b)
+    d = hash.sha1(data)
+    b: [16]u8 = [0; 16]
+    for i in 0..16:
+        b[i] = d[i]
+    _stamp_version(b, 5)
+    return Uuid{ bytes: b }
+
+# The well-known namespaces for `v5`.
+fn namespace_dns() -> Uuid:
+    return parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8").value_or_panic()
+
+fn namespace_url() -> Uuid:
+    return parse("6ba7b811-9dad-11d1-80b4-00c04fd430c8").value_or_panic()
+
+private
+fn _digit(n: u8) -> u8:
+    if n < 10:
+        return 48 + n
+    return 87 + n
+
+fn _value(c: u8) -> i32:
+    if c >= '0' and c <= '9':
+        return i32(c - '0')
+    if c >= 'a' and c <= 'f':
+        return i32(c - 'a') + 10
+    if c >= 'A' and c <= 'F':
+        return i32(c - 'A') + 10
+    return -1
+
+public
+impl Uuid:
+    # `7f3c2a1e-9b04-4c5d-8e21-3a6b0d9c4f12`
+    fn to_string(self: read Self) -> string:
+        out = string.new()
+        for i in 0..16:
+            if i == 4 or i == 6 or i == 8 or i == 10:
+                out.append_byte('-')
+            out.append_byte(_digit(self.bytes[i] >> 4))
+            out.append_byte(_digit(self.bytes[i] & 15))
+        return out
+
+    fn version(self: read Self) -> u8:
+        return self.bytes[6] >> 4
+
+    fn is_nil(self: read Self) -> bool:
+        for b in self.bytes:
+            if b != 0:
+                return false
+        return true
+
+    fn equals(self: read Self, other: read Uuid) -> bool:
+        for i in 0..16:
+            if self.bytes[i] != other.bytes[i]:
+                return false
+        return true
+
+    # For a version 7 id, the Unix milliseconds in it.
+    fn unix_millis(self: read Self) -> i64:
+        ms: u64 = 0
+        for i in 0..6:
+            ms = (ms << 8) | u64(self.bytes[i])
+        return i64(ms)
+
+fn format(id: read Uuid) -> string:
+    return id.to_string()
+
+# Reads the 36-character form with dashes, either case; also 32 digits without dashes and `{...}` braces.
+fn parse(text: str) -> Result[Uuid, string]:
+    b: [16]u8 = [0; 16]
+    n = 0
+    hi = -1
+    start: usize = 0
+    end = text.len
+    if text.len > 2 and text[0] == '{' and text[text.len - 1] == '}':
+        start = 1
+        end = text.len - 1
+    for i in start..end:
+        c = text[i]
+        if c == '-':
+            continue
+        v = _value(c)
+        if v < 0:
+            return Err(f"not a hex digit at position {i}")
+        if hi < 0:
+            hi = v
+        else:
+            if n >= 16:
+                return Err(string.from("too many digits"))
+            b[n] = u8(hi * 16 + v)
+            n += 1
+            hi = -1
+    if hi >= 0 or n != 16:
+        return Err(string.from("a UUID has 32 hex digits"))
+    return Ok(Uuid{ bytes: b })

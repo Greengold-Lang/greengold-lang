@@ -22,7 +22,7 @@ fn locked_bump(p: *u8) -> *u8:
 
 fn producer(p: *u8) -> *u8:
     unsafe:
-        c = ptr_cast[*mut thread.Channel](p)
+        c = ptr_cast[*mut thread.ChannelI64](p)
         for i in 1..101:
             c[0].send(i64(i))
         c[0].close()
@@ -51,7 +51,7 @@ fn main():
         workers[i].join()
     print("guarded =", guarded.value[0])
 
-    ch = thread.Channel.new()
+    ch = thread.ChannelI64.new()
     sum: i64 = 0
     n: i64 = 0
     unsafe:

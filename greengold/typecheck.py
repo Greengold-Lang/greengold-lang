@@ -339,6 +339,10 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
         slug = getattr(decl, "module_slug", "") or ""
         if slug == self.scope_slug:
             return True
+        cur = getattr(getattr(self, "cur", None), "decl", None)
+        if (cur is not None and getattr(cur, "from_feature_default", False) and getattr(decl, "owner", None) is not None
+                and decl.owner == cur.owner):
+            return True  # a default method of a feature sees the methods of the type it was made for
         return bool(slug) and bool(getattr(decl, "is_pub", False))
 
     @staticmethod
@@ -373,7 +377,8 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
         picked = self.selective.get(slug, {}).get(name)
         if picked is not None:
             return picked
-        if self._has_any(name) and (slug == "" or getattr(self._decl_for(name), "from_prelude", False)):
+        if self._has_any(name) and (slug == "" or getattr(self._decl_for(name), "from_prelude", False)
+                                    or name.startswith("__cov_")):   # the coverage probes are visible in every module
             return name
         return None
 
@@ -826,6 +831,11 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
                         fn_copy = copy.deepcopy(m)
                         fn_copy.from_feature_default = True  # type: ignore[attr-defined]
                         fn_copy.owner = target_name
+                        fn_copy.is_pub = True  # type: ignore[attr-defined]
+                        # the body is written in the feature's module: its names resolve there
+                        fn_copy.module_slug = getattr(fdecl, "module_slug", "")  # type: ignore[attr-defined]
+                        if getattr(fdecl, "from_prelude", False):
+                            fn_copy.from_prelude = True  # type: ignore[attr-defined]
                         fn_copy.owner_params = list(owner_params)
                         subst_self_func(fn_copy, target_name, owner_params)
 
@@ -856,13 +866,21 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
     def _comptime_fns(self) -> set[str]:
         return {d.name for d in self.decls if isinstance(d, FuncDecl) and d.is_comptime and d.owner is None}
 
+    def _plain_fn_names(self) -> set[str]:
+        """Top-level functions that a constant may name (`const TABLE: [2]fn() = [reset, tick]`): not generic, not a method."""
+        return {d.name for d in self.decls
+                if isinstance(d, FuncDecl) and d.owner is None and not d.type_params and not d.is_comptime}
+
     def _calls_comptime(self, e: object) -> bool:
         names = self._comptime_fns()
+        fns = self._plain_fn_names()
         found = []
 
         def walk(n: object) -> None:
             if isinstance(n, Call) and n.callee in names:
                 found.append(n)
+            if isinstance(n, Name) and n.name in fns and not any(isinstance(d, ConstDecl) and d.name == n.name for d in self.decls):
+                found.append(n)         # a function used as a value: the constant waits until signatures are known
             if isinstance(n, Node):
                 for v in n.__dict__.values():
                     if isinstance(v, Node):
@@ -933,6 +951,8 @@ class TypeChecker(ClosureMixin, MatchMixin, GenericsMixin, SimdCheckMixin):
             return
         if isinstance(e, Name):
             key = self._resolve_simple(e.name)
+            if (key is None or key not in self.consts) and e.name in self._plain_fn_names():
+                return                  # the address of a function: a link-time constant (vector tables)
             if key is None or key not in self.consts:
                 if any(isinstance(d, ConstDecl) and d.name == e.name for d in self.decls):
                     self._err(e, f"`{e.name}` constant has not been declared yet.",
@@ -5449,6 +5469,11 @@ def _core_refs(root: Node, core: dict[str, FuncDecl]) -> set[str]:
                 found.add(f"{n.owner}.{n.method}")
             elif getattr(n, "from_fn", None) in core:  # `?` converting the error with `Target.from`
                 found.add(n.from_fn)
+            if getattr(n, "ty", None) == "f16":  # half-precision math goes through these conversions
+                found.update(k for k in ("_f32_from_bits", "_f32_to_bits", "_f16_to_f32", "_f32_to_f16") if k in core)
+            if getattr(n, "ty", None) in ("i128", "u128"):  # printing one needs the 128-bit digits loop
+                found.update(k for k in ("string.new", "string.append_byte", "string.append_i128", "string.append_u128")
+                             if k in core)
             if getattr(n, "json_ty", None):  # `to_json` / `from_json`: codegen calls the Core JSON pieces
                 found.update(k for k in core if k.startswith(("_json_", "_JsonReader.")))
                 found.update(k for k in ("string.new", "string.from", "string.append_str", "string.append_byte",

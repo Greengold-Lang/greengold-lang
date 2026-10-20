@@ -1,0 +1,323 @@
+# std.unicode: text as characters, not bytes.
+#
+#     import std.unicode
+#     print(unicode.to_upper("straße ışık"))             # STRASSE IŞIK
+#     print(unicode.width("日本語"), unicode.grapheme_count("éx"))   # 6 2
+#
+# Text in Greengold is UTF-8 bytes; `s.chars()` and `s.char_at(i)` (in the core library) decode code points. This module adds
+# encoding, classification, case mapping, display width and a simplified grapheme count.
+#
+# What it knows. Case mapping covers the Latin, Greek, Cyrillic and Armenian alphabets (including ß -> SS and the final sigma);
+# `to_upper_tr`/`to_lower_tr` handle Turkish `i`. The classes (`is_alphabetic`, `is_numeric`, `is_whitespace`) cover the common
+# scripts by range: Latin, Greek, Cyrillic, Armenian, Hebrew, Arabic, Devanagari, Thai, Hangul, kana, and CJK ideographs. It is not
+# the full Unicode database: no normalization (NFC/NFD), no collation, and scripts outside those ranges are not letters here.
+# `width` follows the East Asian Width idea (wide characters 2, combining marks 0). `grapheme_count` joins a character with the
+# combining marks, variation selectors, skin-tone modifiers and zero-width joiners that follow it, which handles accents and
+# most emoji sequences; it does not implement every rule of UAX #29 (Hangul syllable sequences, regional-indicator pairs).
+
+import std.string
+
+# -- encoding ------------------------------------------------------------------------------------------------------
+
+# The UTF-8 bytes of a code point. A surrogate or a value above U+10FFFF becomes U+FFFD.
+fn encode_utf8(cp0: u32) -> string:
+    cp = cp0
+    if cp > 0x10FFFF or (cp >= 0xD800 and cp <= 0xDFFF):
+        cp = 0xFFFD
+    out = string.new()
+    if cp < 0x80:
+        out.append_byte(u8(cp))
+    elif cp < 0x800:
+        out.append_byte(u8(0xC0 | (cp >> 6)))
+        out.append_byte(u8(0x80 | (cp & 0x3F)))
+    elif cp < 0x10000:
+        out.append_byte(u8(0xE0 | (cp >> 12)))
+        out.append_byte(u8(0x80 | ((cp >> 6) & 0x3F)))
+        out.append_byte(u8(0x80 | (cp & 0x3F)))
+    else:
+        out.append_byte(u8(0xF0 | (cp >> 18)))
+        out.append_byte(u8(0x80 | ((cp >> 12) & 0x3F)))
+        out.append_byte(u8(0x80 | ((cp >> 6) & 0x3F)))
+        out.append_byte(u8(0x80 | (cp & 0x3F)))
+    return out
+
+# Text from code points.
+fn from_code_points(cps: read List[u32]) -> string:
+    out = string.new()
+    for cp in cps:
+        out.append_str(encode_utf8(cp).as_str())
+    return out
+
+# -- classes -------------------------------------------------------------------------------------------------------
+
+fn is_whitespace(cp: u32) -> bool:
+    return (cp >= 9 and cp <= 13) or cp == 32 or cp == 0x85 or cp == 0xA0 or cp == 0x1680 or (cp >= 0x2000 and cp <= 0x200A) or cp == 0x2028 or cp == 0x2029 or cp == 0x202F or cp == 0x205F or cp == 0x3000
+
+fn is_numeric(cp: u32) -> bool:
+    return (cp >= 48 and cp <= 57) or (cp >= 0x660 and cp <= 0x669) or (cp >= 0x6F0 and cp <= 0x6F9) or (cp >= 0x966 and cp <= 0x96F) or (cp >= 0xE50 and cp <= 0xE59) or (cp >= 0xFF10 and cp <= 0xFF19)
+
+fn is_alphabetic(cp: u32) -> bool:
+    if cp < 0x80:
+        return (cp >= 65 and cp <= 90) or (cp >= 97 and cp <= 122)
+    return cp == 0xAA or cp == 0xB5 or cp == 0xBA or (cp >= 0xC0 and cp <= 0xD6) or (cp >= 0xD8 and cp <= 0xF6) or (cp >= 0xF8 and cp <= 0x2C1) or (cp >= 0x370 and cp <= 0x373) or (cp >= 0x376 and cp <= 0x377) or (cp >= 0x37B and cp <= 0x37D) or cp == 0x386 or (cp >= 0x388 and cp <= 0x3FF and cp != 0x38B and cp != 0x38D and cp != 0x3A2 and cp != 0x3F6) or (cp >= 0x400 and cp <= 0x481) or (cp >= 0x48A and cp <= 0x52F) or (cp >= 0x531 and cp <= 0x556) or (cp >= 0x561 and cp <= 0x587) or (cp >= 0x5D0 and cp <= 0x5EA) or (cp >= 0x620 and cp <= 0x64A) or (cp >= 0x671 and cp <= 0x6D3) or (cp >= 0x904 and cp <= 0x939) or (cp >= 0xE01 and cp <= 0xE30) or (cp >= 0x1E00 and cp <= 0x1FFF) or (cp >= 0x3041 and cp <= 0x3096) or (cp >= 0x30A1 and cp <= 0x30FA) or (cp >= 0x3400 and cp <= 0x4DBF) or (cp >= 0x4E00 and cp <= 0x9FFF) or (cp >= 0xAC00 and cp <= 0xD7A3) or (cp >= 0xFF21 and cp <= 0xFF3A) or (cp >= 0xFF41 and cp <= 0xFF5A) or (cp >= 0x20000 and cp <= 0x2FA1F)
+
+fn is_alphanumeric(cp: u32) -> bool:
+    return is_alphabetic(cp) or is_numeric(cp)
+
+# A mark that combines with the character before it (accents, variation selectors, skin tones, zero-width joiner).
+fn is_combining(cp: u32) -> bool:
+    return (cp >= 0x300 and cp <= 0x36F) or (cp >= 0x483 and cp <= 0x489) or (cp >= 0x591 and cp <= 0x5BD) or (cp >= 0x64B and cp <= 0x65F) or (cp >= 0x93A and cp <= 0x94F) or (cp >= 0xE31 and cp <= 0xE3A and cp != 0xE32 and cp != 0xE33) or (cp >= 0xE47 and cp <= 0xE4E) or (cp >= 0x1AB0 and cp <= 0x1AFF) or (cp >= 0x1DC0 and cp <= 0x1DFF) or cp == 0x200C or cp == 0x200D or (cp >= 0x20D0 and cp <= 0x20FF) or (cp >= 0xFE00 and cp <= 0xFE0F) or (cp >= 0xFE20 and cp <= 0xFE2F) or (cp >= 0x1F3FB and cp <= 0x1F3FF) or (cp >= 0xE0100 and cp <= 0xE01EF)
+
+# Columns a character takes in a terminal: 0 for a combining mark, 2 for East Asian wide characters and emoji, else 1.
+fn char_width(cp: u32) -> u32:
+    if is_combining(cp) and cp != 0x200D and cp != 0x200C:
+        return 0
+    if cp == 0x200D or cp == 0x200C:
+        return 0
+    if (cp >= 0x1100 and cp <= 0x115F) or (cp >= 0x2E80 and cp <= 0x303E) or (cp >= 0x3041 and cp <= 0x33FF) or (cp >= 0x3400 and cp <= 0x4DBF) or (cp >= 0x4E00 and cp <= 0xA4CF) or (cp >= 0xAC00 and cp <= 0xD7A3) or (cp >= 0xF900 and cp <= 0xFAFF) or (cp >= 0xFE30 and cp <= 0xFE6F) or (cp >= 0xFF00 and cp <= 0xFF60) or (cp >= 0xFFE0 and cp <= 0xFFE6) or (cp >= 0x1F300 and cp <= 0x1F64F) or (cp >= 0x1F900 and cp <= 0x1F9FF) or (cp >= 0x20000 and cp <= 0x3FFFD):
+        return 2
+    return 1
+
+# -- case ------------------------------------------------------------------------------------------------------------
+
+fn is_uppercase(cp: u32) -> bool:
+    return is_alphabetic(cp) and to_lower_cp(cp) != cp
+
+fn is_lowercase(cp: u32) -> bool:
+    return is_alphabetic(cp) and (to_upper_cp(cp) != cp or cp == 0xDF)
+
+# The lowercase of a code point (one character; `İ` U+0130 has no single-character lowercase here and stays).
+fn to_lower_cp(cp: u32) -> u32:
+    if cp < 0x80:
+        if cp >= 65 and cp <= 90:
+            return cp + 32
+        return cp
+    if cp >= 0xC0 and cp <= 0xDE and cp != 0xD7:
+        return cp + 32
+    if cp >= 0x100 and cp <= 0x17F:
+        if cp == 0x130 or cp == 0x131 or cp == 0x138 or cp == 0x149 or cp == 0x17F:
+            return cp
+        if cp == 0x178:
+            return 0xFF
+        if (cp >= 0x139 and cp <= 0x148) or (cp >= 0x179 and cp <= 0x17E):
+            if cp % 2 == 1:
+                return cp + 1
+            return cp
+        if cp % 2 == 0:
+            return cp + 1
+        return cp
+    if cp == 0x386:
+        return 0x3AC
+    if cp >= 0x388 and cp <= 0x38A:
+        return cp + 37
+    if cp == 0x38C:
+        return 0x3CC
+    if cp == 0x38E or cp == 0x38F:
+        return cp + 63
+    if cp >= 0x391 and cp <= 0x3A9 and cp != 0x3A2:
+        return cp + 32
+    if cp >= 0x400 and cp <= 0x40F:
+        return cp + 80
+    if cp >= 0x410 and cp <= 0x42F:
+        return cp + 32
+    if (cp >= 0x460 and cp <= 0x481) or (cp >= 0x48A and cp <= 0x4BF) or (cp >= 0x4D0 and cp <= 0x52F):
+        if cp % 2 == 0:
+            return cp + 1
+        return cp
+    if cp >= 0x4C1 and cp <= 0x4CE:
+        if cp % 2 == 1:
+            return cp + 1
+        return cp
+    if cp == 0x4C0:
+        return 0x4CF
+    if cp >= 0x531 and cp <= 0x556:
+        return cp + 48
+    return cp
+
+# The uppercase of a code point (one character; `ß` has no single-character uppercase and stays).
+fn to_upper_cp(cp: u32) -> u32:
+    if cp < 0x80:
+        if cp >= 97 and cp <= 122:
+            return cp - 32
+        return cp
+    if cp == 0xB5:
+        return 0x39C
+    if cp >= 0xE0 and cp <= 0xFE and cp != 0xF7:
+        return cp - 32
+    if cp == 0xFF:
+        return 0x178
+    if cp >= 0x100 and cp <= 0x17F:
+        if cp == 0x130 or cp == 0x138 or cp == 0x149 or cp == 0x178:
+            return cp
+        if cp == 0x131:
+            return 73
+        if cp == 0x17F:
+            return 83
+        if (cp >= 0x139 and cp <= 0x148) or (cp >= 0x179 and cp <= 0x17E):
+            if cp % 2 == 0:
+                return cp - 1
+            return cp
+        if cp % 2 == 1:
+            return cp - 1
+        return cp
+    if cp == 0x3AC:
+        return 0x386
+    if cp >= 0x3AD and cp <= 0x3AF:
+        return cp - 37
+    if cp == 0x3CC:
+        return 0x38C
+    if cp == 0x3CD or cp == 0x3CE:
+        return cp - 63
+    if cp == 0x3C2:
+        return 0x3A3
+    if cp >= 0x3B1 and cp <= 0x3C9:
+        return cp - 32
+    if cp >= 0x450 and cp <= 0x45F:
+        return cp - 80
+    if cp >= 0x430 and cp <= 0x44F:
+        return cp - 32
+    if (cp >= 0x460 and cp <= 0x481) or (cp >= 0x48A and cp <= 0x4BF) or (cp >= 0x4D0 and cp <= 0x52F):
+        if cp % 2 == 1:
+            return cp - 1
+        return cp
+    if cp >= 0x4C1 and cp <= 0x4CE:
+        if cp % 2 == 0:
+            return cp - 1
+        return cp
+    if cp == 0x4CF:
+        return 0x4C0
+    if cp >= 0x561 and cp <= 0x586:
+        return cp - 48
+    return cp
+
+private
+fn _case_map(text: str, upper: bool, turkish: bool) -> string:
+    out = string.new()
+    cps = text.chars()
+    for i in 0..cps.len:
+        cp = cps[i]
+        if upper:
+            if cp == 0xDF:
+                out.append_str("SS")
+            elif turkish and cp == 105:
+                out.append_str(encode_utf8(0x130).as_str())
+            else:
+                out.append_str(encode_utf8(to_upper_cp(cp)).as_str())
+        else:
+            if turkish and cp == 73:
+                out.append_str(encode_utf8(0x131).as_str())
+            elif turkish and cp == 0x130:
+                out.append_byte(105)
+            elif cp == 0x3A3:
+                # a capital sigma at the end of a word becomes the final sigma
+                end_of_word = i + 1 >= cps.len or not is_alphabetic(cps[i + 1])
+                after_letter = i > 0 and is_alphabetic(cps[i - 1])
+                if end_of_word and after_letter:
+                    out.append_str(encode_utf8(0x3C2).as_str())
+                else:
+                    out.append_str(encode_utf8(0x3C3).as_str())
+            else:
+                out.append_str(encode_utf8(to_lower_cp(cp)).as_str())
+    return out
+
+public
+# Every character in uppercase (`ß` becomes `SS`).
+fn to_upper(text: str) -> string:
+    return _case_map(text, true, false)
+
+fn to_lower(text: str) -> string:
+    return _case_map(text, false, false)
+
+# Turkish and Azeri: `i` -> `İ` and `I` -> `ı`.
+fn to_upper_tr(text: str) -> string:
+    return _case_map(text, true, true)
+
+fn to_lower_tr(text: str) -> string:
+    return _case_map(text, false, true)
+
+# The text in a form where letters that differ only in case are equal: lowercase, `ß` as `ss`, final sigma as sigma.
+fn case_fold(text: str) -> string:
+    out = string.new()
+    for cp in text.chars():
+        if cp == 0xDF:
+            out.append_str("ss")
+        elif cp == 0x3C2:
+            out.append_str(encode_utf8(0x3C3).as_str())
+        else:
+            out.append_str(encode_utf8(to_lower_cp(cp)).as_str())
+    return out
+
+# True when the two texts are equal ignoring case (`Straße` equals `STRASSE`).
+fn eq_ignore_case(a: str, b: str) -> bool:
+    return case_fold(a).as_str() == case_fold(b).as_str()
+
+# -- measuring and cutting ----------------------------------------------------------------------------------------------
+
+# Columns the text takes in a terminal.
+fn width(text: str) -> usize:
+    total: usize = 0
+    for cp in text.chars():
+        total += usize(char_width(cp))
+    return total
+
+# Characters as a person counts them: a base character with the marks that follow it (accents, variation selectors, skin
+# tones, joined emoji) is one.
+fn grapheme_count(text: str) -> usize:
+    n: usize = 0
+    joined = false
+    for cp in text.chars():
+        if is_combining(cp):
+            if cp == 0x200D:
+                joined = true
+            continue
+        if joined:
+            joined = false     # the character after a joiner belongs to the one before
+            continue
+        n += 1
+    return n
+
+# The text reversed by code point (marks stay with nothing special: use on text without combining marks).
+fn reverse(text: str) -> string:
+    cps = text.chars()
+    out = string.new()
+    i = cps.len
+    while i > 0:
+        i -= 1
+        out.append_str(encode_utf8(cps[i]).as_str())
+    return out
+
+# The first `n` characters (code points), never cutting inside one.
+fn take_chars(text: str, n: usize) -> string:
+    out = string.new()
+    i: usize = 0
+    count: usize = 0
+    while i < text.len and count < n:
+        k = text.char_len_at(i)
+        out.append_str(string.substr(text, i, i + k))
+        i += k
+        count += 1
+    return out
+
+# The text cut so that it fits in `columns` terminal columns, with `ellipsis` appended when something was cut.
+fn truncate_width(text: str, columns: usize, ellipsis: str) -> string:
+    if width(text) <= columns:
+        return string.from(text)
+    room = columns
+    ew = width(ellipsis)
+    if ew < room:
+        room = room - ew
+    else:
+        room = 0
+    out = string.new()
+    used: usize = 0
+    i: usize = 0
+    while i < text.len:
+        k = text.char_len_at(i)
+        w = usize(char_width(text.char_at(i)))
+        if used + w > room:
+            break
+        out.append_str(string.substr(text, i, i + k))
+        used += w
+        i += k
+    out.append_str(ellipsis)
+    return out

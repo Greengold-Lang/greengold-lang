@@ -22,8 +22,8 @@ from .typeinfo import TYPE_ALIASES, BUILTIN_TYPE_ALIASES, PRIMS
 from .lexer import Token, tokenize
 
 NUMERIC_TYPES = {
-    "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64",
-    "isize", "usize", "f32", "f64",
+    "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128",
+    "isize", "usize", "f16", "f32", "f64",
 }
 NUMERIC_CAST_TYPES = NUMERIC_TYPES | {k for k, v in TYPE_ALIASES.items() if v in NUMERIC_TYPES}
 
@@ -553,10 +553,10 @@ class Parser:
                         f"Only `struct`, `enum`, `feature`, `impl`, `fn`, `test`, `const`, `extern`, and `import` can be declared at top-level (found {self._describe(self.tok)}).",
                         "Put code inside a `fn`; program entry point must be `fn main():`.")
                 if attrs:
-                    if isinstance(made, (FuncDecl, StructDecl)):
+                    if isinstance(made, (FuncDecl, StructDecl)) or (isinstance(made, ConstDecl) and made.is_static):
                         made.attrs = attrs
                     else:
-                        self._soft_error(attrs[0], "An attribute goes on a `fn`, a `struct`, or a struct field.",
+                        self._soft_error(attrs[0], "An attribute goes on a `fn`, a `struct`, a `static`, or a struct field.",
                                          "Write the `@name` line directly above one of those.")
                 if made is not None:
                     made.is_pub = export_here

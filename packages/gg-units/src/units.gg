@@ -1,0 +1,402 @@
+# units: physical quantities that cannot be mixed up. A `Length` is not a `Speed`: adding them is a compile error, and the only
+# way to make one is through a constructor that names its unit (`feet(3.0)`, `knots(250.0)`), so a number of feet can never be used where
+# metres are expected. Inside, every quantity is an `f64` in SI units; there is no run-time cost.
+#
+#     import units.units { feet, knots, nautical_miles }
+#     d = nautical_miles(12.0)
+#     v = knots(120.0)
+#     t = d.over_speed(v)                    # a Time
+#     print(t.as_minutes())                  # 6
+#
+# Quantities of one kind add, subtract, negate and compare with the operators. Products and quotients between kinds are methods named
+# for what they give (`length.over_time(t)` is a `Speed`, `speed.times(t)` is a `Length`), because a type has one `*` and one `/`.
+
+public
+const STANDARD_GRAVITY: f64 = 9.80665          # m/s^2
+const METRES_PER_FOOT: f64 = 0.3048
+const METRES_PER_NAUTICAL_MILE: f64 = 1852.0
+const KELVIN_AT_0C: f64 = 273.15
+const PI: f64 = 3.141592653589793
+
+struct Length:
+    metres: f64
+
+struct Time:
+    secs: f64
+
+struct Speed:
+    mps: f64
+
+struct Accel:
+    mps2: f64
+
+struct Mass:
+    kg: f64
+
+struct Force:
+    newtons: f64
+
+struct Angle:
+    rad: f64
+
+struct Pressure:
+    pascals: f64
+
+struct Temperature:
+    kelvin: f64
+
+# -- constructors ------------------------------------------------------------------------------------------------------------
+
+fn metres(x: f64) -> Length:
+    return Length{ metres: x }
+
+fn kilometres(x: f64) -> Length:
+    return Length{ metres: x * 1000.0 }
+
+fn feet(x: f64) -> Length:
+    return Length{ metres: x * METRES_PER_FOOT }
+
+fn nautical_miles(x: f64) -> Length:
+    return Length{ metres: x * METRES_PER_NAUTICAL_MILE }
+
+fn seconds(x: f64) -> Time:
+    return Time{ secs: x }
+
+fn minutes(x: f64) -> Time:
+    return Time{ secs: x * 60.0 }
+
+fn hours(x: f64) -> Time:
+    return Time{ secs: x * 3600.0 }
+
+fn metres_per_second(x: f64) -> Speed:
+    return Speed{ mps: x }
+
+fn knots(x: f64) -> Speed:
+    return Speed{ mps: x * METRES_PER_NAUTICAL_MILE / 3600.0 }
+
+fn kilometres_per_hour(x: f64) -> Speed:
+    return Speed{ mps: x / 3.6 }
+
+fn feet_per_minute(x: f64) -> Speed:
+    return Speed{ mps: x * METRES_PER_FOOT / 60.0 }
+
+fn metres_per_second_squared(x: f64) -> Accel:
+    return Accel{ mps2: x }
+
+fn g_force(x: f64) -> Accel:
+    return Accel{ mps2: x * STANDARD_GRAVITY }
+
+fn kilograms(x: f64) -> Mass:
+    return Mass{ kg: x }
+
+fn pounds(x: f64) -> Mass:
+    return Mass{ kg: x * 0.45359237 }
+
+fn newtons(x: f64) -> Force:
+    return Force{ newtons: x }
+
+fn radians(x: f64) -> Angle:
+    return Angle{ rad: x }
+
+fn degrees(x: f64) -> Angle:
+    return Angle{ rad: x * PI / 180.0 }
+
+fn pascals(x: f64) -> Pressure:
+    return Pressure{ pascals: x }
+
+fn hectopascals(x: f64) -> Pressure:
+    return Pressure{ pascals: x * 100.0 }
+
+fn inches_of_mercury(x: f64) -> Pressure:
+    return Pressure{ pascals: x * 3386.389 }
+
+fn kelvin(x: f64) -> Temperature:
+    return Temperature{ kelvin: x }
+
+fn celsius(x: f64) -> Temperature:
+    return Temperature{ kelvin: x + KELVIN_AT_0C }
+
+fn fahrenheit(x: f64) -> Temperature:
+    return Temperature{ kelvin: (x - 32.0) * 5.0 / 9.0 + KELVIN_AT_0C }
+
+# -- Length ------------------------------------------------------------------------------------------------------------------
+
+impl Length:
+    fn as_metres(self: read Self) -> f64:
+        return self.metres
+
+    fn as_kilometres(self: read Self) -> f64:
+        return self.metres / 1000.0
+
+    fn as_feet(self: read Self) -> f64:
+        return self.metres / METRES_PER_FOOT
+
+    fn as_nautical_miles(self: read Self) -> f64:
+        return self.metres / METRES_PER_NAUTICAL_MILE
+
+    fn add(self: read Self, o: Length) -> Length:
+        return Length{ metres: self.metres + o.metres }
+
+    fn sub(self: read Self, o: Length) -> Length:
+        return Length{ metres: self.metres - o.metres }
+
+    fn neg(self: read Self) -> Length:
+        return Length{ metres: -self.metres }
+
+    fn eq(self: read Self, o: Length) -> bool:
+        return self.metres == o.metres
+
+    fn lt(self: read Self, o: Length) -> bool:
+        return self.metres < o.metres
+
+    # This length times a plain number.
+    fn scaled(self: read Self, k: f64) -> Length:
+        return Length{ metres: self.metres * k }
+
+    # How many times `o` fits in this length.
+    fn ratio(self: read Self, o: Length) -> f64:
+        return self.metres / o.metres
+
+    # The speed that covers this length in `t`.
+    fn over_time(self: read Self, t: Time) -> Speed:
+        return Speed{ mps: self.metres / t.secs }
+
+    # The time it takes to cover this length at speed `v`.
+    fn over_speed(self: read Self, v: Speed) -> Time:
+        return Time{ secs: self.metres / v.mps }
+
+# -- Time --------------------------------------------------------------------------------------------------------------------
+
+impl Time:
+    fn as_seconds(self: read Self) -> f64:
+        return self.secs
+
+    fn as_minutes(self: read Self) -> f64:
+        return self.secs / 60.0
+
+    fn as_hours(self: read Self) -> f64:
+        return self.secs / 3600.0
+
+    fn add(self: read Self, o: Time) -> Time:
+        return Time{ secs: self.secs + o.secs }
+
+    fn sub(self: read Self, o: Time) -> Time:
+        return Time{ secs: self.secs - o.secs }
+
+    fn neg(self: read Self) -> Time:
+        return Time{ secs: -self.secs }
+
+    fn eq(self: read Self, o: Time) -> bool:
+        return self.secs == o.secs
+
+    fn lt(self: read Self, o: Time) -> bool:
+        return self.secs < o.secs
+
+    fn scaled(self: read Self, k: f64) -> Time:
+        return Time{ secs: self.secs * k }
+
+# -- Speed -------------------------------------------------------------------------------------------------------------------
+
+impl Speed:
+    fn as_metres_per_second(self: read Self) -> f64:
+        return self.mps
+
+    fn as_knots(self: read Self) -> f64:
+        return self.mps * 3600.0 / METRES_PER_NAUTICAL_MILE
+
+    fn as_kilometres_per_hour(self: read Self) -> f64:
+        return self.mps * 3.6
+
+    fn as_feet_per_minute(self: read Self) -> f64:
+        return self.mps * 60.0 / METRES_PER_FOOT
+
+    fn add(self: read Self, o: Speed) -> Speed:
+        return Speed{ mps: self.mps + o.mps }
+
+    fn sub(self: read Self, o: Speed) -> Speed:
+        return Speed{ mps: self.mps - o.mps }
+
+    fn neg(self: read Self) -> Speed:
+        return Speed{ mps: -self.mps }
+
+    fn eq(self: read Self, o: Speed) -> bool:
+        return self.mps == o.mps
+
+    fn lt(self: read Self, o: Speed) -> bool:
+        return self.mps < o.mps
+
+    fn scaled(self: read Self, k: f64) -> Speed:
+        return Speed{ mps: self.mps * k }
+
+    # The distance covered in `t`.
+    fn times(self: read Self, t: Time) -> Length:
+        return Length{ metres: self.mps * t.secs }
+
+    # The acceleration that changes this speed in `t`.
+    fn over_time(self: read Self, t: Time) -> Accel:
+        return Accel{ mps2: self.mps / t.secs }
+
+# -- Accel, Mass, Force ------------------------------------------------------------------------------------------------------
+
+impl Accel:
+    fn as_metres_per_second_squared(self: read Self) -> f64:
+        return self.mps2
+
+    fn as_g(self: read Self) -> f64:
+        return self.mps2 / STANDARD_GRAVITY
+
+    fn add(self: read Self, o: Accel) -> Accel:
+        return Accel{ mps2: self.mps2 + o.mps2 }
+
+    fn sub(self: read Self, o: Accel) -> Accel:
+        return Accel{ mps2: self.mps2 - o.mps2 }
+
+    fn neg(self: read Self) -> Accel:
+        return Accel{ mps2: -self.mps2 }
+
+    fn eq(self: read Self, o: Accel) -> bool:
+        return self.mps2 == o.mps2
+
+    fn lt(self: read Self, o: Accel) -> bool:
+        return self.mps2 < o.mps2
+
+    # The speed gained in `t`.
+    fn times(self: read Self, t: Time) -> Speed:
+        return Speed{ mps: self.mps2 * t.secs }
+
+    # The force this acceleration needs on `m`.
+    fn on_mass(self: read Self, m: Mass) -> Force:
+        return Force{ newtons: self.mps2 * m.kg }
+
+impl Mass:
+    fn as_kilograms(self: read Self) -> f64:
+        return self.kg
+
+    fn as_pounds(self: read Self) -> f64:
+        return self.kg / 0.45359237
+
+    fn add(self: read Self, o: Mass) -> Mass:
+        return Mass{ kg: self.kg + o.kg }
+
+    fn sub(self: read Self, o: Mass) -> Mass:
+        return Mass{ kg: self.kg - o.kg }
+
+    fn eq(self: read Self, o: Mass) -> bool:
+        return self.kg == o.kg
+
+    fn lt(self: read Self, o: Mass) -> bool:
+        return self.kg < o.kg
+
+    fn scaled(self: read Self, k: f64) -> Mass:
+        return Mass{ kg: self.kg * k }
+
+    # The weight of this mass in standard gravity.
+    fn weight(self: read Self) -> Force:
+        return Force{ newtons: self.kg * STANDARD_GRAVITY }
+
+impl Force:
+    fn as_newtons(self: read Self) -> f64:
+        return self.newtons
+
+    fn add(self: read Self, o: Force) -> Force:
+        return Force{ newtons: self.newtons + o.newtons }
+
+    fn sub(self: read Self, o: Force) -> Force:
+        return Force{ newtons: self.newtons - o.newtons }
+
+    fn neg(self: read Self) -> Force:
+        return Force{ newtons: -self.newtons }
+
+    fn eq(self: read Self, o: Force) -> bool:
+        return self.newtons == o.newtons
+
+    fn lt(self: read Self, o: Force) -> bool:
+        return self.newtons < o.newtons
+
+    # The acceleration this force gives to `m`.
+    fn on_mass(self: read Self, m: Mass) -> Accel:
+        return Accel{ mps2: self.newtons / m.kg }
+
+# -- Angle, Pressure, Temperature --------------------------------------------------------------------------------------------
+
+impl Angle:
+    fn as_radians(self: read Self) -> f64:
+        return self.rad
+
+    fn as_degrees(self: read Self) -> f64:
+        return self.rad * 180.0 / PI
+
+    fn add(self: read Self, o: Angle) -> Angle:
+        return Angle{ rad: self.rad + o.rad }
+
+    fn sub(self: read Self, o: Angle) -> Angle:
+        return Angle{ rad: self.rad - o.rad }
+
+    fn neg(self: read Self) -> Angle:
+        return Angle{ rad: -self.rad }
+
+    fn eq(self: read Self, o: Angle) -> bool:
+        return self.rad == o.rad
+
+    fn lt(self: read Self, o: Angle) -> bool:
+        return self.rad < o.rad
+
+    fn scaled(self: read Self, k: f64) -> Angle:
+        return Angle{ rad: self.rad * k }
+
+    # The same direction in the range [0, 2 pi).
+    fn normalized(self: read Self) -> Angle:
+        two_pi = 2.0 * PI
+        r = self.rad - two_pi * f64(i64(self.rad / two_pi))
+        if r < 0.0:
+            r = r + two_pi
+        return Angle{ rad: r }
+
+    # The same direction in the range (-pi, pi].
+    fn wrapped(self: read Self) -> Angle:
+        a = self.normalized().rad
+        if a > PI:
+            a = a - 2.0 * PI
+        return Angle{ rad: a }
+
+impl Pressure:
+    fn as_pascals(self: read Self) -> f64:
+        return self.pascals
+
+    fn as_hectopascals(self: read Self) -> f64:
+        return self.pascals / 100.0
+
+    fn as_inches_of_mercury(self: read Self) -> f64:
+        return self.pascals / 3386.389
+
+    fn add(self: read Self, o: Pressure) -> Pressure:
+        return Pressure{ pascals: self.pascals + o.pascals }
+
+    fn sub(self: read Self, o: Pressure) -> Pressure:
+        return Pressure{ pascals: self.pascals - o.pascals }
+
+    fn eq(self: read Self, o: Pressure) -> bool:
+        return self.pascals == o.pascals
+
+    fn lt(self: read Self, o: Pressure) -> bool:
+        return self.pascals < o.pascals
+
+impl Temperature:
+    fn as_kelvin(self: read Self) -> f64:
+        return self.kelvin
+
+    fn as_celsius(self: read Self) -> f64:
+        return self.kelvin - KELVIN_AT_0C
+
+    fn as_fahrenheit(self: read Self) -> f64:
+        return (self.kelvin - KELVIN_AT_0C) * 9.0 / 5.0 + 32.0
+
+    fn eq(self: read Self, o: Temperature) -> bool:
+        return self.kelvin == o.kelvin
+
+    fn lt(self: read Self, o: Temperature) -> bool:
+        return self.kelvin < o.kelvin
+
+    # The difference of two temperatures is a number of kelvin, not a temperature.
+    fn difference(self: read Self, o: Temperature) -> f64:
+        return self.kelvin - o.kelvin

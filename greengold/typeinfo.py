@@ -18,10 +18,10 @@ from .ast_nodes import (
     StructDecl, Unary,
 )
 
-SIGNED_INTS = {"i8", "i16", "i32", "i64", "isize"}
-UNSIGNED_INTS = {"u8", "u16", "u32", "u64", "usize"}
+SIGNED_INTS = {"i8", "i16", "i32", "i64", "i128", "isize"}
+UNSIGNED_INTS = {"u8", "u16", "u32", "u64", "u128", "usize"}
 INTS = SIGNED_INTS | UNSIGNED_INTS
-FLOATS = {"f32", "f64"}
+FLOATS = {"f16", "f32", "f64"}
 NUMERIC = INTS | FLOATS
 PRIMS = NUMERIC | {"bool", "str"}
 TYPE_ALIASES: dict[str, str] = {
@@ -66,11 +66,13 @@ INT_RANGES: dict[str, tuple[int, int]] = {
     "i16": (-32768, 32767),
     "i32": (-2147483648, 2147483647),
     "i64": (-9223372036854775808, 9223372036854775807),
+    "i128": (-(1 << 127), (1 << 127) - 1),
     "isize": (-9223372036854775808, 9223372036854775807),
     "u8": (0, 255),
     "u16": (0, 65535),
     "u32": (0, 4294967295),
     "u64": (0, 18446744073709551615),
+    "u128": (0, (1 << 128) - 1),
     "usize": (0, 18446744073709551615),
 }
 INT_MAX = {k: v[1] for k, v in INT_RANGES.items()}
@@ -277,7 +279,8 @@ def needs_drop(ty: str, structs: dict, enums: dict, _seen: frozenset[str] = froz
 
 # OS handles of `std.thread`. Their bytes are the OS object, so a copy would be a second, unrelated
 # object: `n = m` would be a new lock and a copied channel an empty queue. They are moved, never copied.
-HANDLE_STRUCTS = {"Thread", "Mutex", "Cond", "AtomicI64", "Channel", "Queue", "Atomic", "Locked"}
+HANDLE_STRUCTS = {"Thread", "Mutex", "Cond", "AtomicI64", "Channel", "ChannelI64", "Queue", "Atomic", "Locked",
+                  "Semaphore", "Barrier", "RwLock", "ReadGuard", "WriteGuard", "Once", "ThreadLocal"}
 _STD_THREAD = (Path(__file__).parent / "std" / "thread.gg").resolve()
 
 

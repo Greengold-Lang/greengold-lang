@@ -1,0 +1,131 @@
+# std.csv: comma-separated values (RFC 4180), with any one-byte separator.
+#
+#     import std.csv
+#     rows = csv.parse("name,age\nAda,36\n\"Smith, J\",41\n", ',').value_or_panic()
+#     print(rows.len, rows[2][0])                      # 3 Smith, J
+#     out = csv.format_row(["a", "b,c", "say \"hi\""], ',')      # a,"b,c","say ""hi"""
+#
+# A field may be quoted with `"`; inside quotes the separator, a line break, and a doubled `""` (one quote) are part of the
+# field. Lines end with `\n` or `\r\n`. A blank line is a row with one empty field, except a blank last line. `parse` is strict
+# about quotes (an unterminated quote or a stray quote in an unquoted field is an `Err` with the line number); `parse_lenient`
+# keeps a stray quote as text.
+
+fn parse(text: str, sep: u8) -> Result[List[List[string]], string]:
+    return _parse(text, sep, true)
+
+fn parse_lenient(text: str, sep: u8) -> Result[List[List[string]], string]:
+    return _parse(text, sep, false)
+
+private
+fn _parse(text: str, sep: u8, strict: bool) -> Result[List[List[string]], string]:
+    rows = List[List[string]]()
+    row = List[string]()
+    field = string.new()
+    i: usize = 0
+    line = 1
+    in_quotes = false
+    field_started = false
+    quoted = false
+    n = text.len
+    while i < n:
+        c = text[i]
+        if in_quotes:
+            if c == '"':
+                if i + 1 < n and text[i + 1] == '"':
+                    field.append_byte('"')
+                    i += 2
+                    continue
+                in_quotes = false
+                i += 1
+                continue
+            if c == '\n':
+                line += 1
+            field.append_byte(c)
+            i += 1
+            continue
+        if c == '"':
+            if not field_started:
+                in_quotes = true
+                quoted = true
+                field_started = true
+                i += 1
+                continue
+            if strict:
+                return Err(f"line {line}: a quote inside an unquoted field")
+            field.append_byte('"')
+            i += 1
+            continue
+        if c == sep:
+            row.push(field.clone())
+            field = string.new()
+            field_started = false
+            quoted = false
+            i += 1
+            continue
+        if c == '\r' and i + 1 < n and text[i + 1] == '\n':
+            i += 1
+            continue
+        if c == '\n':
+            row.push(field.clone())
+            rows.push(row.clone())
+            row = List[string]()
+            field = string.new()
+            field_started = false
+            quoted = false
+            line += 1
+            i += 1
+            continue
+        if quoted and strict:
+            return Err(f"line {line}: text after a closing quote")
+        field.append_byte(c)
+        field_started = true
+        i += 1
+    if in_quotes:
+        return Err(f"line {line}: a quote that is never closed")
+    if field_started or row.len > 0 or field.len() > 0:
+        row.push(field.clone())
+        rows.push(row.clone())
+    return Ok(rows)
+
+public
+# One row as text, quoting the fields that need it. No line break at the end.
+fn format_row(fields: read List[string], sep: u8) -> string:
+    out = string.new()
+    for i in 0..fields.len:
+        if i > 0:
+            out.append_byte(sep)
+        f = fields[i].as_str()
+        needs = false
+        for k in 0..f.len:
+            c = f[k]
+            if c == sep or c == '"' or c == '\n' or c == '\r':
+                needs = true
+        if f.len > 0 and (f[0] == ' ' or f[f.len - 1] == ' '):
+            needs = true
+        if needs:
+            out.append_byte('"')
+            for k in 0..f.len:
+                if f[k] == '"':
+                    out.append_byte('"')
+                out.append_byte(f[k])
+            out.append_byte('"')
+        else:
+            out.append_str(f)
+    return out
+
+# All rows, each ending in `\n`.
+fn format(rows: read List[List[string]], sep: u8) -> string:
+    out = string.new()
+    for r in rows:
+        out.append_str(format_row(r, sep).as_str())
+        out.append_byte('\n')
+    return out
+
+# The column index of a header name in the first row, or `None`.
+fn column(rows: read List[List[string]], name: str) -> Optional[usize]:
+    if rows.len == 0:
+        return None
+    for i in 0..rows[0].len:
+        if rows[0][i].as_str() == name:
+            return Valid(i)
+    return None

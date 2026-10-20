@@ -2,6 +2,8 @@
 #
 # Provides canonical struct-based concurrency primitives (Thread, Mutex, Cond, AtomicI64, Channel).
 
+import std.time
+
 private
 extern "stdlib.h" fn malloc(size: usize) -> *mut u8
 extern "stdlib.h" fn free(ptr: *u8)
@@ -14,7 +16,23 @@ extern "pthread.h" fn pthread_mutex_unlock(m: *mut u8) -> i32
 extern "pthread.h" fn pthread_cond_init(c: *mut u8, attr: *u8) -> i32
 extern "pthread.h" fn pthread_cond_wait(c: *mut u8, m: *mut u8) -> i32
 extern "pthread.h" fn pthread_cond_broadcast(c: *mut u8) -> i32
+extern "pthread.h" fn pthread_mutex_trylock(m: *mut u8) -> i32
+extern "pthread.h" fn pthread_cond_signal(c: *mut u8) -> i32
+extern "pthread.h" fn pthread_cond_timedwait(c: *mut u8, m: *mut u8, abstime: *u8) -> i32
+extern "pthread.h" fn pthread_key_create(key: *mut u64, destructor: *u8) -> i32
+extern "pthread.h" fn pthread_getspecific(key: u64) -> *mut u8
+extern "pthread.h" fn pthread_setspecific(key: u64, value: *u8) -> i32
 extern "sched.h" fn sched_yield() -> i32
+
+# Waits on `cnd` (holding `mtx`) until it is signalled or the clock `deadline` (unix milliseconds) passes.
+# Returns false when the time ran out. Wakes up spuriously now and then, like every condition wait.
+fn _timed_wait(cnd: *mut u8, mtx: *mut u8, deadline: i64) -> bool:
+    if time.unix_millis() >= deadline:
+        return false
+    ts: [2]i64 = [deadline / 1000, (deadline % 1000) * 1000000]
+    unsafe:
+        rc = pthread_cond_timedwait(cnd, mtx, ptr_cast[*u8](addr(ts)))
+        return rc == 0
 
 struct _ThreadJobNoArg:
     f: fn()
@@ -50,7 +68,7 @@ fn _thread_trampoline_i64(arg: *u8) -> *u8:
     return null
 
 public
-# Thread, Mutex, Cond, AtomicI64 and Channel are OS handles: they are moved, never copied or cloned
+# Thread, Mutex, Cond, AtomicI64 and ChannelI64 are OS handles: they are moved, never copied or cloned
 # (GG0323). Share one by passing it as `read`/`lend`.
 struct Thread:
     private
@@ -139,6 +157,11 @@ impl Mutex:
         unsafe:
             pthread_mutex_unlock(ptr_cast[*mut u8](addr(self)))
 
+    # Takes the lock if it is free right now; false when another thread holds it.
+    fn try_lock(self: read Mutex) -> bool:
+        unsafe:
+            return pthread_mutex_trylock(ptr_cast[*mut u8](addr(self))) == 0
+
 impl Cond:
     # Creates a new condition variable.
     fn new() -> Cond:
@@ -157,6 +180,17 @@ impl Cond:
     fn broadcast(self: read Cond):
         unsafe:
             pthread_cond_broadcast(ptr_cast[*mut u8](addr(self)))
+
+    # Wakes one thread waiting on this condition variable.
+    fn signal(self: read Cond):
+        unsafe:
+            pthread_cond_signal(ptr_cast[*mut u8](addr(self)))
+
+    # Like `wait`, but gives up after `ms` milliseconds. Returns false when it timed out.
+    fn wait_timeout(self: read Cond, m: read Mutex, ms: i64) -> bool:
+        deadline = time.unix_millis() + ms
+        unsafe:
+            return _timed_wait(ptr_cast[*mut u8](addr(self)), ptr_cast[*mut u8](addr(m)), deadline)
 
 # -- Atomic[T] and AtomicI64: lock-free integers (hardware atomics, sequentially consistent) ------
 
@@ -233,19 +267,19 @@ impl AtomicI64:
         unsafe:
             return atomic_cas[i64](ptr_cast[*mut i64](addr(self)), expected, new, "seq_cst") == expected
 
-# -- Channel: bounded blocking MPMC queue of i64 -----------------------------------------------
+# -- ChannelI64: bounded blocking MPMC queue of i64 (`Channel[T]` below holds any type) -----------------------------------------------
 
 # words: [0..8) mutex, [8..16) cond, 16 head, 17 tail, 18 count, 19 closed, [20..276) ring buffer
-struct Channel:
+struct ChannelI64:
     private
     words: [276]i64
 
-impl Channel:
-    # Creates a new bounded Channel (256 slots).
+impl ChannelI64:
+    # Creates a new bounded ChannelI64 (256 slots).
     public
-    fn new() -> Channel:
+    fn new() -> ChannelI64:
         w: [276]i64 = [0; 276]
-        c = Channel{ words: w }
+        c = ChannelI64{ words: w }
         unsafe:
             base = ptr_cast[*mut u8](addr_mut(c))
             pthread_mutex_init(base, null)
@@ -253,7 +287,7 @@ impl Channel:
         return c
 
     # Blocks while buffer is full. Safe: caller needs no `unsafe:`.
-    fn send(self: read Channel, value: i64):
+    fn send(self: read ChannelI64, value: i64):
         unsafe:
             base = ptr_cast[*mut i64](addr(self))
             mtx = ptr_cast[*mut u8](addr(self))
@@ -263,7 +297,7 @@ impl Channel:
                 pthread_cond_wait(cnd, mtx)
             if base[19] != 0:
                 pthread_mutex_unlock(mtx)
-                panic("Channel.send: channel is closed")
+                panic("ChannelI64.send: channel is closed")
             base[20 + base[17]] = value
             base[17] = (base[17] + 1) % 256
             base[18] = base[18] + 1
@@ -271,7 +305,7 @@ impl Channel:
             pthread_mutex_unlock(mtx)
 
     # Blocks while empty; returns None when channel is closed and drained. Safe: caller needs no `unsafe:`.
-    fn recv(self: read Channel) -> Optional[i64]:
+    fn recv(self: read ChannelI64) -> Optional[i64]:
         unsafe:
             base = ptr_cast[*mut i64](addr(self))
             mtx = ptr_cast[*mut u8](addr(self))
@@ -290,7 +324,7 @@ impl Channel:
             return Valid(v)
 
     # Closes the channel. Safe: caller needs no `unsafe:`.
-    fn close(self: read Channel):
+    fn close(self: read ChannelI64):
         unsafe:
             base = ptr_cast[*mut i64](addr(self))
             mtx = ptr_cast[*mut u8](addr(self))
@@ -310,7 +344,8 @@ struct Queue[T]:
     cell: *mut u8   # List[T] and the closed flag, on the C heap so a shared `read` queue can change them
 
 struct _QueueCell[T]:
-    items: List[T]
+    items: List[T]      # newest last (the inbox)
+    outbox: List[T]     # oldest last: refilled by reversing `items`, so recv is O(1) on average
     closed: bool
 
 impl Queue[T]:
@@ -321,7 +356,7 @@ impl Queue[T]:
         q = Queue[T]{ sync: s, cell: null }
         unsafe:
             raw = malloc(size_of[_QueueCell[T]]())
-            ptr_write[_QueueCell[T]](raw, _QueueCell[T]{ items: List[T](), closed: false })
+            ptr_write[_QueueCell[T]](raw, _QueueCell[T]{ items: List[T](), outbox: List[T](), closed: false })
             q.cell = raw
             base = ptr_cast[*mut u8](addr_mut(q))
             pthread_mutex_init(base, null)
@@ -352,10 +387,13 @@ impl Queue[T]:
             pthread_mutex_lock(mtx)
             while true:
                 c = ptr_read[_QueueCell[T]](self.cell)
-                if c.items.len > 0 or c.closed:
+                if c.items.len > 0 or c.outbox.len > 0 or c.closed:
                     out: Optional[T] = None
-                    if c.items.len > 0:
-                        out = Valid(c.items.remove(0))
+                    if c.outbox.len == 0:
+                        while c.items.len > 0:
+                            c.outbox.push(c.items.pop().value_or_panic())
+                    if c.outbox.len > 0:
+                        out = c.outbox.pop()
                     ptr_write[_QueueCell[T]](self.cell, c)
                     pthread_mutex_unlock(mtx)
                     return out
@@ -454,3 +492,458 @@ impl Guard[T]:
     fn drop(self: lend Self):
         unsafe:
             pthread_mutex_unlock(ptr_cast[*mut u8](addr(self.owner)))
+
+# -- Semaphore: a counter of permits -----------------------------------------------------------------
+
+# `acquire` takes a permit and waits while there is none; `release` gives one back. `Semaphore.new(3)` lets
+# three threads in at once. Share one with `Arc[Semaphore]`.
+# words: [0..8) mutex, [8..16) cond, 16 permits
+public
+struct Semaphore:
+    private
+    words: [24]i64
+
+impl Semaphore:
+    public
+    fn new(permits: i64) -> Semaphore:
+        w: [24]i64 = [0; 24]
+        s = Semaphore{ words: w }
+        unsafe:
+            base = ptr_cast[*mut u8](addr_mut(s))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut i64](base), 8)), null)
+            ptr_cast[*mut i64](base)[16] = permits
+        return s
+
+    # Takes a permit, waiting while none is left.
+    fn acquire(self: read Semaphore):
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            while base[16] <= 0:
+                pthread_cond_wait(cnd, mtx)
+            base[16] = base[16] - 1
+            pthread_mutex_unlock(mtx)
+
+    # Takes a permit if one is free right now.
+    fn try_acquire(self: read Semaphore) -> bool:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            pthread_mutex_lock(mtx)
+            ok = base[16] > 0
+            if ok:
+                base[16] = base[16] - 1
+            pthread_mutex_unlock(mtx)
+            return ok
+
+    # Takes a permit, waiting at most `ms` milliseconds. False when the time ran out.
+    fn acquire_timeout(self: read Semaphore, ms: i64) -> bool:
+        deadline = time.unix_millis() + ms
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            while base[16] <= 0:
+                if not _timed_wait(cnd, mtx, deadline) and base[16] <= 0:
+                    pthread_mutex_unlock(mtx)
+                    return false
+            base[16] = base[16] - 1
+            pthread_mutex_unlock(mtx)
+            return true
+
+    # Gives a permit back and wakes a waiting thread.
+    fn release(self: read Semaphore):
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            base[16] = base[16] + 1
+            pthread_cond_signal(cnd)
+            pthread_mutex_unlock(mtx)
+
+    # The permits free right now.
+    fn available(self: read Semaphore) -> i64:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            pthread_mutex_lock(mtx)
+            n = base[16]
+            pthread_mutex_unlock(mtx)
+            return n
+
+# -- Barrier: threads wait for each other --------------------------------------------------------------
+
+# `Barrier.new(3)`: the first two threads to call `wait` block until the third arrives, then all three go on.
+# The barrier can be used again for the next round. `wait` returns true in exactly one thread of a round.
+# words: [0..8) mutex, [8..16) cond, 16 size, 17 arrived, 18 generation
+public
+struct Barrier:
+    private
+    words: [24]i64
+
+impl Barrier:
+    public
+    fn new(size: i64) -> Barrier:
+        if size <= 0:
+            panic("Barrier.new: size must be positive")
+        w: [24]i64 = [0; 24]
+        b = Barrier{ words: w }
+        unsafe:
+            base = ptr_cast[*mut u8](addr_mut(b))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut i64](base), 8)), null)
+            ptr_cast[*mut i64](base)[16] = size
+        return b
+
+    fn wait(self: read Barrier) -> bool:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            gen = base[18]
+            base[17] = base[17] + 1
+            if base[17] == base[16]:
+                base[17] = 0
+                base[18] = gen + 1
+                pthread_cond_broadcast(cnd)
+                pthread_mutex_unlock(mtx)
+                return true
+            while base[18] == gen:
+                pthread_cond_wait(cnd, mtx)
+            pthread_mutex_unlock(mtx)
+            return false
+
+# -- RwLock: many readers or one writer -----------------------------------------------------------------
+
+# Readers share the lock; a writer has it alone. A waiting writer holds back new readers, so writers are not
+# starved. The lock guards no data itself: take a `ReadGuard` or `WriteGuard` before touching the data it protects,
+# and the lock opens when the guard goes away.
+# words: [0..8) mutex, [8..16) cond, 16 readers, 17 writer active, 18 writers waiting
+public
+struct RwLock:
+    private
+    words: [24]i64
+
+public
+struct ReadGuard:
+    private
+    owner: read RwLock tied to self
+
+public
+struct WriteGuard:
+    private
+    owner: read RwLock tied to self
+
+impl RwLock:
+    public
+    fn new() -> RwLock:
+        w: [24]i64 = [0; 24]
+        l = RwLock{ words: w }
+        unsafe:
+            base = ptr_cast[*mut u8](addr_mut(l))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut i64](base), 8)), null)
+        return l
+
+    # Waits for the lock to be free of writers, then shares it.
+    fn read_lock(self: read RwLock) -> ReadGuard:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            while base[17] != 0 or base[18] > 0:
+                pthread_cond_wait(cnd, mtx)
+            base[16] = base[16] + 1
+            pthread_mutex_unlock(mtx)
+        return ReadGuard{ owner: self }
+
+    # Waits until nobody holds the lock, then holds it alone.
+    fn write_lock(self: read RwLock) -> WriteGuard:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            base[18] = base[18] + 1
+            while base[17] != 0 or base[16] > 0:
+                pthread_cond_wait(cnd, mtx)
+            base[18] = base[18] - 1
+            base[17] = 1
+            pthread_mutex_unlock(mtx)
+        return WriteGuard{ owner: self }
+
+    # True when a reader could take the lock right now (no writer active or waiting).
+    fn can_read(self: read RwLock) -> bool:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            pthread_mutex_lock(mtx)
+            ok = base[17] == 0 and base[18] == 0
+            pthread_mutex_unlock(mtx)
+            return ok
+
+    # How many readers hold the lock now.
+    fn readers(self: read RwLock) -> i64:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            pthread_mutex_lock(mtx)
+            n = base[16]
+            pthread_mutex_unlock(mtx)
+            return n
+
+impl ReadGuard:
+    fn drop(self: lend Self):
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self.owner))
+            mtx = ptr_cast[*mut u8](addr(self.owner))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            base[16] = base[16] - 1
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+impl WriteGuard:
+    fn drop(self: lend Self):
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self.owner))
+            mtx = ptr_cast[*mut u8](addr(self.owner))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            base[17] = 0
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+# -- Once: run something one time ---------------------------------------------------------------------
+
+# `once.run(f)` calls `f` in the first thread that gets here; every other caller waits until `f` is done, and
+# then goes on without calling it. Returns true in the thread that ran `f`.
+# words: [0..8) mutex, [8..16) cond, 16 state (0 new, 1 running, 2 done)
+public
+struct Once:
+    private
+    words: [24]i64
+
+impl Once:
+    public
+    fn new() -> Once:
+        w: [24]i64 = [0; 24]
+        o = Once{ words: w }
+        unsafe:
+            base = ptr_cast[*mut u8](addr_mut(o))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut i64](base), 8)), null)
+        return o
+
+    fn run(self: read Once, f: fn()) -> bool:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(base, 8))
+            pthread_mutex_lock(mtx)
+            while base[16] == 1:
+                pthread_cond_wait(cnd, mtx)
+            if base[16] == 2:
+                pthread_mutex_unlock(mtx)
+                return false
+            base[16] = 1
+            pthread_mutex_unlock(mtx)
+            f()
+            pthread_mutex_lock(mtx)
+            base[16] = 2
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+            return true
+
+    fn is_done(self: read Once) -> bool:
+        unsafe:
+            base = ptr_cast[*mut i64](addr(self))
+            return atomic_load[i64](ptr_cast[*i64](ptr_offset(base, 16)), "seq_cst") == 2
+
+# -- ThreadLocal: one i64 per thread --------------------------------------------------------------------
+
+# Each thread sees its own value, which starts as the `initial` given to `new`.
+public
+struct ThreadLocal:
+    private
+    key: u64
+    initial: i64
+
+impl ThreadLocal:
+    public
+    fn new(initial: i64) -> ThreadLocal:
+        k: u64 = 0
+        unsafe:
+            if pthread_key_create(addr_mut(k), null) != 0:
+                panic("ThreadLocal.new: no more thread-local keys")
+        return ThreadLocal{ key: k, initial: initial }
+
+    fn get(self: read ThreadLocal) -> i64:
+        unsafe:
+            p = pthread_getspecific(self.key)
+            if p == null:
+                return self.initial
+            return ptr_cast[*i64](p)[0]
+
+    fn set(self: read ThreadLocal, value: i64):
+        unsafe:
+            p = pthread_getspecific(self.key)
+            if p == null:
+                p = malloc(usize(8))
+                pthread_setspecific(self.key, p)
+            ptr_cast[*mut i64](p)[0] = value
+
+# -- Channel[T]: blocking queue between threads, bounded or not -----------------------------------------
+
+# `Channel[T].new(capacity)` holds at most `capacity` values (`send` waits while it is full); `unbounded()` never
+# makes a sender wait. `recv` waits for a value and returns `None` once the channel is closed and empty. Share one
+# with `Arc[Channel[T]]`. For the old channel of `i64` with 256 slots, see `ChannelI64`.
+public
+struct Channel[T]:
+    private
+    sync: [16]u64   # [0..8) mutex, [8..16) condition variable
+    cell: *mut u8   # _ChanCell[T], on the C heap so a shared `read` channel can change it
+
+struct _ChanCell[T]:
+    inbox: List[T]
+    outbox: List[T]
+    closed: bool
+    cap: usize
+
+fn _chan_pop[T](c: lend _ChanCell[T]) -> Optional[T]:
+    if c.outbox.len == 0:
+        while c.inbox.len > 0:
+            c.outbox.push(c.inbox.pop().value_or_panic())
+    return c.outbox.pop()
+
+impl Channel[T]:
+    public
+    fn new(capacity: usize) -> Channel[T]:
+        if capacity == 0:
+            panic("Channel.new: capacity must be positive (use unbounded() for no limit)")
+        return Channel[T]._make(capacity)
+
+    fn unbounded() -> Channel[T]:
+        return Channel[T]._make(0)
+
+    fn _make(capacity: usize) -> Channel[T]:
+        s: [16]u64 = [0; 16]
+        q = Channel[T]{ sync: s, cell: null }
+        unsafe:
+            raw = malloc(size_of[_ChanCell[T]]())
+            ptr_write[_ChanCell[T]](raw, _ChanCell[T]{ inbox: List[T](), outbox: List[T](), closed: false, cap: capacity })
+            q.cell = raw
+            base = ptr_cast[*mut u8](addr_mut(q))
+            pthread_mutex_init(base, null)
+            pthread_cond_init(ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](base), 8)), null)
+        return q
+
+    # Adds `value`, waiting while the channel is full. Returns false (and drops the value) when it is closed.
+    fn send(self: read Self, value: send T) -> bool:
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            while true:
+                c = ptr_read[_ChanCell[T]](self.cell)
+                if c.closed:
+                    ptr_write[_ChanCell[T]](self.cell, c)
+                    pthread_mutex_unlock(mtx)
+                    return false
+                if c.cap == 0 or c.inbox.len + c.outbox.len < c.cap:
+                    c.inbox.push(value)
+                    ptr_write[_ChanCell[T]](self.cell, c)
+                    pthread_cond_broadcast(cnd)
+                    pthread_mutex_unlock(mtx)
+                    return true
+                ptr_write[_ChanCell[T]](self.cell, c)
+                pthread_cond_wait(cnd, mtx)
+        return false
+
+    # Takes the oldest value, waiting while the channel is empty. `None` once it is closed and empty.
+    fn recv(self: read Self) -> Optional[T]:
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            while true:
+                c = ptr_read[_ChanCell[T]](self.cell)
+                if c.inbox.len + c.outbox.len > 0 or c.closed:
+                    out = _chan_pop(c)
+                    ptr_write[_ChanCell[T]](self.cell, c)
+                    pthread_cond_broadcast(cnd)
+                    pthread_mutex_unlock(mtx)
+                    return out
+                ptr_write[_ChanCell[T]](self.cell, c)
+                pthread_cond_wait(cnd, mtx)
+        return None
+
+    # Takes a value if one is waiting right now.
+    fn try_recv(self: read Self) -> Optional[T]:
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            c = ptr_read[_ChanCell[T]](self.cell)
+            out = _chan_pop(c)
+            ptr_write[_ChanCell[T]](self.cell, c)
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+            return out
+
+    # Takes a value, waiting at most `ms` milliseconds. `None` on timeout, or when closed and empty.
+    fn recv_timeout(self: read Self, ms: i64) -> Optional[T]:
+        deadline = time.unix_millis() + ms
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            while true:
+                c = ptr_read[_ChanCell[T]](self.cell)
+                if c.inbox.len + c.outbox.len > 0 or c.closed:
+                    out = _chan_pop(c)
+                    ptr_write[_ChanCell[T]](self.cell, c)
+                    pthread_cond_broadcast(cnd)
+                    pthread_mutex_unlock(mtx)
+                    return out
+                ptr_write[_ChanCell[T]](self.cell, c)
+                if not _timed_wait(cnd, mtx, deadline) and time.unix_millis() >= deadline:
+                    pthread_mutex_unlock(mtx)
+                    return None
+        return None
+
+    # How many values are waiting.
+    fn len(self: read Self) -> usize:
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            pthread_mutex_lock(mtx)
+            c = ptr_read[_ChanCell[T]](self.cell)
+            n = c.inbox.len + c.outbox.len
+            ptr_write[_ChanCell[T]](self.cell, c)
+            pthread_mutex_unlock(mtx)
+            return n
+
+    # Closes the channel: senders get false, receivers drain what is left and then get `None`.
+    fn close(self: read Self):
+        unsafe:
+            mtx = ptr_cast[*mut u8](addr(self))
+            cnd = ptr_cast[*mut u8](ptr_offset(ptr_cast[*mut u64](mtx), 8))
+            pthread_mutex_lock(mtx)
+            c = ptr_read[_ChanCell[T]](self.cell)
+            c.closed = true
+            ptr_write[_ChanCell[T]](self.cell, c)
+            pthread_cond_broadcast(cnd)
+            pthread_mutex_unlock(mtx)
+
+    fn drop(self: lend Self):
+        unsafe:
+            if self.cell != null:
+                c = ptr_read[_ChanCell[T]](self.cell)
+                free(self.cell)

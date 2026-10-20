@@ -1,0 +1,556 @@
+# std.bigint: integers of any size.
+#
+#     import std.bigint { BigInt, bigint_from_i64, bigint_parse }
+#     a = bigint_parse("123456789012345678901234567890").value_or_panic()
+#     b = bigint_from_i64(987654321)
+#     print(a.mul(b).to_string())
+#     print(bigint_from_i64(2).pow(200).to_string())
+#
+# A `BigInt` is a sign and a list of 32-bit digits, least significant first, without leading zeros (zero has no
+# digits and is never negative). `add`, `sub`, `mul` take time proportional to the digits (`mul` is the schoolbook
+# method, quadratic); `div_rem` is Knuth's algorithm D. Division truncates toward zero, like `/` and `%` on
+# integers; `modulo` is the always-non-negative remainder. These routines are not constant time: do not use them
+# for secret exponents without `std.crypto`'s protections.
+
+import std.string
+
+struct BigInt:
+    private
+    neg: bool
+    mag: List[u32]
+
+public
+fn bigint_zero() -> BigInt:
+    return BigInt{ neg: false, mag: List[u32]() }
+
+fn bigint_from_u64(n: u64) -> BigInt:
+    m = List[u32]()
+    if n != 0:
+        m.push(u32(n & 4294967295))
+        if (n >> 32) != 0:
+            m.push(u32(n >> 32))
+    return BigInt{ neg: false, mag: m }
+
+fn bigint_from_i64(n: i64) -> BigInt:
+    if n >= 0:
+        return bigint_from_u64(u64(n))
+    r = bigint_from_u64(wrapping_sub[u64](0, u64(n)))
+    r.neg = true
+    return r
+
+# Reads decimal digits with an optional sign (`-123`), or hexadecimal with a `0x` prefix. `_` between digits is ignored.
+fn bigint_parse(text: str) -> Result[BigInt, string]:
+    i: usize = 0
+    neg = false
+    if text.len > 0 and (text[0] == '-' or text[0] == '+'):
+        neg = text[0] == '-'
+        i = 1
+    base: u32 = 10
+    if i + 2 < text.len + 0 and text[i] == '0' and (text[i + 1] == 'x' or text[i + 1] == 'X'):
+        base = 16
+        i += 2
+    if i >= text.len:
+        return Err(string.from("no digits"))
+    mag = List[u32]()
+    while i < text.len:
+        c = text[i]
+        i += 1
+        if c == '_':
+            continue
+        d: u32 = 99
+        if c >= '0' and c <= '9':
+            d = u32(c - '0')
+        elif base == 16 and c >= 'a' and c <= 'f':
+            d = u32(c - 'a') + 10
+        elif base == 16 and c >= 'A' and c <= 'F':
+            d = u32(c - 'A') + 10
+        if d >= base:
+            return Err(f"unexpected character `{string.substr(text, i - 1, i)}`")
+        _mag_mul_small_add(mag, base, d)
+    _trim(mag)
+    if mag.len == 0:
+        neg = false
+    return Ok(BigInt{ neg: neg, mag: mag })
+
+# Big-endian bytes (as in keys and hashes) to a non-negative number.
+fn bigint_from_bytes_be(bytes: read List[u8]) -> BigInt:
+    mag = List[u32]()
+    for b in bytes:
+        _mag_mul_small_add(mag, 256, u32(b))
+    _trim(mag)
+    return BigInt{ neg: false, mag: mag }
+
+impl BigInt:
+    fn is_zero(self: read Self) -> bool:
+        return self.mag.len == 0
+
+    fn is_negative(self: read Self) -> bool:
+        return self.neg
+
+    fn is_even(self: read Self) -> bool:
+        return self.mag.len == 0 or (self.mag[0] & 1) == 0
+
+    fn neg(self: read Self) -> BigInt:
+        r = self.clone()
+        if r.mag.len != 0:
+            r.neg = not r.neg
+        return r
+
+    fn abs(self: read Self) -> BigInt:
+        r = self.clone()
+        r.neg = false
+        return r
+
+    # -1, 0 or 1.
+    fn compare(self: read Self, other: read BigInt) -> i64:
+        if self.neg != other.neg:
+            if self.neg:
+                return -1
+            return 1
+        c = _mag_cmp(self.mag, other.mag)
+        if self.neg:
+            return 0 - c
+        return c
+
+    fn equals(self: read Self, other: read BigInt) -> bool:
+        return self.compare(other) == 0
+
+    fn add(self: read Self, other: read BigInt) -> BigInt:
+        if self.neg == other.neg:
+            return BigInt{ neg: self.neg, mag: _mag_add(self.mag, other.mag) }
+        c = _mag_cmp(self.mag, other.mag)
+        if c == 0:
+            return bigint_zero()
+        if c > 0:
+            return BigInt{ neg: self.neg, mag: _mag_sub(self.mag, other.mag) }
+        return BigInt{ neg: other.neg, mag: _mag_sub(other.mag, self.mag) }
+
+    fn sub(self: read Self, other: read BigInt) -> BigInt:
+        return self.add(other.neg())
+
+    fn mul(self: read Self, other: read BigInt) -> BigInt:
+        m = _mag_mul(self.mag, other.mag)
+        n = (self.neg != other.neg) and m.len != 0
+        return BigInt{ neg: n, mag: m }
+
+    # Quotient and remainder, truncated toward zero: `self == q * other + r`, `r` has the sign of `self`.
+    # Panics on division by zero.
+    fn div_rem(self: read Self, other: read BigInt) -> Tuple2[BigInt, BigInt]:
+        if other.mag.len == 0:
+            panic("BigInt: division by zero")
+        qr = _mag_divmod(self.mag, other.mag)
+        q = BigInt{ neg: (self.neg != other.neg) and qr.f0.len != 0, mag: qr.f0.clone() }
+        r = BigInt{ neg: self.neg and qr.f1.len != 0, mag: qr.f1.clone() }
+        return Tuple2{ f0: q, f1: r }
+
+    fn div(self: read Self, other: read BigInt) -> BigInt:
+        return self.div_rem(other).f0.clone()
+
+    fn rem(self: read Self, other: read BigInt) -> BigInt:
+        return self.div_rem(other).f1.clone()
+
+    # The remainder in `0 .. |m|`, whatever the sign of `self`.
+    fn modulo(self: read Self, m: read BigInt) -> BigInt:
+        r = self.rem(m)
+        if r.neg:
+            return r.add(m.abs())
+        return r
+
+    fn pow(self: read Self, exponent: u32) -> BigInt:
+        result = bigint_from_i64(1)
+        base = self.clone()
+        e = exponent
+        while e > 0:
+            if (e & 1) == 1:
+                result = result.mul(base)
+            e = e >> 1
+            if e > 0:
+                base = base.mul(base)
+        return result
+
+    # `self ** exponent mod m` for a non-negative exponent, by repeated squaring.
+    fn pow_mod(self: read Self, exponent: read BigInt, m: read BigInt) -> BigInt:
+        if m.mag.len == 0:
+            panic("BigInt.pow_mod: modulus is zero")
+        if exponent.neg:
+            panic("BigInt.pow_mod: negative exponent")
+        result = bigint_from_i64(1).modulo(m)
+        base = self.modulo(m)
+        bits = exponent.bit_length()
+        for i in 0..bits:
+            if exponent.bit(i):
+                result = result.mul(base).modulo(m)
+            base = base.mul(base).modulo(m)
+        return result
+
+    fn bit_length(self: read Self) -> usize:
+        n = self.mag.len
+        if n == 0:
+            return 0
+        top = self.mag[n - 1]
+        bits: usize = 0
+        while top != 0:
+            top = top >> 1
+            bits += 1
+        return (n - 1) * 32 + bits
+
+    # Bit `i` of the magnitude (0 is the least significant).
+    fn bit(self: read Self, i: usize) -> bool:
+        w = i / 32
+        if w >= self.mag.len:
+            return false
+        return ((self.mag[w] >> u32(i % 32)) & 1) == 1
+
+    fn shl(self: read Self, bits: usize) -> BigInt:
+        if self.mag.len == 0:
+            return bigint_zero()
+        words = bits / 32
+        rest = u32(bits % 32)
+        m = List[u32]()
+        for _ in 0..words:
+            m.push(0)
+        carry: u32 = 0
+        for d in self.mag:
+            if rest == 0:
+                m.push(d)
+            else:
+                m.push((d << rest) | carry)
+                carry = d >> (32 - rest)
+        if carry != 0:
+            m.push(carry)
+        return BigInt{ neg: self.neg, mag: m }
+
+    # Shifts the magnitude right (toward zero).
+    fn shr(self: read Self, bits: usize) -> BigInt:
+        words = bits / 32
+        rest = u32(bits % 32)
+        if words >= self.mag.len:
+            return bigint_zero()
+        m = List[u32]()
+        for i in words..self.mag.len:
+            d = self.mag[i]
+            if rest == 0:
+                m.push(d)
+            else:
+                hi: u32 = 0
+                if i + 1 < self.mag.len:
+                    hi = self.mag[i + 1] << (32 - rest)
+                m.push((d >> rest) | hi)
+        _trim(m)
+        return BigInt{ neg: self.neg and m.len != 0, mag: m }
+
+    fn gcd(self: read Self, other: read BigInt) -> BigInt:
+        a = self.abs()
+        b = other.abs()
+        while not b.is_zero():
+            r = a.rem(b)
+            a = b.clone()
+            b = r.clone()
+        return a
+
+    # The inverse of `self` modulo `m` (`self * x mod m == 1`), or `None` when they share a factor.
+    fn mod_inverse(self: read Self, m: read BigInt) -> Optional[BigInt]:
+        one = bigint_from_i64(1)
+        r0 = m.abs()
+        r1 = self.modulo(r0)
+        t0 = bigint_zero()
+        t1 = one.clone()
+        while not r1.is_zero():
+            qr = r0.div_rem(r1)
+            r0 = r1.clone()
+            r1 = qr.f1.clone()
+            nt = t0.sub(qr.f0.mul(t1))
+            t0 = t1.clone()
+            t1 = nt
+        if r0.compare(one) != 0:
+            return None
+        return Valid(t0.modulo(m))
+
+    # The value as an `i64`, or `None` when it does not fit.
+    fn to_i64(self: read Self) -> Optional[i64]:
+        if self.mag.len > 2:
+            return None
+        v: u64 = 0
+        if self.mag.len >= 1:
+            v = u64(self.mag[0])
+        if self.mag.len == 2:
+            v = v | (u64(self.mag[1]) << 32)
+        if self.neg:
+            if v > 9223372036854775808:
+                return None
+            return Valid(wrapping_sub[i64](0, i64(v)))
+        if v > 9223372036854775807:
+            return None
+        return Valid(i64(v))
+
+    fn to_f64(self: read Self) -> f64:
+        r = 0.0
+        i = self.mag.len
+        while i > 0:
+            i -= 1
+            r = r * 4294967296.0 + f64(self.mag[i])
+        if self.neg:
+            return 0.0 - r
+        return r
+
+    fn to_string(self: read Self) -> string:
+        if self.mag.len == 0:
+            return string.from("0")
+        digits = List[u8]()
+        cur = self.mag.clone()
+        while cur.len > 0:
+            rem = _mag_div_small(cur, 1000000000)
+            for _ in 0..9:
+                digits.push(u8(48 + rem % 10))
+                rem = rem / 10
+                if cur.len == 0 and rem == 0:
+                    break
+        # strip zeros that were pushed beyond the leading digit, then reverse
+        while digits.len > 1 and digits[digits.len - 1] == '0':
+            digits.pop()
+        out = string.new()
+        if self.neg:
+            out.append_byte('-')
+        i = digits.len
+        while i > 0:
+            i -= 1
+            out.append_byte(digits[i])
+        return out
+
+    fn to_hex(self: read Self) -> string:
+        if self.mag.len == 0:
+            return string.from("0x0")
+        out = string.new()
+        if self.neg:
+            out.append_byte('-')
+        out.append_str("0x")
+        i = self.mag.len
+        first = true
+        while i > 0:
+            i -= 1
+            d = self.mag[i]
+            k: u32 = 8
+            while k > 0:
+                k -= 1
+                nib = (d >> (k * 4)) & 15
+                if first and nib == 0:
+                    continue
+                first = false
+                if nib < 10:
+                    out.append_byte(u8(48 + nib))
+                else:
+                    out.append_byte(u8(87 + nib))
+        return out
+
+    # The magnitude as big-endian bytes without leading zeros (empty for zero).
+    fn to_bytes_be(self: read Self) -> List[u8]:
+        out = List[u8]()
+        i = self.mag.len
+        started = false
+        while i > 0:
+            i -= 1
+            d = self.mag[i]
+            k: u32 = 4
+            while k > 0:
+                k -= 1
+                b = u8((d >> (k * 8)) & 255)
+                if started or b != 0:
+                    started = true
+                    out.push(b)
+        return out
+
+private
+fn _trim(m: lend List[u32]):
+    while m.len > 0 and m[m.len - 1] == 0:
+        m.pop()
+
+# Multiplies the digits by `mul` and adds `add`.
+fn _mag_mul_small_add(m: lend List[u32], mul: u32, add: u32):
+    carry: u64 = u64(add)
+    for i in 0..m.len:
+        cur = u64(m[i]) * u64(mul) + carry
+        m[i] = u32(cur & 4294967295)
+        carry = cur >> 32
+    if carry != 0:
+        m.push(u32(carry))
+
+# Divides the digits by `d` in place and returns the remainder.
+fn _mag_div_small(m: lend List[u32], d: u32) -> u32:
+    rem: u64 = 0
+    i = m.len
+    while i > 0:
+        i -= 1
+        cur = (rem << 32) | u64(m[i])
+        m[i] = u32(cur / u64(d))
+        rem = cur % u64(d)
+    _trim(m)
+    return u32(rem)
+
+fn _mag_cmp(a: read List[u32], b: read List[u32]) -> i64:
+    if a.len != b.len:
+        if a.len < b.len:
+            return -1
+        return 1
+    i = a.len
+    while i > 0:
+        i -= 1
+        if a[i] != b[i]:
+            if a[i] < b[i]:
+                return -1
+            return 1
+    return 0
+
+fn _mag_add(a: read List[u32], b: read List[u32]) -> List[u32]:
+    out = List[u32]()
+    carry: u64 = 0
+    n = a.len
+    if b.len > n:
+        n = b.len
+    for i in 0..n:
+        s = carry
+        if i < a.len:
+            s += u64(a[i])
+        if i < b.len:
+            s += u64(b[i])
+        out.push(u32(s & 4294967295))
+        carry = s >> 32
+    if carry != 0:
+        out.push(u32(carry))
+    return out
+
+# a - b for a >= b.
+fn _mag_sub(a: read List[u32], b: read List[u32]) -> List[u32]:
+    out = List[u32]()
+    borrow: i64 = 0
+    for i in 0..a.len:
+        d = i64(a[i]) - borrow
+        if i < b.len:
+            d -= i64(b[i])
+        if d < 0:
+            d += 4294967296
+            borrow = 1
+        else:
+            borrow = 0
+        out.push(u32(d))
+    _trim(out)
+    return out
+
+fn _mag_mul(a: read List[u32], b: read List[u32]) -> List[u32]:
+    out = List[u32]()
+    if a.len == 0 or b.len == 0:
+        return out
+    for _ in 0..a.len + b.len:
+        out.push(0)
+    for i in 0..a.len:
+        carry: u64 = 0
+        ai = u64(a[i])
+        for j in 0..b.len:
+            cur = u64(out[i + j]) + ai * u64(b[j]) + carry
+            out[i + j] = u32(cur & 4294967295)
+            carry = cur >> 32
+        k = i + b.len
+        while carry != 0:
+            cur2 = u64(out[k]) + carry
+            out[k] = u32(cur2 & 4294967295)
+            carry = cur2 >> 32
+            k += 1
+    _trim(out)
+    return out
+
+# Knuth's algorithm D. Returns (quotient, remainder).
+fn _mag_divmod(a: read List[u32], b: read List[u32]) -> Tuple2[List[u32], List[u32]]:
+    if _mag_cmp(a, b) < 0:
+        return Tuple2{ f0: List[u32](), f1: a.clone() }
+    if b.len == 1:
+        q = a.clone()
+        r = _mag_div_small(q, b[0])
+        rem = List[u32]()
+        if r != 0:
+            rem.push(r)
+        return Tuple2{ f0: q, f1: rem }
+    n = b.len
+    m = a.len - n
+    # normalize so the top digit of the divisor has its high bit set
+    s: u32 = 0
+    top = b[n - 1]
+    while (top & 2147483648) == 0:
+        top = top << 1
+        s += 1
+    vn = List[u32]()
+    un = List[u32]()
+    for i in 0..n:
+        vn.push(0)
+    for i in 0..a.len + 1:
+        un.push(0)
+    i = n
+    while i > 0:
+        i -= 1
+        v = b[i] << s
+        if s != 0 and i > 0:
+            v = v | (b[i - 1] >> (32 - s))
+        vn[i] = v
+    un[a.len] = 0
+    if s != 0:
+        un[a.len] = a[a.len - 1] >> (32 - s)
+    i = a.len
+    while i > 0:
+        i -= 1
+        v2 = a[i] << s
+        if s != 0 and i > 0:
+            v2 = v2 | (a[i - 1] >> (32 - s))
+        un[i] = v2
+    q = List[u32]()
+    for _ in 0..m + 1:
+        q.push(0)
+    base: u64 = 4294967296
+    j = m + 1
+    while j > 0:
+        j -= 1
+        num = (u64(un[j + n]) << 32) | u64(un[j + n - 1])
+        qhat = num / u64(vn[n - 1])
+        rhat = num % u64(vn[n - 1])
+        while qhat >= base or qhat * u64(vn[n - 2]) > ((rhat << 32) | u64(un[j + n - 2])):
+            qhat -= 1
+            rhat += u64(vn[n - 1])
+            if rhat >= base:
+                break
+        # multiply and subtract
+        borrow: i64 = 0
+        carry: u64 = 0
+        for i2 in 0..n:
+            p = qhat * u64(vn[i2]) + carry
+            carry = p >> 32
+            t = i64(un[i2 + j]) - borrow - i64(p & 4294967295)
+            if t < 0:
+                un[i2 + j] = u32(t + 4294967296)
+                borrow = 1
+            else:
+                un[i2 + j] = u32(t)
+                borrow = 0
+        t2 = i64(un[j + n]) - borrow - i64(carry)
+        if t2 < 0:
+            un[j + n] = u32(t2 + 4294967296)
+            borrow = 1
+        else:
+            un[j + n] = u32(t2)
+            borrow = 0
+        if borrow != 0:
+            # qhat was one too large: add the divisor back
+            qhat -= 1
+            c: u64 = 0
+            for i3 in 0..n:
+                sum = u64(un[i3 + j]) + u64(vn[i3]) + c
+                un[i3 + j] = u32(sum & 4294967295)
+                c = sum >> 32
+            un[j + n] = u32((u64(un[j + n]) + c) & 4294967295)
+        q[j] = u32(qhat)
+    # denormalize the remainder
+    rem2 = List[u32]()
+    for i4 in 0..n:
+        v3 = un[i4] >> s
+        if s != 0:
+            v3 = v3 | (un[i4 + 1] << (32 - s))
+        rem2.push(v3)
+    _trim(q)
+    _trim(rem2)
+    return Tuple2{ f0: q, f1: rem2 }

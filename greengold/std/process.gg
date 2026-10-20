@@ -1,5 +1,6 @@
 # std.process: process control and command execution.
 import std.fs
+import std.io
 import std.string
 import std.time
 
@@ -7,6 +8,8 @@ private
 extern "stdlib.h" fn exit(code: i32)
 extern "stdlib.h" fn getenv(name: *u8) -> *u8
 extern "stdlib.h" fn system(cmd: *u8) -> i32
+weak extern "stdio.h" fn popen(cmd: *u8, mode: *u8) -> *mut u8
+weak extern "stdio.h" fn _popen(cmd: *u8, mode: *u8) -> *mut u8
 extern fn gg_argc() -> i32
 extern fn gg_argv_at(index: i32) -> *mut u8
 
@@ -173,6 +176,100 @@ fn process_run(argv: read List[str]) -> Optional[ProcessResult]:
             err = s
         None:
             pass
+    fs.remove_file(out_path.as_str())
+    fs.remove_file(err_path.as_str())
+    if raw < 0:
+        return None
+    code = raw
+    if not host_is_windows():
+        code = (raw >> 8) & 255
+    return Valid(ProcessResult{ code: code, out: out, err: err })
+
+private
+fn _command_line(argv: []str) -> string:
+    cmd = string.new()
+    for i in 0..argv.len:
+        if i > 0:
+            cmd.append_byte(' ')
+        piece = _quote(argv[i])
+        cmd.append_str(piece.as_str())
+    cmd.append_byte(0)
+    return cmd
+
+fn _spawn(argv: []str, mode: str) -> Result[io.File, io.IoError]:
+    if argv.len == 0:
+        return Err(io.error_new(io.IoErrorKind.InvalidInput, "spawn: no command"))
+    cmd = _command_line(argv)
+    how = string.from(mode)
+    how.append_byte(0)
+    unsafe:
+        raw: *mut u8 = null
+        if target_os() == "windows":
+            raw = _popen(string_to_cstr(cmd.as_str()), string_to_cstr(how.as_str()))
+        else:
+            raw = popen(string_to_cstr(cmd.as_str()), string_to_cstr(how.as_str()))
+        if raw == null:
+            return Err(io.last_error("cannot start the command"))
+        return Ok(io.File.from_pipe(raw))
+
+public
+# Starts `argv` and returns a stream that reads what the program writes to its standard output (its standard error goes
+# to this process's). Read it like any `io.File`; `f.wait()` waits for the program and returns its exit code.
+#
+#     f = process.spawn_read(["git", "log", "--oneline"]).value_or_panic()
+#     while true:
+#         line = f.read_line().value_or_panic()
+#         ...
+#     code = f.wait()
+fn spawn_read(argv: []str) -> Result[io.File, io.IoError]:
+    return _spawn(argv, "r")
+
+# Starts `argv` and returns a stream that feeds its standard input. `f.wait()` closes it (the program sees the end of its
+# input) and returns the program's exit code.
+fn spawn_write(argv: []str) -> Result[io.File, io.IoError]:
+    return _spawn(argv, "w")
+
+# Runs `argv` with `input` as its standard input and captures what it writes, like `process_run`.
+fn process_run_input(argv: []str, input: str) -> Optional[ProcessResult]:
+    if argv.len == 0:
+        return None
+    in_path = _temp_file("in")
+    match consume fs.write_text(in_path.as_str(), input):
+        Ok(_):
+            pass
+        Err(_):
+            return None
+    out_path = _temp_file("out")
+    err_path = _temp_file("err")
+    cmd = string.new()
+    for i in 0..argv.len:
+        if i > 0:
+            cmd.append_byte(' ')
+        piece = _quote(argv[i])
+        cmd.append_str(piece.as_str())
+    cmd.append_str(" < ")
+    cmd.append_str(_quote_always(in_path.as_str()).as_str())
+    cmd.append_str(" > ")
+    cmd.append_str(_quote_always(out_path.as_str()).as_str())
+    cmd.append_str(" 2> ")
+    cmd.append_str(_quote_always(err_path.as_str()).as_str())
+    cmd.append_byte(0)
+    raw: i32 = -1
+    unsafe:
+        raw = system(string_to_cstr(cmd.as_str()))
+    out = string.new()
+    err = string.new()
+    match consume fs.read_file_to_string(out_path.as_str()):
+        Valid(s):
+            out = s
+        None:
+            pass
+    match consume fs.read_file_to_string(err_path.as_str()):
+        Valid(s):
+            err = s
+        None:
+            pass
+    fs.remove_file(in_path.as_str())
     fs.remove_file(out_path.as_str())
     fs.remove_file(err_path.as_str())
     if raw < 0:

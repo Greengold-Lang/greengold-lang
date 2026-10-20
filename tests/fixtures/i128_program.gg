@@ -1,0 +1,16 @@
+fn main():
+    a: u128 = 340282366920938463463374607431768211455
+    b: i128 = -170141183460469231731687303715884105728
+    c: i128 = 12345678901234567890123
+    print(a, b, c)
+    d = c * 1000 + 7
+    print(d, d / 3, d % 1000, d - c, i64(d % 1000))
+    print(a > u128(5), b < 0, c == c)
+    x: u64 = 18446744073709551615
+    y: u128 = x
+    print(y * y)
+    print(f"{c} and {a}")
+    print(checked_add[i128](c, 1).value_or(0), checked_mul[u128](a, 2).is_none(), wrapping_add[u128](a, 1))
+    print(max_value[i128](), min_value[u128](), saturating_add[i128](max_value[i128](), 5))
+    z: i128 = 5
+    print(z << 100, z >> 1, -z)

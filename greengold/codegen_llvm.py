@@ -22,8 +22,9 @@ from .ast_nodes import (
     IntLit, Match, MethodCall, Name, Node, Pass, Program, RangePat, Return, SliceExpr, SoaExpr, Stmt, StrLit, StructLit, Try,
     Unary, VarDecl, While, Yield, Require, Wrapping, OverflowMode, unparse,
 )
-from .comptime import ComptimeError, EnumVal, Interp
+from .comptime import ComptimeError, EnumVal, FnRef, Interp
 from . import cabi, simd
+from .attrs import builtin_values
 from .counters import mark_bounded_counters
 from .typeinfo import (
     TYPE_ALIASES, INT_RANGES,
@@ -47,15 +48,26 @@ class _VolatileStore(ir.instructions.StoreInstr):
     def descr(self, buf):
         val, ptr = self.operands
         buf.append(f"store volatile {val.type} {val.get_reference()}, {ptr.type} {ptr.get_reference()}\n")
-F32, F64 = ir.FloatType(), ir.DoubleType()
+def _half_constant(self, value: float) -> str:
+    """llvmlite writes a `half` constant as a double's bits, which LLVM misreads; `0xH` takes the 16 bits."""
+    import struct
+    try:
+        bits = struct.unpack("<H", struct.pack("<e", float(value)))[0]
+    except OverflowError:
+        bits = 0x7C00 if value > 0 else 0xFC00
+    return "0xH%04X" % bits
+
+
+ir.HalfType.format_constant = _half_constant  # type: ignore[method-assign]
+F16, F32, F64 = ir.HalfType(), ir.FloatType(), ir.DoubleType()
 VOID = ir.VoidType()
 I8P = I8.as_pointer()
 
-BITS = {"i8": 8, "i16": 16, "i32": 32, "i64": 64, "isize": 64, "u8": 8, "u16": 16, "u32": 32, "u64": 64,
-        "usize": 64, "bool": 1}
-SIGNED = {"i8", "i16", "i32", "i64", "isize"}
+BITS = {"i8": 8, "i16": 16, "i32": 32, "i64": 64, "i128": 128, "isize": 64, "u8": 8, "u16": 16, "u32": 32, "u64": 64,
+        "u128": 128, "usize": 64, "bool": 1}
+SIGNED = {"i8", "i16", "i32", "i64", "i128", "isize"}
 INTS = set(BITS) - {"bool"}
-FLOATS = {"f32", "f64"}
+FLOATS = {"f16", "f32", "f64"}
 COMPARE = {"==", "!=", "<", "<=", ">", ">="}
 
 
@@ -236,6 +248,8 @@ class LLVMGen:
         self.externs: dict[str, ir.Function] = {}
         self.consts: dict[str, ir.GlobalVariable] = {}
         self.const_init: list[tuple[ConstDecl, ir.GlobalVariable]] = []
+        self.panic_handler_symbol: str | None = None  # `@panic_handler`: runs when the program panics
+        self.used_symbols: list[Any] = []  # `@used`: kept by the linker even when nothing refers to them
         self.interp = Interp(program)
         # function state
         self.b: ir.IRBuilder = None  # type: ignore[assignment]
@@ -331,6 +345,8 @@ class LLVMGen:
             return self.llty(base)
         if ty in BITS:
             return ir.IntType(BITS[ty])
+        if ty == "f16":
+            return F16
         if ty == "f32":
             return F32
         if ty == "f64":
@@ -393,10 +409,12 @@ class LLVMGen:
             return self.size_align(base)
         if ty in ("i8", "u8", "bool"):
             return 1, 1
-        if ty in ("i16", "u16"):
+        if ty in ("i16", "u16", "f16"):
             return 2, 2
         if ty in ("i32", "u32", "f32"):
             return 4, 4
+        if ty in ("i128", "u128"):
+            return 16, 16
         if ty in BITS or ty == "f64":
             return 8, 8
         if ty == "str" or is_slice_type(ty):
@@ -481,6 +499,8 @@ class LLVMGen:
             return ir.Constant(lt, _wrap_const(int(v), BITS[ty]))
         if ty == "str":
             return self.str_const(v)
+        if isinstance(v, FnRef):
+            return self.funcs[func_cname(v.key)]
         if is_array_type(ty):
             _, elem = array_info(ty)
             return ir.Constant(lt, [self.to_const(x, elem) for x in v])
@@ -539,21 +559,32 @@ class LLVMGen:
         externs = [d for d in decls if isinstance(d, ExternFuncDecl)]
         for ext in externs:
             self._declare_extern(ext)
-        for c in (d for d in decls if isinstance(d, ConstDecl)):
-            self._const(c)
         for f in funcs:
             self._declare_func(f)
+        for c in (d for d in decls if isinstance(d, ConstDecl)):
+            self._const(c)         # after the functions are declared: a constant may hold function addresses
         for f in funcs:
             self._define_func(f)
         self._emit_main(funcs)
+        if self.used_symbols:
+            arr = ir.ArrayType(I8P, len(self.used_symbols))
+            used = ir.GlobalVariable(self.mod, arr, "llvm.used")
+            used.linkage = "appending"
+            used.section = "llvm.metadata"
+            used.initializer = ir.Constant(arr, [sym.bitcast(I8P) for sym in self.used_symbols])
         return str(self.mod)
 
     def _const(self, d: ConstDecl) -> None:
         assert d.ty is not None
         lt = self.llty(d.ty)
         ckey = getattr(d, "sym_key", None) or d.name
-        g = ir.GlobalVariable(self.mod, lt, "gg_const_" + self._ident(ckey))
+        battrs = builtin_values(d)
+        gname = "gg_const_" + self._ident(ckey)
+        if "export" in battrs:
+            gname = (battrs["export"].get("name") or "") or d.name
+        g = ir.GlobalVariable(self.mod, lt, gname)
         g.linkage = "internal"
+        self._apply_builtin_attrs(g, battrs)
         try:
             value = getattr(d, "comptime_value", None)
             g.initializer = self.to_const(value if value is not None else self.interp.eval_decl(d), d.ty)
@@ -593,6 +624,47 @@ class LLVMGen:
     def _by_ptr(p: Any, ty: str) -> bool:
         return p.mode in ("read", "lend") and not is_slice_type(ty)
 
+    def _apply_builtin_attrs(self, g: Any, battrs: dict[str, dict]) -> None:
+        """`@inline`, `@cold`, `@naked`, `@section`, `@used`, `@weak`, `@export`, `@interrupt`, `@align` on a function or static."""
+        is_fn = isinstance(g, ir.Function)
+        public = "external" if is_fn else ""  # a global with a value and "external" would print as a declaration
+        if "export" in battrs or "interrupt" in battrs:
+            g.linkage = public
+        if "weak" in battrs:
+            g.linkage = "weak"
+        if "used" in battrs:
+            if g.linkage == "internal":
+                g.linkage = public  # a symbol the linker keeps
+            self.used_symbols.append(g)
+        if "section" in battrs:
+            g.section = battrs["section"]["name"]
+        if "align" in battrs and not is_fn:
+            g.align = battrs["align"]["bytes"]
+        if not is_fn:
+            return
+        known = set(g.attributes._known) | {'"interrupt"="IRQ"', '"interrupt"="user"', '"interrupt"="machine"',
+                                           '"interrupt"="supervisor"', '"interrupt"="FIQ"', '"interrupt"="SWI"',
+                                           '"interrupt"="ABORT"', '"interrupt"="UNDEF"'}
+        g.attributes._known = frozenset(known)
+        mode = battrs.get("inline", {}).get("mode")
+        if mode == "always":
+            g.attributes.add("alwaysinline")
+        elif mode == "never":
+            g.attributes.add("noinline")
+        elif mode == "hint":
+            g.attributes.add("inlinehint")
+        if "cold" in battrs:
+            g.attributes.add("cold")
+        if "naked" in battrs:
+            g.attributes.add("naked")
+            g.attributes.add("noinline")
+        kind = battrs.get("interrupt", {}).get("kind")
+        if kind:
+            attr = f'"interrupt"="{kind}"'
+            if attr not in g.attributes._known:
+                raise CodegenError(f"`@interrupt(\"{kind}\")`: unknown interrupt kind (IRQ, FIQ, SWI, ABORT, UNDEF, user, machine, supervisor).")
+            g.attributes.add(attr)
+
     def _declare_func(self, f: FuncDecl) -> None:
         ret = getattr(f, "ret_ty", None) or (f.ret.name if f.ret else "void")
         args = []
@@ -607,8 +679,15 @@ class LLVMGen:
         ret_ll = VOID if is_main else self.llty(ret)
         if not is_main and getattr(f, "ret_view", False):
             ret_ll = ret_ll.as_pointer()
-        fn = ir.Function(self.mod, ir.FunctionType(ret_ll, args), "gg_" + self.fname(f))
+        battrs = builtin_values(f)
+        symbol = "gg_" + self.fname(f)
+        if "export" in battrs or "interrupt" in battrs:
+            symbol = (battrs.get("export", {}).get("name") or "") or f.name  # the C name of an exported function
+        fn = ir.Function(self.mod, ir.FunctionType(ret_ll, args), symbol)
         fn.linkage = "internal"
+        self._apply_builtin_attrs(fn, battrs)
+        if "panic_handler" in battrs:
+            self.panic_handler_symbol = symbol
         i = 0
         for p in f.params:
             ty = self._param_ty(p)
@@ -711,7 +790,11 @@ class LLVMGen:
             fn = self._wasi_real(c_symbol, d.variadic)
             self.wasi_declared[fn.name] = (rt, self.WASI_C_ABI[c_symbol][2])
         else:
-            fn = existing or ir.Function(self.mod, ir.FunctionType(rt, args, var_arg=d.variadic), c_symbol)
+            fn = existing
+            if fn is None:
+                size_args = {i for i, p in enumerate(d.params)
+                             if self._param_ty(p) in ("usize", "isize") and p.mode not in ("read", "lend") and len(args) == len(d.params)}
+                fn = self._size_t_extern(c_symbol, rt, args, size_args, ret in ("usize", "isize"), ret_plan, d.variadic)
         if existing is None and not wasi_real:
             for i, attr in attrs:
                 fn.args[i].add_attribute(attr)
@@ -847,9 +930,14 @@ class LLVMGen:
             "memcpy": (I8P, [I8P, I8P, I64]), "memmove": (I8P, [I8P, I8P, I64]),
             "memset": (I8P, [I8P, I32, I64]), "memcmp": (I32, [I8P, I8P, I64]),
         }
+        narrow = self.size_t is I32 and not self.triple.startswith("wasm32")      # the C symbol takes a 32-bit `size_t`
         for name, (ret, args) in sigs.items():
-            fn = self.c_fn(name, ret, args)
-            fn.linkage = "weak"
+            if narrow:
+                fn = ir.Function(self.mod, ir.FunctionType(ret, args), "gg_fs_" + name)       # the byte loop, 64-bit length
+                fn.linkage = "internal"
+            else:
+                fn = self.c_fn(name, ret, args)
+                fn.linkage = "weak"
             fn.attributes.add("noinline")
             fn.attributes.add("optnone")
             with self.func_ctx(fn):
@@ -895,6 +983,14 @@ class LLVMGen:
                     self.at(out)
                     b.ret(b.load(res))
                 self.finish_entry()
+            if narrow:
+                real = self.mod.globals.get(name)
+                if real is None:
+                    real = ir.Function(self.mod, ir.FunctionType(ret, [self.size_t if a == I64 else a for a in args]), name)
+                real.linkage = "weak"
+                bld = ir.IRBuilder(real.append_basic_block("entry"))
+                bld.ret(bld.call(fn, [bld.zext(a, I64) if a.type == self.size_t and args[i] == I64 else a
+                                      for i, a in enumerate(real.args)]))
 
     # -- function context ----------------------------------------------------
     @contextmanager
@@ -1014,6 +1110,33 @@ class LLVMGen:
         self.b = saved
         return wrap
 
+    # C library functions whose `size_t` parameters are at these positions (and result, for the names in SIZE_T_RESULT).
+    SIZE_T_ARGS = {"malloc": {0}, "realloc": {1}, "calloc": {0, 1}, "memcpy": {2}, "memmove": {2}, "memset": {2}, "memcmp": {2},
+                   "fwrite": {1, 2}, "fread": {1, 2}}
+    SIZE_T_RESULT = {"strlen", "fwrite", "fread"}
+
+    def _size_t_extern(self, name: str, ret: ir.Type, args: list[ir.Type], size_args: set[int], size_ret: bool,
+                       ret_plan: Any, var_arg: bool) -> ir.Function:
+        """On a 32-bit target `usize` is still 64 bits inside Greengold, but a C function's `size_t` is 32: declare the C function with
+        `size_t` and call it through a tiny internal function that has the 64-bit signature the generated code uses."""
+        if (self.size_t is not I32 or self.triple.startswith("wasm32") or var_arg or ret_plan is not None
+                or not (size_args or size_ret)):
+            return ir.Function(self.mod, ir.FunctionType(ret, args, var_arg=var_arg), name)
+        real_args = [self.size_t if i in size_args else a for i, a in enumerate(args)]
+        real_ret = self.size_t if size_ret else ret
+        real = ir.Function(self.mod, ir.FunctionType(real_ret, real_args), name)
+        wrap = ir.Function(self.mod, ir.FunctionType(ret, args), "gg_c_" + name)
+        wrap.linkage = "internal"
+        wrap.attributes.add("alwaysinline")
+        bld = ir.IRBuilder(wrap.append_basic_block("entry"))
+        call_args = [bld.trunc(a, self.size_t) if i in size_args else a for i, a in enumerate(wrap.args)]
+        res = bld.call(real, call_args)
+        if isinstance(ret, ir.VoidType):
+            bld.ret_void()
+        else:
+            bld.ret(bld.zext(res, ret) if size_ret else res)
+        return wrap
+
     def c_fn(self, name: str, ret: ir.Type, args: list[ir.Type], var_arg: bool = False) -> ir.Function:
         key = "c_" + name
         fn = self.rt.get(key)
@@ -1027,7 +1150,11 @@ class LLVMGen:
                     fn = prev
                     break
         if fn is None:
-            fn = ir.Function(self.mod, ir.FunctionType(ret, args, var_arg=var_arg), name)
+            if name in self.SIZE_T_ARGS and not var_arg:
+                fn = self._size_t_extern(name, ret, args, {i for i in self.SIZE_T_ARGS[name] if i < len(args) and args[i] == I64},
+                                         name in self.SIZE_T_RESULT and ret == I64, None, False)
+            else:
+                fn = ir.Function(self.mod, ir.FunctionType(ret, args, var_arg=var_arg), name)
         self.rt[key] = fn
         return fn
 
@@ -1066,7 +1193,10 @@ class LLVMGen:
 
     def rt_fail(self, msg: str, args: list[ir.Value] | None = None, fmt: str | None = None) -> None:
         """Writes and exits: `Runtime error: ...` to stderr + exit(101). Operates on current builder."""
+        handler = self.mod.globals.get(self.panic_handler_symbol) if self.panic_handler_symbol else None
         if self.freestanding:  # no libc: trap directly instead of error
+            if handler is not None:
+                self.b.call(handler, [])
             self.trap()
             return
         b = self.b
@@ -1081,6 +1211,8 @@ class LLVMGen:
         cnt = n if self.windows else b.sext(n, I64)
         cnt = b.select(b.icmp_signed(">", n, ir.Constant(I32, 511)), ir.Constant(cnt.type, 511), cnt)
         b.call(wr, [ir.Constant(I32, 2), bufp, cnt])
+        if handler is not None:
+            b.call(handler, [])
         b.call(self.c_fn("exit", VOID, [I32]), [ir.Constant(I32, 101)])
         b.unreachable()
 
@@ -2005,7 +2137,7 @@ class LLVMGen:
         """printf conversion for a number, `bool`, or `str`; None for any other type."""
         ty = int_base(ty or "")
         return {"i8": "%d", "i16": "%d", "i32": "%d", "u8": "%u", "u16": "%u", "u32": "%u",
-                "i64": "%lld", "isize": "%lld", "u64": "%llu", "usize": "%llu", "f32": "%g", "f64": "%.15g",
+                "i64": "%lld", "isize": "%lld", "u64": "%llu", "usize": "%llu", "f16": "%g", "f32": "%g", "f64": "%.15g",
                 "bool": "%s", "str": "%.*s"}.get(ty)
 
     def scalar_args(self, ty: str, v: ir.Value) -> list[ir.Value]:
@@ -2016,8 +2148,8 @@ class LLVMGen:
             return [b.sext(v, I32)]
         if ty in ("u8", "u16"):
             return [b.zext(v, I32)]
-        if ty == "f32":
-            return [b.fpext(v, F64)]
+        if ty in ("f16", "f32"):
+            return [self.to_f64(v, ty)]
         if ty == "bool":
             return [b.select(v, self.cstr("true"), self.cstr("false"))]
         if ty == "str":
@@ -2761,15 +2893,33 @@ class LLVMGen:
             self.b.store(ir.Constant(I1, 0), flag)
         return self.b.load(self.place(e))
 
+    # -- f16: stored as `half`, computed as f32 through the Core conversions (no runtime library needed) -------
+    def h2f(self, v: ir.Value) -> ir.Value:
+        return self.core_call("_f16_to_f32", [self.b.bitcast(v, I16)])
+
+    def f2h(self, v: ir.Value) -> ir.Value:
+        return self.b.bitcast(self.core_call("_f32_to_f16", [v]), F16)
+
+    def to_f64(self, v: ir.Value, ty: str) -> ir.Value:
+        """A float of type `ty` as a double (for printf and JSON)."""
+        if ty == "f16":
+            return self.b.fpext(self.h2f(v), F64)
+        return self.b.fpext(v, F64) if ty == "f32" else v
+
     def cast(self, v: ir.Value, src: str, dst: str) -> ir.Value:
         b = self.b
         src = bounded_int_info(src)[0] if is_bounded_int(src) else src
         dst = bounded_int_info(dst)[0] if is_bounded_int(dst) else dst
         if src == dst:
             return v
+        if src == "f16":
+            return self.cast(self.h2f(v), "f32", dst)
+        if dst == "f16":
+            return self.f2h(self.cast(v, src, "f32"))
         if dst in FLOATS:
             if src in FLOATS:
-                return b.fpext(v, F64) if dst == "f64" else b.fptrunc(v, F32)
+                rank = {"f16": 0, "f32": 1, "f64": 2}
+                return b.fpext(v, self.llty(dst)) if rank[dst] > rank[src] else b.fptrunc(v, self.llty(dst))
             return b.sitofp(v, self.llty(dst)) if src in SIGNED else b.uitofp(v, self.llty(dst))
         if dst == "bool":
             if src in FLOATS:
@@ -2790,6 +2940,8 @@ class LLVMGen:
         if ty in simd.SIMD_TYPES:
             return simd.arith(self, op, ty, l, r)
         ty = bounded_int_info(ty)[0] if is_bounded_int(ty) else ty
+        if ty == "f16":
+            return self.f2h({"+": b.fadd, "-": b.fsub, "*": b.fmul, "/": b.fdiv, "%": b.frem}[op](self.h2f(l), self.h2f(r)))
         if ty in FLOATS:
             return {"+": b.fadd, "-": b.fsub, "*": b.fmul, "/": b.fdiv, "%": b.frem}[op](l, r)
         if ty == "bool":
@@ -2852,6 +3004,8 @@ class LLVMGen:
         if ty == "str":
             eq = b.call(self.rt_str_eq(), [l, r])
             return eq if op == "==" else b.not_(eq)
+        if ty == "f16":
+            l, r = self.h2f(l), self.h2f(r)
         if ty in FLOATS:
             return b.fcmp_unordered("!=", l, r) if op == "!=" else b.fcmp_ordered(op, l, r)
         if ty in SIGNED:
@@ -2954,6 +3108,8 @@ class LLVMGen:
             v = self.expr(e.operand)
             if e.op == "not" or e.op == "~":
                 return b.not_(v)
+            if e.ty == "f16":
+                return b.bitcast(b.xor(b.bitcast(v, I16), ir.Constant(I16, 0x8000)), F16)
             if e.ty in FLOATS:
                 return b.fsub(ir.Constant(v.type, -0.0), v)
             return b.neg(v)
@@ -3152,7 +3308,7 @@ class LLVMGen:
 
     def may_borrow(self, ty: str | None, seen: frozenset[str] = frozenset()) -> bool:
         """Can a value of `ty` point into another value (`str`, slice, pointer, reference field)?"""
-        if not ty or ty in seen or ty in BITS or ty in ("bool", "f32", "f64", "void"):
+        if not ty or ty in seen or ty in BITS or ty in ("bool", "f16", "f32", "f64", "void"):
             return False
         if ty == "str" or is_slice_type(ty) or is_ptr_type(ty) or is_fn_type(ty):
             return True
@@ -3498,8 +3654,8 @@ class LLVMGen:
     def promote_vararg(self, v: ir.Value, ty: str) -> ir.Value:
         """C default argument promotion: f32 -> double, narrow int/bool -> int, string -> `char*`."""
         b = self.b
-        if ty == "f32":
-            return b.fpext(v, F64)
+        if ty in ("f16", "f32"):
+            return self.to_f64(v, ty)
         if ty == "str":
             return b.extract_value(v, 0)
         if ty in BITS:
@@ -3755,14 +3911,18 @@ class LLVMGen:
             b.call(self.funcs["string_append_str"], [out, self.str_view(v, ty)])
             if nested:
                 self.append_text(out, '"')
+        elif ty == "i128":
+            b.call(self.funcs["string_append_i128"], [out, v])
+        elif ty == "u128":
+            b.call(self.funcs["string_append_u128"], [out, v])
         elif ty in SIGNED:
             b.call(self.funcs["string_append_i64"], [out, self.to_i64(v, ty)])
         elif ty in BITS and ty != "bool":
             b.call(self.funcs["string_append_u64"], [out, self.to_i64(v, ty)])
         elif ty == "bool":
             b.call(self.funcs["string_append_bool"], [out, v])
-        elif ty in ("f32", "f64"):
-            fval = b.fpext(v, F64) if ty == "f32" else v
+        elif ty in ("f16", "f32", "f64"):
+            fval = self.to_f64(v, ty)
             buf = self.alloca(ir.ArrayType(I8, 64), "flt_buf")
             buf_ptr = b.gep(buf, [ir.Constant(I32, 0), ir.Constant(I32, 0)], inbounds=True)
             snprintf_fn = self.c_fn("snprintf", I32, [I8P, self.size_t, I8P], var_arg=True)
@@ -4285,7 +4445,7 @@ class LLVMGen:
         if ty in ("str", "string"):
             self.core_call("_json_escape", [out, self.str_view(v, ty)])
         elif ty in ("f32", "f64"):
-            self.core_call("_json_number", [out, self.b.fpext(v, F64) if ty == "f32" else v])
+            self.core_call("_json_number", [out, self.to_f64(v, ty)])
         elif ty in BITS or ty == "bool":
             self.append_value(out, v, ty)
         else:
@@ -4377,7 +4537,7 @@ class LLVMGen:
                 ret_ok()
             elif t in ("f32", "f64"):
                 x = self.core_call("_JsonReader.read_f64", [r])
-                b.store(b.fptrunc(x, F32) if t == "f32" else x, out)
+                b.store(b.fptrunc(x, self.llty(t)) if t != "f64" else x, out)
                 ret_ok()
             elif t == "string":
                 b.store(self.core_call("_JsonReader.read_string", [r]), out)
@@ -4547,9 +4707,9 @@ class LLVMGen:
             elif ty in ("u64", "usize"):
                 fmt.append("%llu")
                 args.append(v)
-            elif ty == "f32":
+            elif ty in ("f16", "f32"):
                 fmt.append("%g")
-                args.append(b.fpext(v, F64))
+                args.append(self.to_f64(v, ty))
             elif ty == "f64":
                 fmt.append("%.15g")
                 args.append(v)

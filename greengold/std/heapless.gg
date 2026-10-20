@@ -1,0 +1,446 @@
+# std.heapless: containers with a capacity fixed at compile time. They never allocate, never call the C library, and
+# every operation takes a bounded number of steps (no growth, no rehash), so they work with `--no-std`, on
+# microcontrollers, and in code that must not touch the heap. A full container says so (`push` returns false, `pop`
+# on an empty one returns `None`); it never panics on its own.
+#
+#     import std.heapless { FixedVec, RingBuffer, FixedMap }
+#     v = FixedVec[i32, 4].new(0)         # the argument fills the unused slots
+#     v.push(10)
+#     r = RingBuffer[u8, 16].new(0)       # a FIFO that keeps the newest 16 bytes
+#     m = FixedMap[u32, f64, 8].new(0, 0.0)
+#
+# Import the types by name (`import std.heapless { FixedVec }`): a type with several arguments cannot be written
+# through the module name.
+#
+# Elements are copied in and out, so `T`, `K` and `V` are plain-data types (numbers, `bool`, structs of them).
+
+# A list of at most `N` elements.
+struct FixedVec[T, N: usize]:
+    private
+    items: [N]T
+    count: usize
+
+impl FixedVec[T, N]:
+    # An empty list. `fill` is only the value of the slots that nothing has used yet.
+    public
+    fn new(fill: T) -> FixedVec[T, N]:
+        return FixedVec[T, N]{ items: [fill; N], count: 0 }
+
+    fn len(self: read Self) -> usize:
+        return self.count
+
+    fn capacity(self: read Self) -> usize:
+        return N
+
+    fn is_empty(self: read Self) -> bool:
+        return self.count == 0
+
+    fn is_full(self: read Self) -> bool:
+        return self.count == N
+
+    # Adds at the end; false (and no change) when the list is full.
+    fn push(self: lend Self, value: T) -> bool:
+        if self.count == N:
+            return false
+        self.items[self.count] = value
+        self.count += 1
+        return true
+
+    fn pop(self: lend Self) -> Optional[T]:
+        if self.count == 0:
+            return None
+        self.count -= 1
+        return Valid(self.items[self.count])
+
+    # The element at `i`, or `None` when `i` is past the end.
+    fn get(self: read Self, i: usize) -> Optional[T]:
+        if i >= self.count:
+            return None
+        return Valid(self.items[i])
+
+    # Replaces the element at `i`; false when `i` is past the end.
+    fn set(self: lend Self, i: usize, value: T) -> bool:
+        if i >= self.count:
+            return false
+        self.items[i] = value
+        return true
+
+    # Inserts before position `i` (`i <= len`), shifting the rest up; false when full or `i` is too large.
+    fn insert(self: lend Self, i: usize, value: T) -> bool:
+        if self.count == N or i > self.count:
+            return false
+        j = self.count
+        while j > i:
+            self.items[j] = self.items[j - 1]
+            j -= 1
+        self.items[i] = value
+        self.count += 1
+        return true
+
+    # Removes position `i`, shifting the rest down.
+    fn remove(self: lend Self, i: usize) -> Optional[T]:
+        if i >= self.count:
+            return None
+        out = self.items[i]
+        j = i
+        while j + 1 < self.count:
+            self.items[j] = self.items[j + 1]
+            j += 1
+        self.count -= 1
+        return Valid(out)
+
+    # Removes position `i` by moving the last element into its place (O(1), order not kept).
+    fn swap_remove(self: lend Self, i: usize) -> Optional[T]:
+        if i >= self.count:
+            return None
+        out = self.items[i]
+        self.count -= 1
+        self.items[i] = self.items[self.count]
+        return Valid(out)
+
+    fn clear(self: lend Self):
+        self.count = 0
+
+    # The elements in use, as a view.
+    fn as_slice(self: read Self) -> []T:
+        return self.items[0..self.count]
+
+# Text of at most `N` bytes.
+struct FixedString[N: usize]:
+    private
+    bytes: [N]u8
+    count: usize
+
+impl FixedString[N]:
+    public
+    fn new() -> FixedString[N]:
+        return FixedString[N]{ bytes: [0; N], count: 0 }
+
+    fn len(self: read Self) -> usize:
+        return self.count
+
+    fn capacity(self: read Self) -> usize:
+        return N
+
+    fn is_empty(self: read Self) -> bool:
+        return self.count == 0
+
+    fn push_byte(self: lend Self, b: u8) -> bool:
+        if self.count == N:
+            return false
+        self.bytes[self.count] = b
+        self.count += 1
+        return true
+
+    # Adds all of `text`, or nothing when it does not fit.
+    fn push_str(self: lend Self, text: str) -> bool:
+        if self.count + text.len > N:
+            return false
+        for i in 0..text.len:
+            self.bytes[self.count + i] = text[i]
+        self.count += text.len
+        return true
+
+    # Adds the decimal digits of `n` (with a minus sign), or nothing when they do not fit.
+    fn push_i64(self: lend Self, n: i64) -> bool:
+        digits: [20]u8 = [0; 20]
+        used: usize = 0
+        neg = n < 0
+        v: u64 = 0
+        if neg:
+            v = wrapping_sub[u64](0, u64(n))
+        else:
+            v = u64(n)
+        if v == 0:
+            digits[0] = '0'
+            used = 1
+        while v > 0:
+            digits[used] = u8(48 + v % 10)
+            v = v / 10
+            used += 1
+        need = used
+        if neg:
+            need += 1
+        if self.count + need > N:
+            return false
+        if neg:
+            self.bytes[self.count] = '-'
+            self.count += 1
+        while used > 0:
+            used -= 1
+            self.bytes[self.count] = digits[used]
+            self.count += 1
+        return true
+
+    fn byte_at(self: read Self, i: usize) -> Optional[u8]:
+        if i >= self.count:
+            return None
+        return Valid(self.bytes[i])
+
+    fn clear(self: lend Self):
+        self.count = 0
+
+    # Equal to `text`?
+    fn equals(self: read Self, text: str) -> bool:
+        if text.len != self.count:
+            return false
+        for i in 0..self.count:
+            if self.bytes[i] != text[i]:
+                return false
+        return true
+
+    # The text as a view; it lasts while the `FixedString` is not changed.
+    fn as_str(self: read Self) -> str:
+        unsafe:
+            return str_from_raw(ptr_cast[*u8](addr(self.bytes)), self.count)
+
+# A queue of at most `N` elements: `push` at the back, `pop` from the front, both in constant time.
+struct RingBuffer[T, N: usize]:
+    private
+    items: [N]T
+    head: usize
+    count: usize
+
+impl RingBuffer[T, N]:
+    public
+    fn new(fill: T) -> RingBuffer[T, N]:
+        return RingBuffer[T, N]{ items: [fill; N], head: 0, count: 0 }
+
+    fn len(self: read Self) -> usize:
+        return self.count
+
+    fn capacity(self: read Self) -> usize:
+        return N
+
+    fn is_empty(self: read Self) -> bool:
+        return self.count == 0
+
+    fn is_full(self: read Self) -> bool:
+        return self.count == N
+
+    # Adds at the back; false when full.
+    fn push(self: lend Self, value: T) -> bool:
+        if self.count == N:
+            return false
+        self.items[(self.head + self.count) % N] = value
+        self.count += 1
+        return true
+
+    # Adds at the back; when full the oldest element is dropped to make room. Returns true if one was dropped.
+    fn push_overwrite(self: lend Self, value: T) -> bool:
+        if self.count == N:
+            self.items[self.head] = value
+            self.head = (self.head + 1) % N
+            return true
+        self.items[(self.head + self.count) % N] = value
+        self.count += 1
+        return false
+
+    fn pop(self: lend Self) -> Optional[T]:
+        if self.count == 0:
+            return None
+        out = self.items[self.head]
+        self.head = (self.head + 1) % N
+        self.count -= 1
+        return Valid(out)
+
+    # The oldest element without removing it.
+    fn peek(self: read Self) -> Optional[T]:
+        if self.count == 0:
+            return None
+        return Valid(self.items[self.head])
+
+    # The element `i` places from the front (0 is the oldest).
+    fn get(self: read Self, i: usize) -> Optional[T]:
+        if i >= self.count:
+            return None
+        return Valid(self.items[(self.head + i) % N])
+
+    fn clear(self: lend Self):
+        self.head = 0
+        self.count = 0
+
+# A map of at most `N` entries with a plain linear search: `N` steps at most, no hashing, and the same
+# time on every run. Meant for small tables (dozens of entries). Keys compare with `==`.
+struct FixedMap[K: Eq, V, N: usize]:
+    private
+    keys: [N]K
+    values: [N]V
+    count: usize
+
+impl FixedMap[K, V, N]:
+    public
+    fn new(key_fill: K, value_fill: V) -> FixedMap[K, V, N]:
+        return FixedMap[K, V, N]{ keys: [key_fill; N], values: [value_fill; N], count: 0 }
+
+    fn len(self: read Self) -> usize:
+        return self.count
+
+    fn capacity(self: read Self) -> usize:
+        return N
+
+    fn is_full(self: read Self) -> bool:
+        return self.count == N
+
+    fn _find(self: read Self, key: K) -> Optional[usize]:
+        for i in 0..self.count:
+            if self.keys[i] == key:
+                return Valid(i)
+        return None
+
+    fn contains(self: read Self, key: K) -> bool:
+        return self._find(key).has_value()
+
+    fn get(self: read Self, key: K) -> Optional[V]:
+        idx = self._find(key)
+        if idx.is_none():
+            return None
+        return Valid(self.values[idx.value_or_panic()])
+
+    # Adds or replaces. Returns false (and changes nothing) when `key` is new and the map is full.
+    fn insert(self: lend Self, key: K, value: V) -> bool:
+        idx = self._find(key)
+        if idx.has_value():
+            self.values[idx.value_or_panic()] = value
+            return true
+        if self.count == N:
+            return false
+        self.keys[self.count] = key
+        self.values[self.count] = value
+        self.count += 1
+        return true
+
+    fn remove(self: lend Self, key: K) -> Optional[V]:
+        idx = self._find(key)
+        if idx.is_none():
+            return None
+        i = idx.value_or_panic()
+        out = self.values[i]
+        self.count -= 1
+        self.keys[i] = self.keys[self.count]
+        self.values[i] = self.values[self.count]
+        return Valid(out)
+
+    # The key at position `i` in insertion-ish order (removals move the last entry into the gap).
+    fn key_at(self: read Self, i: usize) -> Optional[K]:
+        if i >= self.count:
+            return None
+        return Valid(self.keys[i])
+
+    fn value_at(self: read Self, i: usize) -> Optional[V]:
+        if i >= self.count:
+            return None
+        return Valid(self.values[i])
+
+    fn clear(self: lend Self):
+        self.count = 0
+
+# A set of the numbers `0 .. 64 * W`, `W` words of 64 bits.
+struct FixedBitSet[W: usize]:
+    private
+    words: [W]u64
+
+impl FixedBitSet[W]:
+    public
+    fn new() -> FixedBitSet[W]:
+        return FixedBitSet[W]{ words: [0; W] }
+
+    # How many numbers fit (`64 * W`).
+    fn capacity(self: read Self) -> usize:
+        return W * 64
+
+    # Adds `i`; false when `i` is out of range.
+    fn insert(self: lend Self, i: usize) -> bool:
+        if i >= W * 64:
+            return false
+        self.words[i / 64] = self.words[i / 64] | (u64(1) << u32(i % 64))
+        return true
+
+    fn remove(self: lend Self, i: usize) -> bool:
+        if i >= W * 64:
+            return false
+        self.words[i / 64] = self.words[i / 64] & ~(u64(1) << u32(i % 64))
+        return true
+
+    fn contains(self: read Self, i: usize) -> bool:
+        if i >= W * 64:
+            return false
+        return (self.words[i / 64] >> u32(i % 64)) & 1 == 1
+
+    fn count(self: read Self) -> usize:
+        n: usize = 0
+        for w in 0..W:
+            v = self.words[w]
+            while v != 0:
+                v = v & (v - 1)
+                n += 1
+        return n
+
+    fn clear(self: lend Self):
+        for w in 0..W:
+            self.words[w] = 0
+
+    # The smallest member that is at least `from`, or `None`.
+    fn next_from(self: read Self, from: usize) -> Optional[usize]:
+        i = from
+        while i < W * 64:
+            if self.contains(i):
+                return Valid(i)
+            i += 1
+        return None
+
+# A lock-free queue for exactly one producer and one consumer (an interrupt handler and the main loop, or two threads).
+# `push` is called by one side only and `pop` by the other only; with that rule neither ever waits or locks, and both
+# take a bounded number of steps. The indexes are published with release stores and read with acquire loads, so the
+# consumer sees an element only after the producer finished writing it. Share it by `read` (it changes through atomics).
+#
+#     ring = SpscRing[u8, 64].new(0)        # capacity N - 1 = 63 (one slot tells full from empty)
+#     ring.push(7)                           # producer
+#     b = ring.pop()                         # consumer: Optional[u8]
+struct SpscRing[T, N: usize]:
+    private
+    items: [N]T
+    head: u64      # next slot to read; written only by the consumer
+    tail: u64      # next slot to write; written only by the producer
+
+impl SpscRing[T, N]:
+    public
+    fn new(fill: T) -> SpscRing[T, N]:
+        return SpscRing[T, N]{ items: [fill; N], head: 0, tail: 0 }
+
+    fn capacity(self: read Self) -> usize:
+        return N - 1
+
+    # Producer: adds `value` at the back; false when full.
+    fn push(self: read Self, value: T) -> bool:
+        unsafe:
+            tail = atomic_load[u64](ptr_cast[*u64](addr(self.tail)), "relaxed")
+            head = atomic_load[u64](ptr_cast[*u64](addr(self.head)), "acquire")
+            next = (tail + 1) % u64(N)
+            if next == head:
+                return false
+            slots = ptr_cast[*mut T](addr(self.items))
+            ptr_write[T](ptr_cast[*mut u8](ptr_offset(slots, usize(tail))), value)
+            atomic_store[u64](ptr_cast[*mut u64](addr(self.tail)), next, "release")
+        return true
+
+    # Consumer: removes the oldest element; None when empty.
+    fn pop(self: read Self) -> Optional[T]:
+        unsafe:
+            head = atomic_load[u64](ptr_cast[*u64](addr(self.head)), "relaxed")
+            tail = atomic_load[u64](ptr_cast[*u64](addr(self.tail)), "acquire")
+            if head == tail:
+                return None
+            slots = ptr_cast[*T](addr(self.items))
+            value = ptr_read[T](ptr_cast[*u8](ptr_offset(slots, usize(head))))
+            atomic_store[u64](ptr_cast[*mut u64](addr(self.head)), (head + 1) % u64(N), "release")
+            return Valid(value)
+        return None
+
+    # A snapshot of how many elements wait (exact only when the other side is idle).
+    fn len(self: read Self) -> usize:
+        unsafe:
+            head = atomic_load[u64](ptr_cast[*u64](addr(self.head)), "acquire")
+            tail = atomic_load[u64](ptr_cast[*u64](addr(self.tail)), "acquire")
+            return usize((tail + u64(N) - head) % u64(N))
+        return 0

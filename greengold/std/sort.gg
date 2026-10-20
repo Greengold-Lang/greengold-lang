@@ -86,3 +86,126 @@ fn binary_search[T: Ord](v: read List[T], x: T) -> Optional[usize]:
         else:
             return Valid(mid)
     return None
+
+public
+fn is_sorted[T: Ord](v: read List[T]) -> bool:
+    for i in 1..v.len:
+        if v[i] < v[i - 1]:
+            return false
+    return true
+
+# A stable sort (equal elements keep their order): merge sort, O(n log n) steps, one extra buffer of `n` elements.
+# `sort` and `sort_by` use no extra memory but may reorder equal elements. For copyable elements.
+fn sort_stable_by[T](v: lend List[T], before: fn(T, T) -> bool):
+    n = v.len
+    if n < 2:
+        return
+    run: usize = 8
+    i: usize = 0
+    while i < n:
+        end = i + run
+        if end > n:
+            end = n
+        j = i + 1
+        while j < end:
+            x = v[j]
+            k = j
+            while k > i and before(x, v[k - 1]):
+                v[k] = v[k - 1]
+                k -= 1
+            v[k] = x
+            j += 1
+        i += run
+    buf = List[T]()
+    for x in v:
+        buf.push(x)
+    width = run
+    while width < n:
+        lo: usize = 0
+        while lo < n:
+            mid = lo + width
+            if mid > n:
+                mid = n
+            hi = lo + 2 * width
+            if hi > n:
+                hi = n
+            a = lo
+            b = mid
+            k = lo
+            while a < mid and b < hi:
+                if before(v[b], v[a]):
+                    buf[k] = v[b]
+                    b += 1
+                else:
+                    buf[k] = v[a]
+                    a += 1
+                k += 1
+            while a < mid:
+                buf[k] = v[a]
+                a += 1
+                k += 1
+            while b < hi:
+                buf[k] = v[b]
+                b += 1
+                k += 1
+            lo += 2 * width
+        for q in 0..n:
+            v[q] = buf[q]
+        width *= 2
+
+fn sort_stable[T: Ord](v: lend List[T]):
+    n = v.len
+    if n < 2:
+        return
+    run: usize = 8
+    i: usize = 0
+    while i < n:
+        end = i + run
+        if end > n:
+            end = n
+        j = i + 1
+        while j < end:
+            x = v[j]
+            k = j
+            while k > i and x < v[k - 1]:
+                v[k] = v[k - 1]
+                k -= 1
+            v[k] = x
+            j += 1
+        i += run
+    buf = List[T]()
+    for x in v:
+        buf.push(x)
+    width = run
+    while width < n:
+        lo: usize = 0
+        while lo < n:
+            mid = lo + width
+            if mid > n:
+                mid = n
+            hi = lo + 2 * width
+            if hi > n:
+                hi = n
+            a = lo
+            b = mid
+            k = lo
+            while a < mid and b < hi:
+                if v[b] < v[a]:
+                    buf[k] = v[b]
+                    b += 1
+                else:
+                    buf[k] = v[a]
+                    a += 1
+                k += 1
+            while a < mid:
+                buf[k] = v[a]
+                a += 1
+                k += 1
+            while b < hi:
+                buf[k] = v[b]
+                b += 1
+                k += 1
+            lo += 2 * width
+        for q in 0..n:
+            v[q] = buf[q]
+        width *= 2
