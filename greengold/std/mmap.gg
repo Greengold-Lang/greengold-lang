@@ -2,13 +2,13 @@
 #
 #     import std.mmap
 #
-#     match mmap.MappedFile.open("model.gguf"):
+#     match mmap.MappedFile.open("data.bin"):
 #         Ok(f): print(f.len(), f.bytes()[0])
 #         Err(e): print(e)
 #
 # The file is not read into memory: the operating system pages it in when the bytes are used, shares those
-# pages between programs, and drops them again under memory pressure. This is how a model of several gigabytes
-# starts in a moment. `bytes()` is a view of the whole file; it is valid until the `MappedFile` goes away.
+# pages between programs, and drops them again under memory pressure. This is how a file of several gigabytes
+# opens in a moment. `bytes()` is a view of the whole file; it is valid until the `MappedFile` goes away.
 import std.string
 
 private

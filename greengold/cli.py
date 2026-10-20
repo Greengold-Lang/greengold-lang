@@ -1003,7 +1003,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     r = add("run", help="compile and run")
     r.add_argument("files", nargs="*", help="source file(s) (default: gg.toml main)")
-    r.epilog = "Arguments after `--` go to the program: gg run app.gg --release -- model.gguf -p hello"
+    r.epilog = "Arguments after `--` go to the program: gg run app.gg --release -- input.txt -v"
     r.add_argument("-e", "--eval", metavar="CODE",
                    help="run a snippet instead of a file: the body of `main` (a last bare expression is printed)")
     r.add_argument("--release", action="store_true", help="optimize (LLVM -O3); bounds checks remain enabled")

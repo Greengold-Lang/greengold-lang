@@ -8,6 +8,7 @@ Work toward use in embedded, aerospace, defense, and financial code (the plan is
 
 **Breaking**
 
+- The LLM inference modules are removed from the standard library: `std.llama`, `std.gguf`, `std.tokenizer`, `std.sampler`, `std.kquant`, `std.tensor` and `std.nn`, together with their tests, the `gg-infer` app and the `qmatvec`, `qmatvec_mt`, `q4matvec` and `nnkernels` benchmarks. `std.mmap` stays. The SIMD `dot_i8` / `dot_u8i8` / `fma` operations are unchanged.
 - `std.math`: `abs_f64`, `abs_i64`, `min_f64`, `max_f64`, `min_i64`, `max_i64`, `clamp_i64` are replaced by the generic `abs`, `min`, `max`, `clamp` (`math.min(3, 2)`, `math.max(2.5, 1.0)`). The old names collided with the generic functions' emitted names.
 - `std.io`: every fallible call returns `Result[T, IoError]` instead of `Result[T, string]`; `read_some`, `read_rest` and `flush` return a `Result` too, and `read_line` returns `Result[Optional[string], IoError]`. `File` methods take `lend self`. `IoError` has `kind`, `code` and `message`.
 - `std.thread`: the `i64` channel is now `ChannelI64`; `Channel[T]` is a generic channel (bounded or unbounded, `recv_timeout`, `try_recv`, `close`). `RwLock` has `read_lock` and `write_lock` (`read` is a keyword).

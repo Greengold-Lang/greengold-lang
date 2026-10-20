@@ -321,6 +321,6 @@ fn saturating_pow_i64(base: i64, exp_: u32) -> i64:
         result = saturating_mul(result, base)
     return result
 
-# Fused multiply-add in plain arithmetic (two roundings); use `std.nn` or SIMD `fma` for hardware FMA.
+# Fused multiply-add in plain arithmetic (two roundings); use SIMD `fma` for hardware FMA.
 fn lerp(a: f64, b: f64, t: f64) -> f64:
     return a + (b - a) * t

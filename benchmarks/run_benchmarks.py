@@ -112,7 +112,7 @@ def main():
     all_tasks = [
         "fib", "collatz", "fannkuch", "mandel", "nbody", "spectral",
         "matmul", "heat", "monte", "fnv", "qsort", "dijkstra",
-        "sieve", "primes", "vector", "trees", "particle", "wordfreq", "jsonparse", "gpumatmul", "qmatvec",
+        "sieve", "primes", "vector", "trees", "particle", "wordfreq", "jsonparse", "gpumatmul",
     ]
     selected_tasks = []
     iterations = 5

@@ -115,16 +115,38 @@ def test_dot_and_fma(cpu):
     ]
 
 
-def test_cpu_changes_the_machine_code():
-    from pathlib import Path
+MATVEC = """hot fn matvec(w: []i8, x: []i8, y: lend []i32, rows: usize, cols: usize):
+    for r in 0..rows:
+        base = r * cols
+        acc = i32x8.splat(0)
+        c: usize = 0
+        while c + 32 <= cols:
+            acc = acc.dot_i8(i8x32.load(x, c), i8x32.load(w, base + c))
+            c += 32
+        y[r] = acc.sum()
 
+fn main():
+    w = List[i8]()
+    x = List[i8]()
+    for i in 0..4096:
+        w.push(i8(i % 100))
+    for i in 0..64:
+        x.push(i8(i % 50))
+    y = List[i32]()
+    for i in 0..64:
+        y.push(0)
+    matvec(w[..], x[..], y[..], 64, 64)
+    print(y[3])
+"""
+
+
+def test_cpu_changes_the_machine_code():
     from greengold import llvm_driver
     from greengold.codegen_llvm import native_triple
     triple = native_triple(None)
     if not triple.startswith("x86_64"):
         pytest.skip("x86 only")
-    ir_text = compile_to_ir((Path(__file__).parent.parent / "benchmarks" / "qmatvec.gg").read_text(encoding="utf-8"),
-                            release=True)
+    ir_text = compile_to_ir(MATVEC, release=True)
     asm = {}
     for cpu in (None, "x86-64-v3"):
         llvm_driver.set_cpu(cpu)

@@ -148,7 +148,7 @@ Faz 5'in ilk sürümleri (`packages/gg-units`, `gg-linalg`, `gg-geo`, `gg-dsp`, 
 hedeflerde (macOS, Linux ARM) yalnız CI'nın sonucuna güvenilebilir.
 
 **Yapılmadı:**
-- Faz 1: ML modüllerinin `gg-ml` paketine taşınması (çok sayıda test ve örnek `std.llama`/`std.tensor` adlarına bağlı); `std.sock` private yapılmadı
+- Faz 1: ML modülleri `gg-ml` paketine taşınmadı; bunun yerine std'den silindi (`std.llama`, `std.tensor`, `std.nn`, `std.gguf`, `std.kquant`, `std.tokenizer`, `std.sampler`); `std.sock` private yapılmadı
   (`std.net` belgeleri `Poller` ile birlikte onu kullanıcıya gösteriyor); her public API için test şartı yalnız yeni modüller için sağlandı.
 - Faz 2: `usize`'ın hedefin işaretçi genişliğine bağlanması (iç gösterim hâlâ 64 bit; yalnız C sınırında daraltılıyor); `gg new --target cortex-m4` şablonu;
   QEMU'da çalışan test (yukarıya bakın); `std.serial`/`std.can`; RTOS için hazır bağlamalar (yalnız belge).
