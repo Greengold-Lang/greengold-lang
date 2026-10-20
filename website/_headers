@@ -45,3 +45,12 @@
 
 /playground/gg-bundle.zip
   Cache-Control: no-cache
+
+/learn/*.js
+  Cache-Control: no-cache
+
+/learn/learn.css
+  Cache-Control: no-cache
+
+/learn/content/*
+  Cache-Control: no-cache

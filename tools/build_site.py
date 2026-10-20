@@ -279,13 +279,15 @@ def asset_version() -> str:
     return h.hexdigest()[:10]
 
 
-def layout(key: str, path: str, title: str, description: str, body: str) -> str:
+def layout(key: str, path: str, title: str, description: str, body: str, root: str = "", extra_head: str = "") -> str:
+    """`root` is the path from this page back to the site root ("../" for a page in a folder); it is put in front of every
+    relative link and script of the shared header and footer. `body` and `extra_head` are written relative to the root."""
     full_title = "Greengold — Systems speed, readable ownership" if key == "home" else f"{title} — Greengold"
     url = f"{DOMAIN}/" if key == "home" else f"{DOMAIN}/{path}"
     current = ' aria-current="page"'
     nav = "\n".join(
         f'        <a href="{href}"{current if k == key else ""}>{label}</a>' for k, href, label in NAV)
-    return f"""<!DOCTYPE html>
+    page = f"""<!DOCTYPE html>
 <html lang="en" class="no-js">
 <head>
   <meta charset="UTF-8">
@@ -307,7 +309,7 @@ def layout(key: str, path: str, title: str, description: str, body: str) -> str:
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v={asset_version()}">
-</head>
+{extra_head}</head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
@@ -379,6 +381,9 @@ def layout(key: str, path: str, title: str, description: str, body: str) -> str:
 </body>
 </html>
 """
+    if root:
+        page = re.sub(r'((?:href|src)=")(?!https?:|#|mailto:|data:)', lambda m: m.group(1) + root, page)
+    return page
 
 
 def page_hero(kicker: str, title: str, lede: str, extra: str = "", narrow: bool = False) -> str:
@@ -1098,6 +1103,37 @@ def playground_version() -> str:
     return h.hexdigest()[:10]
 
 
+def build_learn() -> str:
+    """The Learn app (website/learn/): lessons, an editor and the standard library reference. The page is only the frame;
+    learn.js draws everything from website/learn/content/."""
+    body = """    <div class="wrap">
+      <div id="learn" class="learn">
+        <aside class="learn-side" id="learn-side" aria-label="Contents"></aside>
+        <section class="learn-main" id="learn-main" aria-live="polite"></section>
+        <section class="learn-lab" id="learn-lab" hidden>
+          <div class="pg-bar">
+            <button type="button" class="btn btn-primary" id="lab-run"></button>
+            <button type="button" class="btn btn-ghost" id="lab-stop" hidden></button>
+            <button type="button" class="btn btn-ghost" id="lab-reset"></button>
+            <span class="pg-status" id="lab-status" role="status" aria-live="polite"></span>
+          </div>
+          <div class="pg-progress" id="lab-progress" role="presentation" hidden><span></span></div>
+          <div class="pg-pane lab-editor"><pre class="pg-gutter" id="lab-gutter" aria-hidden="true">1</pre>
+            <div class="pg-code"><pre class="pg-hl" id="lab-hl" aria-hidden="true"></pre>
+              <textarea class="pg-editor" id="lab-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code"></textarea></div></div>
+          <pre class="pg-out lab-out" id="lab-out" aria-label="Output"></pre>
+          <div class="lab-verdict" id="lab-verdict" role="status" hidden></div>
+        </section>
+      </div>
+    </div>
+    <script src="playground/highlight.js"></script>
+    <script src="playground/editor.js"></script>
+    <script src="learn/learn.js"></script>"""
+    return layout("learn", "learn/index.html", "Learn",
+                  "Learn Greengold step by step in your browser: lessons, runnable code, exercises, and the standard library.",
+                  body, root="../", extra_head='  <link rel="stylesheet" href="learn/learn.css">\n')
+
+
 def build_playground() -> str:
     body = page_hero("Playground", "Playground",
                      "Write Greengold, see errors and checked fixes as you type, and run the program, all in the browser. "
@@ -1323,6 +1359,7 @@ def main() -> None:
         "diagnostics.html": build_diagnostics(),
         "roadmap.html": build_roadmap(),
         "playground.html": build_playground(),
+        "learn/index.html": build_learn(),
         "about.html": build_about(),
     }
     for name, text in pages.items():
