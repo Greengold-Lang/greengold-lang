@@ -1,6 +1,49 @@
 {
-  "chapters": [
-    {"id": "c00", "only": "beginner", "title": {"tr": "Programlamaya giriş", "en": "Introduction to programming"}, "lessons": ["c00-l01"]},
-    {"id": "c01", "title": {"tr": "Temeller ve tipler", "en": "Basics and types"}, "lessons": ["c01-l01"]}
-  ]
+ "chapters": [
+  {
+   "id": "c00",
+   "only": "beginner",
+   "title": {
+    "tr": "Programlamaya giriş",
+    "en": "Introduction to programming"
+   },
+   "lessons": [
+    "c00-l01",
+    "c00-l02",
+    "c00-l03",
+    "c00-l04",
+    "c00-l05"
+   ]
+  },
+  {
+   "id": "c01",
+   "title": {
+    "tr": "Temeller ve tipler",
+    "en": "Basics and types"
+   },
+   "lessons": [
+    "c01-l01",
+    "c01-l02",
+    "c01-l03",
+    "c01-l04",
+    "c01-l05",
+    "c01-l06"
+   ]
+  },
+  {
+   "id": "c02",
+   "title": {
+    "tr": "Kontrol akışı",
+    "en": "Control flow"
+   },
+   "lessons": [
+    "c02-l01",
+    "c02-l02",
+    "c02-l03",
+    "c02-l04",
+    "c02-l05",
+    "c02-l06"
+   ]
+  }
+ ]
 }

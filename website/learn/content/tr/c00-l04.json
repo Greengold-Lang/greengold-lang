@@ -1,0 +1,86 @@
+{
+ "title": "Tekrar etmek",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Aynı işi birçok kez yapmak için **döngü** kullanılır. `for i in 0..5:` döngüsü `i` değişkenini 0, 1, 2, 3, 4 yaparak girintili bölümü beş kez çalıştırır (5 dahil değildir)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..5:",
+    "        print(\"Round\", i)"
+   ],
+   "run": true,
+   "output": [
+    "Round 0",
+    "Round 1",
+    "Round 2",
+    "Round 3",
+    "Round 4"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`while` döngüsü koşul doğru olduğu sürece çalışmaya devam eder. Koşulu bir noktada yanlış yapmayı unutursan döngü hiç bitmez!"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 3",
+    "    while n > 0:",
+    "        print(n)",
+    "        n -= 1",
+    "    print(\"Go!\")"
+   ],
+   "run": true,
+   "output": [
+    "3",
+    "2",
+    "1",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`n -= 1` kısaca `n = n - 1` demektir; `+=` de benzer şekilde artırır."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l04-x1",
+   "prompt": "1'den 5'e kadar olan sayıların toplamını bulup yazdır. (`1..=5` hem 1'i hem 5'i içerir.)",
+   "starter": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        pass",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        total += i",
+    "    print(total)"
+   ],
+   "hint": "`pass` yerine `total += i` yaz.",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l04-q1",
+   "q": "`for i in 0..3:` döngüsü kaç kez çalışır?",
+   "options": [
+    "2",
+    "3",
+    "4"
+   ],
+   "answer": 1,
+   "why": "`i` 0, 1 ve 2 olur; 3 dahil değildir."
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+ "title": "if bir ifade olarak",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`if` bir değer de üretebilir: `if koşul then A else B`. Sonucu doğrudan bir değişkene atarsın. `else` zorunludur ve tüm dalların tipi **aynı** olmalıdır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    status = if age >= 18 then \"Adult\" else \"Child\"",
+    "    print(status)",
+    "",
+    "    score = 75",
+    "    grade = if score >= 90 then \"A\" elif score >= 70 then \"B\" else \"C\"",
+    "    print(\"Grade:\", grade)"
+   ],
+   "run": true,
+   "output": [
+    "Adult",
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l02-x1",
+   "prompt": "`n` negatifse `-1`, değilse `1` olan `sign` değişkenini `if ... then ... else` ile yaz ve yazdır.",
+   "starter": [
+    "fn main():",
+    "    n = -7",
+    "    sign = 0",
+    "    print(sign)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = -7",
+    "    sign = if n < 0 then -1 else 1",
+    "    print(sign)"
+   ],
+   "hint": "`sign = if n < 0 then -1 else 1`",
+   "expected": [
+    "-1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l02-q1",
+   "q": "`if` ifadesinde `else` yazmak zorunlu mudur?",
+   "options": [
+    "Hayır",
+    "Evet",
+    "Yalnızca `elif` varsa"
+   ],
+   "answer": 1,
+   "why": "Değer üreten `if` her durumda bir değer vermelidir."
+  }
+ ]
+}

@@ -1,0 +1,81 @@
+{
+ "title": "Sayılar ve tipler",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Her değerin bir **tipi** vardır ve tip, değerin bellekte ne kadar yer kaplayacağını ve hangi değerleri alabileceğini belirler. Tam sayı tipleri: `i8`, `i16`, `i32`, `i64` (işaretli, `i` = integer) ve `u8`, `u16`, `u32`, `u64` (işaretsiz, yani negatif olamaz). Sayı sonraki rakam kadar bit kaplar. Ondalıklı sayılar için `f32` ve `f64` vardır."
+  },
+  {
+   "t": "p",
+   "text": "Tip yazmazsan tam sayılar `i32`, ondalıklılar `f64` olur. Tipi kendin belirtmek için `name: tip = değer` yazılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 42",
+    "    pi: f64 = 3.14159",
+    "    age: u8 = 25",
+    "    big: i64 = 5_000_000_000",
+    "    print(a, pi, age, big)"
+   ],
+   "run": true,
+   "output": [
+    "42 3.14159 25 5000000000"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Büyük sayıları okunur yazmak için `_` kullanabilirsin. `0x` onaltılık, `0b` ikilik sayı başlatır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    million = 1_000_000",
+    "    color = 0xFF",
+    "    mask = 0b1100",
+    "    print(million, color, mask)"
+   ],
+   "run": true,
+   "output": [
+    "1000000 255 12"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`usize` dizi uzunluğu ve indeks için kullanılan tiptir; ileride sık göreceksin."
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l02-x1",
+   "prompt": "`radius` adlı bir `f64` değişkeni 2.0 olsun. `radius * radius * 3.0` değerini yazdır.",
+   "starter": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(radius * radius * 3.0)"
+   ],
+   "hint": "`print(0)` yerine hesabı yazdır.",
+   "expected": [
+    "12"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l02-q1",
+   "q": "Negatif olamayan 8 bitlik tam sayı tipi hangisidir?",
+   "options": [
+    "i8",
+    "u8",
+    "f32"
+   ],
+   "answer": 1,
+   "why": "`u` işaretsiz demektir; `u8` 0 ile 255 arasındadır."
+  }
+ ]
+}

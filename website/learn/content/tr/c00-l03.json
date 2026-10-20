@@ -1,0 +1,80 @@
+{
+ "title": "Karar vermek",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Programlar duruma göre farklı davranabilir. Bunun için **`if`** kullanılır: koşul doğruysa girintili bölüm çalışır. Koşulun sonunda `:` unutulmaz."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    temperature = 31",
+    "    if temperature > 30:",
+    "        print(\"It is hot\")",
+    "    print(\"Done\")"
+   ],
+   "run": true,
+   "output": [
+    "It is hot",
+    "Done"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`else` koşul doğru değilse çalışır. Karşılaştırma işaretleri: `>` büyük, `<` küçük, `>=` büyük eşit, `==` eşit mi?, `!=` farklı mı?"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 45",
+    "    if score >= 50:",
+    "        print(\"Passed\")",
+    "    else:",
+    "        print(\"Failed\")"
+   ],
+   "run": true,
+   "output": [
+    "Failed"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l03-x1",
+   "prompt": "`age` 20 iken `Adult`, değilse `Child` yazdıran programı tamamla. (`>= 18` kullan)",
+   "starter": [
+    "fn main():",
+    "    age = 20",
+    "    if age >= 18:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    age = 20",
+    "    if age >= 18:",
+    "        print(\"Adult\")",
+    "    else:",
+    "        print(\"Child\")"
+   ],
+   "hint": "İki `print` içindeki `?` işaretlerini değiştir. Çıktı: `Adult` (yaş 20 olduğu için).",
+   "expected": [
+    "Adult"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l03-q1",
+   "q": "`if x == 3:` satırında `==` ne anlama gelir?",
+   "options": [
+    "x'e 3 ata",
+    "x 3'e eşit mi diye sor",
+    "x 3'ten büyük mü"
+   ],
+   "answer": 1,
+   "why": "`==` karşılaştırır; atama için tek `=` kullanılır."
+  }
+ ]
+}

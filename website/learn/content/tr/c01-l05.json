@@ -1,0 +1,72 @@
+{
+ "title": "Tip dönüşümü",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold değer kaybı olmayan dönüşümleri kendisi yapar: küçük tam sayı daha büyüğüne (`i32` → `i64`), `i32` → `f64` gibi. İşlemdeki iki taraf farklıysa dar olan genişler."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a: i32 = 100",
+    "    b: i64 = 200",
+    "    c = a + b",
+    "    ratio: f64 = a",
+    "    print(c, ratio)"
+   ],
+   "run": true,
+   "output": [
+    "300 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Değer kaybedebilecek dönüşümleri (`f64` → `i32`, `i64` → `i32`) **sen** yazarsın: `i32(...)`. Derleyici hata mesajında bu çözümü de önerir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    value: f64 = 9.81",
+    "    truncated = i32(value)",
+    "    print(truncated)"
+   ],
+   "run": true,
+   "output": [
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l05-x1",
+   "prompt": "`f64` olan `price`ı `i32`'ye çevirip yazdır (küsurat atılır).",
+   "starter": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(price)"
+   ],
+   "solution": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(i32(price))"
+   ],
+   "hint": "`print(i32(price))` yaz.",
+   "expected": [
+    "19"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l05-q1",
+   "q": "`f64`'ten `i32`'ye geçiş neden elle yazılır?",
+   "options": [
+    "Daha hızlı olduğu için",
+    "Küsurat kaybolabileceği için",
+    "Derleyici bilmediği için"
+   ],
+   "answer": 1,
+   "why": "Değer kaybı sessizce olmasın diye bu dönüşüm açıkça yazılır."
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+ "title": "Constants",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`const` defines a value at file level (outside functions) that is known at compile time. You can write its type or leave it to the compiler. Their names are usually WRITTEN_IN_CAPITALS."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const MAX_SCORE: i32 = 100",
+    "const APP_NAME = \"Notebook\"",
+    "",
+    "fn main():",
+    "    print(APP_NAME, MAX_SCORE)"
+   ],
+   "run": true,
+   "output": [
+    "Notebook 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Constants save you from repeating the same number in many functions; if the value changes you fix a single place."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const PI: f64 = 3.14159",
+    "",
+    "fn circle_area(r: f64) -> f64:",
+    "    return PI * r * r",
+    "",
+    "fn main():",
+    "    print(circle_area(2.0))"
+   ],
+   "run": true,
+   "output": [
+    "12.56636"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l06-x1",
+   "prompt": "Make a constant `TAX_RATE` equal to 18. With a price of 200 print `price * TAX_RATE / 100`.",
+   "starter": [
+    "fn main():",
+    "    price = 200",
+    "    print(0)"
+   ],
+   "solution": [
+    "const TAX_RATE = 18",
+    "",
+    "fn main():",
+    "    price = 200",
+    "    print(price * TAX_RATE / 100)"
+   ],
+   "hint": "Write the line `const TAX_RATE = 18` above `main`.",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l06-q1",
+   "q": "Where is a `const` defined?",
+   "options": [
+    "Only inside `main`",
+    "At file level, outside functions",
+    "Inside parentheses"
+   ],
+   "answer": 1,
+   "why": "`const` is at file level; inside a function you use `fixed`."
+  }
+ ]
+}

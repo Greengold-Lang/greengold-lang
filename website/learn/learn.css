@@ -46,3 +46,11 @@
   .learn, .learn.no-lab { grid-template-columns: minmax(0, 1fr); }
   .learn-side, .learn-lab { position: static; max-height: none; }
 }
+.learn-side details.chapter { margin: 4px 0; }
+.learn-side summary { cursor: pointer; padding: 6px 8px; border-radius: 8px; font-weight: 600; display: flex; gap: 8px; }
+.learn-side summary:hover { background: color-mix(in srgb, var(--green) 8%, transparent); }
+.learn-side summary .count { margin-left: auto; color: var(--muted); font-weight: 400; font-size: .85em; }
+.learn-side ul { padding-left: 8px; }
+.learn-side a.next { font-weight: 600; }
+.notice { padding: 8px 12px; border: 1px dashed var(--gold); border-radius: 10px; color: var(--gold-soft); }
+.notice a { color: inherit; text-decoration: underline; }

@@ -1,0 +1,91 @@
+{
+ "title": "Operatörler",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Aritmetik: `+ - * / %`. Tam sayılarda `/` küsuratı atar (`20 / 3` = 6), `%` kalanı verir (`20 % 3` = 2)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(10 + 20, 30 - 5, 4 * 6)",
+    "    print(20 / 3, 20 % 3)"
+   ],
+   "run": true,
+   "output": [
+    "30 25 24",
+    "6 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Karşılaştırma `true` ya da `false` (bool) verir: `== != < > <= >=`. Mantıksal işleçler ise yazıyla yazılır: `and`, `or`, `not`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number = 15",
+    "    print(number > 10, number == 20)",
+    "    print(number > 10 and number < 20)",
+    "    print(not (number > 10))"
+   ],
+   "run": true,
+   "output": [
+    "true false",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Bit işleçleri (`&`, `|`, `^`, `<<`, `>>`) Greengold'da karşılaştırmalardan **önce** hesaplanır; yani `bits & 1 == 0` beklediğin gibi `(bits & 1) == 0` demektir. (C dilindeki tuzak burada yok.)"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    bits = 6",
+    "    print(bits & 1 == 0)",
+    "    print(1 << 4)"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "16"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l03-x1",
+   "prompt": "`n` çift ise `true`, tek ise `false` yazdırsın. (`n % 2 == 0`)",
+   "starter": [
+    "fn main():",
+    "    n = 14",
+    "    print(false)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = 14",
+    "    print(n % 2 == 0)"
+   ],
+   "hint": "`print(false)` yerine koşulun kendisini yazdır.",
+   "expected": [
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l03-q1",
+   "q": "`17 % 5` kaçtır?",
+   "options": [
+    "3",
+    "2",
+    "3.4"
+   ],
+   "answer": 1,
+   "why": "17'de 5, üç kez var ve 2 artar; `%` kalanı verir."
+  }
+ ]
+}

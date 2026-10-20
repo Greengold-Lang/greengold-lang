@@ -1,0 +1,72 @@
+{
+ "title": "Metin ve karakter",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Çift tırnaklı yazı bir **metindir** (`str`): değiştirilemez, UTF-8 kodlanmış bir bellek görünümüdür, yani Türkçe harfleri de içerebilir. Tek tırnaklı `'A'` ise tek bir karakterdir ve değeri ASCII sayısıdır (`u8`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    greeting = \"Hello\"",
+    "    letter = 'A'",
+    "    print(greeting, letter)"
+   ],
+   "run": true,
+   "output": [
+    "Hello 65"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Özel karakterler `\\` ile yazılır: `\\n` yeni satır, `\\t` sekme, `\\\\` ters eğik çizgi, `\\\"` çift tırnak."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"First\\nSecond\")",
+    "    print(\"Name:\\tAli\")",
+    "    print(\"He said \\\"hello\\\"\")"
+   ],
+   "run": true,
+   "output": [
+    "First",
+    "Second",
+    "Name:\tAli",
+    "He said \"hello\""
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l04-x1",
+   "prompt": "Tek bir `print` ile iki satır yazdır: `One` ve `Two`. (`\\n` kullan)",
+   "starter": [
+    "fn main():",
+    "    print(\"Bir İki\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"One\\nTwo\")"
+   ],
+   "hint": "Boşluğun yerine `\\n` koy.",
+   "expected": [
+    "One",
+    "Two"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l04-q1",
+   "q": "`'A'` ve `\"A\"` aynı şey midir?",
+   "options": [
+    "Evet",
+    "Hayır: biri karakter, biri metin",
+    "Hayır: biri hata verir"
+   ],
+   "answer": 1,
+   "why": "Tek tırnak bir karakter (sayı), çift tırnak bir metindir."
+  }
+ ]
+}

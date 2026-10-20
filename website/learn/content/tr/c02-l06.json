@@ -1,0 +1,67 @@
+{
+ "title": "break, continue, pass",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`break` döngüyü hemen bitirir. `continue` o turun kalanını atlayıp sonrakine geçer. `pass` hiçbir şey yapmaz: Greengold boş gövde kabul etmediği için bilerek boş bırakılan yere yazılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..10:",
+    "        if i == 3:",
+    "            continue",
+    "        if i == 7:",
+    "            break",
+    "        print(i)"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "1",
+    "2",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Yukarıda 3 atlandı ve 7'de döngü bitti."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l06-x1",
+   "prompt": "1'den 20'ye kadar sayılarda ilk 7'ye tam bölünen sayıyı bul ve yazdır, sonra döngüden çık.",
+   "starter": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        pass"
+   ],
+   "solution": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        if i % 7 == 0:",
+    "            print(i)",
+    "            break"
+   ],
+   "hint": "`if i % 7 == 0:` içinde `print(i)` ve `break` yaz.",
+   "expected": [
+    "7"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l06-q1",
+   "q": "`continue` ne yapar?",
+   "options": [
+    "Döngüyü bitirir",
+    "O turun kalanını atlayıp sonraki tura geçer",
+    "Programı durdurur"
+   ],
+   "answer": 1,
+   "why": "Döngüyü bitiren `break`'tir."
+  }
+ ]
+}

@@ -1,11 +1,75 @@
 {
-  "title": "What is a program?",
-  "blocks": [
-    {"t": "p", "text": "A **program** is a text that tells the computer what to do, step by step. In Greengold you write it in a `.gg` file, and the compiler turns it into code the computer understands."},
-    {"t": "p", "text": "Every Greengold program starts with a **function** called `main`. The lines inside the function are indented by 4 spaces. The indentation shows which lines belong to the function."},
-    {"t": "code", "run": true, "code": ["fn main():", "    print(\"Hello, world!\")"], "output": ["Hello, world!"]},
-    {"t": "p", "text": "`print` writes something on the screen. Text in quotes is called a **string**."},
-    {"t": "exercise", "id": "c00-l01-x1", "prompt": "Change the program so that it prints `Hello, Greengold!`.", "starter": ["fn main():", "    print(\"Hello, world!\")"], "expected": ["Hello, Greengold!"], "hint": "Only the text inside the quotes needs to change.", "solution": ["fn main():", "    print(\"Hello, Greengold!\")"]},
-    {"t": "quiz", "id": "c00-l01-q1", "q": "Which function does a Greengold program start with?", "options": ["start", "main", "begin"], "answer": 1, "why": "Execution always begins in `main`."}
-  ]
+ "title": "What is a program?",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A **program** is a text that tells the computer what to do, step by step. In Greengold you write it in a `.gg` file, and the compiler turns it into code the computer understands."
+  },
+  {
+   "t": "p",
+   "text": "Every Greengold program starts with a **function** called `main`. The lines inside the function are indented by 4 spaces. The indentation shows which lines belong to the function."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "run": true,
+   "output": [
+    "Hello, world!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`print` writes something on the screen. Text in quotes is called a **string**. A line starting with `#` is a **comment**: the computer ignores it, it is a note for people."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    # This line is a comment",
+    "    print(\"First line\")",
+    "    print(\"Second line\")"
+   ],
+   "run": true,
+   "output": [
+    "First line",
+    "Second line"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Lines run from top to bottom, in order."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l01-x1",
+   "prompt": "Change the program so that it prints `Hello, Greengold!`.",
+   "starter": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"Hello, Greengold!\")"
+   ],
+   "hint": "Only the text inside the quotes needs to change.",
+   "expected": [
+    "Hello, Greengold!"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l01-q1",
+   "q": "Which function does a Greengold program start with?",
+   "options": [
+    "start",
+    "main",
+    "begin"
+   ],
+   "answer": 1,
+   "why": "Execution always begins in `main`."
+  }
+ ]
 }

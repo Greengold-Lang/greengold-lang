@@ -1,0 +1,80 @@
+{
+ "title": "Değerler ve değişkenler",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bilgisayar **değerlerle** çalışır: sayılar (`42`, `3.5`) ve metinler (`\"Ali\"`). Bir değere isim verirsen onu sonra tekrar kullanabilirsin. Bu isme **değişken** denir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    name = \"Ali\"",
+    "    print(name, age)"
+   ],
+   "run": true,
+   "output": [
+    "Ali 20"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`=` işareti \"eşittir\" değil, **\"ata\"** demektir: sağdaki değeri soldaki isme koyar. Sayılarla hesap yapabilirsin: `+`, `-`, `*`, `/`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    apple = 5",
+    "    pear = 3",
+    "    total = apple + pear",
+    "    print(total)",
+    "    apple = 10",
+    "    print(apple + pear)"
+   ],
+   "run": true,
+   "output": [
+    "8",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Bir değişkenin değeri sonradan değiştirilebilir. Yukarıda `apple` önce 5, sonra 10 oldu."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l02-x1",
+   "prompt": "`a` 6, `b` 7 olsun. Çarpımlarını yazdır (`*` kullan).",
+   "starter": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(a * b)"
+   ],
+   "hint": "`print(0)` yerine `print(a * b)` yaz.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l02-q1",
+   "q": "`x = 5` satırı ne yapar?",
+   "options": [
+    "x'in 5'e eşit olup olmadığını sorar",
+    "5 değerini x ismine koyar",
+    "ekrana 5 yazar"
+   ],
+   "answer": 1,
+   "why": "`=` bir atamadır: değeri isme koyar."
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "title": "Converting types",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold converts by itself when no value can be lost: a small integer to a wider one (`i32` → `i64`), `i32` → `f64`, and so on. If the two sides of an operation differ, the narrower side widens."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a: i32 = 100",
+    "    b: i64 = 200",
+    "    c = a + b",
+    "    ratio: f64 = a",
+    "    print(c, ratio)"
+   ],
+   "run": true,
+   "output": [
+    "300 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Conversions that might lose a value (`f64` → `i32`, `i64` → `i32`) are written **by you**: `i32(...)`. The compiler suggests this fix in its error message too."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    value: f64 = 9.81",
+    "    truncated = i32(value)",
+    "    print(truncated)"
+   ],
+   "run": true,
+   "output": [
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l05-x1",
+   "prompt": "Convert the `f64` `price` to `i32` and print it (the fraction is dropped).",
+   "starter": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(price)"
+   ],
+   "solution": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(i32(price))"
+   ],
+   "hint": "Write `print(i32(price))`.",
+   "expected": [
+    "19"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l05-q1",
+   "q": "Why is going from `f64` to `i32` written by hand?",
+   "options": [
+    "Because it is faster",
+    "Because the fraction can be lost",
+    "Because the compiler does not know how"
+   ],
+   "answer": 1,
+   "why": "So that a loss of value never happens silently, this conversion is written out."
+  }
+ ]
+}

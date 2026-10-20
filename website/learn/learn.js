@@ -15,7 +15,7 @@
       correct: "Doğru!", wrong: "Çıktı beklenenle aynı değil.", expected: "Beklenen", got: "Senin çıktın", answer: "Doğru cevap",
       contents: "İçindekiler", badges: "Rozetler", progress: "İlerleme", lessons: "ders",
       b_first_run: "İlk program", b_first_ex: "İlk alıştırma", b_ex10: "10 alıştırma", b_quiz5: "5 doğru cevap", b_chapter: "Bölüm bitirildi",
-      stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
+      cont: "Kaldığın yerden devam et", start: "Başla", review: "Önce şunu bitirmeni öneririz", stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
     },
     en: {
       title: "Learn Greengold", lede: "From zero to the standard library. Write code in the browser, run it, solve the exercises.",
@@ -27,7 +27,7 @@
       correct: "Correct!", wrong: "The output is not what was expected.", expected: "Expected", got: "Your output", answer: "Correct answer",
       contents: "Contents", badges: "Badges", progress: "Progress", lessons: "lessons",
       b_first_run: "First program", b_first_ex: "First exercise", b_ex10: "10 exercises", b_quiz5: "5 correct answers", b_chapter: "Chapter finished",
-      stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
+      cont: "Continue where you left off", start: "Start", review: "We suggest finishing this first", stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
     }
   };
 
@@ -172,6 +172,23 @@
   var manifest = null, cache = {}, titles = {}, currentLesson = null;
   function lessonIds() { var ids = []; manifest.chapters.forEach(function (c) { c.lessons.forEach(function (l) { ids.push(l); }); }); return ids; }
   function skipped(ch) { return !!ch.only && !!level && ch.only !== level; }
+  // The lessons in order, leaving out chapters the chosen path skips.
+  function pathIds() {
+    var ids = [];
+    manifest.chapters.forEach(function (c) { if (!skipped(c)) c.lessons.forEach(function (l) { ids.push(l); }); });
+    return ids;
+  }
+  function nextToDo() {
+    var ids = pathIds();
+    for (var i = 0; i < ids.length; i++) if (!progress.lessons[ids[i]]) return ids[i];
+    return null;
+  }
+  // The first unfinished lesson before `id` on the path, or null: a suggestion, never a lock.
+  function missingBefore(id) {
+    var ids = pathIds(), at = ids.indexOf(id);
+    for (var i = 0; i < at; i++) if (!progress.lessons[ids[i]]) return ids[i];
+    return null;
+  }
   function loadLesson(id) {
     var key = lang + "/" + id;
     if (cache[key]) return Promise.resolve(cache[key]);
@@ -186,13 +203,18 @@
     html += '<div class="learn-tools"><div class="pg-seg" role="radiogroup" aria-label="Language">' +
       ["tr", "en"].map(function (l) { return '<button type="button" role="radio" aria-checked="' + (l === lang) + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>"; }).join("") + "</div></div>";
     html += '<a href="#/">' + T("contents") + "</a>";
-    manifest.chapters.forEach(function (ch) {
-      var sk = skipped(ch);
-      html += "<h3>" + H.esc(ch.title[lang]) + (sk ? " · " + T("skipped") : "") + "</h3><ul" + (sk ? ' class="skipped"' : "") + ">";
+    var next = nextToDo();
+    manifest.chapters.forEach(function (ch, ci) {
+      var sk = skipped(ch), open = activeId ? ch.lessons.indexOf(activeId) >= 0 : ch.lessons.indexOf(next) >= 0;
+      var doneN = ch.lessons.filter(function (l) { return progress.lessons[l]; }).length;
+      html += '<details class="chapter' + (sk ? " skipped" : "") + '"' + (open ? " open" : "") + "><summary>" + H.esc(ch.title[lang]) +
+        (sk ? " · " + T("skipped") : "") + ' <span class="count">' + doneN + "/" + ch.lessons.length + "</span></summary><ul>";
       ch.lessons.forEach(function (id) {
-        html += '<li><a href="#/' + id + '"' + (id === activeId ? ' aria-current="page"' : "") + '><span class="tick">' + (progress.lessons[id] ? "✓" : "") + "</span>" + H.esc(titles[id] || id) + "</a></li>";
+        var cls = (!sk && id === next ? "next" : "");
+        html += '<li><a href="#/' + id + '"' + (id === activeId ? ' aria-current="page"' : "") + (cls ? ' class="' + cls + '"' : "") + '><span class="tick">' +
+          (progress.lessons[id] ? "✓" : (cls ? "→" : "")) + "</span>" + H.esc(titles[id] || id) + "</a></li>";
       });
-      html += "</ul>";
+      html += "</ul></details>";
     });
     s.innerHTML = html;
     Array.prototype.forEach.call(s.querySelectorAll("[data-lang]"), function (b) {
@@ -216,6 +238,8 @@
     html += "<h3>" + T("pickPath") + '</h3><div class="pathpick">' +
       ["beginner", "dev"].map(function (l) { return '<button type="button" class="btn ' + (level === l ? "btn-primary" : "btn-ghost") + '" data-level="' + l + '">' + T(l) + "</button>"; }).join("") +
       "</div><p>" + T("pathNote") + "</p>";
+    var nx = nextToDo();
+    if (nx) html += '<p><a class="btn btn-primary" href="#/' + nx + '">' + (done ? T("cont") : T("start")) + ": " + H.esc(titles[nx] || nx) + "</a></p>";
     html += "<h3>" + T("progress") + ": " + done + "/" + total + " " + T("lessons") + "</h3>" + badges();
     manifest.chapters.forEach(function (ch) {
       html += '<div class="chapter-card"><h3>' + H.esc(ch.title[lang]) + (skipped(ch) ? " · " + T("skipped") : "") + "</h3>" +
@@ -236,6 +260,10 @@
       $("lab-run").textContent = T("run"); $("lab-stop").textContent = T("stop"); $("lab-reset").textContent = T("reset");
       var main = $("learn-main"); main.innerHTML = "";
       main.appendChild(el("h1", "", H.esc(d.title)));
+      var miss = missingBefore(id);
+      if (miss && !skipped(manifest.chapters.filter(function (c) { return c.lessons.indexOf(id) >= 0; })[0])) {
+        main.appendChild(el("p", "notice", T("review") + ': <a href="#/' + miss + '">' + H.esc(titles[miss] || miss) + "</a>"));
+      }
       var firstCode = null;
       d.blocks.forEach(function (b) {
         if (b.t === "p") main.appendChild(el("p", "", inline(b.text)));

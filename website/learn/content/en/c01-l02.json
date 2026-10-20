@@ -1,0 +1,81 @@
+{
+ "title": "Numbers and types",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Every value has a **type**, and the type decides how much memory the value takes and which values it can hold. Whole-number types: `i8`, `i16`, `i32`, `i64` (signed, `i` = integer) and `u8`, `u16`, `u32`, `u64` (unsigned, so never negative). The number is the bit width. For fractions there are `f32` and `f64`."
+  },
+  {
+   "t": "p",
+   "text": "If you write no type, whole numbers are `i32` and fractions are `f64`. To state the type yourself, write `name: type = value`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 42",
+    "    pi: f64 = 3.14159",
+    "    age: u8 = 25",
+    "    big: i64 = 5_000_000_000",
+    "    print(a, pi, age, big)"
+   ],
+   "run": true,
+   "output": [
+    "42 3.14159 25 5000000000"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Use `_` to make big numbers readable. `0x` starts a hexadecimal number and `0b` a binary one."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    million = 1_000_000",
+    "    color = 0xFF",
+    "    mask = 0b1100",
+    "    print(million, color, mask)"
+   ],
+   "run": true,
+   "output": [
+    "1000000 255 12"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`usize` is the type used for array lengths and indexes; you will see it often later."
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l02-x1",
+   "prompt": "Make an `f64` variable named `radius` equal to 2.0. Print `radius * radius * 3.0`.",
+   "starter": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(radius * radius * 3.0)"
+   ],
+   "hint": "Print the calculation instead of `0`.",
+   "expected": [
+    "12"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l02-q1",
+   "q": "Which type is an 8-bit whole number that can never be negative?",
+   "options": [
+    "i8",
+    "u8",
+    "f32"
+   ],
+   "answer": 1,
+   "why": "`u` means unsigned; `u8` runs from 0 to 255."
+  }
+ ]
+}

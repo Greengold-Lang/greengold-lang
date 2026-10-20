@@ -1,10 +1,72 @@
 {
-  "title": "Variables",
-  "blocks": [
-    {"t": "p", "text": "A **variable** is a name for a value. In Greengold you define it with `=`; the compiler infers the type from the value."},
-    {"t": "code", "run": true, "code": ["fn main():", "    x = 42", "    name = \"Ahmet\"", "    x = 50", "    print(x, name)"], "output": ["50 Ahmet"]},
-    {"t": "p", "text": "Variables can be changed by default. For a value that never changes, write `fixed`; trying to change it later is a compile error."},
-    {"t": "exercise", "id": "c01-l01-x1", "prompt": "Start `counter` at 0, increase it twice with `+= 1`, and print the result.", "starter": ["fn main():", "    counter = 0", "    print(counter)"], "expected": ["2"], "hint": "Write the line `counter += 1` twice.", "solution": ["fn main():", "    counter = 0", "    counter += 1", "    counter += 1", "    print(counter)"]},
-    {"t": "quiz", "id": "c01-l01-q1", "q": "Which keyword defines a variable that never changes?", "options": ["const", "fixed", "let"], "answer": 1, "why": "Inside a function you use `fixed`; `const` is for file-level constants."}
-  ]
+ "title": "Variables",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A **variable** is a name for a value. In Greengold you define it with `=`; the compiler infers the type from the value."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    x = 42",
+    "    name = \"Ahmet\"",
+    "    x = 50",
+    "    print(x, name)"
+   ],
+   "run": true,
+   "output": [
+    "50 Ahmet"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Variables can be changed by default. For a value that never changes, write `fixed`; trying to change it later is a compile error."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    fixed limit = 10",
+    "    print(limit)"
+   ],
+   "run": true,
+   "output": [
+    "10"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l01-x1",
+   "prompt": "Start `counter` at 0, increase it twice with `+= 1`, and print the result.",
+   "starter": [
+    "fn main():",
+    "    counter = 0",
+    "    print(counter)"
+   ],
+   "solution": [
+    "fn main():",
+    "    counter = 0",
+    "    counter += 1",
+    "    counter += 1",
+    "    print(counter)"
+   ],
+   "hint": "Write the line `counter += 1` twice.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l01-q1",
+   "q": "Which keyword defines a variable that never changes?",
+   "options": [
+    "const",
+    "fixed",
+    "let"
+   ],
+   "answer": 1,
+   "why": "Inside a function you use `fixed`; `const` is for file-level constants."
+  }
+ ]
 }

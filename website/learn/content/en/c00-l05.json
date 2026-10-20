@@ -1,0 +1,81 @@
+{
+ "title": "Functions",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "To write a job once and use it many times we define a **function**. It starts with `fn` and has a name and parentheses. `main` is a function too; we call the other functions from inside `main`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn greet():",
+    "    print(\"Hello!\")",
+    "    print(\"Welcome.\")",
+    "",
+    "fn main():",
+    "    greet()",
+    "    greet()"
+   ],
+   "run": true,
+   "output": [
+    "Hello!",
+    "Welcome.",
+    "Hello!",
+    "Welcome."
+   ]
+  },
+  {
+   "t": "p",
+   "text": "A function can take information (**parameters**) and give a result back (`return`). The parameter's type is written after `:`, the return type after `->`. `i32` is the whole-number type; you will learn types in the next chapter."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn twice(x: i32) -> i32:",
+    "    return x * 2",
+    "",
+    "fn main():",
+    "    print(twice(21))"
+   ],
+   "run": true,
+   "output": [
+    "42"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l05-x1",
+   "prompt": "Finish the function `square`: it should return the square of the number it receives (the number times itself).",
+   "starter": [
+    "fn square(x: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(square(9))"
+   ],
+   "solution": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn main():",
+    "    print(square(9))"
+   ],
+   "hint": "Replace `return 0` with `return x * x`.",
+   "expected": [
+    "81"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l05-q1",
+   "q": "Which word gives a result back from a function?",
+   "options": [
+    "give",
+    "return",
+    "print"
+   ],
+   "answer": 1,
+   "why": "`return` sends the value back to the caller; `print` only writes to the screen."
+  }
+ ]
+}
