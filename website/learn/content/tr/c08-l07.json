@@ -1,0 +1,127 @@
+{
+ "title": "Pratik: güvenli metin çözümleyici",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Metni sayıya çeviren bir fonksiyon, `Result` ve enum hatalarını bir arada kullanır. Karakter aralıkları `'0'..'9'` gibi karşılaştırılır; bir rakamın değeri `c - '0'` ile bulunur."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum ParseError:",
+    "    EmptyInput",
+    "    InvalidFormat",
+    "",
+    "fn parse_positive(input: str) -> Result[i32, ParseError]:",
+    "    if input.len == 0:",
+    "        return Err(ParseError.EmptyInput)",
+    "    total = 0",
+    "    for i in 0..input.len:",
+    "        c = input[i]",
+    "        if c < '0' or c > '9':",
+    "            return Err(ParseError.InvalidFormat)",
+    "        total = total * 10 + i32(c - '0')",
+    "    return Ok(total)",
+    "",
+    "fn main():",
+    "    inputs: [3]str = [\"1234\", \"\", \"42a\"]",
+    "    for s in inputs:",
+    "        match parse_positive(s):",
+    "            Ok(num):",
+    "                print(\"parsed:\", num)",
+    "            Err(e):",
+    "                match e:",
+    "                    ParseError.EmptyInput:",
+    "                        print(\"error: input is empty\")",
+    "                    ParseError.InvalidFormat:",
+    "                        print(\"error: invalid character in\", s)"
+   ],
+   "run": true,
+   "output": [
+    "parsed: 1234",
+    "error: input is empty",
+    "error: invalid character in 42a"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l07-x1",
+   "prompt": "`parse_positive`'e bir sınır ekle: 5'ten uzun girdiler için yeni bir `TooLong` hatası döndürsün. `\"123456\"` ile dene.",
+   "starter": [
+    "enum ParseError:",
+    "    EmptyInput",
+    "    InvalidFormat",
+    "",
+    "fn parse_positive(input: str) -> Result[i32, ParseError]:",
+    "    if input.len == 0:",
+    "        return Err(ParseError.EmptyInput)",
+    "    total = 0",
+    "    for i in 0..input.len:",
+    "        c = input[i]",
+    "        if c < '0' or c > '9':",
+    "            return Err(ParseError.InvalidFormat)",
+    "        total = total * 10 + i32(c - '0')",
+    "    return Ok(total)",
+    "",
+    "fn main():",
+    "    match parse_positive(\"123456\"):",
+    "        Ok(n):",
+    "            print(\"parsed:\", n)",
+    "        Err(e):",
+    "            match e:",
+    "                ParseError.EmptyInput:",
+    "                    print(\"empty\")",
+    "                ParseError.InvalidFormat:",
+    "                    print(\"invalid\")"
+   ],
+   "solution": [
+    "enum ParseError:",
+    "    EmptyInput",
+    "    InvalidFormat",
+    "    TooLong",
+    "",
+    "fn parse_positive(input: str) -> Result[i32, ParseError]:",
+    "    if input.len == 0:",
+    "        return Err(ParseError.EmptyInput)",
+    "    if input.len > 5:",
+    "        return Err(ParseError.TooLong)",
+    "    total = 0",
+    "    for i in 0..input.len:",
+    "        c = input[i]",
+    "        if c < '0' or c > '9':",
+    "            return Err(ParseError.InvalidFormat)",
+    "        total = total * 10 + i32(c - '0')",
+    "    return Ok(total)",
+    "",
+    "fn main():",
+    "    match parse_positive(\"123456\"):",
+    "        Ok(n):",
+    "            print(\"parsed:\", n)",
+    "        Err(e):",
+    "            match e:",
+    "                ParseError.EmptyInput:",
+    "                    print(\"empty\")",
+    "                ParseError.InvalidFormat:",
+    "                    print(\"invalid\")",
+    "                ParseError.TooLong:",
+    "                    print(\"too long\")"
+   ],
+   "hint": "Yeni varyantı hem enum'a, hem `match`'e, hem de kontrole ekle.",
+   "expected": [
+    "too long"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l07-q1",
+   "q": "`c - '0'` ifadesi ne bulur?",
+   "options": [
+    "Karakterin ASCII kodunu",
+    "Rakam karakterinin sayı değerini",
+    "Karakterin sırasını"
+   ],
+   "answer": 1,
+   "why": "`'5' - '0'` = 5: rakam karakterleri art arda sıralanır."
+  }
+ ]
+}

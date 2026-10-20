@@ -1,0 +1,69 @@
+{
+ "title": "Generic fonksiyonlar",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Aynı algoritmayı farklı tiplerle kullanmak için **generic** yazılır. Tip parametresi köşeli parantez içindedir: `[T]`. `T: Ord` bir **sınırdır**: `T`'nin sıralanabilir (`<`, `>`) bir tip olması gerekir. Çağrıda tip genellikle kendiliğinden çıkarılır; istersen `larger[i64](...)` ile açıkça da yazabilirsin."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn larger[T: Ord](a: T, b: T) -> T:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(larger(10, 25))",
+    "    print(larger(3.14, 2.71))",
+    "    print(larger[i64](100, 200))"
+   ],
+   "run": true,
+   "output": [
+    "25",
+    "3.14",
+    "200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Her tip birleşimi için derleyici o tipe özel, en iyi hale getirilmiş kod üretir (C++ şablonları gibi). Çalışma anında ekstra maliyet, kutulama ya da tip silme yoktur."
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l01-x1",
+   "prompt": "`smaller[T: Ord](a, b)` yaz: küçük olanı döndürsün. `smaller(7, 3)` ve `smaller(2.5, 9.5)` yazdır.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn smaller[T: Ord](a: T, b: T) -> T:",
+    "    if a < b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(smaller(7, 3))",
+    "    print(smaller(2.5, 9.5))"
+   ],
+   "hint": "`fn smaller[T: Ord](a: T, b: T) -> T:` ile başla.",
+   "expected": [
+    "3",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l01-q1",
+   "q": "Generic fonksiyon çalışma anında yavaşlar mı?",
+   "options": [
+    "Evet, her çağrıda tip aranır",
+    "Hayır, her tip için ayrı kod derlenir",
+    "Yalnızca sayılarda"
+   ],
+   "answer": 1,
+   "why": "Tip bilgisi derleme sırasında çözülür (monomorphization)."
+  }
+ ]
+}

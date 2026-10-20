@@ -1,0 +1,92 @@
+{
+ "title": "Practice: a command interpreter",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Enums, variants with data and the `match` expression together: a small calculator."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Subtract(f64, f64)",
+    "    Square(f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Subtract(a, b) => a - b",
+    "        Command.Square(x) => x * x",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    commands: [4]Command = [",
+    "        Command.Add(10.0, 5.0),",
+    "        Command.Square(4.0),",
+    "        Command.Subtract(20.0, 8.0),",
+    "        Command.Reset",
+    "    ]",
+    "    for c in commands:",
+    "        print(\"result:\", evaluate(c))"
+   ],
+   "run": true,
+   "output": [
+    "result: 15",
+    "result: 16",
+    "result: 12",
+    "result: 0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l06-x1",
+   "prompt": "Add a `Multiply(f64, f64)` variant to `Command` and write its branch in `evaluate`. Print `Multiply(6.0, 7.0)`.",
+   "starter": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Add(6.0, 7.0)))"
+   ],
+   "solution": [
+    "enum Command:",
+    "    Add(f64, f64)",
+    "    Multiply(f64, f64)",
+    "    Reset",
+    "",
+    "fn evaluate(cmd: Command) -> f64:",
+    "    return match cmd:",
+    "        Command.Add(a, b) => a + b",
+    "        Command.Multiply(a, b) => a * b",
+    "        Command.Reset => 0.0",
+    "",
+    "fn main():",
+    "    print(evaluate(Command.Multiply(6.0, 7.0)))"
+   ],
+   "hint": "Add the new branch to both the enum and the `match`; it will not compile if one is missing.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l06-q1",
+   "q": "If you add a variant to the enum and do not update the `match`, what happens?",
+   "options": [
+    "The old branch runs",
+    "The compiler reports the missing branch",
+    "The program silently misbehaves"
+   ],
+   "answer": 1,
+   "why": "The exhaustiveness check catches forgotten cases at compile time."
+  }
+ ]
+}

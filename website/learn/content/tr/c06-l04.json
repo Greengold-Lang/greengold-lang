@@ -1,0 +1,70 @@
+{
+ "title": "match bir ifade olarak",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` bir değer de üretebilir: her dalı `=>` ile tek bir ifadeye bağlarsın ve sonucu bir değişkene atar ya da `return` edersin."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn error_message(code: i32) -> str:",
+    "    return match code:",
+    "        0 => \"success\"",
+    "        1 => \"file not found\"",
+    "        2 => \"access denied\"",
+    "        _ => \"general error\"",
+    "",
+    "fn main():",
+    "    print(error_message(2))",
+    "    msg = match 0:",
+    "        0 => \"OK\"",
+    "        _ => \"Error!\"",
+    "    print(msg)"
+   ],
+   "run": true,
+   "output": [
+    "access denied",
+    "OK"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l04-x1",
+   "prompt": "`days_in(month: i32) -> i32` yaz (şubat için 28): 2 => 28; 4, 6, 9, 11 => 30; diğerleri => 31. 9. ayı yazdır.",
+   "starter": [
+    "fn days_in(month: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "solution": [
+    "fn days_in(month: i32) -> i32:",
+    "    return match month:",
+    "        2 => 28",
+    "        4 | 6 | 9 | 11 => 30",
+    "        _ => 31",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "hint": "`return match month:` ile üç dal yaz.",
+   "expected": [
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l04-q1",
+   "q": "İfade olarak `match`'te her dalın değeri nasıl olmalıdır?",
+   "options": [
+    "Farklı tipten olabilir",
+    "Aynı tipten olmalı",
+    "Metin olmalı"
+   ],
+   "answer": 1,
+   "why": "Sonuç tek bir değişkene gideceği için tipler eşit olmalıdır."
+  }
+ ]
+}

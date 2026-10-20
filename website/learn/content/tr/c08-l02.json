@@ -1,0 +1,79 @@
+{
+ "title": "Optional yardımcıları",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Her seferinde `match` yazmak yerine pratik metotlar vardır: `.has_value()` değer olup olmadığını söyler, `.value_or(varsayılan)` değer yoksa varsayılanı verir, `.value_or_panic()` ise değerin var olduğundan eminsen onu açar (yoksa program çöker; yalnızca test ve prototipte kullan)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(find_index(numbers, 25).has_value())",
+    "    print(find_index(numbers, 99).has_value())",
+    "    print(find_index(numbers, 99).value_or(0))",
+    "    print(find_index(numbers, 25).value_or_panic())"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "false",
+    "0",
+    "1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l02-x1",
+   "prompt": "`find_index(numbers, 99)` bulunamazsa 1000 yazdırmak için `value_or`'u kullan; `numbers[2]` (40) için ise bulunan indeksi yazdır.",
+   "starter": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(0)",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(find_index(numbers, 99).value_or(1000))",
+    "    print(find_index(numbers, 40).value_or(1000))"
+   ],
+   "hint": "`.value_or(1000)` iki çağrının sonuna.",
+   "expected": [
+    "1000",
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l02-q1",
+   "q": "`None` olan bir `Optional`'da `value_or_panic()` ne yapar?",
+   "options": [
+    "0 döndürür",
+    "Programı `panic` ile durdurur",
+    "Yeni bir `Optional` döndürür"
+   ],
+   "answer": 1,
+   "why": "Bu yüzden yalnızca değerden emin olduğunda kullanılır."
+  }
+ ]
+}

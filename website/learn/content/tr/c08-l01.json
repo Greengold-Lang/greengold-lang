@@ -1,0 +1,85 @@
+{
+ "title": "Değer yoksa: Optional",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Güvenli Greengold kodunda **`null` yoktur**. Bir fonksiyon bazen değer döndüremiyorsa dönüş tipi `Optional[T]` olur. İki durumu vardır: `Valid(değer)` (değer var) ve `None` (yok). `match` ile ikisi de ele alınmak zorundadır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    match find_index(numbers, 40):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")",
+    "    match find_index(numbers, 7):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")"
+   ],
+   "run": true,
+   "output": [
+    "found at 2",
+    "not in the array"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l01-x1",
+   "prompt": "`first_negative(items: []i32) -> Optional[i32]` yaz: ilk negatif sayıyı `Valid` ile, yoksa `None` döndürsün. `[3, 8, -2, 5]` için sonucu `match` ile yazdır.",
+   "starter": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "solution": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    for x in items:",
+    "        if x < 0:",
+    "            return Valid(x)",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "hint": "Döngüde `x < 0` bulunca `return Valid(x)`.",
+   "expected": [
+    "found -2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l01-q1",
+   "q": "`Optional[T]` hangi iki duruma sahiptir?",
+   "options": [
+    "`Ok` ve `Err`",
+    "`Valid` ve `None`",
+    "`True` ve `False`"
+   ],
+   "answer": 1,
+   "why": "`Ok`/`Err` `Result`'a aittir."
+  }
+ ]
+}

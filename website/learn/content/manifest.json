@@ -87,6 +87,51 @@
     "c05-l05",
     "c05-l06"
    ]
+  },
+  {
+   "id": "c06",
+   "title": {
+    "tr": "Enum ve desen eşleştirme",
+    "en": "Enums and pattern matching"
+   },
+   "lessons": [
+    "c06-l01",
+    "c06-l02",
+    "c06-l03",
+    "c06-l04",
+    "c06-l05",
+    "c06-l06"
+   ]
+  },
+  {
+   "id": "c07",
+   "title": {
+    "tr": "Generics, feature'lar ve operatörler",
+    "en": "Generics, features and operators"
+   },
+   "lessons": [
+    "c07-l01",
+    "c07-l02",
+    "c07-l03",
+    "c07-l04",
+    "c07-l05"
+   ]
+  },
+  {
+   "id": "c08",
+   "title": {
+    "tr": "Hata yönetimi ve prelude",
+    "en": "Error handling and the prelude"
+   },
+   "lessons": [
+    "c08-l01",
+    "c08-l02",
+    "c08-l03",
+    "c08-l04",
+    "c08-l05",
+    "c08-l06",
+    "c08-l07"
+   ]
   }
  ]
 }

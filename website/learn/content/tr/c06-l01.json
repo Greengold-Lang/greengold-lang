@@ -1,0 +1,122 @@
+{
+ "title": "Enum ve match",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**`enum`**, bir değerin alabileceği seçenekleri (**varyantları**) sıralar. Bir enum değerine bakmak için **`match`** kullanılır. En önemli özelliği: derleyici **tüm durumların** ele alındığını denetler. Bir varyantı unutursan kod derlenmez."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn action(light: TrafficLight):",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            print(\"Stop!\")",
+    "        TrafficLight.Yellow:",
+    "            print(\"Get ready...\")",
+    "        TrafficLight.Green:",
+    "            print(\"Go!\")",
+    "",
+    "fn main():",
+    "    action(TrafficLight.Red)",
+    "    action(TrafficLight.Green)"
+   ],
+   "run": true,
+   "output": [
+    "Stop!",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Hepsini tek tek yazmak istemezsen `_:` kalan her şeyi yakalar."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn is_stop(light: TrafficLight) -> bool:",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            return true",
+    "        _:",
+    "            return false",
+    "",
+    "fn main():",
+    "    print(is_stop(TrafficLight.Red), is_stop(TrafficLight.Yellow))"
+   ],
+   "run": true,
+   "output": [
+    "true false"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l01-x1",
+   "prompt": "`Direction` enum'ı (`North`, `South`, `East`, `West`) için `name(d)` fonksiyonu yaz: her biri için kendi adını (`north`, `south`...) yazdırsın. `West` için çağır.",
+   "starter": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        _:",
+    "            print(\"?\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "solution": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        Direction.South:",
+    "            print(\"south\")",
+    "        Direction.East:",
+    "            print(\"east\")",
+    "        Direction.West:",
+    "            print(\"west\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "hint": "Her varyant için bir dal yaz; `_` bırakma.",
+   "expected": [
+    "west"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l01-q1",
+   "q": "`match` içinde bir enum varyantını yazmayı unutursan ne olur?",
+   "options": [
+    "Çalışma anında çöker",
+    "Kod derlenmez",
+    "Sessizce atlanır"
+   ],
+   "answer": 1,
+   "why": "`match` kapsamlıdır: eksik durum derleme hatasıdır."
+  }
+ ]
+}

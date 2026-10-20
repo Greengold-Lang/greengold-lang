@@ -1,0 +1,100 @@
+{
+ "title": "Yerinde değiştirmek: match lend",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Fonksiyon parametreleri gibi `match` de modlarla çalışır. Varsayılan olarak (`match s:`) veriyi yalnızca okur. `match lend s:` ile varyantın içindeki veriyi **yerinde değiştirebilirsin**; desendeki isim bir `lend` referansı olur."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Item:",
+    "    Weapon(i32)",
+    "    Empty",
+    "",
+    "fn upgrade(item: lend Item):",
+    "    match lend item:",
+    "        Item.Weapon(power):",
+    "            power += 10",
+    "        Item.Empty:",
+    "            pass",
+    "",
+    "fn main():",
+    "    sword = Item.Weapon(50)",
+    "    upgrade(sword)",
+    "    match sword:",
+    "        Item.Weapon(p):",
+    "            print(\"power:\", p)",
+    "        Item.Empty:",
+    "            pass"
+   ],
+   "run": true,
+   "output": [
+    "power: 60"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Üçüncü mod `match consume s:` sahipliği alır ve verileri yeni sahiplerine taşır; `String`/`List` gibi tipler içeren varyantlarda kullanılır."
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l05-x1",
+   "prompt": "`double_it(c: lend Cell)` yaz: `Cell.Number(n)` ise `n`'i iki katına çıkarsın, `Cell.Blank` ise bir şey yapmasın. `Number(21)` ile dene ve sonucu yazdır.",
+   "starter": [
+    "enum Cell:",
+    "    Number(i32)",
+    "    Blank",
+    "",
+    "fn double_it(c: lend Cell):",
+    "    pass",
+    "",
+    "fn main():",
+    "    c = Cell.Number(21)",
+    "    double_it(c)",
+    "    match c:",
+    "        Cell.Number(n):",
+    "            print(n)",
+    "        Cell.Blank:",
+    "            pass"
+   ],
+   "solution": [
+    "enum Cell:",
+    "    Number(i32)",
+    "    Blank",
+    "",
+    "fn double_it(c: lend Cell):",
+    "    match lend c:",
+    "        Cell.Number(n):",
+    "            n *= 2",
+    "        Cell.Blank:",
+    "            pass",
+    "",
+    "fn main():",
+    "    c = Cell.Number(21)",
+    "    double_it(c)",
+    "    match c:",
+    "        Cell.Number(n):",
+    "            print(n)",
+    "        Cell.Blank:",
+    "            pass"
+   ],
+   "hint": "`match lend c:` yaz ve `Cell.Number(n)` dalında `n *= 2`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l05-q1",
+   "q": "Varyantın içindeki veriyi yerinde değiştirmek için hangi `match` biçimi kullanılır?",
+   "options": [
+    "`match s:`",
+    "`match lend s:`",
+    "`match read s:`"
+   ],
+   "answer": 1,
+   "why": "`lend` değişiklik içindir; varsayılan `match` yalnızca okur."
+  }
+ ]
+}

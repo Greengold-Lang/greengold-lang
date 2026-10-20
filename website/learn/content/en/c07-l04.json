@@ -1,0 +1,72 @@
+{
+ "title": "Built-in bounds",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "The compiler provides ready-made bounds for common abilities: `Num` (numeric: `+ - * /`), `Int` (whole numbers only), `Float` (fractions only), `Ord` (orderable: `< > <= >=`) and `Eq` (equality: `== !=`). They can be combined: `[T: Num + Ord]`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum3[T: Num](a: T, b: T, c: T) -> T:",
+    "    return a + b + c",
+    "",
+    "fn clamp[T: Num + Ord](x: T, lo: T, hi: T) -> T:",
+    "    if x < lo:",
+    "        return lo",
+    "    if x > hi:",
+    "        return hi",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(sum3(1, 2, 3))",
+    "    print(sum3(0.5, 0.25, 0.25))",
+    "    print(clamp(15, 0, 10))",
+    "    print(clamp(-3, 0, 10))"
+   ],
+   "run": true,
+   "output": [
+    "6",
+    "1",
+    "10",
+    "0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l04-x1",
+   "prompt": "`abs_of[T: Num + Ord](x: T, zero: T)`: returns `zero - x` when `x` is less than zero, otherwise `x`. Try it with `-8` and `2.5`.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn abs_of[T: Num + Ord](x: T, zero: T) -> T:",
+    "    if x < zero:",
+    "        return zero - x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(abs_of(-8, 0))",
+    "    print(abs_of(2.5, 0.0))"
+   ],
+   "hint": "`[T: Num + Ord]` makes both subtraction and comparison possible.",
+   "expected": [
+    "8",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l04-q1",
+   "q": "Which bound does `T` need to use `<` in a generic function?",
+   "options": [
+    "`Eq`",
+    "`Ord`",
+    "`Int`"
+   ],
+   "answer": 1,
+   "why": "`Ord` provides ordering operators; `Eq` only equality."
+  }
+ ]
+}

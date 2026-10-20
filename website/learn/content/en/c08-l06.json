@@ -1,0 +1,77 @@
+{
+ "title": "Converting errors and panic",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Different libraries produce different error types. If the calling function returns `Result[T, AppError]`, the called one returns `Result[T, i32]`, and `impl AppError:` defines `fn from(e: i32) -> AppError`, then `?` does the conversion **by itself**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum AppError:",
+    "    Database(i32)",
+    "    Network(str)",
+    "",
+    "impl AppError:",
+    "    fn from(code: i32) -> AppError:",
+    "        return AppError.Database(code)",
+    "",
+    "fn query_db() -> Result[str, i32]:",
+    "    return Err(500)",
+    "",
+    "fn handle_request() -> Result[str, AppError]:",
+    "    data = query_db()?",
+    "    return Ok(data)",
+    "",
+    "fn main():",
+    "    if let Err(e) = handle_request():",
+    "        print(\"application error caught\")"
+   ],
+   "run": true,
+   "output": [
+    "application error caught"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "For unrecoverable situations where the program cannot go on, use **`panic`**: the message is written to `stderr` and the program ends at once with exit code 101. Use `Result` for expected errors, `panic` for \"this must never happen\" cases."
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l06-x1",
+   "prompt": "Write `check_level(level: i32)`: `panic(\"invalid level\")` if `level < 0`, otherwise print `access granted`. Call it only with a valid level (3).",
+   "starter": [
+    "fn check_level(level: i32):",
+    "    print(\"?\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "solution": [
+    "fn check_level(level: i32):",
+    "    if level < 0:",
+    "        panic(\"invalid level\")",
+    "    print(\"access granted\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "hint": "Use `panic(...)` inside `if level < 0:`.",
+   "expected": [
+    "access granted"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l06-q1",
+   "q": "When is `Result` used instead of `panic`?",
+   "options": [
+    "For expected, recoverable errors",
+    "Never",
+    "Only with numbers"
+   ],
+   "answer": 0,
+   "why": "`panic` is for unrecoverable situations."
+  }
+ ]
+}
