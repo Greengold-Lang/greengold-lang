@@ -133,6 +133,96 @@
     "c08-l06",
     "c08-l07"
    ]
+  },
+  {
+   "id": "c09",
+   "title": {
+    "tr": "Lambdalar ve fonksiyon değerleri",
+    "en": "Lambdas and function values"
+   },
+   "lessons": [
+    "c09-l01",
+    "c09-l02",
+    "c09-l03",
+    "c09-l04",
+    "c09-l05",
+    "c09-l06"
+   ]
+  },
+  {
+   "id": "c10",
+   "title": {
+    "tr": "Standart kütüphane turu",
+    "en": "A tour of the standard library"
+   },
+   "lessons": [
+    "c10-l01",
+    "c10-l02",
+    "c10-l03",
+    "c10-l04",
+    "c10-l05",
+    "c10-l06",
+    "c10-l07",
+    "c10-l08",
+    "c10-l09",
+    "c10-l10"
+   ]
+  },
+  {
+   "id": "c11",
+   "title": {
+    "tr": "gg araçları ve proje yönetimi",
+    "en": "The gg tools and project management"
+   },
+   "lessons": [
+    "c11-l01",
+    "c11-l02",
+    "c11-l03",
+    "c11-l04",
+    "c11-l05",
+    "c11-l06"
+   ]
+  },
+  {
+   "id": "c12",
+   "title": {
+    "tr": "Eşzamanlılık",
+    "en": "Concurrency"
+   },
+   "lessons": [
+    "c12-l01",
+    "c12-l02",
+    "c12-l03",
+    "c12-l04",
+    "c12-l05"
+   ]
+  },
+  {
+   "id": "c13",
+   "title": {
+    "tr": "Sistem programlama: FFI ve unsafe",
+    "en": "Systems programming: FFI and unsafe"
+   },
+   "lessons": [
+    "c13-l01",
+    "c13-l02",
+    "c13-l03",
+    "c13-l04"
+   ]
+  },
+  {
+   "id": "c14",
+   "title": {
+    "tr": "Alan kütüphaneleri: finans, güvenlik, gömülü",
+    "en": "Domain libraries: finance, security, embedded"
+   },
+   "lessons": [
+    "c14-l01",
+    "c14-l02",
+    "c14-l03",
+    "c14-l04",
+    "c14-l05"
+   ]
   }
  ]
 }

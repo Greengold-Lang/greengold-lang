@@ -1,0 +1,78 @@
+{
+ "title": "Düzenli ifadeler: std.regex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`regex.compile(desen)` bir `Result[Regex, string]` verir (desen hatalı olabilir). `is_match` eşleşme var mı der, `find` ilk eşleşmeyi (`Optional[Match]`), `find_all` hepsini bulur, `replace_all` değiştirir; `Match.text()` eşleşen metni verir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[0-9]+\"):",
+    "        Ok(re):",
+    "            print(re.is_match(\"order 42\"))",
+    "            for m in re.find_all(\"a1 b22 c333\"):",
+    "                print(m.text().as_str())",
+    "            print(re.replace_all(\"a1 b22\", \"#\").as_str())",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "1",
+    "22",
+    "333",
+    "a# b#"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l08-x1",
+   "prompt": "`[a-z]+` desenini `\"Hi 42 you\"` metninde bul ve ilk eşleşmenin metnini yazdır (`find` ve `Valid`).",
+   "starter": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            print(\"?\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "solution": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            match re.find(\"Hi 42 you\"):",
+    "                Valid(m):",
+    "                    print(m.text().as_str())",
+    "                None:",
+    "                    print(\"no match\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "hint": "`re.find(...)` bir `Optional` döndürür; `match` ile aç.",
+   "expected": [
+    "i"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l08-q1",
+   "q": "`regex.compile` neden `Result` döndürür?",
+   "options": [
+    "Desen hatalı yazılmış olabilir",
+    "Yavaş olduğu için",
+    "Metin boş olabileceği için"
+   ],
+   "answer": 0,
+   "why": "Geçersiz desen bir hata değeri olarak döner."
+  }
+ ]
+}

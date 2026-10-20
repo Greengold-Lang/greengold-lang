@@ -1,0 +1,65 @@
+{
+ "title": "Hashes and encoding: std.hash, std.encoding",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.hash` offers SHA-256/384/512, SHA-3, SHAKE, HMAC, HKDF and PBKDF2; the code is portable Greengold and needs no libc. Byte data goes in as `[]u8` (a `List[u8]`, an array or `text.as_bytes()`). `std.encoding` turns byte arrays into hexadecimal or base64 text."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hash",
+    "import std.encoding",
+    "",
+    "fn main():",
+    "    d = hash.sha256(\"abc\".as_bytes())",
+    "    print(encoding.hex_encode(d).as_str())"
+   ],
+   "run": true,
+   "output": [
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**Never compare** digests or MACs **with `==`**: a measurable time difference leaks information. Use `crypto.constant_time_eq`. `std.crypto` also offers ChaCha20-Poly1305, AES-GCM, X25519, Ed25519 and the self-wiping `SecretBytes`."
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l03-x1",
+   "prompt": "Compute the SHA-256 digests of `\"abc\"` and `\"abd\"`, compare them with `crypto.constant_time_eq` and print the result.",
+   "starter": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    a = hash.sha256(\"abc\".as_bytes())",
+    "    b = hash.sha256(\"abd\".as_bytes())",
+    "    print(crypto.constant_time_eq(a[..], b[..]))"
+   ],
+   "hint": "The digests are `[32]u8` arrays; turn them into slices with `a[..]`.",
+   "expected": [
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l03-q1",
+   "q": "Why use `constant_time_eq` instead of `==` to compare two digests?",
+   "options": [
+    "Because it is shorter",
+    "Because a timing difference can leak information",
+    "Because `==` does not work"
+   ],
+   "answer": 1,
+   "why": "A constant-time comparison does not stop at the first differing byte."
+  }
+ ]
+}

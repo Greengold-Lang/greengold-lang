@@ -1,0 +1,63 @@
+{
+ "title": "Çalıştırmak, derlemek, denetlemek",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Geliştirme sırasında en çok kullanacağın üç komut: `gg run` (derle ve çalıştır), `gg build` (dağıtılabilir yürütülebilir dosya üret) ve `gg check` (yalnızca tip denetimi, kod üretmeden; en hızlısı)."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg run                      # debug mode: every run-time check on",
+    "gg run --release            # LLVM -O3 optimizations",
+    "gg build -o my_app          # a debug executable",
+    "gg build --release -o my_app_release",
+    "gg check src/main.gg        # errors and warnings only"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**Akıllı önbellek:** `gg build`, kaynağın SHA-256 özetini `.gg-cache/` içinde tutar; kod değişmediyse `Up to date (cached)` der ve yeniden derlemez. Derleme ayrıca `--target` ile başka platformlar için de yapılabilir (`gg targets` neleri bağlayabildiğini listeler)."
+  },
+  {
+   "t": "p",
+   "text": "Bir hata kodunun ayrıntılı açıklaması için `gg explain`, bilgisayarın ve kurulumun sağlığı için `gg doctor` vardır:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg explain GG0207",
+    "gg doctor",
+    "gg toolchain"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q1",
+   "q": "Kod üretmeden yalnızca hataları görmek için hangi komut kullanılır?",
+   "options": [
+    "`gg run`",
+    "`gg check`",
+    "`gg build`"
+   ],
+   "answer": 1,
+   "why": "`gg check` tip denetimi yapar ve kod üretmez."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q2",
+   "q": "`gg build` kod değişmediğinde ne yapar?",
+   "options": [
+    "Her zaman yeniden derler",
+    "`Up to date (cached)` der",
+    "Hata verir"
+   ],
+   "answer": 1,
+   "why": "Kaynağın özeti önbellekle karşılaştırılır."
+  }
+ ]
+}

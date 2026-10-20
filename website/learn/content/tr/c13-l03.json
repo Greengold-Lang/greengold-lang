@@ -1,0 +1,66 @@
+{
+ "title": "Ham göstericiler ve unsafe",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Güvenli kodda başvurular `lend` ve `ref` ile yönetilir. FFI ve donanım erişiminde **ham göstericiler** devreye girer: `*T` salt okunur (`const T*`), `*mut T` yazılabilir (`T*`), `*void` tipten bağımsızdır. Boşa işaret eden gösterici `null`'dur ve güvenli kodda `null` ile karşılaştırılabilir."
+  },
+  {
+   "t": "p",
+   "text": "Göstericinin gösterdiği veriyi okumak/yazmak, gösterici aritmetiği ve ham C fonksiyonu çağırmak **yalnızca `unsafe:` bloğunda** yapılır. Derleyici orada der ki: \"güvenceler kapalı; bellek güvenliği, sınır denetimi ve gösterici geçerliliği tamamen programcının sorumluluğunda.\""
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number: i32 = 42",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(number)",
+    "        p[0] = 99",
+    "    print(\"updated number:\", number)"
+   ],
+   "run": true,
+   "output": [
+    "updated number: 99"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Yardımcılar (hepsi `unsafe:` ister): `addr(x)` / `addr_mut(x)` bir değişkenin adresini alır, `ptr_offset(p, n)` göstericiyi ilerletir, `ptr_cast[*T](p)` tipini değiştirir, `ptr_to_int` / `int_to_ptr` tamsayıyla gösterici arasında çevirir, `string_to_cstr` / `cstr_to_string` C metinleriyle çalışır."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l03-x1",
+   "prompt": "`x = 5` değişkeninin adresini `addr_mut` ile al ve gösterici üzerinden değerini 50 yap. `x`'i yazdır.",
+   "starter": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(x)",
+    "        p[0] = 50",
+    "    print(x)"
+   ],
+   "hint": "`unsafe:` bloğu içinde `p[0] = 50`.",
+   "expected": [
+    "50"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l03-q1",
+   "q": "`*mut T` ile `*T` arasındaki fark nedir?",
+   "options": [
+    "Fark yok",
+    "`*mut T` yazılabilir, `*T` salt okunur",
+    "`*T` daha hızlı"
+   ],
+   "answer": 1,
+   "why": "`*T` C'deki `const T*`, `*mut T` ise `T*` gibidir."
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "title": "Calling C functions: extern",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold talks to C libraries directly over the C ABI, with no overhead in between. To declare an existing C function you use **`extern`**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sin(x: f64) -> f64",
+    "extern \"math.h\" fn cos(x: f64) -> f64",
+    "",
+    "fn main():",
+    "    unsafe:",
+    "        print(sin(0.0), cos(0.0))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Calling a declared C function means trusting a contract the compiler cannot verify; that is why the call is made inside an **`unsafe:`** block. C functions with a variable number of parameters (`printf`) are marked with `...` in the signature."
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l01-q1",
+   "q": "Where is an `extern` C function called?",
+   "options": [
+    "Anywhere",
+    "In an `unsafe:` block",
+    "Only in `main`"
+   ],
+   "answer": 1,
+   "why": "The compiler cannot verify the C side; the responsibility is the programmer's."
+  }
+ ]
+}

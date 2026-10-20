@@ -1,0 +1,87 @@
+{
+ "title": "JSON: std.json",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`json.parse(metin)` bir `Result[Json, string]` verir. `Json` bir enum'dur; `doc.get(\"anahtar\")` bir alt değeri alır ve `as_i64()`, `as_string()`, `as_bool()` ... onu `Optional` olarak çıkarır. Yeni bir belge kurmak için `json.object()`, `set`, `json.integer`, `json.text` kullanılır; `to_text()` metne çevirir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"name\\\": \\\"Ada\\\", \\\"age\\\": 36, \\\"tags\\\": [\\\"math\\\", \\\"code\\\"]}\"):",
+    "        Ok(doc):",
+    "            print(doc.get(\"name\").as_string().value_or(\"?\").as_str())",
+    "            print(doc.get(\"age\").as_i64().value_or(0))",
+    "            print(doc.get(\"tags\").len())",
+    "        Err(msg):",
+    "            print(\"bad json:\", msg.as_str())"
+   ],
+   "run": true,
+   "output": [
+    "Ada",
+    "36",
+    "2"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    doc = json.object()",
+    "    doc.set(\"id\", json.integer(7))",
+    "    doc.set(\"ok\", json.text(\"yes\"))",
+    "    print(doc.to_text().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "{\"id\":7,\"ok\":\"yes\"}"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l07-x1",
+   "prompt": "`{\"price\": 12, \"qty\": 3}` JSON'unu çözümle ve `price * qty` değerini yazdır.",
+   "starter": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"price\\\": 12, \\\"qty\\\": 3}\"):",
+    "        Ok(doc):",
+    "            print(0)",
+    "        Err(msg):",
+    "            print(\"bad json\")"
+   ],
+   "solution": [
+    "import std.json",
+    "",
+    "fn main():",
+    "    match json.parse(\"{\\\"price\\\": 12, \\\"qty\\\": 3}\"):",
+    "        Ok(doc):",
+    "            print(doc.get(\"price\").as_i64().value_or(0) * doc.get(\"qty\").as_i64().value_or(0))",
+    "        Err(msg):",
+    "            print(\"bad json\")"
+   ],
+   "hint": "`doc.get(\"price\").as_i64().value_or(0)` ile değerleri al.",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l07-q1",
+   "q": "`json.parse` neden `Result` döndürür?",
+   "options": [
+    "Metin geçersiz JSON olabilir",
+    "Her zaman başarısız olur",
+    "Hız için"
+   ],
+   "answer": 0,
+   "why": "Beklenen hata (bozuk girdi) `Err` ile değer olarak taşınır."
+  }
+ ]
+}

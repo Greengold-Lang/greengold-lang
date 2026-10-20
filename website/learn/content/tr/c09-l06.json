@@ -1,0 +1,82 @@
+{
+ "title": "Pratik: lambda ile sıralama",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Standart kütüphanedeki `sort.sort_by`, listeyi senin verdiğin \"önce gelir\" kuralıyla sıralar. Kuralı bir lambda olarak yazarsın: `a`, `b`'den önce gelecekse `true` döndür."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a > b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "5",
+    "2",
+    "1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l06-x1",
+   "prompt": "Aynı listeyi **küçükten büyüğe** sıralamak için lambdayı değiştir.",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a > b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a < b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "hint": "`a > b` yerine `a < b`.",
+   "expected": [
+    "1",
+    "2",
+    "5",
+    "9"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l06-q1",
+   "q": "`sort_by`'a verilen lambda `true` döndürürse ne anlama gelir?",
+   "options": [
+    "`a`, `b`'den önce gelir",
+    "`a` silinir",
+    "Liste biter"
+   ],
+   "answer": 0,
+   "why": "Lambda \"önce gelir\" sorusunu yanıtlar."
+  }
+ ]
+}

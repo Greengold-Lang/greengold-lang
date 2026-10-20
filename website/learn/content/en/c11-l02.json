@@ -1,0 +1,63 @@
+{
+ "title": "Running, building, checking",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "The three commands you will use most while developing: `gg run` (compile and run), `gg build` (produce a distributable executable) and `gg check` (type-check only, without generating code; the fastest)."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg run                      # debug mode: every run-time check on",
+    "gg run --release            # LLVM -O3 optimizations",
+    "gg build -o my_app          # a debug executable",
+    "gg build --release -o my_app_release",
+    "gg check src/main.gg        # errors and warnings only"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**Smart cache:** `gg build` keeps the SHA-256 hash of the source in `.gg-cache/`; if the code has not changed it says `Up to date (cached)` and does not rebuild. You can also build for other platforms with `--target` (`gg targets` lists which ones it can link)."
+  },
+  {
+   "t": "p",
+   "text": "For a detailed explanation of an error code there is `gg explain`; for the health of the machine and install there is `gg doctor`:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg explain GG0207",
+    "gg doctor",
+    "gg toolchain"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q1",
+   "q": "Which command shows only the errors, without generating code?",
+   "options": [
+    "`gg run`",
+    "`gg check`",
+    "`gg build`"
+   ],
+   "answer": 1,
+   "why": "`gg check` type-checks and generates no code."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q2",
+   "q": "What does `gg build` do when the code has not changed?",
+   "options": [
+    "Always rebuilds",
+    "Says `Up to date (cached)`",
+    "Reports an error"
+   ],
+   "answer": 1,
+   "why": "The source's hash is compared with the cache."
+  }
+ ]
+}

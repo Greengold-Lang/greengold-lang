@@ -1,0 +1,78 @@
+{
+ "title": "Veri biçimleri: std.csv, std.uuid, std.log",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.csv` (RFC 4180) alanları tırnaklama ve ayraç kurallarıyla doğru okur: `csv.parse(metin, ',')` bir `Result[List[List[string]], string]` verir. `csv.format_row` bir satırı gerektiğinde tırnaklayarak yazar."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"name,age\\nAda,36\\n\\\"Smith, J\\\",41\\n\", ',').value_or_panic()",
+    "    print(rows.len, rows[2][0].as_str())"
+   ],
+   "run": true,
+   "output": [
+    "3 Smith, J"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`std.uuid` RFC 9562 kimlikleri üretir: `v4` rastgele, `v7` zaman sıralı, `v5` ad tabanlı (aynı ad her zaman aynı kimliği verir). `std.log` stderr'e seviyeli satırlar yazar (`log.info`, `log.warn`, `log.kv`) ve `log.set_json(true)` ile JSON çıktı verir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.uuid",
+    "",
+    "fn main():",
+    "    ns = uuid.namespace_dns()",
+    "    id = uuid.v5(ns, \"example.com\".as_bytes())",
+    "    print(id.to_string().as_str())",
+    "    print(id.version())"
+   ],
+   "run": true,
+   "output": [
+    "cfbff0d1-9375-5685-968c-48ce8b15ae17",
+    "5"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l04-x1",
+   "prompt": "`\"a,b\\nc,d\\n\"` metnini `csv.parse` ile oku ve satır sayısını yazdır.",
+   "starter": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"a,b\\nc,d\\n\", ',').value_or_panic()",
+    "    print(rows.len)"
+   ],
+   "hint": "`csv.parse(...).value_or_panic()` ve `rows.len`.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l04-q1",
+   "q": "Aynı ad için her zaman aynı UUID'yi hangi sürüm üretir?",
+   "options": [
+    "`v4`",
+    "`v5`",
+    "`v7`"
+   ],
+   "answer": 1,
+   "why": "`v5` ad ve ad alanından hesaplanır; `v4` rastgele, `v7` zamana bağlıdır."
+  }
+ ]
+}

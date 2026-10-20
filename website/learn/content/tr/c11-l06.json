@@ -1,0 +1,56 @@
+{
+ "title": "Güvence araçları ve editör desteği",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Güvenlik ve kalite gerektiren yazılım için `gg` ek denetimler sunar:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg check --profile safety main.gg   # also rejects unsafe, panic, recursion, heap use,",
+    "                                    # unbounded loops and mutable statics",
+    "gg test --coverage                  # statement, decision, condition and MC/DC coverage",
+    "gg coverage --annotate              # list what never ran",
+    "gg fuzz main.gg                     # run fn fuzz_target(data: []u8) on mutated inputs",
+    "gg sbom main.gg                     # software bill of materials (CycloneDX or SPDX)",
+    "gg repro main.gg                    # build twice, compare the bytes (reproducible build)",
+    "gg unsafe-audit main.gg             # every unsafe block, asm, foreign function and static"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Derleyici aşamalarını incelemek için `gg emit-ll` (LLVM IR), `gg emit-bc` (bitcode), `gg ast` (sözdizimi ağacı) ve `gg attrs` (`@öznitelik` kullanımları, JSON) vardır."
+  },
+  {
+   "t": "p",
+   "text": "**Editör:** Greengold'un VS Code eklentisi, yerleşik dil sunucusuyla (LSP) yazarken anında hata gösterir, tanıma gitme (`F12`), üzerine gelince belge, `.` ile tamamlama, `Shift+Alt+F` ile biçimlendirme, ampul menüsünde derleyicinin düzeltmeleri ve Run/Release/Build düğmeleri sunar. Dosyayı kaydedince `safe` düzeltmeler de uygulanır."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q1",
+   "q": "Bir programdaki her `unsafe` bloğunu listeleyen komut hangisidir?",
+   "options": [
+    "`gg unsafe-audit`",
+    "`gg fix`",
+    "`gg doctor`"
+   ],
+   "answer": 0,
+   "why": "`unsafe-audit` bellek güvenliğini elle sağlaman gereken yerleri toplar."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q2",
+   "q": "`gg check --profile safety` neyi reddeder?",
+   "options": [
+    "Yalnızca uzun satırları",
+    "`unsafe`, `panic`, özyineleme, heap kullanımı gibi şeyleri",
+    "Hiçbir şeyi"
+   ],
+   "answer": 1,
+   "why": "Güvenlik profili, kanıtlanması zor özellikleri kapatır."
+  }
+ ]
+}

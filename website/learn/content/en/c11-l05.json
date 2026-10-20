@@ -1,0 +1,60 @@
+{
+ "title": "Docs, the API list and the REPL",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "The `#` comments you write right above function and struct definitions are turned into Markdown API documentation by `gg doc`:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "# Adds two numbers.",
+    "# Parameters:",
+    "#   a: the first addend",
+    "#   b: the second addend",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg doc src/                 # print to the screen",
+    "gg doc src/ -o API_DOCS.md  # save to a file"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**`gg api`** lists every public name of the standard library with its signature and a one-line description (`gg api --json` gives it in machine-readable form; the reference on this site is built from it). **`gg repl`** opens an interactive prompt: you type declarations, bindings and expressions and see the result at once."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg api                      # the whole standard library",
+    "gg repl                     # an interactive prompt",
+    "gg repl -e \"1 + 2\"          # evaluate one snippet"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l05-q1",
+   "q": "Where does `gg doc` take the documentation from?",
+   "options": [
+    "From a separate docs file",
+    "From the `#` comments above definitions",
+    "From the internet"
+   ],
+   "answer": 1,
+   "why": "The comments stay next to the code, so the docs do not go stale."
+  }
+ ]
+}

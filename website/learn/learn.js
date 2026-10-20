@@ -15,7 +15,7 @@
       correct: "Doğru!", wrong: "Çıktı beklenenle aynı değil.", expected: "Beklenen", got: "Senin çıktın", answer: "Doğru cevap",
       contents: "İçindekiler", badges: "Rozetler", progress: "İlerleme", lessons: "ders",
       b_first_run: "İlk program", b_first_ex: "İlk alıştırma", b_ex10: "10 alıştırma", b_quiz5: "5 doğru cevap", b_chapter: "Bölüm bitirildi",
-      cont: "Kaldığın yerden devam et", start: "Başla", review: "Önce şunu bitirmeni öneririz", stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
+      cont: "Kaldığın yerden devam et", start: "Başla", review: "Önce şunu bitirmeni öneririz", localOnly: "Bu örnek tarayıcıda çalışmaz; kendi bilgisayarında dene.", ref: "Standart kütüphane referansı", search: "Ara: fonksiyon, tip, modül…", modules: "Modüller", results: "sonuç", noResults: "Sonuç yok.", openInEditor: "Editörde dene", stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
     },
     en: {
       title: "Learn Greengold", lede: "From zero to the standard library. Write code in the browser, run it, solve the exercises.",
@@ -27,7 +27,7 @@
       correct: "Correct!", wrong: "The output is not what was expected.", expected: "Expected", got: "Your output", answer: "Correct answer",
       contents: "Contents", badges: "Badges", progress: "Progress", lessons: "lessons",
       b_first_run: "First program", b_first_ex: "First exercise", b_ex10: "10 exercises", b_quiz5: "5 correct answers", b_chapter: "Chapter finished",
-      cont: "Continue where you left off", start: "Start", review: "We suggest finishing this first", stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
+      cont: "Continue where you left off", start: "Start", review: "We suggest finishing this first", localOnly: "This example does not run in the browser; try it on your own machine.", ref: "Standard library reference", search: "Search: function, type, module…", modules: "Modules", results: "results", noResults: "No results.", openInEditor: "Try in editor", stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
     }
   };
 
@@ -206,6 +206,7 @@
     html += '<div class="learn-tools"><div class="pg-seg" role="radiogroup" aria-label="Language">' +
       ["tr", "en"].map(function (l) { return '<button type="button" role="radio" aria-checked="' + (l === lang) + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>"; }).join("") + "</div></div>";
     html += '<a href="#/">' + T("contents") + "</a>";
+    html += '<a href="#/ref"' + (activeId === "ref" ? ' aria-current="page"' : "") + '>' + T("ref") + "</a>";
     var next = nextToDo();
     manifest.chapters.forEach(function (ch, ci) {
       var sk = skipped(ch), open = activeId ? ch.lessons.indexOf(activeId) >= 0 : ch.lessons.indexOf(next) >= 0;
@@ -242,6 +243,7 @@
       ["beginner", "dev"].map(function (l) { return '<button type="button" class="btn ' + (level === l ? "btn-primary" : "btn-ghost") + '" data-level="' + l + '">' + T(l) + "</button>"; }).join("") +
       "</div><p>" + T("pathNote") + "</p>";
     var nx = nextToDo();
+    html += '<p><a href="#/ref">' + T("ref") + " →</a></p>";
     if (nx) html += '<p><a class="btn btn-primary" href="#/' + nx + '">' + (done ? T("cont") : T("start")) + ": " + H.esc(titles[nx] || nx) + "</a></p>";
     html += "<h3>" + T("progress") + ": " + done + "/" + total + " " + T("lessons") + "</h3>" + badges();
     manifest.chapters.forEach(function (ch) {
@@ -273,7 +275,8 @@
         else if (b.t === "h") main.appendChild(el("h3", "", inline(b.text)));
         else if (b.t === "code") {
           var src = b.code.join("\n"), box = el("div", "lesson-code");
-          box.appendChild(el("pre", "", H.source(src)));
+          box.appendChild(el("pre", b.lang === "sh" ? "sh" : "", b.lang === "sh" ? H.esc(src) : H.source(src)));
+          if (b.local) box.appendChild(el("pre", "expect", H.esc(T("localOnly"))));
           if (b.output) box.appendChild(el("pre", "expect", H.esc(b.output.join("\n"))));
           if (b.run) {
             var btn = el("button", "btn btn-ghost try", T("tryIt")); btn.type = "button";
@@ -299,7 +302,8 @@
       main.appendChild(nav);
       // the editor opens with the exercise (the first one not yet solved), or with the first example
       if (startEx) setCode(startEx.starter.join("\n"), startEx);
-      else setCode(firstCode || "fn main():\n    print(\"\")\n", null);
+      else if (firstCode) setCode(firstCode, null);
+      else { setCode("fn main():\n    print(\"\")\n", null); $("learn").classList.add("no-lab"); $("learn-lab").hidden = true; }   // nothing to run here
       side(id);
       window.scrollTo(0, 0);
     }).catch(function (e) { $("learn-main").textContent = String(e); });
@@ -343,11 +347,75 @@
     box.appendChild(res); main.appendChild(box);
   }
 
+  // ---- standard library reference ----
+  var stdlib = null;
+  function loadRef() {
+    return stdlib ? Promise.resolve(stdlib) : fetch("content/stdlib.json").then(function (r) { return r.json(); }).then(function (d) { stdlib = d; return d; });
+  }
+  function refTemplate(m) {
+    var name = m.id.indexOf("std.") === 0 ? m.id.slice(4) : null;
+    return (name ? "import std." + name + "\n\n" : "") + "fn main():\n    # " + (name ? "try " + name + ". here" : "try it here") + "\n    print(\"hello\")\n";
+  }
+  function symHtml(sym, mod) {
+    return '<div class="sym"><code>' + H.esc(sym.s) + "</code>" +
+      (sym.d ? "<p>" + inline(sym.d) + "</p>" : "") + (mod ? '<span class="mod">' + H.esc(mod) + "</span>" : "") + "</div>";
+  }
+  function reference(modId) {
+    loadRef().then(function (d) {
+      currentLesson = null;
+      $("learn").classList.remove("no-lab"); $("learn-lab").hidden = false;
+      $("lab-run").textContent = T("run"); $("lab-stop").textContent = T("stop"); $("lab-reset").textContent = T("reset");
+      var main = $("learn-main"), mod = null;
+      d.modules.forEach(function (m) { if (m.id === modId) mod = m; });
+      var html = "<h1>" + T("ref") + '</h1><input type="search" id="ref-q" class="ref-q" placeholder="' + H.esc(T("search")) + '" aria-label="' + H.esc(T("search")) + '">' +
+        '<div class="ref-mods" aria-label="' + T("modules") + '">' +
+        d.modules.map(function (m) { return '<a href="#/ref/' + m.id + '"' + (m === mod ? ' aria-current="page"' : "") + ">" + H.esc(m.id) + "</a>"; }).join("") + "</div>" +
+        '<div id="ref-out"></div>';
+      main.innerHTML = html;
+      var out = $("ref-out"), q = $("ref-q");
+      function show() {
+        var terms = q.value.toLowerCase().split(/\s+/).filter(Boolean), res = [];
+        if (terms.length) {
+          d.modules.forEach(function (m) {
+            m.symbols.forEach(function (sym) {
+              var hay = (sym.n + " " + sym.s + " " + sym.d + " " + m.id).toLowerCase();
+              if (terms.every(function (t) { return hay.indexOf(t) >= 0; })) res.push([sym, m.id]);
+            });
+          });
+          // exact name first, then names starting with the term, then names containing it, then the rest
+          var rank = function (r) {
+            var n = r[0].n.toLowerCase().replace(/^.*\./, "");
+            return n === terms[0] ? 0 : n.indexOf(terms[0]) === 0 ? 1 : n.indexOf(terms[0]) > 0 ? 2 : 3;
+          };
+          res.sort(function (a, b) { return rank(a) - rank(b); });
+          out.innerHTML = "<p>" + res.length + " " + T("results") + (res.length > 80 ? " (80)" : "") + "</p>" +
+            (res.slice(0, 80).map(function (r) { return symHtml(r[0], r[1]); }).join("") || "<p>" + T("noResults") + "</p>");
+        } else if (mod) {
+          out.innerHTML = "<h2>" + H.esc(mod.title) + "</h2>" + (mod.summary ? "<p>" + inline(mod.summary) + "</p>" : "") +
+            '<p><button type="button" class="btn btn-ghost" id="ref-try">' + T("openInEditor") + "</button></p>" +
+            mod.symbols.map(function (sym) { return symHtml(sym, ""); }).join("");
+          $("ref-try").addEventListener("click", function () { setCode(refTemplate(mod), null); editor.focus(); });
+        } else {
+          out.innerHTML = d.modules.map(function (m) {
+            return '<p><a href="#/ref/' + m.id + '"><strong>' + H.esc(m.id) + "</strong></a> (" + m.symbols.length + ")" + (m.summary ? " — " + inline(m.summary) : "") + "</p>";
+          }).join("");
+        }
+      }
+      q.addEventListener("input", show);
+      show();
+      if (mod) setCode(refTemplate(mod), null); else setCode("fn main():\n    print(\"hello\")\n", null);
+      side("ref");
+      window.scrollTo(0, 0);
+    }).catch(function (e) { $("learn-main").textContent = String(e); });
+  }
+
   function refresh() { if (manifest && currentLesson) side(currentLesson); }
 
   function route() {
     var id = (location.hash.match(/^#\/(.*)$/) || [])[1];
-    if (!id) home(); else lesson(id);
+    if (!id) home();
+    else if (id === "ref" || id.indexOf("ref/") === 0) reference(id.slice(4));
+    else lesson(id);
   }
   window.addEventListener("hashchange", route);
 

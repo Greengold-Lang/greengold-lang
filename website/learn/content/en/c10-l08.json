@@ -1,0 +1,78 @@
+{
+ "title": "Regular expressions: std.regex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`regex.compile(pattern)` gives a `Result[Regex, string]` (the pattern may be wrong). `is_match` says whether there is a match, `find` finds the first (`Optional[Match]`), `find_all` finds them all, `replace_all` replaces; `Match.text()` gives the matched text."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[0-9]+\"):",
+    "        Ok(re):",
+    "            print(re.is_match(\"order 42\"))",
+    "            for m in re.find_all(\"a1 b22 c333\"):",
+    "                print(m.text().as_str())",
+    "            print(re.replace_all(\"a1 b22\", \"#\").as_str())",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "1",
+    "22",
+    "333",
+    "a# b#"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l08-x1",
+   "prompt": "Find the pattern `[a-z]+` in `\"Hi 42 you\"` and print the text of the first match (`find` and `Valid`).",
+   "starter": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            print(\"?\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "solution": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            match re.find(\"Hi 42 you\"):",
+    "                Valid(m):",
+    "                    print(m.text().as_str())",
+    "                None:",
+    "                    print(\"no match\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "hint": "`re.find(...)` returns an `Optional`; open it with `match`.",
+   "expected": [
+    "i"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l08-q1",
+   "q": "Why does `regex.compile` return a `Result`?",
+   "options": [
+    "The pattern may be written wrongly",
+    "Because it is slow",
+    "Because the text may be empty"
+   ],
+   "answer": 0,
+   "why": "An invalid pattern comes back as an error value."
+  }
+ ]
+}

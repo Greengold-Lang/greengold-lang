@@ -1,0 +1,39 @@
+{
+ "title": "Channels: sharing by messaging",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Instead of communicating by sharing memory, **sharing by communicating** is the safest way. A **channel** lets one thread receive the values another thread sends. `ChannelI64` carries `i64`; for values of any type there is `Queue[T]`. `send` sends, `recv` returns an `Optional` (`None` once the channel is closed and empty), `close` closes it."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    ch = thread.ChannelI64.new()",
+    "    ch.send(100)",
+    "    ch.send(200)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    ch.close()"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l03-q1",
+   "q": "What does `recv()` give on a channel that is closed and empty?",
+   "options": [
+    "`0`",
+    "`None`",
+    "An error"
+   ],
+   "answer": 1,
+   "why": "That is why a `while let Valid(v) = ch.recv()` loop ends by itself."
+  }
+ ]
+}

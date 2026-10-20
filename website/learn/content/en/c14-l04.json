@@ -1,0 +1,78 @@
+{
+ "title": "Data formats: std.csv, std.uuid, std.log",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.csv` (RFC 4180) reads fields correctly with the quoting and separator rules: `csv.parse(text, ',')` gives a `Result[List[List[string]], string]`. `csv.format_row` writes a row, quoting where needed."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"name,age\\nAda,36\\n\\\"Smith, J\\\",41\\n\", ',').value_or_panic()",
+    "    print(rows.len, rows[2][0].as_str())"
+   ],
+   "run": true,
+   "output": [
+    "3 Smith, J"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`std.uuid` makes RFC 9562 identifiers: `v4` random, `v7` time-ordered, `v5` name-based (the same name always gives the same id). `std.log` writes levelled lines to stderr (`log.info`, `log.warn`, `log.kv`) and gives JSON output with `log.set_json(true)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.uuid",
+    "",
+    "fn main():",
+    "    ns = uuid.namespace_dns()",
+    "    id = uuid.v5(ns, \"example.com\".as_bytes())",
+    "    print(id.to_string().as_str())",
+    "    print(id.version())"
+   ],
+   "run": true,
+   "output": [
+    "cfbff0d1-9375-5685-968c-48ce8b15ae17",
+    "5"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l04-x1",
+   "prompt": "Read the text `\"a,b\\nc,d\\n\"` with `csv.parse` and print the number of rows.",
+   "starter": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"a,b\\nc,d\\n\", ',').value_or_panic()",
+    "    print(rows.len)"
+   ],
+   "hint": "`csv.parse(...).value_or_panic()` and `rows.len`.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l04-q1",
+   "q": "Which version always produces the same UUID for the same name?",
+   "options": [
+    "`v4`",
+    "`v5`",
+    "`v7`"
+   ],
+   "answer": 1,
+   "why": "`v5` is computed from a name and a namespace; `v4` is random, `v7` depends on time."
+  }
+ ]
+}

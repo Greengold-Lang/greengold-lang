@@ -1,0 +1,61 @@
+{
+ "title": "Saklanabilen closure'lar: Fn",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`fn(...)` düz bir fonksiyon göstericisidir. Bir closure'ı fonksiyondan **döndürmek**, struct alanında ya da listede **saklamak** için **`Fn(...) -> R`** tipi kullanılır. `Fn` beklenen yerde yazılan lambda yakaladığı şeylerin **sahibi** olur (heap değerler içine taşınır, diğerleri kopyalanır) ve bu yüzden onları değiştiremez."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn make_adder(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x + k",
+    "",
+    "fn main():",
+    "    add5 = make_adder(5)",
+    "    print(add5(1), make_adder(2)(3))",
+    "    steps = List[Fn(i32) -> i32]()",
+    "    steps.push(make_adder(10))",
+    "    steps.push(make_adder(20))",
+    "    print(steps[0](1), steps[1](1))"
+   ],
+   "run": true,
+   "output": [
+    "6 5",
+    "11 21"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l05-x1",
+   "prompt": "`make_multiplier(k)` yaz: bir `Fn(i32) -> i32` döndürsün ve girdisini `k` ile çarpsın. `make_multiplier(3)(7)` yazdır.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn make_multiplier(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x * k",
+    "",
+    "fn main():",
+    "    print(make_multiplier(3)(7))"
+   ],
+   "hint": "`make_adder` örneğine bak; `+` yerine `*` yaz.",
+   "expected": [
+    "21"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l05-q1",
+   "q": "Bir closure'ı fonksiyondan döndürmek için hangi tip gerekir?",
+   "options": [
+    "`fn(...)`",
+    "`Fn(...)`",
+    "`str`"
+   ],
+   "answer": 1,
+   "why": "`Fn` saklanabilen, yakaladığı değerlerin sahibi closure'dır."
+  }
+ ]
+}

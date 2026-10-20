@@ -1,0 +1,66 @@
+{
+ "title": "Raw pointers and unsafe",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In safe code references are managed with `lend` and `ref`. In FFI and hardware access **raw pointers** come into play: `*T` is read-only (`const T*`), `*mut T` is writable (`T*`), `*void` is type-independent. A pointer pointing nowhere is `null` and can be compared with `null` in safe code."
+  },
+  {
+   "t": "p",
+   "text": "Reading/writing the data a pointer points to, pointer arithmetic and calling raw C functions are done **only inside an `unsafe:` block**. There the compiler says: \"the safeguards are off; memory safety, bounds checks and pointer validity are entirely the programmer's responsibility.\""
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number: i32 = 42",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(number)",
+    "        p[0] = 99",
+    "    print(\"updated number:\", number)"
+   ],
+   "run": true,
+   "output": [
+    "updated number: 99"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Helpers (all need `unsafe:`): `addr(x)` / `addr_mut(x)` take a variable's address, `ptr_offset(p, n)` moves the pointer, `ptr_cast[*T](p)` changes its type, `ptr_to_int` / `int_to_ptr` convert between an integer and a pointer, `string_to_cstr` / `cstr_to_string` work with C strings."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l03-x1",
+   "prompt": "Take the address of `x = 5` with `addr_mut` and set its value to 50 through the pointer. Print `x`.",
+   "starter": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(x)",
+    "        p[0] = 50",
+    "    print(x)"
+   ],
+   "hint": "`p[0] = 50` inside an `unsafe:` block.",
+   "expected": [
+    "50"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l03-q1",
+   "q": "What is the difference between `*mut T` and `*T`?",
+   "options": [
+    "There is none",
+    "`*mut T` is writable, `*T` is read-only",
+    "`*T` is faster"
+   ],
+   "answer": 1,
+   "why": "`*T` is like C's `const T*`, `*mut T` like `T*`."
+  }
+ ]
+}

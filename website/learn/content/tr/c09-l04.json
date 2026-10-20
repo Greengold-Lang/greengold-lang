@@ -1,0 +1,69 @@
+{
+ "title": "Closure: dış değişkeni yakalamak",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bir lambda, yazıldığı fonksiyondaki değişkenleri kullanabilir; buna **closure** denir. Kopyalanabilir değerler (sayılar, düz struct'lar) lambda oluşturulurken **kopyalanır**; `List` gibi heap'e sahip değerler ise `read` olarak **ödünç alınır**. Closure kullanıldığı sürece ödünç alınan değişken değiştirilemez, taşınamaz; derleyici bunu denetler."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn apply(f: fn(i32) -> i32, x: i32) -> i32:",
+    "    return f(x)",
+    "",
+    "fn main():",
+    "    k = 3",
+    "    add_k = fn(x: i32) -> i32 => x + k",
+    "    print(add_k(1), apply(add_k, 10))",
+    "",
+    "    xs = List[i32]()",
+    "    xs.push(7)",
+    "    has = fn(i: i32) -> bool => xs.len > usize(i)",
+    "    print(has(0))",
+    "    xs.push(8)"
+   ],
+   "run": true,
+   "output": [
+    "4 13",
+    "true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Lambdanın gövdesi yakalanan değişkeni **değiştiriyorsa** (`fn(x: i32) => out.push(x)`), closure onu `lend` olarak ödünç alır: değişken `fixed` olamaz ve closure kullanılırken başka yerden erişilemez."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l04-x1",
+   "prompt": "`factor` değişkenini yakalayan bir lambda yaz: girdisini `factor` ile çarpsın (`factor = 4`). `scale(5)`'i yazdır.",
+   "starter": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x",
+    "    print(scale(5))"
+   ],
+   "solution": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x * factor",
+    "    print(scale(5))"
+   ],
+   "hint": "Gövdeyi `x * factor` yap.",
+   "expected": [
+    "20"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l04-q1",
+   "q": "Sayılar lambdaya yakalandığında ne olur?",
+   "options": [
+    "Kopyalanır",
+    "Taşınır",
+    "Silinir"
+   ],
+   "answer": 0,
+   "why": "Copy tipleri yakalanırken kopyalanır; Move tipleri ödünç alınır ya da taşınır."
+  }
+ ]
+}

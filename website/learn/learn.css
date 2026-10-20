@@ -55,3 +55,12 @@
 .notice { padding: 8px 12px; border: 1px dashed var(--gold); border-radius: 10px; color: var(--gold-soft); }
 .notice a { color: inherit; text-decoration: underline; }
 .exercise.active { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 55%, transparent); }
+.ref-q { width: 100%; box-sizing: border-box; margin: 6px 0 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--bg-soft); color: var(--text); font: inherit; }
+.ref-mods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.ref-mods a { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: .82rem; text-decoration: none; color: var(--text); }
+.ref-mods a[aria-current="page"], .ref-mods a:hover { border-color: var(--green); color: var(--green); }
+.sym { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sym code { display: block; font-family: var(--mono); font-size: .86rem; white-space: pre-wrap; word-break: break-word; background: none; padding: 0; }
+.sym p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+.sym .k { display: inline-block; margin-right: 8px; font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); }
+.sym .mod { font-size: .75rem; color: var(--muted); }

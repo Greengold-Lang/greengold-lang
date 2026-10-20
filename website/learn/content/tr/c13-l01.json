@@ -1,0 +1,38 @@
+{
+ "title": "C fonksiyonlarını çağırmak: extern",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold, C kütüphaneleriyle C ABI üzerinden doğrudan konuşur; arada ek yük yoktur. Mevcut bir C fonksiyonunu bildirmek için **`extern`** kullanılır:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sin(x: f64) -> f64",
+    "extern \"math.h\" fn cos(x: f64) -> f64",
+    "",
+    "fn main():",
+    "    unsafe:",
+    "        print(sin(0.0), cos(0.0))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Bildirimi yapılmış bir C fonksiyonunu çağırmak, derleyicinin doğrulayamayacağı bir sözleşmeye güvenmek demektir; bu yüzden çağrı **`unsafe:`** bloğunda yapılır. Değişken sayıda parametre alan C fonksiyonları (`printf`) imzada `...` ile işaretlenir."
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l01-q1",
+   "q": "Bir `extern` C fonksiyonu nerede çağrılır?",
+   "options": [
+    "Her yerde",
+    "`unsafe:` bloğunda",
+    "Yalnızca `main`'de"
+   ],
+   "answer": 1,
+   "why": "Derleyici C tarafını doğrulayamaz; sorumluluk programcıdadır."
+  }
+ ]
+}

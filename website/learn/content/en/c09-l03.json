@@ -1,0 +1,87 @@
+{
+ "title": "Lambda expressions",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "For a small job, instead of writing a separate `fn` you can write an anonymous **lambda**: `fn(parameters) -> Return => expression`. It is stored in a variable or given directly as an argument."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x * x)",
+    "    adder = fn(a: i32, b: i32) -> i32 => a + b",
+    "    print(\"sum:\", adder(10, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1",
+    "4",
+    "9",
+    "sum: 30"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "In a lambda that returns no value, the return type is left out and the body must be a call expression:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    logger = fn(s: str) => print(\"[LOG]\", s)",
+    "    logger(\"the lambda ran\")"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] the lambda ran"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l03-x1",
+   "prompt": "Use `transform` with a lambda that adds 10 to every number and print the results (11, 12, 13 for `[1, 2, 3]`).",
+   "starter": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x)"
+   ],
+   "solution": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x + 10)"
+   ],
+   "hint": "Make the lambda's body `x + 10`.",
+   "expected": [
+    "11",
+    "12",
+    "13"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l03-q1",
+   "q": "What is `fn(x: i32) -> i32 => x * 2`?",
+   "options": [
+    "A struct",
+    "An anonymous function (lambda) that multiplies its input by two",
+    "An error"
+   ],
+   "answer": 1,
+   "why": "`=>` starts the body of the lambda."
+  }
+ ]
+}

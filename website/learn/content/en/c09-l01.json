@@ -1,0 +1,80 @@
+{
+ "title": "Functions as values",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In Greengold functions are values too: you can store one in a variable, pass it as a parameter or put it in a struct field. A function type is written `fn(T1, T2) -> R`; since it is long it is often named with `type`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn multiply(a: i32, b: i32) -> i32:",
+    "    return a * b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    current: MathOp = multiply",
+    "    print(apply_op(current, 6, 7))",
+    "    print(apply_op(add, 6, 7))"
+   ],
+   "run": true,
+   "output": [
+    "42",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`apply_op` does not know which operation it will do; the function it is given decides. This is the basic way to pass behaviour as a parameter."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l01-x1",
+   "prompt": "Write a `subtract` function and print the result of `apply_op(subtract, 10, 4)`.",
+   "starter": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(apply_op(subtract, 10, 4))"
+   ],
+   "hint": "Write `fn subtract(a: i32, b: i32) -> i32:` and pass it in `main`.",
+   "expected": [
+    "6"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l01-q1",
+   "q": "What kind of type is `fn(i32, i32) -> i32`?",
+   "options": [
+    "A number type",
+    "The type of functions taking two `i32` and returning `i32`",
+    "A struct"
+   ],
+   "answer": 1,
+   "why": "A function type describes the parameter and return types."
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "title": "Matematik: std.math",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.math` `sqrt`, `pow`, `sin`, `cos`, `floor`, `ceil`, `round`, `hypot`, `ln`, `log10`... gibi `f64` fonksiyonlarını ve sabitleri sunar. Sabitler fonksiyon olarak çağrılır: `math.pi()`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(2.0))",
+    "    print(math.floor(2.7), math.ceil(2.1), math.round(2.5))",
+    "    print(math.hypot(3.0, 4.0))",
+    "    print(math.pi())",
+    "    print(math.pow_i64(2, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1.4142135623731",
+    "2 3 3",
+    "5",
+    "3.14159265358979",
+    "1048576"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l05-x1",
+   "prompt": "Yarıçapı 3 olan dairenin alanını `pi * r * r` ile hesapla ve `math.floor` ile aşağı yuvarlayıp yazdır.",
+   "starter": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    r = 3.0",
+    "    print(0.0)"
+   ],
+   "solution": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    r = 3.0",
+    "    print(math.floor(math.pi() * r * r))"
+   ],
+   "hint": "`math.floor(math.pi() * r * r)`",
+   "expected": [
+    "28"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l05-q1",
+   "q": "`pi` değerini nasıl alırsın?",
+   "options": [
+    "`math.pi`",
+    "`math.pi()`",
+    "`PI`"
+   ],
+   "answer": 1,
+   "why": "`std.math`'te sabitler fonksiyon çağrısıyla alınır."
+  }
+ ]
+}
