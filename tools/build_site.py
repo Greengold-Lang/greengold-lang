@@ -260,6 +260,7 @@ NAV = [
     ("spec", "spec.html", "Spec"),
     ("benchmarks", "benchmarks.html", "Benchmarks"),
     ("playground", "playground.html", "Playground"),
+    ("learn", "learn/index.html", "Learn"),
     ("diagnostics", "diagnostics.html", "Diagnostics"),
     ("roadmap", "roadmap.html", "Roadmap"),
     ("about", "about.html", "About"),
@@ -1329,7 +1330,7 @@ def main() -> None:
     shutil.copyfile(SPEC, SITE / "spec.md")
     sitemap = ["<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"]
-    for path in ["", "why.html", "spec.html", "spec.md", "benchmarks.html", "playground.html", "diagnostics.html",
+    for path in ["", "why.html", "spec.html", "spec.md", "benchmarks.html", "playground.html", "learn/index.html", "diagnostics.html",
                  "roadmap.html", "about.html", "benchmarks/data.json"]:
         sitemap.append(f"  <url><loc>{DOMAIN}/{path}</loc><lastmod>{UPDATED}</lastmod></url>")
     sitemap.append("</urlset>")
