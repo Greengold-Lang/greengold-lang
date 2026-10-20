@@ -15,7 +15,7 @@
       correct: "Doğru!", wrong: "Çıktı beklenenle aynı değil.", expected: "Beklenen", got: "Senin çıktın", answer: "Doğru cevap",
       contents: "İçindekiler", badges: "Rozetler", progress: "İlerleme", lessons: "ders",
       b_first_run: "İlk program", b_first_ex: "İlk alıştırma", b_ex10: "10 alıştırma", b_quiz5: "5 doğru cevap", b_chapter: "Bölüm bitirildi",
-      cont: "Kaldığın yerden devam et", start: "Başla", review: "Önce şunu bitirmeni öneririz", localOnly: "Bu örnek tarayıcıda çalışmaz; kendi bilgisayarında dene.", ref: "Standart kütüphane referansı", search: "Ara: fonksiyon, tip, modül…", modules: "Modüller", results: "sonuç", noResults: "Sonuç yok.", openInEditor: "Editörde dene", stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
+      cont: "Kaldığın yerden devam et", start: "Başla", review: "Önce şunu bitirmeni öneririz", localOnly: "Bu örnek tarayıcıda çalışmaz; kendi bilgisayarında dene.", ref: "Standart kütüphane referansı", search: "Ara: fonksiyon, tip, modül…", modules: "Modüller", results: "sonuç", noResults: "Sonuç yok.", openInEditor: "Editörde dene", finishNeeds: "Tamamlamak için gerekli", stopped: "Durduruldu.", tooLong: "Program çok uzun sürdü.", exit: "çıkış kodu"
     },
     en: {
       title: "Learn Greengold", lede: "From zero to the standard library. Write code in the browser, run it, solve the exercises.",
@@ -27,7 +27,7 @@
       correct: "Correct!", wrong: "The output is not what was expected.", expected: "Expected", got: "Your output", answer: "Correct answer",
       contents: "Contents", badges: "Badges", progress: "Progress", lessons: "lessons",
       b_first_run: "First program", b_first_ex: "First exercise", b_ex10: "10 exercises", b_quiz5: "5 correct answers", b_chapter: "Chapter finished",
-      cont: "Continue where you left off", start: "Start", review: "We suggest finishing this first", localOnly: "This example does not run in the browser; try it on your own machine.", ref: "Standard library reference", search: "Search: function, type, module…", modules: "Modules", results: "results", noResults: "No results.", openInEditor: "Try in editor", stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
+      cont: "Continue where you left off", start: "Start", review: "We suggest finishing this first", localOnly: "This example does not run in the browser; try it on your own machine.", ref: "Standard library reference", search: "Search: function, type, module…", modules: "Modules", results: "results", noResults: "No results.", openInEditor: "Try in editor", finishNeeds: "Needed to complete", stopped: "Stopped.", tooLong: "The program ran too long.", exit: "exit code"
     }
   };
 
@@ -172,6 +172,7 @@
   editor.addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runLab(!!currentExercise); } });
 
   // ---- content ----
+  var updateFinish = function () {};
   var manifest = null, cache = {}, titles = {}, currentLesson = null;
   function lessonIds() { var ids = []; manifest.chapters.forEach(function (c) { c.lessons.forEach(function (l) { ids.push(l); }); }); return ids; }
   function skipped(ch) { return !!ch.only && !!level && ch.only !== level; }
@@ -214,9 +215,9 @@
       html += '<details class="chapter' + (sk ? " skipped" : "") + '"' + (open ? " open" : "") + "><summary>" + H.esc(ch.title[lang]) +
         (sk ? " · " + T("skipped") : "") + ' <span class="count">' + doneN + "/" + ch.lessons.length + "</span></summary><ul>";
       ch.lessons.forEach(function (id) {
-        var cls = (!sk && id === next ? "next" : "");
-        html += '<li><a href="#/' + id + '"' + (id === activeId ? ' aria-current="page"' : "") + (cls ? ' class="' + cls + '"' : "") + '><span class="tick">' +
-          (progress.lessons[id] ? "✓" : (cls ? "→" : "")) + "</span>" + H.esc(titles[id] || id) + "</a></li>";
+        var cls = (progress.lessons[id] ? "done" : "todo") + (!sk && id === next ? " next" : "");
+        html += '<li><a href="#/' + id + '"' + (id === activeId ? ' aria-current="page"' : "") + ' class="' + cls + '"><span class="tick">' +
+          (progress.lessons[id] ? "✓" : (!sk && id === next ? "→" : "")) + "</span>" + H.esc(titles[id] || id) + "</a></li>";
       });
       html += "</ul></details>";
     });
@@ -248,7 +249,7 @@
     html += "<h3>" + T("progress") + ": " + done + "/" + total + " " + T("lessons") + "</h3>" + badges();
     manifest.chapters.forEach(function (ch) {
       html += '<div class="chapter-card"><h3>' + H.esc(ch.title[lang]) + (skipped(ch) ? " · " + T("skipped") : "") + "</h3>" +
-        ch.lessons.map(function (id) { return '<a href="#/' + id + '">' + (progress.lessons[id] ? "✓ " : "") + H.esc(titles[id] || id) + "</a>"; }).join("") + "</div>";
+        ch.lessons.map(function (id) { return '<a class="' + (progress.lessons[id] ? "done" : "todo") + '" href="#/' + id + '">' + (progress.lessons[id] ? "✓ " : "") + H.esc(titles[id] || id) + "</a>"; }).join("") + "</div>";
     });
     main.innerHTML = html;
     Array.prototype.forEach.call(main.querySelectorAll("[data-level]"), function (b) {
@@ -300,6 +301,21 @@
       });
       nav.appendChild(fin);
       main.appendChild(nav);
+      // "Completed" opens only after every exercise is checked successfully and every question is answered correctly
+      var needEx = d.blocks.filter(function (x) { return x.t === "exercise"; }).map(function (x) { return x.id; });
+      var needQz = d.blocks.filter(function (x) { return x.t === "quiz"; }).map(function (x) { return x.id; });
+      var hint = el("p", "finish-hint"); main.appendChild(hint);
+      updateFinish = function () {
+        var exDone = needEx.filter(function (x) { return progress.exercises[x]; }).length;
+        var qzDone = needQz.filter(function (x) { return progress.quiz[x]; }).length;
+        var ok = !!progress.lessons[id] || (exDone === needEx.length && qzDone === needQz.length);
+        fin.disabled = !ok;
+        var parts = [];
+        if (needEx.length) parts.push(T("exercise") + " " + exDone + "/" + needEx.length);
+        if (needQz.length) parts.push(T("quiz") + " " + qzDone + "/" + needQz.length);
+        hint.textContent = ok ? "" : T("finishNeeds") + ": " + parts.join(", ");
+      };
+      updateFinish();
       // the editor opens with the exercise (the first one not yet solved), or with the first example
       if (startEx) setCode(startEx.starter.join("\n"), startEx);
       else if (firstCode) setCode(firstCode, null);
@@ -339,6 +355,7 @@
       label.querySelector("input").addEventListener("change", function () {
         var ok = i === b.answer;
         progress.quiz[b.id] = ok || progress.quiz[b.id] || false; save();
+        updateFinish();
         res.innerHTML = '<span class="' + (ok ? "good" : "bad") + '">' + (ok ? "✓ " + T("correct") : "✗ " + T("answer") + ": " + inline(b.options[b.answer])) + "</span> " + inline(b.why || "");
         if (ok) box.classList.add("done");
       });
@@ -409,7 +426,7 @@
     }).catch(function (e) { $("learn-main").textContent = String(e); });
   }
 
-  function refresh() { if (manifest && currentLesson) side(currentLesson); }
+  function refresh() { if (manifest && currentLesson) { side(currentLesson); updateFinish(); } }
 
   function route() {
     var id = (location.hash.match(/^#\/(.*)$/) || [])[1];
