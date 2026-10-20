@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import difflib
 
-from .ast_nodes import Attr, AttrArg, AttrDecl, FieldDecl, FuncDecl, StructDecl
+from .ast_nodes import Attr, AttrArg, AttrDecl, AttrParam, ConstDecl, FieldDecl, FuncDecl, StructDecl
 from .diagnostics import DiagnosticBag
 
 _KIND_WORDS = {"str": "a string", "int": "an integer", "float": "a number", "bool": "`true` or `false`",
@@ -28,8 +28,30 @@ def _fits(param_kind: str, arg: AttrArg) -> bool:
     return arg.kind == param_kind
 
 
+def _builtin(name: str, targets: list[str], *params: tuple[str, str, object]) -> AttrDecl:
+    ps = [AttrParam(n, k, default=None if d is None else AttrArg(k, d)) for n, k, d in params]
+    return AttrDecl(name, ps, targets=targets)
+
+
+# Attributes the compiler gives a meaning to (see docs/SPEC.md, "Attributes the compiler knows").
+BUILTIN_ATTRS: dict[str, AttrDecl] = {d.name: d for d in (
+    _builtin("inline", ["fn"], ("mode", "ident", "hint")),                  # always | never | hint
+    _builtin("cold", ["fn"]),
+    _builtin("naked", ["fn"]),
+    _builtin("section", ["fn", "static"], ("name", "str", None)),
+    _builtin("used", ["fn", "static"]),
+    _builtin("weak", ["fn", "static"]),
+    _builtin("export", ["fn", "static"], ("name", "str", "")),
+    _builtin("interrupt", ["fn"], ("kind", "str", "")),
+    _builtin("align", ["static"], ("bytes", "int", None)),
+    _builtin("allow", ["fn"], ("a", "ident", None), ("b", "ident", "none"), ("c", "ident", "none")),   # exceptions to a --profile rule
+    _builtin("panic_handler", ["fn"]),                                      # fn() run when the program panics
+)}
+_INLINE_MODES = ("always", "never", "hint")
+
+
 def _declarations(decls, diags: DiagnosticBag | None) -> dict[str, AttrDecl]:
-    found: dict[str, AttrDecl] = {}
+    found: dict[str, AttrDecl] = dict(BUILTIN_ATTRS)
     for d in decls:
         if not isinstance(d, AttrDecl):
             continue
@@ -106,6 +128,9 @@ def _targets(program):
     for d in program.decls:
         if isinstance(d, FuncDecl):
             yield "fn", d, d.owner, getattr(d, "module_slug", "")
+        elif isinstance(d, ConstDecl):
+            if getattr(d, "is_static", False):
+                yield "static", d, None, getattr(d, "module_slug", "")
         elif isinstance(d, StructDecl):
             slug = getattr(d, "module_slug", "")
             yield "struct", d, None, slug
@@ -139,6 +164,12 @@ def check_attributes(program, diags: DiagnosticBag) -> None:
             values = _bind(attr, decl, diags)
             if values is not None:
                 attr.resolved = values  # type: ignore[attr-defined]
+                if attr.name == "panic_handler" and isinstance(node, FuncDecl) and (node.params or node.ret is not None):
+                    diags.error("A `@panic_handler` takes no parameters and returns nothing: `fn on_panic():`.",
+                                attr.line, attr.col, attr.length, filename=attr.filename, rule="bad-attribute")
+                if attr.name == "inline" and values["mode"] not in _INLINE_MODES:
+                    diags.error("`@inline` takes `always`, `never`, or `hint`.", attr.line, attr.col, attr.length,
+                                filename=attr.filename, rule="bad-attribute")
 
 
 def run_handlers(program, diags: DiagnosticBag) -> None:
@@ -176,6 +207,15 @@ def run_handlers(program, diags: DiagnosticBag) -> None:
                                 rule="attribute-print").severity = "note"
                 else:
                     diags.error(message, attr.line, attr.col, attr.length, filename=attr.filename, rule="attribute-check")
+
+
+def builtin_values(node) -> dict[str, dict]:
+    """The checked built-in attributes on a function or static: {name: arguments}."""
+    out: dict[str, dict] = {}
+    for attr in getattr(node, "attrs", ()):
+        if attr.name in BUILTIN_ATTRS and getattr(attr, "resolved", None) is not None:
+            out[attr.name] = attr.resolved  # type: ignore[attr-defined]
+    return out
 
 
 def export(program) -> list[dict]:

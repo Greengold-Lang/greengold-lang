@@ -1,0 +1,66 @@
+{
+ "title": "Generische Structs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Auch Structs und Enums können Typparameter haben. `Pair[A, B]` hält zwei Werte zweier verschiedener Typen. Methoden werden in einem `impl Pair[A, B]:`-Block geschrieben."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Pair[A, B]:",
+    "    first: A",
+    "    second: B",
+    "",
+    "impl Pair[A, B]:",
+    "    fn swap(self) -> Pair[B, A]:",
+    "        return Pair[B, A]{ first: self.second.clone(), second: self.first.clone() }",
+    "",
+    "fn main():",
+    "    p = Pair[i32, str]{ first: 1, second: \"one\" }",
+    "    s = p.swap()",
+    "    print(s.first, s.second)"
+   ],
+   "run": true,
+   "output": [
+    "one 1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l02-x1",
+   "prompt": "Schreibe ein `Wrapper[T]`-Struct, das einen einzelnen Wert (`value: T`) hält. Erzeuge `Wrapper[i32]{ value: 5 }` und `Wrapper[str]{ value: \"hi\" }` und gib ihre Werte aus.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Wrapper[T]:",
+    "    value: T",
+    "",
+    "fn main():",
+    "    a = Wrapper[i32]{ value: 5 }",
+    "    b = Wrapper[str]{ value: \"hi\" }",
+    "    print(a.value)",
+    "    print(b.value)"
+   ],
+   "hint": "`struct Wrapper[T]:` mit `value: T` darunter.",
+   "expected": [
+    "5",
+    "hi"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l02-q1",
+   "q": "Sind `Pair[i32, str]` und `Pair[f64, f64]` derselbe Typ?",
+   "options": [
+    "Ja",
+    "Nein, es sind verschiedene Typen",
+    "Es hängt vom Compiler ab"
+   ],
+   "answer": 1,
+   "why": "Jede Kombination von Typargumenten ergibt einen eigenen Typ."
+  }
+ ]
+}

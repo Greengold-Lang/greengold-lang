@@ -17,10 +17,10 @@ from .typeinfo import array_info, heap_inner, heap_kind, is_array_type, is_ptr_t
 
 _BASIC = {
     "i8": (8, "DW_ATE_signed"), "i16": (16, "DW_ATE_signed"), "i32": (32, "DW_ATE_signed"),
-    "i64": (64, "DW_ATE_signed"), "isize": (64, "DW_ATE_signed"),
+    "i64": (64, "DW_ATE_signed"), "i128": (128, "DW_ATE_signed"), "u128": (128, "DW_ATE_unsigned"), "isize": (64, "DW_ATE_signed"),
     "u8": (8, "DW_ATE_unsigned"), "u16": (16, "DW_ATE_unsigned"), "u32": (32, "DW_ATE_unsigned"),
     "u64": (64, "DW_ATE_unsigned"), "usize": (64, "DW_ATE_unsigned"),
-    "f32": (32, "DW_ATE_float"), "f64": (64, "DW_ATE_float"), "bool": (8, "DW_ATE_boolean"),
+    "f16": (16, "DW_ATE_float"), "f32": (32, "DW_ATE_float"), "f64": (64, "DW_ATE_float"), "bool": (8, "DW_ATE_boolean"),
 }
 
 

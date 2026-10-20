@@ -1,0 +1,69 @@
+{
+ "title": "C uyumlu veri: extern struct",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold'un kendi struct düzeni derleyici tarafından en iyi hale getirilebilir. C fonksiyonlarına geçirilecek bir struct ise C derleyicilerinin beklediği bellek düzenine (hizalama, boşluk) **tam uymalıdır**. Bunun için **`extern struct`** kullanılır:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern struct Point2D:",
+    "    x: f32",
+    "    y: f32",
+    "",
+    "extern struct RectInfo:",
+    "    top_left: Point2D",
+    "    width: i32",
+    "    height: i32",
+    "",
+    "fn main():",
+    "    r = RectInfo{ top_left: Point2D{ x: 1.0, y: 2.0 }, width: 30, height: 40 }",
+    "    print(r.width * r.height)"
+   ],
+   "run": true,
+   "output": [
+    "1200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Kural: `extern struct` alanları yalnızca sayılar, `bool`, ham göstericiler ya da başka `extern struct`'lar olabilir; `Box` ve `List` gibi heap tipleri olamaz."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l02-x1",
+   "prompt": "`Color` adlı bir `extern struct` tanımla (`r`, `g`, `b`: hepsi `u8`). `Color{ r: 255, g: 128, b: 0 }` oluştur ve üç değerin toplamını yazdır.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "extern struct Color:",
+    "    r: u8",
+    "    g: u8",
+    "    b: u8",
+    "",
+    "fn main():",
+    "    c = Color{ r: 255, g: 128, b: 0 }",
+    "    print(i32(c.r) + i32(c.g) + i32(c.b))"
+   ],
+   "hint": "`u8` toplarken taşmamak için `i32(...)` ile çevir.",
+   "expected": [
+    "383"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l02-q1",
+   "q": "`extern struct` içinde `List[i32]` alanı olabilir mi?",
+   "options": [
+    "Evet",
+    "Hayır, heap tipleri olamaz",
+    "Yalnızca sayılarla birlikte"
+   ],
+   "answer": 1,
+   "why": "C'nin bildiği düz bellek düzeni heap tiplerini içermez."
+  }
+ ]
+}

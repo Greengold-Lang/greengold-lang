@@ -1,8 +1,12 @@
-# std.io: files read and written a piece at a time.
+# std.io: streams, and the error type shared by std.io, std.fs and the other library modules.
 #
 # `File.open(path)` reads, `File.create(path)` writes a new file, `File.append(path)` adds to the end.
 # A file is closed when it goes away (`drop`), and what was written is flushed then. Reads and writes
-# are buffered by the C library. Use std.fs for whole-file reads and writes.
+# are buffered by the C library. Every operation that can fail returns `Result[T, IoError]`; the error
+# says what went wrong (`kind`), the operating system's code, and a message with the path.
+#
+# `Reader` and `Writer` are features: write `fn dump[W: Writer](out: read W)` once and pass a `File`,
+# one of the standard streams (`stdout()`), or a `Cursor` (an in-memory stream, handy in tests).
 
 private
 extern "stdio.h" fn fopen(path: *u8, mode: *u8) -> *mut u8
@@ -11,93 +15,392 @@ extern "stdio.h" fn fread(buf: *mut u8, size: usize, count: usize, f: *mut u8) -
 extern "stdio.h" fn fwrite(buf: *u8, size: usize, count: usize, f: *mut u8) -> usize
 extern "stdio.h" fn fflush(f: *mut u8) -> i32
 extern "stdio.h" fn fgetc(f: *mut u8) -> i32
+extern "stdio.h" fn ferror(f: *mut u8) -> i32
+extern "stdio.h" fn clearerr(f: *mut u8)
 extern "stdlib.h" fn malloc(size: usize) -> *mut u8
 extern "stdlib.h" fn free(ptr: *u8)
-
-fn _open(path: str, mode: str) -> Result[File, string]:
-    owned = string.from(path)
-    owned.append_byte(0)
-    how = string.from(mode)
-    how.append_byte(0)
-    unsafe:
-        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr(how.as_str()))
-        if f == null:
-            return Err(f"cannot open {path}")
-        return Ok(File{ handle: f })
+extern "string.h" fn strerror(code: i32) -> *u8
+weak extern "stdio.h" fn fdopen(fd: i32, mode: *u8) -> *mut u8
+weak extern "stdio.h" fn _fdopen(fd: i32, mode: *u8) -> *mut u8
+weak extern "errno.h" fn __errno_location() -> *mut i32
+weak extern "errno.h" fn __error() -> *mut i32
+weak extern "errno.h" fn _errno() -> *mut i32
+weak extern "stdio.h" fn fseeko(f: *mut u8, offset: i64, whence: i32) -> i32
+weak extern "stdio.h" fn ftello(f: *mut u8) -> i64
+weak extern "stdio.h" fn _fseeki64(f: *mut u8, offset: i64, whence: i32) -> i32
+weak extern "stdio.h" fn _ftelli64(f: *mut u8) -> i64
+weak extern "stdio.h" fn fileno(f: *mut u8) -> i32
+weak extern "stdio.h" fn _fileno(f: *mut u8) -> i32
+weak extern "stdio.h" fn pclose(f: *mut u8) -> i32
+weak extern "stdio.h" fn _pclose(f: *mut u8) -> i32
+weak extern "unistd.h" fn fsync(fd: i32) -> i32
+weak extern "io.h" fn _commit(fd: i32) -> i32
 
 public
-# An open file.
+enum IoErrorKind:
+    NotFound
+    PermissionDenied
+    AlreadyExists
+    NotADirectory
+    IsADirectory
+    DirectoryNotEmpty
+    InvalidInput
+    UnexpectedEof
+    TimedOut
+    Interrupted
+    Other
+
+# What went wrong. `code` is the C library's `errno` (0 when the error did not come from the system).
+struct IoError:
+    kind: IoErrorKind
+    code: i32
+    message: string
+
+impl IoError:
+    fn is_not_found(self: read Self) -> bool:
+        return self.kind == IoErrorKind.NotFound
+
+    fn describe(self: read Self) -> string:
+        return string.from(self.message.as_str())
+
+fn error_new(kind: IoErrorKind, message: str) -> IoError:
+    return IoError{ kind: kind, code: 0, message: string.from(message) }
+
+# The kind that an `errno` value stands for.
+fn kind_of_errno(code: i32) -> IoErrorKind:
+    if code == 2:
+        return IoErrorKind.NotFound
+    if code == 1 or code == 13:
+        return IoErrorKind.PermissionDenied
+    if code == 17:
+        return IoErrorKind.AlreadyExists
+    if code == 20:
+        return IoErrorKind.NotADirectory
+    if code == 21:
+        return IoErrorKind.IsADirectory
+    if code == 4:
+        return IoErrorKind.Interrupted
+    if code == 22:
+        return IoErrorKind.InvalidInput
+    if code == 39 or code == 41 or code == 66:
+        return IoErrorKind.DirectoryNotEmpty
+    return IoErrorKind.Other
+
+# The C library's current `errno`.
+fn last_errno() -> i32:
+    unsafe:
+        if target_os() == "windows":
+            return _errno()[0]
+        if target_os() == "macos":
+            return __error()[0]
+        return __errno_location()[0]
+
+# An error built from the current `errno`, with `context` (usually the operation and the path) in front.
+fn last_error(context: str) -> IoError:
+    code = last_errno()
+    text = string.from(context)
+    unsafe:
+        text.append_str(": ")
+        text.append_str(cstr_to_string(strerror(code)))
+    return IoError{ kind: kind_of_errno(code), code: code, message: text }
+
+# An error for a Windows API failure (a `GetLastError` code), with `context` in front.
+fn windows_error(context: str, code: i32) -> IoError:
+    kind = IoErrorKind.Other
+    if code == 2 or code == 3:
+        kind = IoErrorKind.NotFound
+    elif code == 5:
+        kind = IoErrorKind.PermissionDenied
+    elif code == 80 or code == 183:
+        kind = IoErrorKind.AlreadyExists
+    elif code == 145:
+        kind = IoErrorKind.DirectoryNotEmpty
+    elif code == 267:
+        kind = IoErrorKind.NotADirectory
+    return IoError{ kind: kind, code: code, message: f"{context}: Windows error {code}" }
+
+# Something that bytes can be read from.
+feature Reader:
+    # Reads up to `max` bytes; an empty string at the end of the stream.
+    fn read_some(self: lend Self, max: usize) -> Result[string, IoError]
+
+    # Reads everything up to the end of the stream.
+    fn read_rest(self: lend Self) -> Result[string, IoError]:
+        out = string.new()
+        while true:
+            chunk = self.read_some(65536)?
+            if chunk.len == 0:
+                return Ok(out)
+            out.append_str(chunk.as_str())
+        return Ok(out)
+
+# Something that bytes can be written to.
+feature Writer:
+    # Writes every byte of `data` and returns how many.
+    fn write(self: lend Self, data: str) -> Result[usize, IoError]
+
+    fn flush(self: lend Self) -> Result[bool, IoError]
+
+    # Writes `data` and a newline.
+    fn write_line(self: lend Self, data: str) -> Result[usize, IoError]:
+        n = self.write(data)?
+        self.write("\n")?
+        return Ok(n + 1)
+
+# An open file or standard stream.
 struct File:
     private
     handle: *mut u8
+    owned: bool
+    autoflush: bool
+    pipe: bool          # the stream of a child process (popen): closed with pclose, which also gives the exit code
+
+private
+fn _cpath(path: str) -> string:
+    owned = string.from(path)
+    owned.append_byte(0)
+    return owned
+
+fn _open(path: str, mode: str) -> Result[File, IoError]:
+    owned = _cpath(path)
+    how = _cpath(mode)
+    unsafe:
+        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr(how.as_str()))
+        if f == null:
+            return Err(last_error(f"cannot open {path}".as_str()))
+        return Ok(File{ handle: f, owned: true, autoflush: false, pipe: false })
+
+fn _std_stream(fd: i32, mode: str) -> File:
+    how = _cpath(mode)
+    unsafe:
+        f: *mut u8 = null
+        if target_os() == "windows":
+            f = _fdopen(fd, string_to_cstr(how.as_str()))
+        else:
+            f = fdopen(fd, string_to_cstr(how.as_str()))
+        return File{ handle: f, owned: false, autoflush: true, pipe: false }
 
 public
+# The process's standard input, output and error as streams. Output is flushed after every write.
+# `print` has its own buffer, so mixing it with `stdout()` can reorder text; use one or the other.
+fn stdin() -> File:
+    return _std_stream(0, "rb")
+
+fn stdout() -> File:
+    return _std_stream(1, "wb")
+
+fn stderr() -> File:
+    return _std_stream(2, "wb")
+
 impl File:
     # Opens `path` for reading.
-    fn open(path: str) -> Result[File, string]:
+    fn open(path: str) -> Result[File, IoError]:
         return _open(path, "rb")
 
     # Creates `path` (or empties it) for writing.
-    fn create(path: str) -> Result[File, string]:
+    fn create(path: str) -> Result[File, IoError]:
         return _open(path, "wb")
 
     # Opens `path` for writing at its end, creating it when it does not exist.
-    fn append(path: str) -> Result[File, string]:
+    fn append(path: str) -> Result[File, IoError]:
         return _open(path, "ab")
 
     # Writes every byte of `data`.
-    fn write(self: read Self, data: str) -> Result[usize, string]:
+    fn write(self: lend Self, data: str) -> Result[usize, IoError]:
         unsafe:
             n = fwrite(addr(data), usize(1), data.len, self.handle)
             if n != data.len:
-                return Err("write failed")
+                return Err(last_error("write failed"))
+            if self.autoflush:
+                fflush(self.handle)
             return Ok(n)
 
     # Writes `data` and a newline.
-    fn write_line(self: read Self, data: str) -> Result[usize, string]:
+    fn write_line(self: lend Self, data: str) -> Result[usize, IoError]:
         n = self.write(data)?
         self.write("\n")?
         return Ok(n + 1)
 
     # Reads up to `max` bytes; an empty string at the end of the file.
-    fn read_some(self: read Self, max: usize) -> string:
+    fn read_some(self: lend Self, max: usize) -> Result[string, IoError]:
         out = string.new()
+        if max == 0:
+            return Ok(out)
         unsafe:
             buf = malloc(max)
             n = fread(buf, usize(1), max, self.handle)
+            if n == 0 and ferror(self.handle) != 0:
+                free(buf)
+                clearerr(self.handle)
+                return Err(last_error("read failed"))
             out.append_str(str_from_raw(buf, n))
             free(buf)
-        return out
+        return Ok(out)
 
     # Reads the rest of the file.
-    fn read_rest(self: read Self) -> string:
+    fn read_rest(self: lend Self) -> Result[string, IoError]:
         out = string.new()
         while true:
-            chunk = self.read_some(65536)
+            chunk = self.read_some(65536)?
             if chunk.len == 0:
-                return out
+                return Ok(out)
             out.append_str(chunk.as_str())
-        return out
+        return Ok(out)
+
+    # Reads exactly `n` bytes; `UnexpectedEof` when the file ends first.
+    fn read_exact(self: lend Self, n: usize) -> Result[string, IoError]:
+        out = string.new()
+        while out.len < n:
+            chunk = self.read_some(n - out.len)?
+            if chunk.len == 0:
+                return Err(error_new(IoErrorKind.UnexpectedEof, "unexpected end of file"))
+            out.append_str(chunk.as_str())
+        return Ok(out)
 
     # The next line without its line break, or None at the end of the file.
-    fn read_line(self: read Self) -> Optional[string]:
+    fn read_line(self: lend Self) -> Result[Optional[string], IoError]:
         out = string.new()
         unsafe:
             c = fgetc(self.handle)
             if c < 0:
-                return None
+                if ferror(self.handle) != 0:
+                    clearerr(self.handle)
+                    return Err(last_error("read failed"))
+                return Ok(None)
             while c >= 0 and c != 10:
                 if c != 13:
                     out.append_byte(u8(c))
                 c = fgetc(self.handle)
-        return Valid(out)
+        return Ok(Valid(out))
 
     # Hands what was written to the operating system now.
-    fn flush(self: read Self):
+    fn flush(self: lend Self) -> Result[bool, IoError]:
         unsafe:
-            fflush(self.handle)
+            if fflush(self.handle) != 0:
+                return Err(last_error("flush failed"))
+        return Ok(true)
+
+    # Writes what is buffered and asks the operating system to put it on the disk (fsync).
+    fn sync_all(self: lend Self) -> Result[bool, IoError]:
+        unsafe:
+            if fflush(self.handle) != 0:
+                return Err(last_error("flush failed"))
+            r: i32 = 0
+            if target_os() == "windows":
+                r = _commit(_fileno(self.handle))
+            else:
+                r = fsync(fileno(self.handle))
+            if r != 0:
+                return Err(last_error("sync failed"))
+        return Ok(true)
+
+    # Moves the read/write position to `offset` bytes from the start.
+    fn seek(self: lend Self, offset: i64) -> Result[bool, IoError]:
+        unsafe:
+            r: i32 = 0
+            if target_os() == "windows":
+                r = _fseeki64(self.handle, offset, 0)
+            else:
+                r = fseeko(self.handle, offset, 0)
+            if r != 0:
+                return Err(last_error("seek failed"))
+        return Ok(true)
+
+    # The size of the file in bytes; the position goes back to the start.
+    fn size(self: lend Self) -> Result[u64, IoError]:
+        unsafe:
+            n: i64 = 0
+            if target_os() == "windows":
+                if _fseeki64(self.handle, 0, 2) != 0:
+                    return Err(last_error("seek failed"))
+                n = _ftelli64(self.handle)
+                _fseeki64(self.handle, 0, 0)
+            else:
+                if fseeko(self.handle, 0, 2) != 0:
+                    return Err(last_error("seek failed"))
+                n = ftello(self.handle)
+                fseeko(self.handle, 0, 0)
+            if n < 0:
+                return Err(last_error("size failed"))
+            return Ok(u64(n))
+
+    # The current position, in bytes from the start.
+    fn position(self: lend Self) -> Result[u64, IoError]:
+        unsafe:
+            n: i64 = 0
+            if target_os() == "windows":
+                n = _ftelli64(self.handle)
+            else:
+                n = ftello(self.handle)
+            if n < 0:
+                return Err(last_error("tell failed"))
+            return Ok(u64(n))
+
+    # Wraps the `FILE*` that `popen` returned (what `std.process.spawn_read` and `spawn_write` do). Closing it waits for the child.
+    fn from_pipe(raw: *mut u8) -> File:
+        return File{ handle: raw, owned: true, autoflush: false, pipe: true }
+
+    # Closes a child-process stream, waits for the child, and returns its exit code (-1 when it cannot be known).
+    # For any other file this is a plain close and returns 0.
+    fn wait(self: lend Self) -> i32:
+        unsafe:
+            if self.handle == null:
+                return -1
+            h = self.handle
+            self.handle = null
+            if not self.pipe:
+                fclose(h)
+                return 0
+            raw: i32 = 0
+            if target_os() == "windows":
+                raw = _pclose(h)
+                return raw
+            raw = pclose(h)
+            if raw < 0:
+                return -1
+            if (raw & 127) != 0:
+                return 128 + (raw & 127)         # ended by a signal: the shell convention
+            return (raw >> 8) & 255
+        return -1
 
     fn drop(self: lend Self):
         unsafe:
             if self.handle != null:
-                fclose(self.handle)
+                if self.pipe:
+                    if target_os() == "windows":
+                        _pclose(self.handle)
+                    else:
+                        pclose(self.handle)
+                elif self.owned:
+                    fclose(self.handle)
+                else:
+                    fflush(self.handle)
+
+# An in-memory stream: reads take bytes from `data` starting at `pos`, writes append to `data`.
+struct Cursor:
+    data: string
+    pos: usize
+
+fn cursor_new(text: str) -> Cursor:
+    return Cursor{ data: string.from(text), pos: 0 }
+
+impl Cursor:
+    fn read_some(self: lend Self, max: usize) -> Result[string, IoError]:
+        out = string.new()
+        end = self.pos + max
+        if end > self.data.len:
+            end = self.data.len
+        while self.pos < end:
+            out.append_byte(self.data.as_str()[self.pos])
+            self.pos += 1
+        return Ok(out)
+
+    fn write(self: lend Self, data: str) -> Result[usize, IoError]:
+        self.data.append_str(data)
+        return Ok(data.len)
+
+    fn flush(self: lend Self) -> Result[bool, IoError]:
+        return Ok(true)
+
+    fn text(self: read Self) -> str:
+        return self.data.as_str()

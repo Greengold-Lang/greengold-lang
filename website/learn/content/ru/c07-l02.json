@@ -1,0 +1,66 @@
+{
+ "title": "Обобщённые структуры",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Структуры и enum тоже могут принимать параметры типа. `Pair[A, B]` хранит два значения двух разных типов. Методы пишутся в блоке `impl Pair[A, B]:`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Pair[A, B]:",
+    "    first: A",
+    "    second: B",
+    "",
+    "impl Pair[A, B]:",
+    "    fn swap(self) -> Pair[B, A]:",
+    "        return Pair[B, A]{ first: self.second.clone(), second: self.first.clone() }",
+    "",
+    "fn main():",
+    "    p = Pair[i32, str]{ first: 1, second: \"one\" }",
+    "    s = p.swap()",
+    "    print(s.first, s.second)"
+   ],
+   "run": true,
+   "output": [
+    "one 1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l02-x1",
+   "prompt": "Напишите структуру `Wrapper[T]`, хранящую одно значение (`value: T`). Создайте `Wrapper[i32]{ value: 5 }` и `Wrapper[str]{ value: \"hi\" }` и выведите их значения.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Wrapper[T]:",
+    "    value: T",
+    "",
+    "fn main():",
+    "    a = Wrapper[i32]{ value: 5 }",
+    "    b = Wrapper[str]{ value: \"hi\" }",
+    "    print(a.value)",
+    "    print(b.value)"
+   ],
+   "hint": "`struct Wrapper[T]:` с `value: T` ниже.",
+   "expected": [
+    "5",
+    "hi"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l02-q1",
+   "q": "Один ли тип `Pair[i32, str]` и `Pair[f64, f64]`?",
+   "options": [
+    "Да",
+    "Нет, это разные типы",
+    "Зависит от компилятора"
+   ],
+   "answer": 1,
+   "why": "Каждое сочетание аргументов типа создаёт свой тип."
+  }
+ ]
+}

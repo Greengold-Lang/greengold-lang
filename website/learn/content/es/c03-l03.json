@@ -1,0 +1,66 @@
+{
+ "title": "Recursión",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Una función puede llamarse a sí misma; esto se llama **recursión**. Toda función recursiva necesita un **caso base** en el que deja de llamarse y da un resultado; si no, sigue para siempre."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn factorial(n: i32) -> i32:",
+    "    if n <= 1:",
+    "        return 1",
+    "    return n * factorial(n - 1)",
+    "",
+    "fn main():",
+    "    print(factorial(5))"
+   ],
+   "run": true,
+   "output": [
+    "120"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`factorial(5)` significa `5 * factorial(4)`, y así hasta `factorial(1)`; luego los productos vuelven hacia arriba: 5 · 4 · 3 · 2 · 1 = 120."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l03-x1",
+   "prompt": "Calcula un número de Fibonacci con recursión: `fib(0)` = 0, `fib(1)` = 1 y cada uno de los demás es la suma de los dos anteriores. Imprime `fib(10)`.",
+   "starter": [
+    "fn fib(n: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "solution": [
+    "fn fib(n: i32) -> i32:",
+    "    if n < 2:",
+    "        return n",
+    "    return fib(n - 1) + fib(n - 2)",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "hint": "Si `n < 2` devuelve `n`; si no, `fib(n - 1) + fib(n - 2)`.",
+   "expected": [
+    "55"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l03-q1",
+   "q": "¿Qué ocurre en una función recursiva sin caso base?",
+   "options": [
+    "Nunca se ejecuta",
+    "Se llama a sí misma para siempre (la pila se desborda)",
+    "Devuelve 0"
+   ],
+   "answer": 1,
+   "why": "Sin punto de parada, las llamadas se acumulan y la pila se desborda."
+  }
+ ]
+}

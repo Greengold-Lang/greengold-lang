@@ -1,0 +1,46 @@
+{
+ "title": "任务：async 与 await",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "想让等待型工作（定时器、网络）重叠进行而不必开线程，可以使用**任务**。`async fn` 启动一个任务，`await` 等待它的结果。`std.tasks` 中的 `sleep` 和 `yield_now` 会挂起任务。下面的三个 `sleep` 会**重叠**：总耗时约 100 毫秒，而不是 300。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.tasks",
+    "import std.time",
+    "",
+    "async fn twice(n: i32) -> i32:",
+    "    tasks.sleep(100)",
+    "    return n * 2",
+    "",
+    "fn main():",
+    "    t = time.Instant.now()",
+    "    a = twice(1)",
+    "    b = twice(2)",
+    "    c = twice(3)",
+    "    print(await a + await b + await c)",
+    "    print(t.elapsed_millis() < 250)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "你也可以用 lambda 启动任务：`h = tasks.spawn(fn() -> string => ...)`，然后 `h.is_done()` 和 `await h`。"
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l04-q1",
+   "q": "如果三个 `async` 任务各自 `sleep` 100 毫秒，并且全部先启动，总共大约需要多久？",
+   "options": [
+    "300 毫秒",
+    "100 毫秒（它们重叠）",
+    "0 毫秒"
+   ],
+   "answer": 1,
+   "why": "等待会重叠；如果一个接一个地运行，则需要 300 毫秒。"
+  }
+ ]
+}

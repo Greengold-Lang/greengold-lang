@@ -1,0 +1,72 @@
+{
+ "title": "Convertir tipos",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold convierte por sí mismo cuando no se puede perder ningún valor: un entero pequeño a uno más ancho (`i32` → `i64`), `i32` → `f64`, etc. Si los dos lados de una operación difieren, el más estrecho se ensancha."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a: i32 = 100",
+    "    b: i64 = 200",
+    "    c = a + b",
+    "    ratio: f64 = a",
+    "    print(c, ratio)"
+   ],
+   "run": true,
+   "output": [
+    "300 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Las conversiones que podrían perder un valor (`f64` → `i32`, `i64` → `i32`) las escribes **tú**: `i32(...)`. El compilador también sugiere esta corrección en su mensaje de error."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    value: f64 = 9.81",
+    "    truncated = i32(value)",
+    "    print(truncated)"
+   ],
+   "run": true,
+   "output": [
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l05-x1",
+   "prompt": "Convierte el `f64` `price` a `i32` e imprímelo (la parte fraccionaria se descarta).",
+   "starter": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(price)"
+   ],
+   "solution": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(i32(price))"
+   ],
+   "hint": "Escribe `print(i32(price))`.",
+   "expected": [
+    "19"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l05-q1",
+   "q": "¿Por qué se escribe a mano el paso de `f64` a `i32`?",
+   "options": [
+    "Porque es más rápido",
+    "Porque la parte fraccionaria se puede perder",
+    "Porque el compilador no sabe cómo hacerlo"
+   ],
+   "answer": 1,
+   "why": "Para que una pérdida de valor nunca ocurra en silencio, esta conversión se escribe explícitamente."
+  }
+ ]
+}

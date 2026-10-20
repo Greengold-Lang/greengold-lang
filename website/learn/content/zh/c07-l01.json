@@ -1,0 +1,69 @@
+{
+ "title": "泛型函数",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "想让同一个算法适用于不同类型，就把它写成**泛型**。类型参数写在方括号里：`[T]`。`T: Ord` 是一个**约束**：`T` 必须是可排序（`<`、`>`）的类型。调用时类型通常会被推断；你也可以明确写出，如 `larger[i64](...)`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn larger[T: Ord](a: T, b: T) -> T:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(larger(10, 25))",
+    "    print(larger(3.14, 2.71))",
+    "    print(larger[i64](100, 200))"
+   ],
+   "run": true,
+   "output": [
+    "25",
+    "3.14",
+    "200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "对每一种类型组合，编译器都会生成针对该类型特化并优化的代码（类似 C++ 模板）。没有额外的运行时开销，没有装箱，也没有类型擦除。"
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l01-x1",
+   "prompt": "编写 `smaller[T: Ord](a, b)`：返回较小的那个。输出 `smaller(7, 3)` 和 `smaller(2.5, 9.5)`。",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn smaller[T: Ord](a: T, b: T) -> T:",
+    "    if a < b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(smaller(7, 3))",
+    "    print(smaller(2.5, 9.5))"
+   ],
+   "hint": "以 `fn smaller[T: Ord](a: T, b: T) -> T:` 开头。",
+   "expected": [
+    "3",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l01-q1",
+   "q": "泛型函数在运行时会更慢吗？",
+   "options": [
+    "会，每次调用都要查找类型",
+    "不会，每种类型都编译出独立的代码",
+    "只有处理数字时"
+   ],
+   "answer": 1,
+   "why": "类型在编译期就已确定（单态化）。"
+  }
+ ]
+}

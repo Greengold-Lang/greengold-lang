@@ -1,0 +1,69 @@
+{
+ "title": "与 C 兼容的数据：extern struct",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold 自己的结构体布局可以由编译器优化。但传给 C 函数的结构体必须与 C 编译器预期的内存布局（对齐、填充）**完全一致**。为此使用 **`extern struct`**："
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern struct Point2D:",
+    "    x: f32",
+    "    y: f32",
+    "",
+    "extern struct RectInfo:",
+    "    top_left: Point2D",
+    "    width: i32",
+    "    height: i32",
+    "",
+    "fn main():",
+    "    r = RectInfo{ top_left: Point2D{ x: 1.0, y: 2.0 }, width: 30, height: 40 }",
+    "    print(r.width * r.height)"
+   ],
+   "run": true,
+   "output": [
+    "1200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "规则：`extern struct` 的字段只能是数字、`bool`、原始指针或其他 `extern struct`；不允许 `Box`、`List` 这样的堆类型。"
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l02-x1",
+   "prompt": "定义一个名为 `Color` 的 `extern struct`（`r`、`g`、`b`：都是 `u8`）。创建 `Color{ r: 255, g: 128, b: 0 }` 并输出三个值之和。",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "extern struct Color:",
+    "    r: u8",
+    "    g: u8",
+    "    b: u8",
+    "",
+    "fn main():",
+    "    c = Color{ r: 255, g: 128, b: 0 }",
+    "    print(i32(c.r) + i32(c.g) + i32(c.b))"
+   ],
+   "hint": "相加时用 `i32(...)` 转换，避免 `u8` 值溢出。",
+   "expected": [
+    "383"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l02-q1",
+   "q": "`extern struct` 可以有 `List[i32]` 字段吗？",
+   "options": [
+    "可以",
+    "不可以，不允许堆类型",
+    "只能和数字一起"
+   ],
+   "answer": 1,
+   "why": "C 所知道的扁平内存布局里不包含堆类型。"
+  }
+ ]
+}

@@ -1,8 +1,9 @@
-# std.net: TCP connections and UDP datagrams over IPv4, with time limits, TLS, and many sockets at once.
+# std.net: TCP connections and UDP datagrams over IPv4 and IPv6, with time limits, TLS, and many sockets at once.
 #
 # A server binds a TcpListener and accepts TcpStreams; a client connects a TcpStream. Each stream is
-# closed when it goes away (`drop`). Hosts are IPv4 addresses ("127.0.0.1", "0.0.0.0"), "localhost", or a name the
-# system can look up ("example.com").
+# closed when it goes away (`drop`). Hosts are IPv4 addresses ("127.0.0.1", "0.0.0.0"), IPv6 addresses ("::1", "::",
+# "[2001:db8::1]"), "localhost", or a name the system can look up ("example.com"; an IPv4 address is preferred when the
+# name has both). A listener bound to "::" accepts IPv6 and IPv4 clients (IPv4 ones show as "1.2.3.4").
 #
 # Three ways to serve many clients:
 #   - one thread per connection (`Thread.spawn(fn() => handle(stream))`), with blocking calls;
@@ -137,17 +138,120 @@ fn _ipv4(host: str) -> Optional[[4]u8]:
     parts[3] = u8(value)
     return Valid(parts)
 
-# An address for `host`: dotted digits and "localhost" need no lookup; any other name is looked up (IPv4 only).
-fn _resolve(host: str) -> Result[[4]u8, string]:
+fn _hexval(c: u8) -> i32:
+    if c >= '0' and c <= '9':
+        return i32(c - '0')
+    if c >= 'a' and c <= 'f':
+        return i32(c - 'a') + 10
+    if c >= 'A' and c <= 'F':
+        return i32(c - 'A') + 10
+    return -1
+
+# An IPv6 address in text (`::1`, `2001:db8::1`, `::ffff:1.2.3.4`, with or without `[ ]`) as sixteen bytes, or None.
+fn _ipv6(host0: str) -> Optional[[16]u8]:
+    host = host0
+    if host.len >= 2 and host[0] == '[' and host[host.len - 1] == ']':
+        host = host[1..host.len - 1]
+    if host.len < 2:
+        return None
+    groups = List[u32]()
+    tail = List[u32]()
+    seen_gap = false
+    i: usize = 0
+    cur_is_tail = false
+    if host[0] == ':':
+        if host[1] != ':':
+            return None
+    while i < host.len:
+        if host[i] == ':':
+            if i + 1 < host.len and host[i + 1] == ':':
+                if seen_gap:
+                    return None
+                seen_gap = true
+                cur_is_tail = true
+                i += 2
+                continue
+            i += 1
+            continue
+        # a group of hex digits, or a trailing dotted IPv4
+        j = i
+        value: u32 = 0
+        digits = 0
+        dotted = false
+        while j < host.len and host[j] != ':':
+            if host[j] == '.':
+                dotted = true
+            j += 1
+        if dotted:
+            if j != host.len:
+                return None
+            v4 = _ipv4(host[i..j])
+            if v4.is_none():
+                return None
+            q = v4.value_or_panic()
+            w1 = (u32(q[0]) << 8) | u32(q[1])
+            w2 = (u32(q[2]) << 8) | u32(q[3])
+            if cur_is_tail:
+                tail.push(w1)
+                tail.push(w2)
+            else:
+                groups.push(w1)
+                groups.push(w2)
+            i = j
+            continue
+        for k in i..j:
+            h = _hexval(host[k])
+            if h < 0:
+                return None
+            value = value * 16 + u32(h)
+            digits += 1
+        if digits == 0 or digits > 4:
+            return None
+        if cur_is_tail:
+            tail.push(value)
+        else:
+            groups.push(value)
+        i = j
+    total = groups.len + tail.len
+    if total > 8 or (not seen_gap and total != 8) or (seen_gap and total > 7):
+        return None
+    out: [16]u8 = [0; 16]
+    k = 0
+    for g in groups:
+        out[k * 2] = u8(g >> 8)
+        out[k * 2 + 1] = u8(g & 255)
+        k += 1
+    k = 8 - i32(tail.len)
+    for g in tail:
+        out[k * 2] = u8(g >> 8)
+        out[k * 2 + 1] = u8(g & 255)
+        k += 1
+    return Valid(out)
+
+# A resolved address: IPv4 (the first four bytes) or IPv6 (all sixteen).
+struct _IpAddr:
+    v6: bool
+    b: [16]u8
+
+fn _v4_addr(q: [4]u8) -> _IpAddr:
+    b: [16]u8 = [0; 16]
+    for i in 0..4:
+        b[i] = q[i]
+    return _IpAddr{ v6: false, b: b }
+
+# An address for `host`: dotted digits, IPv6 text and "localhost" need no lookup; any other name is looked up.
+fn _resolve(host: str) -> Result[_IpAddr, string]:
     _start()
     match _ipv4(host):
-        Valid(v): return Ok(v)
+        Valid(v): return Ok(_v4_addr(v))
+        None: pass
+    match _ipv6(host):
+        Valid(v6): return Ok(_IpAddr{ v6: true, b: v6 })
         None: pass
     if host.len == 0 or host.len > 253:
         return Err(f"cannot resolve host: {host}")
     unsafe:
         hints = calloc(1, 64)
-        ptr_cast[*mut i32](ptr_offset(hints, 4))[0] = 2       # AF_INET
         ptr_cast[*mut i32](ptr_offset(hints, 8))[0] = 1       # SOCK_STREAM, so each address comes once
         name = sock.cstr(host)
         found: *mut u8 = null
@@ -156,36 +260,120 @@ fn _resolve(host: str) -> Result[[4]u8, string]:
         free(hints)
         if rc != 0 or found == null:
             return Err(f"cannot resolve host: {host}")
-        # struct addrinfo: ai_addr sits at byte 24 on Linux, 32 on Windows and macOS (64-bit).
+        # struct addrinfo: ai_family at byte 4, ai_addr at 24 on Linux and 32 on Windows and macOS (64-bit), ai_next at 40.
         at: i64 = if target_os() == "linux" then 24 else 32
-        sa = ptr_cast[*mut *mut u8](ptr_offset(found, at))[0]
-        if sa == null:
-            freeaddrinfo(found)
-            return Err(f"cannot resolve host: {host}")
-        ip: [4]u8 = [0; 4]
-        for i in 0..4:
-            ip[i] = ptr_cast[*u8](ptr_offset(sa, 4 + i64(i)))[0]
+        got4 = false
+        have6 = false
+        out4: [4]u8 = [0; 4]
+        out6: [16]u8 = [0; 16]
+        node = found
+        while node != null:
+            fam = ptr_cast[*i32](ptr_offset(node, 4))[0]
+            sa = ptr_cast[*mut *mut u8](ptr_offset(node, at))[0]
+            if sa != null:
+                if fam == 2 and not got4:
+                    for i in 0..4:
+                        out4[i] = ptr_cast[*u8](ptr_offset(sa, 4 + i64(i)))[0]
+                    got4 = true
+                elif fam != 2 and not have6:
+                    for i in 0..16:
+                        out6[i] = ptr_cast[*u8](ptr_offset(sa, 8 + i64(i)))[0]
+                    have6 = true
+            node = ptr_cast[*mut *mut u8](ptr_offset(node, 40))[0]
         freeaddrinfo(found)
-        return Ok(ip)
+        if got4:
+            return Ok(_v4_addr(out4))
+        if have6:
+            return Ok(_IpAddr{ v6: true, b: out6 })
+        return Err(f"cannot resolve host: {host}")
 
-# The 16 bytes of a `sockaddr_in` for `ip:port`.
-fn _sockaddr(ip: [4]u8, port: u16) -> [16]u8:
-    a: [16]u8 = [0; 16]
+# The socket family number: AF_INET is 2 everywhere; AF_INET6 is 10 on Linux, 23 on Windows, 30 on macOS.
+fn _family(ip: read _IpAddr) -> i32:
+    if not ip.v6:
+        return 2
+    if target_os() == "linux":
+        return 10
+    if target_os() == "windows":
+        return 23
+    return 30
+
+fn _sa_len(ip: read _IpAddr) -> i32:
+    return if ip.v6 then 28 else 16
+
+# The bytes of a `sockaddr_in` (16) or `sockaddr_in6` (28) for `ip:port`.
+fn _sockaddr(ip: read _IpAddr, port: u16) -> [28]u8:
+    a: [28]u8 = [0; 28]
+    fam = _family(ip)
     if target_os() == "macos":
-        a[0] = 16
-        a[1] = 2
+        a[0] = if ip.v6 then 28 else 16
+        a[1] = u8(fam)
     else:
-        a[0] = 2
+        a[0] = u8(fam)
     a[2] = u8(port >> 8)
     a[3] = u8(port & 255)
-    for i in 0..4:
-        a[4 + i] = ip[i]
+    if ip.v6:
+        for i in 0..16:
+            a[8 + i] = ip.b[i]
+    else:
+        for i in 0..4:
+            a[4 + i] = ip.b[i]
     return a
 
-fn _port_of(sa: [16]u8) -> u16:
+fn _port_of(sa: [28]u8) -> u16:
     return u16(sa[2]) * 256 + u16(sa[3])
 
-fn _host_of(sa: [16]u8) -> string:
+fn _is_v6_sockaddr(sa: [28]u8) -> bool:
+    fam: u8 = sa[0]
+    if target_os() == "macos":
+        fam = sa[1]
+    return fam != 2
+
+# `2001:db8::1`: the longest run of zero groups becomes `::`. An IPv4-mapped address is shown as plain IPv4.
+fn _ip6_text(b: [16]u8) -> string:
+    mapped = true
+    for i in 0..10:
+        if b[i] != 0:
+            mapped = false
+    if b[10] != 255 or b[11] != 255:
+        mapped = false
+    if mapped:
+        return f"{b[12]}.{b[13]}.{b[14]}.{b[15]}"
+    groups: [8]u32 = [0; 8]
+    for i in 0..8:
+        groups[i] = (u32(b[i * 2]) << 8) | u32(b[i * 2 + 1])
+    best_start = 8
+    best_len = 0
+    run_start = 0
+    run_len = 0
+    for i in 0..8:
+        if groups[i] == 0:
+            if run_len == 0:
+                run_start = i
+            run_len += 1
+            if run_len > best_len:
+                best_len = run_len
+                best_start = run_start
+        else:
+            run_len = 0
+    out = string.new()
+    i2 = 0
+    while i2 < 8:
+        if best_len >= 2 and i2 == best_start:
+            out.append_str("::")
+            i2 += best_len
+            continue
+        if out.len() > 0 and out.as_str()[out.len() - 1] != ':':
+            out.append_byte(':')
+        out.append(f"{groups[i2]:x}")
+        i2 += 1
+    return out
+
+fn _host_of(sa: [28]u8) -> string:
+    if _is_v6_sockaddr(sa):
+        b: [16]u8 = [0; 16]
+        for i in 0..16:
+            b[i] = sa[8 + i]
+        return _ip6_text(b)
     return f"{sa[4]}.{sa[5]}.{sa[6]}.{sa[7]}"
 
 # The pending error of a socket (0 when none), as `connect` leaves it.
@@ -197,20 +385,20 @@ fn _so_error(fd: i64) -> i32:
         return v
 
 # A connected TCP socket for `ip:port`, or an error. `timeout` < 0 waits for ever.
-fn _tcp_connect(ip: [4]u8, host: str, port: u16, timeout: i64) -> Result[i64, string]:
+fn _tcp_connect(ip: read _IpAddr, host: str, port: u16, timeout: i64) -> Result[i64, string]:
     unsafe:
-        fd = i64(socket(2, 1, 6))
+        fd = i64(socket(_family(ip), 1, 6))
         if fd < 0:
             return Err("socket() failed")
         _tune_tcp(fd)
         sa = _sockaddr(ip, port)
         if timeout < 0:
-            if connect(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+            if connect(fd, ptr_cast[*u8](addr(sa)), _sa_len(ip)) != 0:
                 _close(fd)
                 return Err(f"cannot connect to {host}:{port}")
             return Ok(fd)
         _set_blocking(fd, false)
-        rc = connect(fd, ptr_cast[*u8](addr(sa)), 16)
+        rc = connect(fd, ptr_cast[*u8](addr(sa)), _sa_len(ip))
         if rc != 0:
             if sock.wait(fd, true, timeout) != 1:
                 _close(fd)
@@ -269,15 +457,17 @@ impl TcpListener:
     fn bind(host: str, port: u16) -> Result[TcpListener, string]:
         ip = _resolve(host)?
         unsafe:
-            fd = i64(socket(2, 1, 6))
+            fd = i64(socket(_family(ip), 1, 6))
             if fd < 0:
                 return Err("socket() failed")
             if target_os() == "windows":
                 _setopt_int(fd, 65535, 4, 1)
             else:
                 _setopt_int(fd, _sol(), _opt(2, 4), 1)
+            if ip.v6:
+                _setopt_int(fd, 41, if target_os() == "linux" then 26 else 27, 0)   # IPV6_V6ONLY off: IPv4 clients too
             sa = _sockaddr(ip, port)
-            if bind(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+            if bind(fd, ptr_cast[*u8](addr(sa)), _sa_len(ip)) != 0:
                 _close(fd)
                 return Err(f"cannot bind {host}:{port}")
             if listen(fd, 1024) != 0:
@@ -287,8 +477,8 @@ impl TcpListener:
 
     # The port the listener is bound to.
     fn port(self: read Self) -> u16:
-        sa: [16]u8 = [0; 16]
-        len: i32 = 16
+        sa: [28]u8 = [0; 28]
+        len: i32 = 28
         unsafe:
             getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
         return _port_of(sa)
@@ -382,8 +572,8 @@ impl TcpStream:
 
     # The other side's address.
     fn peer_addr(self: read Self) -> Result[Addr, string]:
-        sa: [16]u8 = [0; 16]
-        len: i32 = 16
+        sa: [28]u8 = [0; 28]
+        len: i32 = 28
         unsafe:
             if getpeername(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len)) != 0:
                 return Err("getpeername() failed")
@@ -391,8 +581,8 @@ impl TcpStream:
 
     # The port on this side.
     fn local_port(self: read Self) -> u16:
-        sa: [16]u8 = [0; 16]
-        len: i32 = 16
+        sa: [28]u8 = [0; 28]
+        len: i32 = 28
         unsafe:
             getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
         return _port_of(sa)
@@ -586,11 +776,13 @@ impl UdpSocket:
     fn bind(host: str, port: u16) -> Result[UdpSocket, string]:
         ip = _resolve(host)?
         unsafe:
-            fd = i64(socket(2, 2, 17))
+            fd = i64(socket(_family(ip), 2, 17))
             if fd < 0:
                 return Err("socket() failed")
+            if ip.v6:
+                _setopt_int(fd, 41, if target_os() == "linux" then 26 else 27, 0)
             sa = _sockaddr(ip, port)
-            if bind(fd, ptr_cast[*u8](addr(sa)), 16) != 0:
+            if bind(fd, ptr_cast[*u8](addr(sa)), _sa_len(ip)) != 0:
                 _close(fd)
                 return Err(f"cannot bind {host}:{port}")
             if target_os() == "windows":
@@ -601,8 +793,8 @@ impl UdpSocket:
             return Ok(UdpSocket{ fd: fd, timeout: -1 })
 
     fn port(self: read Self) -> u16:
-        sa: [16]u8 = [0; 16]
-        len: i32 = 16
+        sa: [28]u8 = [0; 28]
+        len: i32 = 28
         unsafe:
             getsockname(self.fd, ptr_cast[*mut u8](addr_mut(sa)), addr_mut(len))
         return _port_of(sa)
@@ -628,16 +820,23 @@ impl UdpSocket:
     # Sends `data` as one datagram to `host:port`.
     fn send_to(self: read Self, data: str, host: str, port: u16) -> Result[usize, string]:
         ip = _resolve(host)?
-        return self.send_to_ip(data, ip, port)
+        return self._send_to_addr(data, ip, port)
 
     # Replies to a datagram: sends `data` to the address it came from.
     fn reply(self: read Self, to: read Datagram, data: str) -> Result[usize, string]:
         return self.send_to(data, to.host.as_str(), to.port)
 
     fn send_to_ip(self: read Self, data: str, ip: [4]u8, port: u16) -> Result[usize, string]:
+        return self._send_to_addr(data, _v4_addr(ip), port)
+
+    # Like `send_to_ip` for an IPv6 address given as sixteen bytes.
+    fn send_to_ip6(self: read Self, data: str, ip: [16]u8, port: u16) -> Result[usize, string]:
+        return self._send_to_addr(data, _IpAddr{ v6: true, b: ip }, port)
+
+    fn _send_to_addr(self: read Self, data: str, ip: read _IpAddr, port: u16) -> Result[usize, string]:
         sa = _sockaddr(ip, port)
         unsafe:
-            n = sendto(self.fd, addr(data), i64(data.len), 0, ptr_cast[*u8](addr(sa)), 16)
+            n = sendto(self.fd, addr(data), i64(data.len), 0, ptr_cast[*u8](addr(sa)), _sa_len(ip))
             if n < 0:
                 return Err("sendto() failed")
             return Ok(usize(n))
@@ -661,8 +860,8 @@ impl UdpSocket:
         return Ok(Valid(d))
 
     fn _recv_from(self: read Self, max: usize) -> Result[Datagram, string]:
-        sa: [16]u8 = [0; 16]
-        len: i32 = 16
+        sa: [28]u8 = [0; 28]
+        len: i32 = 28
         out = string.new()
         unsafe:
             buf = malloc(max + 1)

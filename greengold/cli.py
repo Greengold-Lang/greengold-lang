@@ -53,6 +53,7 @@ def _print_notes(diags: list[Diagnostic], sources: dict[str, str], primary: str)
 STD_DIR = Path(__file__).parent / "std"
 DEP_ROOTS: dict[str, Path] = {}  # gg.toml dependencies: name -> import root directory
 DEBUG_INFO = False  # `-g`: emit DWARF debug information
+LIMITS: dict = {}  # `--forbid-heap`, `--forbid-recursion`, `--max-stack`: checks on the generated code
 NATIVE = None  # native.Native of the active package (C/C++ sources to compile and link)
 
 
@@ -230,7 +231,11 @@ def load_sources_and_ast(
         loader.load_text(initial_source, initial_filename)
     for i, f in enumerate(files):
         loader.load_path(Path(f), None, as_root=initial_source is None and i == 0)
-    return loader.program(), loader.sources, diags
+    program = loader.program()
+    from . import coverage
+    if coverage.enabled() and not diags.has_errors():
+        coverage.instrument(program)
+    return program, loader.sources, diags
 
 
 def analyze(files: list[str | Path], initial_source: str | None = None, initial_filename: str = "<source>",
@@ -603,9 +608,24 @@ def cmd_explain(code: str, as_json: bool) -> int:
     return 0
 
 
-def cmd_check(files: list[str], as_json: bool) -> int:
+def cmd_check(files: list[str], as_json: bool, profile: str | None = None, max_complexity: int = 15,
+              max_statements: int = 80, allow: list[str] | None = None, list_allowed: bool = False) -> int:
     _program, sources, diags, _checker = analyze(files)
     primary = files[0]
+    if profile is not None and not any(d.severity == "error" and not d.hidden for d in diags.items):
+        from . import profiles
+        if profile != "safety":
+            print(f"Error: unknown profile `{profile}` (known: safety).", file=sys.stderr)
+            return 2
+        bad = [r for r in (allow or []) if r not in profiles.RULES]
+        if bad:
+            print(f"Error: unknown rule `{bad[0]}` for --allow (rules: {', '.join(profiles.RULES)}).", file=sys.stderr)
+            return 2
+        profiles.check(_program, diags, profiles.Options(max_complexity=max_complexity, max_statements=max_statements,
+                                                         allow_rules=set(allow or [])))
+        if list_allowed:
+            for e in profiles.allowed_exceptions(_program):
+                print(f"{e.file}:{e.line}: {e.function} allows {e.rule}")
     prepare(diags.items)
     verify_fixes(diags.items, sources, primary)
     from .diagnostics import reset_prepared
@@ -739,10 +759,20 @@ def _is_freestanding(target: str | None, no_std: bool) -> bool:
 
 def _gen_llvm(program: Program, primary_file: str, release: bool, unchecked: bool, target: str | None = None,
               no_std: bool = False) -> str:
-    from .codegen_llvm import generate_llvm
-    return generate_llvm(program, filename=primary_file, release=release, unchecked=unchecked, target=target,
-                         leakcheck=bool(os.environ.get("GG_LEAKCHECK")),
-                         freestanding=_is_freestanding(target, no_std), debug=DEBUG_INFO)
+    from .codegen_llvm import CodegenError, generate_llvm, native_triple
+    ir_text = generate_llvm(program, filename=primary_file, release=release, unchecked=unchecked, target=target,
+                            leakcheck=bool(os.environ.get("GG_LEAKCHECK")),
+                            freestanding=_is_freestanding(target, no_std), debug=DEBUG_INFO)
+    if LIMITS:
+        from .analysis import check_limits
+        from .typeinfo import func_cname
+        alloc = {"gg_" + (func_cname(k) if "::" in k else k) for k in (getattr(program, "allocator", None) or [])}
+        problems = check_limits(ir_text, native_triple(target), forbid_heap=LIMITS.get("forbid_heap", False),
+                                forbid_recursion=LIMITS.get("forbid_recursion", False),
+                                max_stack=LIMITS.get("max_stack"), allocator_symbols=alloc)
+        if problems:
+            raise CodegenError("\n".join(problems))
+    return ir_text
 
 
 def _can_link_freestanding(triple: str, target: str | None) -> bool:
@@ -871,6 +901,40 @@ def cmd_run(files: list[str] | str, release: bool = False, links: list[str] | No
         return subprocess.run([str(exe_path), *PROGRAM_ARGS]).returncode
 
 
+def cmd_stack_usage(files: list[str], target: str | None, no_std: bool, as_json: bool, per_call: int) -> int:
+    """Prints the stack bound of a program: locals of each function, and the deepest call chain."""
+    import json
+    from .analysis import parse_ir, stack_usage
+    from .codegen_llvm import CodegenError, native_triple
+    front = _frontend(files)
+    if front is None:
+        return 1
+    program, primary_file = front
+    try:
+        ir_text = _gen_llvm(program, primary_file, False, False, target, no_std)
+    except CodegenError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 1
+    funcs = parse_ir(ir_text, native_triple(target))
+    rep = stack_usage(funcs, per_call)
+    rows = sorted(rep.per_function.items(), key=lambda kv: -kv[1])
+    if as_json:
+        print(json.dumps({"worst_case_bytes": None if rep.recursive else rep.worst, "recursive": rep.recursive,
+                          "chain": rep.chain, "indirect_calls": rep.indirect,
+                          "functions": {n: {"frame_bytes": b} for n, b in rows}}, indent=2))
+        return 0
+    print(f"{'bytes':>8}  function (locals + {per_call} per call)")
+    for name, b in rows:
+        print(f"{b:>8}  {name[3:] if name.startswith('gg_') else name}")
+    if rep.recursive:
+        print("worst case: unbounded (the program recurses; see --forbid-recursion)")
+    else:
+        print(f"worst case: {rep.worst} bytes along " + " -> ".join(n[3:] if n.startswith("gg_") else n for n in rep.chain))
+    if rep.indirect:
+        print(f"note: {rep.indirect} call(s) through function pointers, closures or dyn values are not followed")
+    return 0
+
+
 def cmd_emit_llvm(files: list[str], release: bool, unchecked: bool, bitcode_out: str | None, optimized: bool,
                   target: str | None = None, no_std: bool = False, ir_out: str | None = None) -> int:
     from .codegen_llvm import CodegenError, native_triple
@@ -932,6 +996,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     b.add_argument("--target", help="target triple or `bare-metal` (default: host machine)")
     b.add_argument("--no-std", action="store_true", help="compile without libc/OS (no print, input, heap; Core is used)")
     b.add_argument("-g", "--debug", action="store_true", help="emit debug information (DWARF) for debuggers")
+    b.add_argument("--forbid-heap", action="store_true", help="fail when code reachable from an entry point can allocate")
+    b.add_argument("--forbid-recursion", action="store_true", help="fail when the reachable call graph has a cycle")
+    b.add_argument("--max-stack", type=int, metavar="BYTES", help="fail when the deepest call chain may need more stack (locals + 32 bytes per call)")
+    b.add_argument("--linker-script", metavar="FILE", help="link with this linker script (passed as -T)")
 
     r = add("run", help="compile and run")
     r.add_argument("files", nargs="*", help="source file(s) (default: gg.toml main)")
@@ -948,6 +1016,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     r.add_argument("--target", help="target triple (default: host machine)")
     r.add_argument("--no-std", action="store_true", help="compile without libc/OS (can only be run on Linux x86_64)")
     r.add_argument("-g", "--debug", action="store_true", help="emit debug information (DWARF) for debuggers")
+    r.add_argument("--coverage", action="store_true", help="count statements, decisions, conditions and MC/DC while it runs, then print the summary (data in .gg-coverage)")
+    r.add_argument("--forbid-heap", action="store_true", help="fail when code reachable from an entry point can allocate")
+    r.add_argument("--forbid-recursion", action="store_true", help="fail when the reachable call graph has a cycle")
+    r.add_argument("--max-stack", type=int, metavar="BYTES", help="fail when the deepest call chain may need more stack (locals + 32 bytes per call)")
+
+    su = add("stack-usage", help="bound the stack a program uses: bytes of locals per function and along the deepest call chain")
+    su.add_argument("files", nargs="+", help="source file(s)")
+    su.add_argument("--target", help="target triple (pointer sizes follow it)")
+    su.add_argument("--no-std", action="store_true", help="compile without libc/OS")
+    su.add_argument("--json", action="store_true", help="print JSON")
+    su.add_argument("--call-cost", type=int, default=32, metavar="BYTES", help="bytes per call for the return address and saved registers (default 32)")
 
     ll = add("emit-ll", help="emit LLVM IR (.ll file, default: next to source)")
     ll.add_argument("files", nargs="+", help="source file(s)")
@@ -958,6 +1037,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ll.add_argument("--unchecked", action="store_true", help="UNSAFE: remove bounds checks")
     ll.add_argument("--target", help="target triple or `bare-metal`")
     ll.add_argument("--no-std", action="store_true", help="compile without libc/OS")
+    ll.add_argument("--forbid-heap", action="store_true", help="fail when code reachable from an entry point can allocate")
+    ll.add_argument("--forbid-recursion", action="store_true", help="fail when the reachable call graph has a cycle")
+    ll.add_argument("--max-stack", type=int, metavar="BYTES", help="fail when the deepest call chain may need more stack (locals + 32 bytes per call)")
     ll.add_argument("-g", "--debug", action="store_true", help="emit debug information (DWARF)")
 
     bc = add("emit-bc", help="write LLVM bitcode (.bc) file")
@@ -1005,8 +1087,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     nw = add("new", help="create a package (gg.toml + src/main.gg)")
     nw.add_argument("name")
     nw.add_argument("--path", help="directory (default: ./<name>)")
-    nw.add_argument("--template", choices=("bin", "lib", "cli"), default="bin",
-                    help="bin: hello world (default); lib: a library with tests; cli: reads arguments and input")
+    nw.add_argument("--template", choices=("bin", "lib", "cli", "cortex-m"), default="bin",
+                    help="bin: hello world (default); lib: a library with tests; cli: reads arguments and input; cortex-m: bare-metal Cortex-M4 firmware with a linker script")
     fm = add("fmt", help="rewrite .gg files into the one canonical layout")
     fm.add_argument("paths", nargs="*", help="files or directories (default: .)")
     fm.add_argument("--check", action="store_true", help="only report files that would change (exit 1)")
@@ -1014,13 +1096,46 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ts.add_argument("paths", nargs="*", help="files or directories (default: .)")
     ts.add_argument("--release", action="store_true")
     ts.add_argument("--json", action="store_true", help="write the test report as JSON to stdout")
+    ts.add_argument("--coverage", action="store_true", help="measure statement, decision, condition and MC/DC coverage over all the tests (data in .gg-coverage)")
     fx = add("fix", help="apply the compiler's verified fixes to .gg files")
     fx.add_argument("paths", nargs="*", help="files or directories (default: .)")
     fx.add_argument("--dry-run", action="store_true", help="print the fixes without writing files")
     fx.add_argument("--likely", action="store_true", help="also apply `likely` fixes (verified, but a guess)")
+    sb = add("sbom", help="print the software bill of materials of a program (CycloneDX or SPDX JSON)")
+    sb.add_argument("files", nargs="+", help="source file(s)")
+    sb.add_argument("--format", choices=("cyclonedx", "spdx"), default="cyclonedx")
+    sb.add_argument("-o", "--output", help="write to this file instead of standard output")
+    sb.add_argument("--timestamp", action="store_true", help="include the creation time (makes the file differ between runs)")
+    rp = add("repro", help="build twice in different directories and compare the bytes (a reproducible-build check)")
+    rp.add_argument("files", nargs="+", help="source file(s)")
+    rp.add_argument("--release", action="store_true")
+    rp.add_argument("--target", help="target triple")
+    ua = add("unsafe-audit", help="list every unsafe block, inline asm, foreign function, custom allocator and static in the program")
+    ua.add_argument("files", nargs="+", help="source file(s)")
+    ua.add_argument("--json", action="store_true")
+    fz = add("fuzz", help="run `fn fuzz_target(data: []u8)` on mutated inputs, guided by coverage, until something stops the program")
+    fz.add_argument("file", help="a .gg file with `fn fuzz_target(data: []u8)`")
+    fz.add_argument("--runs", type=int, default=10000, help="inputs to try (default 10000)")
+    fz.add_argument("--time", type=float, default=0, metavar="SECONDS", help="stop after this long (0: only --runs)")
+    fz.add_argument("--seed", type=int, default=1, help="the random seed (default 1): the same seed tries the same inputs")
+    fz.add_argument("--corpus", metavar="DIR", help="start from the files in DIR and save inputs that reach new code there")
+    fz.add_argument("--crashes", default="fuzz-crashes", metavar="DIR", help="where findings are saved (default fuzz-crashes)")
+    fz.add_argument("--max-len", type=int, default=1024, help="longest input in bytes (default 1024)")
+    fz.add_argument("--timeout", type=float, default=5.0, help="seconds one run may take before it counts as a finding (default 5)")
+    fz.add_argument("--keep-going", action="store_true", help="do not stop at the first finding")
+    fz.add_argument("--replay", metavar="FILE", help="run the target once on FILE and say whether it crashed")
+    cv = add("coverage", help="summarize coverage data written by `gg run --coverage` or `gg test --coverage`")
+    cv.add_argument("data", nargs="?", default=".gg-coverage", help="the data file (default .gg-coverage)")
+    cv.add_argument("--annotate", action="store_true", help="list the statements never executed and the decisions without full coverage")
+    cv.add_argument("--lcov", metavar="FILE", help="also write an LCOV tracefile")
     ck = add("check", help="type-check and report diagnostics (no codegen)")
     ck.add_argument("files", nargs="+", help="source file(s)")
     ck.add_argument("--json", action="store_true", help="write diagnostics as JSON to stdout")
+    ck.add_argument("--profile", choices=("safety",), help="also hold the program to a coding profile (safety: no unsafe, panic, recursion, heap, unbounded loops, mutable statics; bounded complexity)")
+    ck.add_argument("--max-complexity", type=int, default=15, metavar="N", help="profile limit on cyclomatic complexity (default 15)")
+    ck.add_argument("--max-statements", type=int, default=80, metavar="N", help="profile limit on statements per function (default 80)")
+    ck.add_argument("--allow", action="append", default=[], metavar="RULE", help="switch a profile rule off for the whole run (repeatable)")
+    ck.add_argument("--list-allowed", action="store_true", help="with --profile, list every `@allow` exception in the program")
     at = add("attrs", help="list every `@attribute` use with its resolved arguments, as JSON")
     at.add_argument("files", nargs="+", help="source file(s)")
 
@@ -1058,6 +1173,10 @@ def main(argv: list[str] | None = None) -> int:
     _set_color(getattr(args, "color", "auto"))
     global DEBUG_INFO, NATIVE
     DEBUG_INFO = bool(getattr(args, "debug", False))
+    LIMITS.clear()
+    for key in ("forbid_heap", "forbid_recursion", "max_stack"):
+        if getattr(args, key, None):
+            LIMITS[key] = getattr(args, key)
     NATIVE = None  # set again by the package of this command, if there is one
     DEP_ROOTS.clear()
     try:
@@ -1066,7 +1185,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "explain":
             return cmd_explain(args.code, args.json)
         if args.command == "check":
-            return cmd_check(args.files, args.json)
+            return cmd_check(args.files, args.json, args.profile, args.max_complexity, args.max_statements, args.allow,
+                             args.list_allowed)
         if args.command == "attrs":
             return cmd_attrs(args.files)
         if args.command == "fix":
@@ -1098,7 +1218,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "fmt":
                 return tools.cmd_fmt(args.paths, args.check)
             if args.command == "test":
-                return tools.cmd_test(args.paths, args.release, args.json)
+                return tools.cmd_test(args.paths, args.release, args.json, args.coverage)
             return tools.cmd_doc(args.paths, args.output)
         if args.command in ("build", "run") and not args.files:
             from . import tools
@@ -1166,6 +1286,24 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(ast_str)
             return 0
+        if args.command == "sbom":
+            from .assure import cmd_sbom
+            return cmd_sbom(args.files, args.format, args.output, args.timestamp)
+        if args.command == "repro":
+            from .assure import cmd_repro
+            return cmd_repro(args.files, args.release, args.target)
+        if args.command == "unsafe-audit":
+            from .assure import cmd_audit
+            return cmd_audit(args.files, args.json)
+        if args.command == "fuzz":
+            from .fuzz import cmd_fuzz
+            return cmd_fuzz(args.file, args.runs, args.time, args.seed, args.corpus, args.crashes, args.max_len, args.timeout,
+                            args.keep_going, args.replay)
+        if args.command == "coverage":
+            from . import coverage
+            return coverage.run_report(args.data, args.annotate, args.lcov)
+        if args.command == "stack-usage":
+            return cmd_stack_usage(args.files, args.target, args.no_std, args.json, args.call_cost)
         if args.command == "emit-ll":
             return cmd_emit_llvm(args.files, args.release, args.unchecked, None, args.release, args.target,
                                  args.no_std, ir_out=args.output)
@@ -1178,9 +1316,23 @@ def main(argv: list[str] | None = None) -> int:
             set_cpu(args.cpu, args.features)
         if args.command in ("build", "run"):
             args.link = args.link + [f"-L{d}" for d in args.link_path] + args.link_file
+            if getattr(args, "linker_script", None):
+                args.link = args.link + ["-Wl,-T," + str(Path(args.linker_script).resolve())]
         if args.command == "build":
             return cmd_build(args.files, args.output, release=args.release, links=args.link,
                              unchecked=args.unchecked, target=args.target, no_std=args.no_std)
+        if getattr(args, "coverage", False):
+            from . import coverage
+            out = os.environ.setdefault(coverage.ENV_OUT, ".gg-coverage")
+            os.environ[coverage.ENV_ON] = "1"
+            Path(out).unlink(missing_ok=True)
+            sys.stdout.flush()
+            code = cmd_run(args.files, release=args.release, links=args.link, unchecked=args.unchecked,
+                           target=args.target, no_std=args.no_std)
+            sys.stdout.flush()
+            if Path(out).is_file():
+                coverage.run_report(out, False, None)
+            return code
         return cmd_run(args.files, release=args.release, links=args.link, unchecked=args.unchecked,
                        target=args.target, no_std=args.no_std)
     except CompileError as err:

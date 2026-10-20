@@ -137,6 +137,31 @@ impl string:
             return
         self.append_u64(u64(n))
 
+    fn append_u128(self: lend string, n: u128):
+        if n == 0:
+            self.append_byte('0')
+            return
+        digits: [40]u8 = [0; 40]
+        cnt: usize = 0
+        r_val = n
+        while r_val > 0:
+            digits[cnt] = u8(r_val % 10)
+            r_val = r_val / 10
+            cnt += 1
+        while cnt > 0:
+            cnt -= 1
+            self.append_byte('0' + digits[cnt])
+
+    fn append_i128(self: lend string, n: i128):
+        if n < 0:
+            self.append_byte('-')
+            if n == min_value[i128]():
+                self.append_u128(u128(1) << 127)
+                return
+            self.append_u128(u128(0 - n))
+            return
+        self.append_u128(u128(n))
+
     fn append_bool(self: lend string, b: bool):
         if b:
             self.append_str("true")
@@ -463,6 +488,11 @@ fn _list_sift[T: Ord](v: List[T], start: usize, end: usize):
 impl str:
     fn is_empty(self: str) -> bool:
         return self.len == 0
+
+    # The bytes of the text as a `[]u8` view (for hashes, ciphers, and other byte-oriented code).
+    fn as_bytes(self: str) -> []u8:
+        unsafe:
+            return slice_from_raw[u8](addr(self), self.len)
 
     fn starts_with(self: str, prefix: str) -> bool:
         if prefix.len > self.len:
@@ -1301,3 +1331,72 @@ impl _JsonReader:
         else:
             x = self.read_f64()
         return not self.failed()
+
+
+# ---------------------------------------------------------------------------
+# `f16` support. A half-precision number is stored in 16 bits; every operation converts it to `f32`, computes, and
+# converts back, with these two functions. They use integer arithmetic only, so no `__extendhfsf2` from a runtime
+# library is needed (a bare-metal target has none).
+# ---------------------------------------------------------------------------
+
+fn _f32_from_bits(b: u32) -> f32:
+    x: u32 = b
+    unsafe:
+        return ptr_cast[*f32](addr(x))[0]
+
+fn _f32_to_bits(f: f32) -> u32:
+    x: f32 = f
+    unsafe:
+        return ptr_cast[*u32](addr(x))[0]
+
+fn _f16_to_f32(h: u16) -> f32:
+    sign: u32 = u32(h >> 15) << 31
+    e: u32 = u32((h >> 10) & 31)
+    m: u32 = u32(h & 1023)
+    bits: u32 = 0
+    if e == 0:
+        if m == 0:
+            bits = sign
+        else:
+            e2: u32 = 113
+            mm: u32 = m
+            while (mm & 1024) == 0:
+                mm = mm << 1
+                e2 -= 1
+            low: u32 = mm & 1023
+            bits = sign | (e2 << 23) | (low << 13)
+    elif e == 31:
+        bits = sign | 0x7F800000 | (m << 13)
+    else:
+        bits = sign | ((e + 112) << 23) | (m << 13)
+    return _f32_from_bits(bits)
+
+# Rounds to nearest, ties to even; too large becomes infinity, too small becomes zero or a subnormal.
+fn _f32_to_f16(f: f32) -> u16:
+    x = _f32_to_bits(f)
+    sign: u32 = (x >> 16) & 0x8000
+    e = i32((x >> 23) & 255)
+    m: u32 = x & 0x7FFFFF
+    if e == 255:
+        if m != 0:
+            return u16(sign | 0x7E00 | (m >> 13))
+        return u16(sign | 0x7C00)
+    e2 = e - 112
+    if e2 >= 31:
+        return u16(sign | 0x7C00)
+    if e2 <= 0:
+        if e2 < -10:
+            return u16(sign)
+        mant: u32 = m | 0x800000
+        shift = u32(14 - e2)
+        half = mant >> shift
+        rem: u32 = mant & ((u32(1) << shift) - 1)
+        mid = u32(1) << (shift - 1)
+        if rem > mid or (rem == mid and (half & 1) == 1):
+            half += 1
+        return u16(sign | half)
+    h = sign | (u32(e2) << 10) | (m >> 13)
+    rem2: u32 = m & 0x1FFF
+    if rem2 > 0x1000 or (rem2 == 0x1000 and (h & 1) == 1):
+        h += 1
+    return u16(h)

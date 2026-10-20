@@ -1,0 +1,80 @@
+{
+ "title": "Funciones como valores",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "En Greengold las funciones también son valores: puedes guardar una en una variable, pasarla como parámetro o ponerla en un campo de un struct. Un tipo de función se escribe `fn(T1, T2) -> R`; como es largo, a menudo se le da nombre con `type`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn multiply(a: i32, b: i32) -> i32:",
+    "    return a * b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    current: MathOp = multiply",
+    "    print(apply_op(current, 6, 7))",
+    "    print(apply_op(add, 6, 7))"
+   ],
+   "run": true,
+   "output": [
+    "42",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`apply_op` no sabe qué operación va a hacer; lo decide la función que recibe. Es la forma básica de pasar comportamiento como parámetro."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l01-x1",
+   "prompt": "Escribe una función `subtract` e imprime el resultado de `apply_op(subtract, 10, 4)`.",
+   "starter": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(apply_op(subtract, 10, 4))"
+   ],
+   "hint": "Escribe `fn subtract(a: i32, b: i32) -> i32:` y pásala en `main`.",
+   "expected": [
+    "6"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l01-q1",
+   "q": "¿Qué clase de tipo es `fn(i32, i32) -> i32`?",
+   "options": [
+    "Un tipo numérico",
+    "El tipo de las funciones que reciben dos `i32` y devuelven `i32`",
+    "Un struct"
+   ],
+   "answer": 1,
+   "why": "Un tipo de función describe los tipos de los parámetros y del resultado."
+  }
+ ]
+}

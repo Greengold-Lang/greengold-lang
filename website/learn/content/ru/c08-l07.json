@@ -1,0 +1,127 @@
+{
+ "title": "Практика: безопасный разбор текста",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Функция, превращающая текст в число, использует `Result` и ошибки-enum вместе. Диапазоны символов сравниваются как `'0'..'9'`; значение цифры находят через `c - '0'`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum ParseError:",
+    "    EmptyInput",
+    "    InvalidFormat",
+    "",
+    "fn parse_positive(input: str) -> Result[i32, ParseError]:",
+    "    if input.len == 0:",
+    "        return Err(ParseError.EmptyInput)",
+    "    total = 0",
+    "    for i in 0..input.len:",
+    "        c = input[i]",
+    "        if c < '0' or c > '9':",
+    "            return Err(ParseError.InvalidFormat)",
+    "        total = total * 10 + i32(c - '0')",
+    "    return Ok(total)",
+    "",
+    "fn main():",
+    "    inputs: [3]str = [\"1234\", \"\", \"42a\"]",
+    "    for s in inputs:",
+    "        match parse_positive(s):",
+    "            Ok(num):",
+    "                print(\"parsed:\", num)",
+    "            Err(e):",
+    "                match e:",
+    "                    ParseError.EmptyInput:",
+    "                        print(\"error: input is empty\")",
+    "                    ParseError.InvalidFormat:",
+    "                        print(\"error: invalid character in\", s)"
+   ],
+   "run": true,
+   "output": [
+    "parsed: 1234",
+    "error: input is empty",
+    "error: invalid character in 42a"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l07-x1",
+   "prompt": "Добавьте ограничение в `parse_positive`: для входа длиннее 5 символов возвращайте новую ошибку `TooLong`. Проверьте на `\"123456\"`.",
+   "starter": [
+    "enum ParseError:",
+    "    EmptyInput",
+    "    InvalidFormat",
+    "",
+    "fn parse_positive(input: str) -> Result[i32, ParseError]:",
+    "    if input.len == 0:",
+    "        return Err(ParseError.EmptyInput)",
+    "    total = 0",
+    "    for i in 0..input.len:",
+    "        c = input[i]",
+    "        if c < '0' or c > '9':",
+    "            return Err(ParseError.InvalidFormat)",
+    "        total = total * 10 + i32(c - '0')",
+    "    return Ok(total)",
+    "",
+    "fn main():",
+    "    match parse_positive(\"123456\"):",
+    "        Ok(n):",
+    "            print(\"parsed:\", n)",
+    "        Err(e):",
+    "            match e:",
+    "                ParseError.EmptyInput:",
+    "                    print(\"empty\")",
+    "                ParseError.InvalidFormat:",
+    "                    print(\"invalid\")"
+   ],
+   "solution": [
+    "enum ParseError:",
+    "    EmptyInput",
+    "    InvalidFormat",
+    "    TooLong",
+    "",
+    "fn parse_positive(input: str) -> Result[i32, ParseError]:",
+    "    if input.len == 0:",
+    "        return Err(ParseError.EmptyInput)",
+    "    if input.len > 5:",
+    "        return Err(ParseError.TooLong)",
+    "    total = 0",
+    "    for i in 0..input.len:",
+    "        c = input[i]",
+    "        if c < '0' or c > '9':",
+    "            return Err(ParseError.InvalidFormat)",
+    "        total = total * 10 + i32(c - '0')",
+    "    return Ok(total)",
+    "",
+    "fn main():",
+    "    match parse_positive(\"123456\"):",
+    "        Ok(n):",
+    "            print(\"parsed:\", n)",
+    "        Err(e):",
+    "            match e:",
+    "                ParseError.EmptyInput:",
+    "                    print(\"empty\")",
+    "                ParseError.InvalidFormat:",
+    "                    print(\"invalid\")",
+    "                ParseError.TooLong:",
+    "                    print(\"too long\")"
+   ],
+   "hint": "Добавьте новый вариант в enum, в `match` и в проверку.",
+   "expected": [
+    "too long"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l07-q1",
+   "q": "Что находит выражение `c - '0'`?",
+   "options": [
+    "ASCII-код символа",
+    "Числовое значение символа-цифры",
+    "Позицию символа"
+   ],
+   "answer": 1,
+   "why": "`'5' - '0'` = 5: символы цифр идут подряд."
+  }
+ ]
+}

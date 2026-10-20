@@ -194,6 +194,15 @@ For advanced developers and system architects, Greengold can export the compilat
 * **`gg ast file.gg`:** Inspects the syntax tree (AST) hierarchically.
 * **`gg attrs file.gg`:** Lists every `@attribute` use (functions, structs, fields) as JSON, for code generators. See [Chapter 03, section 5](03_Functions_Methods_and_Lambdas.md).
 
+### Assurance tools
+
+* **`gg check --profile safety file.gg`:** Also rejects `unsafe`, `panic`, recursion, heap use, unbounded loops and mutable statics, and limits complexity. `--allow RULE` turns a rule off; `@allow` marks a reviewed exception; `--list-allowed` lists them.
+* **`gg test --coverage`** / **`gg run --coverage`**, then **`gg coverage`:** Statement, decision, condition and MC/DC coverage. `--annotate` lists what never ran; `--lcov FILE` writes an LCOV file.
+* **`gg fuzz file.gg`:** Runs `fn fuzz_target(data: []u8)` on mutated inputs, guided by coverage. A crash is shrunk and saved in `fuzz-crashes/`; `--replay FILE` runs it again.
+* **`gg sbom file.gg`:** Software bill of materials (CycloneDX or SPDX).
+* **`gg repro file.gg`:** Builds twice in different directories and compares the bytes.
+* **`gg unsafe-audit file.gg`:** Lists every `unsafe` block, inline assembly, foreign function, custom allocator and static.
+
 ---
 
 ## 9. VS Code Integration

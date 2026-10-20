@@ -12,6 +12,33 @@ extern "math.h" fn log(x: f64) -> f64 as c_log
 extern "math.h" fn floor(x: f64) -> f64 as c_floor
 extern "math.h" fn ceil(x: f64) -> f64 as c_ceil
 extern "math.h" fn fmod(x: f64, y: f64) -> f64 as c_fmod
+extern "math.h" fn asin(x: f64) -> f64 as c_asin
+extern "math.h" fn acos(x: f64) -> f64 as c_acos
+extern "math.h" fn atan(x: f64) -> f64 as c_atan
+extern "math.h" fn sinh(x: f64) -> f64 as c_sinh
+extern "math.h" fn cosh(x: f64) -> f64 as c_cosh
+extern "math.h" fn tanh(x: f64) -> f64 as c_tanh
+extern "math.h" fn log2(x: f64) -> f64 as c_log2
+extern "math.h" fn log10(x: f64) -> f64 as c_log10
+extern "math.h" fn round(x: f64) -> f64 as c_round
+extern "math.h" fn trunc(x: f64) -> f64 as c_trunc
+extern "math.h" fn cbrt(x: f64) -> f64 as c_cbrt
+extern "math.h" fn log1p(x: f64) -> f64 as c_log1p
+extern "math.h" fn expm1(x: f64) -> f64 as c_expm1
+extern "math.h" fn exp2(x: f64) -> f64 as c_exp2
+extern "math.h" fn hypot(x: f64, y: f64) -> f64 as c_hypot
+extern "math.h" fn copysign(x: f64, y: f64) -> f64 as c_copysign
+extern "math.h" fn sqrtf(x: f32) -> f32 as c_sqrtf
+extern "math.h" fn sinf(x: f32) -> f32 as c_sinf
+extern "math.h" fn cosf(x: f32) -> f32 as c_cosf
+extern "math.h" fn tanf(x: f32) -> f32 as c_tanf
+extern "math.h" fn atan2f(x: f32, y: f32) -> f32 as c_atan2f
+extern "math.h" fn powf(x: f32, y: f32) -> f32 as c_powf
+extern "math.h" fn expf(x: f32) -> f32 as c_expf
+extern "math.h" fn floorf(x: f32) -> f32 as c_floorf
+extern "math.h" fn ceilf(x: f32) -> f32 as c_ceilf
+extern "math.h" fn fabsf(x: f32) -> f32 as c_fabsf
+extern "math.h" fn logf(x: f32) -> f32 as c_logf
 
 public
 fn pi() -> f64:
@@ -64,39 +91,6 @@ fn fmod(x: f64, y: f64) -> f64:
     unsafe:
         return c_fmod(x, y)
 
-fn abs_f64(x: f64) -> f64:
-    if x < 0.0:
-        return 0.0 - x
-    return x
-
-fn abs_i64(x: i64) -> i64:
-    if x < 0:
-        return 0 - x
-    return x
-
-fn min_i64(a: i64, b: i64) -> i64:
-    if a < b:
-        return a
-    return b
-
-fn max_i64(a: i64, b: i64) -> i64:
-    if a > b:
-        return a
-    return b
-
-fn min_f64(a: f64, b: f64) -> f64:
-    if a < b:
-        return a
-    return b
-
-fn max_f64(a: f64, b: f64) -> f64:
-    if a > b:
-        return a
-    return b
-
-fn clamp_i64(x: i64, lo: i64, hi: i64) -> i64:
-    return min_i64(max_i64(x, lo), hi)
-
 fn gcd_u64(a: u64, b: u64) -> u64:
     x = a
     y = b
@@ -116,3 +110,217 @@ fn pow_i64(base: i64, exp_: u32) -> i64:
         b = b * b
         n = n / 2
     return result
+
+fn asin(x: f64) -> f64:
+    unsafe:
+        return c_asin(x)
+
+fn acos(x: f64) -> f64:
+    unsafe:
+        return c_acos(x)
+
+fn atan(x: f64) -> f64:
+    unsafe:
+        return c_atan(x)
+
+fn sinh(x: f64) -> f64:
+    unsafe:
+        return c_sinh(x)
+
+fn cosh(x: f64) -> f64:
+    unsafe:
+        return c_cosh(x)
+
+fn tanh(x: f64) -> f64:
+    unsafe:
+        return c_tanh(x)
+
+fn log2(x: f64) -> f64:
+    unsafe:
+        return c_log2(x)
+
+fn log10(x: f64) -> f64:
+    unsafe:
+        return c_log10(x)
+
+fn round(x: f64) -> f64:
+    unsafe:
+        return c_round(x)
+
+fn trunc(x: f64) -> f64:
+    unsafe:
+        return c_trunc(x)
+
+fn cbrt(x: f64) -> f64:
+    unsafe:
+        return c_cbrt(x)
+
+fn log1p(x: f64) -> f64:
+    unsafe:
+        return c_log1p(x)
+
+fn expm1(x: f64) -> f64:
+    unsafe:
+        return c_expm1(x)
+
+fn exp2(x: f64) -> f64:
+    unsafe:
+        return c_exp2(x)
+
+fn hypot(x: f64, y: f64) -> f64:
+    unsafe:
+        return c_hypot(x, y)
+
+fn copysign(x: f64, y: f64) -> f64:
+    unsafe:
+        return c_copysign(x, y)
+
+fn sqrt_f32(x: f32) -> f32:
+    unsafe:
+        return c_sqrtf(x)
+
+fn sin_f32(x: f32) -> f32:
+    unsafe:
+        return c_sinf(x)
+
+fn cos_f32(x: f32) -> f32:
+    unsafe:
+        return c_cosf(x)
+
+fn tan_f32(x: f32) -> f32:
+    unsafe:
+        return c_tanf(x)
+
+fn atan2_f32(x: f32, y: f32) -> f32:
+    unsafe:
+        return c_atan2f(x, y)
+
+fn pow_f32(x: f32, y: f32) -> f32:
+    unsafe:
+        return c_powf(x, y)
+
+fn exp_f32(x: f32) -> f32:
+    unsafe:
+        return c_expf(x)
+
+fn floor_f32(x: f32) -> f32:
+    unsafe:
+        return c_floorf(x)
+
+fn ceil_f32(x: f32) -> f32:
+    unsafe:
+        return c_ceilf(x)
+
+fn abs_f32(x: f32) -> f32:
+    unsafe:
+        return c_fabsf(x)
+
+fn ln_f32(x: f32) -> f32:
+    unsafe:
+        return c_logf(x)
+
+fn tau() -> f64:
+    return 6.28318530717958647692
+
+fn is_nan(x: f64) -> bool:
+    return x != x
+
+fn is_inf(x: f64) -> bool:
+    return x - x != 0.0 and x == x
+
+fn is_finite(x: f64) -> bool:
+    return x - x == 0.0
+
+fn is_nan_f32(x: f32) -> bool:
+    return x != x
+
+fn is_finite_f32(x: f32) -> bool:
+    return x - x == 0.0
+
+fn to_radians(deg: f64) -> f64:
+    return deg * pi() / 180.0
+
+fn to_degrees(rad: f64) -> f64:
+    return rad * 180.0 / pi()
+
+# Generic helpers. `abs` traps on the most negative integer, like `-x`.
+fn min[T: Ord](a: T, b: T) -> T:
+    if b < a:
+        return b
+    return a
+
+fn max[T: Ord](a: T, b: T) -> T:
+    if b > a:
+        return b
+    return a
+
+fn clamp[T: Ord](x: T, lo: T, hi: T) -> T:
+    if lo > hi:
+        panic("clamp: lo must not be greater than hi")
+    if x < lo:
+        return lo
+    if x > hi:
+        return hi
+    return x
+
+fn abs[T: Num](x: T) -> T:
+    if x < T(0):
+        return T(0) - x
+    return x
+
+fn signum[T: Num](x: T) -> T:
+    if x < T(0):
+        return T(0) - T(1)
+    if x > T(0):
+        return T(1)
+    return T(0)
+
+fn lcm_u64(a: u64, b: u64) -> u64:
+    if a == 0 or b == 0:
+        return 0
+    return a / gcd_u64(a, b) * b
+
+# Floor of the square root, exact for every u64. Integer arithmetic only: no libm, works with `--no-std`.
+fn isqrt(n0: u64) -> u64:
+    n = n0
+    res: u64 = 0
+    bit: u64 = u64(1) << 62
+    while bit > n:
+        bit = bit >> 2
+    while bit != 0:
+        if n >= res + bit:
+            n = n - (res + bit)
+            res = (res >> 1) + bit
+        else:
+            res = res >> 1
+        bit = bit >> 2
+    return res
+
+# Euclidean (always non-negative) remainder.
+fn rem_euclid(a: i64, b: i64) -> i64:
+    r = a % b
+    if r < 0:
+        if b < 0:
+            return r - b
+        return r + b
+    return r
+
+# `base ** exp` that returns None when it does not fit.
+fn checked_pow_i64(base: i64, exp_: u32) -> Optional[i64]:
+    result: i64 = 1
+    for _ in 0..exp_:
+        r = checked_mul(result, base)
+        if r.is_none():
+            return None
+        result = r.value_or_panic()
+    return Valid(result)
+
+fn saturating_pow_i64(base: i64, exp_: u32) -> i64:
+    result: i64 = 1
+    for _ in 0..exp_:
+        result = saturating_mul(result, base)
+    return result
+
+# Fused multiply-add in plain arithmetic (two roundings); use `std.nn` or SIMD `fma` for hardware FMA.
+fn lerp(a: f64, b: f64, t: f64) -> f64:
+    return a + (b - a) * t

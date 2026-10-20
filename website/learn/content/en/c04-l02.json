@@ -1,0 +1,115 @@
+{
+ "title": "Methods and impl",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "To add behaviour to a type you write an **`impl`** block. The first parameter of a method is `self`; you reach the object's fields with `self.field`. A call looks like `object.method()`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rectangle:",
+    "    width: f64",
+    "    height: f64",
+    "",
+    "impl Rectangle:",
+    "    fn area(self) -> f64:",
+    "        return self.width * self.height",
+    "",
+    "fn main():",
+    "    rect = Rectangle{ width: 10.0, height: 5.0 }",
+    "    print(\"Area:\", rect.area())"
+   ],
+   "run": true,
+   "output": [
+    "Area: 50"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "A method that changes the object in place writes `self: lend Type` (you will learn `lend` in chapter 5: \"borrow and change\"). Methods that take no `self` are **static** methods and are often used as constructors: `Type.name(...)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    name: str",
+    "    health: i32",
+    "",
+    "impl Player:",
+    "    fn new(name: str) -> Player:",
+    "        return Player{ name: name, health: 100 }",
+    "",
+    "    fn is_alive(self) -> bool:",
+    "        return self.health > 0",
+    "",
+    "    fn take_damage(self: lend Player, amount: i32):",
+    "        self.health -= amount",
+    "        if self.health < 0:",
+    "            self.health = 0",
+    "",
+    "fn main():",
+    "    hero = Player.new(\"Aragorn\")",
+    "    hero.take_damage(35)",
+    "    print(\"Health:\", hero.health)",
+    "    print(\"Alive?\", hero.is_alive())"
+   ],
+   "run": true,
+   "output": [
+    "Health: 65",
+    "Alive? true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l02-x1",
+   "prompt": "Add an `increment` method to the `Counter` struct (`value: i32`): it increases `value` by 1. Call it three times and print `value`.",
+   "starter": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        pass",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "solution": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        self.value += 1",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "hint": "Replace `pass` with `self.value += 1`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l02-q1",
+   "q": "What is a method without `self` called?",
+   "options": [
+    "Private method",
+    "Static method (often a constructor)",
+    "Broken method"
+   ],
+   "answer": 1,
+   "why": "Methods called like `Player.new(...)` are static."
+  }
+ ]
+}

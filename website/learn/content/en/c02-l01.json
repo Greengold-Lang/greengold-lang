@@ -1,0 +1,73 @@
+{
+ "title": "if, elif, else",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "No parentheses are needed around the condition; you write `:` at the end and indent the lines below by 4 spaces. Chain `elif` for several cases; `else` catches everything left."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 85",
+    "    if score >= 90:",
+    "        print(\"Grade: A\")",
+    "    elif score >= 80:",
+    "        print(\"Grade: B\")",
+    "    elif score >= 70:",
+    "        print(\"Grade: C\")",
+    "    else:",
+    "        print(\"Grade: F\")"
+   ],
+   "run": true,
+   "output": [
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "The first branch that is true runs and the rest are skipped. That is why you put the biggest thresholds first."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l01-x1",
+   "prompt": "Finish the chain: print `Cold` when `temperature` is below 10, `Hot` when it is above 25, and `Mild` otherwise.",
+   "starter": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"?\")",
+    "    elif temperature > 25:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"Cold\")",
+    "    elif temperature > 25:",
+    "        print(\"Hot\")",
+    "    else:",
+    "        print(\"Mild\")"
+   ],
+   "hint": "Replace the three `?` with `Cold`, `Hot`, `Mild` in this order.",
+   "expected": [
+    "Cold"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l01-q1",
+   "q": "If several branches are true, how many run?",
+   "options": [
+    "All of them",
+    "Only the first true one",
+    "Only the last one"
+   ],
+   "answer": 1,
+   "why": "An `if`/`elif` chain stops at the first true branch."
+  }
+ ]
+}

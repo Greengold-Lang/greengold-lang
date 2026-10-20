@@ -1,0 +1,99 @@
+{
+ "title": "Variants that carry data",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In Greengold enum variants can **carry data**, and each variant can carry something different. Such a value is called an \"algebraic data type\". Inside `match` you give names to the data in the pattern."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Shape:",
+    "    Circle(f64)",
+    "    Rectangle(f64, f64)",
+    "    Point",
+    "",
+    "fn describe(s: Shape):",
+    "    match s:",
+    "        Shape.Circle(radius):",
+    "            print(\"circle, radius\", radius)",
+    "        Shape.Rectangle(w, h):",
+    "            print(\"rectangle\", w, \"x\", h)",
+    "        Shape.Point:",
+    "            print(\"a point\")",
+    "",
+    "fn main():",
+    "    describe(Shape.Circle(5.0))",
+    "    describe(Shape.Rectangle(10.0, 4.0))",
+    "    describe(Shape.Point)"
+   ],
+   "run": true,
+   "output": [
+    "circle, radius 5",
+    "rectangle 10 x 4",
+    "a point"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "You can ignore a field you do not care about with `_`: `Shape.Rectangle(w, _):`."
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l02-x1",
+   "prompt": "Finish `area(s)`: `w * h` for a rectangle, `side * side` for a square, 0 for `Empty`. Print the area of `Rect(3, 4)`.",
+   "starter": [
+    "enum Figure:",
+    "    Rect(i32, i32)",
+    "    Square(i32)",
+    "    Empty",
+    "",
+    "fn area(s: Figure) -> i32:",
+    "    match s:",
+    "        Figure.Rect(w, h):",
+    "            return 0",
+    "        Figure.Square(side):",
+    "            return 0",
+    "        Figure.Empty:",
+    "            return 0",
+    "",
+    "fn main():",
+    "    print(area(Figure.Rect(3, 4)))"
+   ],
+   "solution": [
+    "enum Figure:",
+    "    Rect(i32, i32)",
+    "    Square(i32)",
+    "    Empty",
+    "",
+    "fn area(s: Figure) -> i32:",
+    "    match s:",
+    "        Figure.Rect(w, h):",
+    "            return w * h",
+    "        Figure.Square(side):",
+    "            return side * side",
+    "        Figure.Empty:",
+    "            return 0",
+    "",
+    "fn main():",
+    "    print(area(Figure.Rect(3, 4)))"
+   ],
+   "hint": "Change the first two `return 0` lines to the calculation.",
+   "expected": [
+    "12"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l02-q1",
+   "q": "In the pattern `Shape.Rectangle(w, _)` what does `_` do?",
+   "options": [
+    "Ignores the second field",
+    "Is an error",
+    "Sets the second field to 0"
+   ],
+   "answer": 0,
+   "why": "`_` is the wildcard: that value is not needed."
+  }
+ ]
+}

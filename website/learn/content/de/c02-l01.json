@@ -1,0 +1,73 @@
+{
+ "title": "if, elif, else",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Um die Bedingung braucht man keine Klammern; du schreibst `:` ans Ende und rückst die folgenden Zeilen um 4 Leerzeichen ein. Verkette `elif` für mehrere Fälle; `else` fängt alles Übrige."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 85",
+    "    if score >= 90:",
+    "        print(\"Grade: A\")",
+    "    elif score >= 80:",
+    "        print(\"Grade: B\")",
+    "    elif score >= 70:",
+    "        print(\"Grade: C\")",
+    "    else:",
+    "        print(\"Grade: F\")"
+   ],
+   "run": true,
+   "output": [
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Der erste wahre Zweig wird ausgeführt, die übrigen werden übersprungen. Deshalb stellst du die größten Schwellenwerte nach vorn."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l01-x1",
+   "prompt": "Vervollständige die Kette: Gib `Cold` aus, wenn `temperature` unter 10 liegt, `Hot`, wenn sie über 25 liegt, und sonst `Mild`.",
+   "starter": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"?\")",
+    "    elif temperature > 25:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"Cold\")",
+    "    elif temperature > 25:",
+    "        print(\"Hot\")",
+    "    else:",
+    "        print(\"Mild\")"
+   ],
+   "hint": "Ersetze die drei `?` der Reihe nach durch `Cold`, `Hot`, `Mild`.",
+   "expected": [
+    "Cold"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l01-q1",
+   "q": "Wenn mehrere Zweige wahr sind, wie viele werden ausgeführt?",
+   "options": [
+    "Alle",
+    "Nur der erste wahre",
+    "Nur der letzte"
+   ],
+   "answer": 1,
+   "why": "Eine `if`/`elif`-Kette hält beim ersten wahren Zweig an."
+  }
+ ]
+}

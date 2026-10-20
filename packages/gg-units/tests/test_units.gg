@@ -1,0 +1,46 @@
+import "../src/units.gg"
+
+fn near(a: f64, b: f64) -> bool:
+    d = a - b
+    if d < 0.0:
+        d = -d
+    return d < 0.000000001
+
+fn test_length_conversions():
+    require near(units.feet(1000.0).as_metres(), 304.8)
+    require near(units.nautical_miles(1.0).as_feet(), 6076.115485564304)
+    require near((units.metres(5.0) + units.metres(7.0)).as_metres(), 12.0)
+    require units.metres(1.0) < units.kilometres(1.0)
+
+fn test_speed_time_distance():
+    d = units.nautical_miles(12.0)
+    v = units.knots(120.0)
+    t = d.over_speed(v)
+    require near(t.as_minutes(), 6.0)
+    require near(v.times(t).as_nautical_miles(), 12.0)
+    require near(units.feet_per_minute(1000.0).as_metres_per_second(), 5.08)
+    require near(units.kilometres_per_hour(36.0).as_metres_per_second(), 10.0)
+
+fn test_force_mass_acceleration():
+    m = units.kilograms(80.0)
+    a = units.g_force(2.0)
+    f = a.on_mass(m)
+    require near(f.as_newtons(), 80.0 * 2.0 * units.STANDARD_GRAVITY)
+    require near(f.on_mass(m).as_g(), 2.0)
+    require near(m.weight().as_newtons(), 80.0 * units.STANDARD_GRAVITY)
+    require near(units.pounds(1.0).as_kilograms(), 0.45359237)
+
+fn test_angles_wrap():
+    require near(units.degrees(180.0).as_radians(), units.PI)
+    require near(units.degrees(370.0).normalized().as_degrees(), 10.0)
+    require near(units.degrees(-10.0).normalized().as_degrees(), 350.0)
+    require near(units.degrees(190.0).wrapped().as_degrees(), -170.0)
+
+fn test_temperature_and_pressure():
+    require near(units.celsius(0.0).as_kelvin(), 273.15)
+    require near(units.fahrenheit(212.0).as_celsius(), 100.0)
+    require near(units.celsius(100.0).as_fahrenheit(), 212.0)
+    require near(units.hectopascals(1013.25).as_pascals(), 101325.0)
+
+fn main():
+    pass

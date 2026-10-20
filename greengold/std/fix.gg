@@ -1,0 +1,179 @@
+# std.fix: reading and writing FIX messages (the tag=value text protocol of securities trading), checked the way a counterparty checks them.
+#
+#     import std.fix { FixBuilder }
+#     b = FixBuilder.new("FIX.4.4")
+#     b.add(35, "D")                       # MsgType: new order single
+#     b.add(55, "EURUSD")
+#     b.add(38, "1000000")
+#     wire = b.finish()                    # "8=FIX.4.4\x019=NN\x0135=D\x01...\x0110=NNN\x01"
+#     msg = fix.parse(wire.as_str()).value_or_panic()
+#     print(msg.get(55).value_or_panic())      # EURUSD
+#
+# A message is `tag=value` fields, each ended by the byte 0x01 (SOH). `parse` checks the frame the way the protocol defines it: the first
+# field is `8` (BeginString), the second `9` (BodyLength) and it must equal the number of bytes after the `9` field up to and including
+# the SOH before `10`, the last field is `10` (CheckSum, three digits) and it must equal the sum of all the bytes before it modulo 256.
+# Every tag is a positive integer, every field has a non-empty value and a `=`, and a message with more than `MAX_FIELDS` fields is
+# rejected. Anything else is an `Err` that names the problem; no input can make `parse` read out of bounds or run for long.
+#
+# Limits. Repeating groups are kept as they come (the same tag several times, in order: `get_all`). Raw-data fields whose value contains a
+# SOH byte (`96`, `91`, `213`, ...) are not supported: a message with one fails the length check. No session layer (sequence numbers,
+# heartbeats, resend) and no dictionary: it does not know which tags a message type requires.
+
+import std.string
+
+const SOH: u8 = 1
+const MAX_FIELDS: usize = 4096
+
+public
+struct FixField:
+    tag: i64
+    value: string
+
+struct FixMessage:
+    fields: List[FixField]
+
+private
+fn _checksum(data: []u8, end: usize) -> u32:
+    total: u32 = 0
+    for i in 0..end:
+        total = (total + u32(data[usize(i)])) % 256
+    return total
+
+fn _digits(n: u32) -> string:
+    out = string.new()
+    out.append_byte(u8(48 + (n / 100) % 10))
+    out.append_byte(u8(48 + (n / 10) % 10))
+    out.append_byte(u8(48 + n % 10))
+    return out
+
+public
+# Reads one message. The text must be exactly one message (nothing before `8=` or after the final SOH).
+fn parse(text: str) -> Result[FixMessage, string]:
+    data = text.as_bytes()
+    fields = List[FixField]()
+    start: usize = 0
+    body_start: usize = 0
+    body_len: i64 = -1
+    sum_end: usize = 0
+    i: usize = 0
+    while i < data.len:
+        if data[i] != SOH:
+            i += 1
+            continue
+        if i == start:
+            return Err(f"field {fields.len + 1}: empty field")
+        eq: usize = start
+        while eq < i and data[eq] != 61:
+            eq += 1
+        if eq == i or eq == start:
+            return Err(f"field {fields.len + 1}: expected `tag=value`")
+        if eq + 1 == i:
+            return Err(f"field {fields.len + 1}: empty value")
+        tag: i64 = 0
+        for k in start..eq:
+            c = data[usize(k)]
+            if c < 48 or c > 57 or tag > 99999999:
+                return Err(f"field {fields.len + 1}: the tag is not a positive number")
+            tag = tag * 10 + i64(c - 48)
+        if tag == 0:
+            return Err(f"field {fields.len + 1}: the tag is not a positive number")
+        value = string.new()
+        for k in (eq + 1)..i:
+            value.append_byte(data[usize(k)])
+        n = fields.len
+        if n == 0 and tag != 8:
+            return Err("the first field must be 8 (BeginString)")
+        if n == 1:
+            if tag != 9:
+                return Err("the second field must be 9 (BodyLength)")
+            body_len = value.as_str().parse_int().value_or(-1)
+            if body_len < 0:
+                return Err("BodyLength is not a number")
+            body_start = i + 1
+        if tag == 10:
+            if n < 2:
+                return Err("the message has no body")
+            if i + 1 != data.len:
+                return Err("bytes follow the CheckSum field")
+            if i64(start - body_start) != body_len:
+                return Err(f"BodyLength says {body_len}, the body has {start - body_start} bytes")
+            if value.len != 3:
+                return Err("CheckSum must have three digits")
+            want = _digits(_checksum(data, start))
+            if want.as_str() != value.as_str():
+                return Err(f"CheckSum is {value.as_str()}, expected {want.as_str()}")
+            fields.push(FixField{ tag: tag, value: value })
+            return Ok(FixMessage{ fields: fields })
+        if fields.len >= MAX_FIELDS:
+            return Err("too many fields")
+        fields.push(FixField{ tag: tag, value: value })
+        start = i + 1
+        i += 1
+    return Err("the message does not end with a CheckSum (10) field")
+
+impl FixMessage:
+    public
+    # The first value of `tag`, or None.
+    fn get(self: read Self, tag: i64) -> Optional[string]:
+        for f in self.fields:
+            if f.tag == tag:
+                return Valid(f.value.clone())
+        return None
+
+    # Every value of `tag`, in order (a repeating group repeats its tags).
+    fn get_all(self: read Self, tag: i64) -> List[string]:
+        out = List[string]()
+        for f in self.fields:
+            if f.tag == tag:
+                out.push(f.value.clone())
+        return out
+
+    # The first value of `tag` as an integer, or None when it is missing or not a number.
+    fn get_i64(self: read Self, tag: i64) -> Optional[i64]:
+        for f in self.fields:
+            if f.tag == tag:
+                return f.value.as_str().parse_int()
+        return None
+
+    # The number of fields, the frame fields (8, 9, 10) included.
+    fn len(self: read Self) -> usize:
+        return self.fields.len
+
+public
+# Builds a message and fills in BodyLength (9) and CheckSum (10).
+struct FixBuilder:
+    private
+    begin: string
+    body: string
+
+impl FixBuilder:
+    public
+    # `begin_string` is the protocol version text, e.g. "FIX.4.4" or "FIXT.1.1".
+    fn new(begin_string: str) -> FixBuilder:
+        return FixBuilder{ begin: string.from(begin_string), body: string.new() }
+
+    # Adds `tag=value`. The value must not be empty and must not contain the SOH byte.
+    fn add(self: lend Self, tag: i64, value: str):
+        if tag <= 0 or tag == 8 or tag == 9 or tag == 10:
+            panic("FixBuilder.add: tags 8, 9 and 10 are written by finish()")
+        if value.len == 0:
+            panic("FixBuilder.add: a FIX field cannot have an empty value")
+        for b in value.as_bytes():
+            if b == SOH:
+                panic("FixBuilder.add: the value contains the SOH byte")
+        self.body.append(f"{tag}={value}")
+        self.body.append_byte(SOH)
+
+    # The wire form of the message.
+    fn finish(self: read Self) -> string:
+        out = string.new()
+        out.append(f"8={self.begin.as_str()}")
+        out.append_byte(SOH)
+        out.append(f"9={self.body.len}")
+        out.append_byte(SOH)
+        out.append(self.body.clone())
+        sum = _checksum(out.as_str().as_bytes(), out.len)
+        out.append(string.from("10="))
+        out.append(_digits(sum))
+        out.append_byte(SOH)
+        return out

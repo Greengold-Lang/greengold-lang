@@ -1,0 +1,66 @@
+{
+ "title": "Safe wrappers",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "The best practice in professional systems programming is to confine `unsafe` code inside small functions and offer the outside world a **completely safe** API. The caller never has to write `unsafe`, and invalid inputs are filtered out in the wrapper."
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"stdlib.h\" fn rand() -> i32",
+    "extern \"stdlib.h\" fn srand(seed: u32)",
+    "",
+    "fn get_c_random(max: i32) -> i32:",
+    "    if max <= 0:",
+    "        return 0",
+    "    unsafe:",
+    "        raw = rand()",
+    "        return raw % max",
+    "",
+    "fn main():",
+    "    dice = get_c_random(6) + 1",
+    "    print(\"dice:\", dice)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "In the example below C's `sqrt` is hidden inside a safe function that returns a `Result`:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sqrt(x: f64) -> f64",
+    "",
+    "fn square_root(x: f64) -> Result[f64, str]:",
+    "    if x < 0.0:",
+    "        return Err(\"negative number\")",
+    "    unsafe:",
+    "        return Ok(sqrt(x))",
+    "",
+    "fn main():",
+    "    match square_root(16.0):",
+    "        Ok(v):",
+    "            print(v)",
+    "        Err(m):",
+    "            print(m)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l04-q1",
+   "q": "What is the purpose of a safe wrapper?",
+   "options": [
+    "To slow the code down",
+    "To gather `unsafe` code in one small place and keep the caller safe",
+    "To remove `extern`"
+   ],
+   "answer": 1,
+   "why": "The `unsafe` surface to audit shrinks."
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "title": "调用 C 函数：extern",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold 通过 C ABI 直接与 C 库对话，中间没有额外开销。要声明一个已有的 C 函数，使用 **`extern`**："
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sin(x: f64) -> f64",
+    "extern \"math.h\" fn cos(x: f64) -> f64",
+    "",
+    "fn main():",
+    "    unsafe:",
+    "        print(sin(0.0), cos(0.0))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "调用已声明的 C 函数，意味着信任一份编译器无法验证的约定；因此调用要在 **`unsafe:`** 块内进行。参数个数可变的 C 函数（`printf`）在签名中用 `...` 标记。"
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l01-q1",
+   "q": "`extern` 的 C 函数在哪里调用？",
+   "options": [
+    "任何地方",
+    "在 `unsafe:` 块中",
+    "只在 `main` 中"
+   ],
+   "answer": 1,
+   "why": "编译器无法验证 C 那一侧；责任在程序员。"
+  }
+ ]
+}

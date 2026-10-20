@@ -1,0 +1,85 @@
+{
+ "title": "没有值：Optional",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "在安全的 Greengold 代码中**没有 `null`**。如果一个函数有时无法返回值，它的返回类型就是 `Optional[T]`。它有两种状态：`Valid(值)`（有值）和 `None`（没有）。用 `match` 必须处理这两种情况。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    match find_index(numbers, 40):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")",
+    "    match find_index(numbers, 7):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")"
+   ],
+   "run": true,
+   "output": [
+    "found at 2",
+    "not in the array"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l01-x1",
+   "prompt": "编写 `first_negative(items: []i32) -> Optional[i32]`：把第一个负数作为 `Valid` 返回，如果没有则返回 `None`。对 `[3, 8, -2, 5]`，用 `match` 输出结果。",
+   "starter": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "solution": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    for x in items:",
+    "        if x < 0:",
+    "            return Valid(x)",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "hint": "在循环中，当 `x < 0` 时 `return Valid(x)`。",
+   "expected": [
+    "found -2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l01-q1",
+   "q": "`Optional[T]` 有哪两种状态？",
+   "options": [
+    "`Ok` 和 `Err`",
+    "`Valid` 和 `None`",
+    "`True` 和 `False`"
+   ],
+   "answer": 1,
+   "why": "`Ok`/`Err` 属于 `Result`。"
+  }
+ ]
+}

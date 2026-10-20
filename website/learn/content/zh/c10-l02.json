@@ -1,0 +1,100 @@
+{
+ "title": "文本处理：std.string",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "在 Greengold 中文本有两种形式：**`str`**（不可变，是一个视图：`\"hello\"`）和 **`string`**（可在堆上增长的 UTF-8 序列）。`std.string` 提供了对两者都适用的辅助函数。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    text = \"  apple,pear,banana  \"",
+    "    trimmed = string.str_trim(text)",
+    "    print(trimmed)",
+    "    print(string.str_contains(trimmed, \"pear\"))",
+    "    print(string.str_starts_with(trimmed, \"apple\"))",
+    "    parts = string.str_split(trimmed, ',')",
+    "    print(parts.len)",
+    "    for p in parts:",
+    "        print(p)"
+   ],
+   "run": true,
+   "output": [
+    "apple,pear,banana",
+    "true",
+    "true",
+    "3",
+    "apple",
+    "pear",
+    "banana"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "要构建可增长的 `string`，使用 `string.from`、`append_str` 和 `append_byte`；输出时用 `as_str()` 取得只读视图。数字转换返回 `Optional`：`parse_i64`、`parse_f64`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    msg = string.from(\"Greengold\")",
+    "    msg.append_str(\" Language\")",
+    "    msg.append_byte('!')",
+    "    print(msg.as_str())",
+    "    print(string.parse_i64(\"42\").value_or(0))",
+    "    print(string.parse_i64(\"4x2\").value_or(-1))",
+    "    print(string.to_upper(\"hello\").as_str())"
+   ],
+   "run": true,
+   "output": [
+    "Greengold Language!",
+    "42",
+    "-1",
+    "HELLO"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l02-x1",
+   "prompt": "把文本 `\"1,2,3,4\"` 按逗号拆分，用 `parse_i64` 转换每一部分，并输出它们的总和。",
+   "starter": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    total: i64 = 0",
+    "    print(total)"
+   ],
+   "solution": [
+    "import std.string",
+    "",
+    "fn main():",
+    "    total: i64 = 0",
+    "    parts = string.str_split(\"1,2,3,4\", ',')",
+    "    for p in parts:",
+    "        total += string.parse_i64(p).value_or(0)",
+    "    print(total)"
+   ],
+   "hint": "用 `str_split` 拆分，在循环里累加 `parse_i64(p).value_or(0)`。",
+   "expected": [
+    "10"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l02-q1",
+   "q": "`string.parse_i64(\"abc\")` 返回什么？",
+   "options": [
+    "0",
+    "`None`（一个 `Optional`）",
+    "程序崩溃"
+   ],
+   "answer": 1,
+   "why": "无法转换的文本得到 `None`；失败被表达为一个值。"
+  }
+ ]
+}

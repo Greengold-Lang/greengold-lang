@@ -1,0 +1,77 @@
+{
+ "title": "错误转换与 panic",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "不同的库会产生不同的错误类型。如果调用方返回 `Result[T, AppError]`，被调用方返回 `Result[T, i32]`，并且 `impl AppError:` 中定义了 `fn from(e: i32) -> AppError`，那么 `?` 会**自己**完成转换。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum AppError:",
+    "    Database(i32)",
+    "    Network(str)",
+    "",
+    "impl AppError:",
+    "    fn from(code: i32) -> AppError:",
+    "        return AppError.Database(code)",
+    "",
+    "fn query_db() -> Result[str, i32]:",
+    "    return Err(500)",
+    "",
+    "fn handle_request() -> Result[str, AppError]:",
+    "    data = query_db()?",
+    "    return Ok(data)",
+    "",
+    "fn main():",
+    "    if let Err(e) = handle_request():",
+    "        print(\"application error caught\")"
+   ],
+   "run": true,
+   "output": [
+    "application error caught"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "对于程序无法继续的不可恢复情况，使用 **`panic`**：消息写入 `stderr`，程序以退出码 101 立即结束。预期之内的错误用 `Result`，“这绝不应该发生”的情形用 `panic`。"
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l06-x1",
+   "prompt": "编写 `check_level(level: i32)`：`level < 0` 时 `panic(\"invalid level\")`，否则输出 `access granted`。只用合法的级别（3）调用它。",
+   "starter": [
+    "fn check_level(level: i32):",
+    "    print(\"?\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "solution": [
+    "fn check_level(level: i32):",
+    "    if level < 0:",
+    "        panic(\"invalid level\")",
+    "    print(\"access granted\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "hint": "在 `if level < 0:` 里使用 `panic(...)`。",
+   "expected": [
+    "access granted"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l06-q1",
+   "q": "什么时候用 `Result` 而不是 `panic`？",
+   "options": [
+    "对预期之内、可恢复的错误",
+    "从不",
+    "只用于数字"
+   ],
+   "answer": 0,
+   "why": "`panic` 用于不可恢复的情况。"
+  }
+ ]
+}

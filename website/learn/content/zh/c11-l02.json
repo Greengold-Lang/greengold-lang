@@ -1,0 +1,63 @@
+{
+ "title": "运行、构建、检查",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "开发时你最常用的三个命令：`gg run`（编译并运行）、`gg build`（生成可分发的可执行文件）和 `gg check`（只做类型检查，不生成代码；最快）。"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg run                      # debug mode: every run-time check on",
+    "gg run --release            # LLVM -O3 optimizations",
+    "gg build -o my_app          # a debug executable",
+    "gg build --release -o my_app_release",
+    "gg check src/main.gg        # errors and warnings only"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**智能缓存：** `gg build` 在 `.gg-cache/` 中保存源码的 SHA-256 哈希；如果代码没有变化，它会提示 `Up to date (cached)` 并且不重新构建。你也可以用 `--target` 为其他平台构建（`gg targets` 会列出它能链接哪些）。"
+  },
+  {
+   "t": "p",
+   "text": "想详细了解某个错误码，有 `gg explain`；想检查机器和安装是否健康，有 `gg doctor`："
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg explain GG0207",
+    "gg doctor",
+    "gg toolchain"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q1",
+   "q": "哪个命令只显示错误，而不生成代码？",
+   "options": [
+    "`gg run`",
+    "`gg check`",
+    "`gg build`"
+   ],
+   "answer": 1,
+   "why": "`gg check` 做类型检查，不生成代码。"
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q2",
+   "q": "代码没有变化时，`gg build` 会做什么？",
+   "options": [
+    "总是重新构建",
+    "提示 `Up to date (cached)`",
+    "报告一个错误"
+   ],
+   "answer": 1,
+   "why": "源码的哈希会与缓存比较。"
+  }
+ ]
+}

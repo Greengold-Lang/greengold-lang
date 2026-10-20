@@ -1,0 +1,72 @@
+{
+ "title": "Text and characters",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Text in double quotes is a **string** (`str`): an immutable view of UTF-8 memory, so it can hold any language. `'A'` in single quotes is a single character and its value is the ASCII number (`u8`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    greeting = \"Hello\"",
+    "    letter = 'A'",
+    "    print(greeting, letter)"
+   ],
+   "run": true,
+   "output": [
+    "Hello 65"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Special characters are written with `\\`: `\\n` a new line, `\\t` a tab, `\\\\` a backslash, `\\\"` a double quote."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"First\\nSecond\")",
+    "    print(\"Name:\\tAli\")",
+    "    print(\"He said \\\"hello\\\"\")"
+   ],
+   "run": true,
+   "output": [
+    "First",
+    "Second",
+    "Name:\tAli",
+    "He said \"hello\""
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l04-x1",
+   "prompt": "With a single `print`, output two lines: `One` and `Two`. (use `\\n`)",
+   "starter": [
+    "fn main():",
+    "    print(\"Bir İki\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"One\\nTwo\")"
+   ],
+   "hint": "Put `\\n` where the space is.",
+   "expected": [
+    "One",
+    "Two"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l04-q1",
+   "q": "Are `'A'` and `\"A\"` the same thing?",
+   "options": [
+    "Yes",
+    "No: one is a character, the other a string",
+    "No: one is an error"
+   ],
+   "answer": 1,
+   "why": "Single quotes make a character (a number), double quotes make a string."
+  }
+ ]
+}

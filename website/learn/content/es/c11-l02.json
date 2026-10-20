@@ -1,0 +1,63 @@
+{
+ "title": "Ejecutar, compilar, comprobar",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Los tres comandos que más usarás al desarrollar: `gg run` (compilar y ejecutar), `gg build` (producir un ejecutable distribuible) y `gg check` (solo comprobación de tipos, sin generar código; el más rápido)."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg run                      # debug mode: every run-time check on",
+    "gg run --release            # LLVM -O3 optimizations",
+    "gg build -o my_app          # a debug executable",
+    "gg build --release -o my_app_release",
+    "gg check src/main.gg        # errors and warnings only"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**Caché inteligente:** `gg build` guarda el hash SHA-256 del código fuente en `.gg-cache/`; si el código no ha cambiado dice `Up to date (cached)` y no recompila. También puedes compilar para otras plataformas con `--target` (`gg targets` lista cuáles puede enlazar)."
+  },
+  {
+   "t": "p",
+   "text": "Para una explicación detallada de un código de error existe `gg explain`; para la salud de la máquina y de la instalación existe `gg doctor`:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg explain GG0207",
+    "gg doctor",
+    "gg toolchain"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q1",
+   "q": "¿Qué comando muestra solo los errores, sin generar código?",
+   "options": [
+    "`gg run`",
+    "`gg check`",
+    "`gg build`"
+   ],
+   "answer": 1,
+   "why": "`gg check` comprueba tipos y no genera código."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q2",
+   "q": "¿Qué hace `gg build` cuando el código no ha cambiado?",
+   "options": [
+    "Siempre recompila",
+    "Dice `Up to date (cached)`",
+    "Da un error"
+   ],
+   "answer": 1,
+   "why": "El hash del código fuente se compara con la caché."
+  }
+ ]
+}

@@ -82,8 +82,14 @@ def recur_inline(ir: str) -> str:
     spans = _spans(ir)
     for start, end in spans:
         chunk = ir[start:end]
-        brace = chunk.find("{")
-        if brace < 0:
+        # The body opens at the end of the define line (or on the next line); `{i8*, i64}` parameters have braces too.
+        first_nl = chunk.find("\n")
+        line = chunk if first_nl < 0 else chunk[:first_nl]
+        if line.rstrip().endswith("{"):
+            brace = line.rfind("{")
+        elif first_nl >= 0 and chunk[first_nl + 1:].startswith("{"):
+            brace = first_nl + 1
+        else:
             continue
         header, body = chunk[: brace + 1], chunk[brace + 1 :]
         token = _token(header)

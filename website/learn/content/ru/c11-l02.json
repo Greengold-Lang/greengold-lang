@@ -1,0 +1,63 @@
+{
+ "title": "Запуск, сборка, проверка",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Три команды, которыми вы будете пользоваться чаще всего при разработке: `gg run` (скомпилировать и запустить), `gg build` (получить распространяемый исполняемый файл) и `gg check` (только проверка типов без генерации кода; самая быстрая)."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg run                      # debug mode: every run-time check on",
+    "gg run --release            # LLVM -O3 optimizations",
+    "gg build -o my_app          # a debug executable",
+    "gg build --release -o my_app_release",
+    "gg check src/main.gg        # errors and warnings only"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**Умный кеш:** `gg build` хранит хеш SHA-256 исходника в `.gg-cache/`; если код не изменился, он пишет `Up to date (cached)` и не пересобирает. Можно также собирать для других платформ через `--target` (`gg targets` перечисляет, какие он умеет линковать)."
+  },
+  {
+   "t": "p",
+   "text": "Для подробного объяснения кода ошибки есть `gg explain`; для проверки состояния машины и установки — `gg doctor`:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg explain GG0207",
+    "gg doctor",
+    "gg toolchain"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q1",
+   "q": "Какая команда показывает только ошибки, не генерируя код?",
+   "options": [
+    "`gg run`",
+    "`gg check`",
+    "`gg build`"
+   ],
+   "answer": 1,
+   "why": "`gg check` проверяет типы и не генерирует код."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q2",
+   "q": "Что делает `gg build`, когда код не изменился?",
+   "options": [
+    "Всегда пересобирает",
+    "Пишет `Up to date (cached)`",
+    "Сообщает об ошибке"
+   ],
+   "answer": 1,
+   "why": "Хеш исходника сравнивается с кешем."
+  }
+ ]
+}

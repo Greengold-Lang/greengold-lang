@@ -1,0 +1,76 @@
+{
+ "title": "Modüller ve import",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Standart kütüphane `std.*` modüllerinden oluşur. Bir modülü dosyanın başında `import std.modül` ile alırsın; adlar modül adıyla birlikte yazılır: `math.sqrt(...)`. Belirli adları doğrudan almak için `import std.math { sqrt }`, yeni bir ad vermek için `import std.math as m` yazılır. Çekirdek (prelude) ve yerleşikler için import gerekmez (`print`, `List`, `Optional`, `Result`...)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(16.0))",
+    "    print(math.pow(2.0, 10.0))"
+   ],
+   "run": true,
+   "output": [
+    "4",
+    "1024"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math { sqrt, floor }",
+    "",
+    "fn main():",
+    "    print(sqrt(81.0))",
+    "    print(floor(3.99))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "3"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Her import yalnızca o dosya için geçerlidir ve başka dosyalara geçmez. Hangi modülde ne olduğunu sol menüdeki **Standart kütüphane referansı**'ndan arayabilirsin; terminalde `gg api` aynı listeyi verir."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l01-x1",
+   "prompt": "`std.math`'ten `sqrt` ve `pow` adlarını doğrudan içe aktar. `sqrt(49.0)` ve `pow(3.0, 4.0)` yazdır.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.math { sqrt, pow }",
+    "",
+    "fn main():",
+    "    print(sqrt(49.0))",
+    "    print(pow(3.0, 4.0))"
+   ],
+   "hint": "`import std.math { sqrt, pow }` yaz.",
+   "expected": [
+    "7",
+    "81"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l01-q1",
+   "q": "Hangisi için `import` gerekmez?",
+   "options": [
+    "`math.sqrt`",
+    "`List` ve `print`",
+    "`sort.sort`"
+   ],
+   "answer": 1,
+   "why": "Çekirdek prelude ve yerleşikler her zaman kapsamdadır."
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+{
+ "title": "Kanäle: Teilen durch Nachrichten",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Statt durch gemeinsamen Speicher zu kommunizieren, ist **Teilen durch Kommunizieren** der sicherste Weg. Ein **Kanal** lässt einen Thread die Werte empfangen, die ein anderer sendet. `ChannelI64` trägt `i64`; für Werte beliebigen Typs gibt es `Queue[T]`. `send` sendet, `recv` liefert ein `Optional` (`None`, sobald der Kanal geschlossen und leer ist), `close` schließt ihn."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    ch = thread.ChannelI64.new()",
+    "    ch.send(100)",
+    "    ch.send(200)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    ch.close()"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l03-q1",
+   "q": "Was liefert `recv()` bei einem geschlossenen und leeren Kanal?",
+   "options": [
+    "`0`",
+    "`None`",
+    "Einen Fehler"
+   ],
+   "answer": 1,
+   "why": "Deshalb endet eine Schleife `while let Valid(v) = ch.recv()` von selbst."
+  }
+ ]
+}

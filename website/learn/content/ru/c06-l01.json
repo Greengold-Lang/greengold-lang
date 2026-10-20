@@ -1,0 +1,122 @@
+{
+ "title": "Перечисления (enum) и match",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**`enum`** перечисляет варианты (**варианты**), которые может принимать значение. Чтобы рассмотреть значение enum, используют **`match`**. Его главная особенность: компилятор проверяет, что обработаны **все случаи**. Если забыть вариант, код не скомпилируется."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn action(light: TrafficLight):",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            print(\"Stop!\")",
+    "        TrafficLight.Yellow:",
+    "            print(\"Get ready...\")",
+    "        TrafficLight.Green:",
+    "            print(\"Go!\")",
+    "",
+    "fn main():",
+    "    action(TrafficLight.Red)",
+    "    action(TrafficLight.Green)"
+   ],
+   "run": true,
+   "output": [
+    "Stop!",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Если не хочется писать все варианты, `_:` ловит всё остальное."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn is_stop(light: TrafficLight) -> bool:",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            return true",
+    "        _:",
+    "            return false",
+    "",
+    "fn main():",
+    "    print(is_stop(TrafficLight.Red), is_stop(TrafficLight.Yellow))"
+   ],
+   "run": true,
+   "output": [
+    "true false"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l01-x1",
+   "prompt": "Для enum `Direction` (`North`, `South`, `East`, `West`) напишите `name(d)`: она выводит собственное имя (`north`, `south`...). Вызовите её для `West`.",
+   "starter": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        _:",
+    "            print(\"?\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "solution": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        Direction.South:",
+    "            print(\"south\")",
+    "        Direction.East:",
+    "            print(\"east\")",
+    "        Direction.West:",
+    "            print(\"west\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "hint": "Напишите по ветке на каждый вариант; не используйте `_`.",
+   "expected": [
+    "west"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l01-q1",
+   "q": "Что произойдёт, если забыть вариант в `match`?",
+   "options": [
+    "Упадёт во время выполнения",
+    "Код не скомпилируется",
+    "Будет молча пропущен"
+   ],
+   "answer": 1,
+   "why": "`match` исчерпывающий: пропущенный случай — ошибка компиляции."
+  }
+ ]
+}

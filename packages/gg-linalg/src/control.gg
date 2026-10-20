@@ -1,0 +1,101 @@
+# linalg.control: a PID controller and a linear Kalman filter, the two pieces every control loop and navigation filter starts from.
+# Both are plain structs of numbers and arrays: no allocation, a fixed number of operations per step.
+#
+#     import linalg.control { Pid, Kalman }
+#     pid = Pid.new(2.0, 0.5, 0.05, -1.0, 1.0)             # kp, ki, kd, output limits
+#     u = pid.update(10.0, measured, 0.01)                  # setpoint, measurement, seconds since the last call
+#
+# `Pid` differentiates the measurement, not the error, so a step in the setpoint does not kick the output, and it stops the integral from
+# growing while the output is saturated (conditional integration), so it recovers quickly after a limit is hit.
+#
+# `Kalman[N, M]` tracks an N-dimensional state from M-dimensional measurements: `predict()` moves the state forward with the model `f`,
+# `update(z)` corrects it with a measurement. All matrices are `Mat` values, so a size mistake is a compile error.
+
+import "mat.gg" { Mat, matmul }
+
+public
+struct Pid:
+    kp: f64
+    ki: f64
+    kd: f64
+    out_min: f64
+    out_max: f64
+    integral: f64
+    last_measurement: f64
+    primed: bool
+
+impl Pid:
+    public
+    fn new(kp: f64, ki: f64, kd: f64, out_min: f64, out_max: f64) -> Pid:
+        return Pid{ kp: kp, ki: ki, kd: kd, out_min: out_min, out_max: out_max, integral: 0.0, last_measurement: 0.0, primed: false }
+
+    # Forgets the integral and the previous measurement (after a mode change or a long pause).
+    fn reset(self: lend Self):
+        self.integral = 0.0
+        self.primed = false
+
+    # One step. `dt` is the time since the previous call in seconds and must be positive (otherwise the output is the
+    # proportional term alone).
+    fn update(self: lend Self, setpoint: f64, measurement: f64, dt: f64) -> f64:
+        error = setpoint - measurement
+        p = self.kp * error
+        d = 0.0
+        if self.primed and dt > 0.0:
+            d = -self.kd * (measurement - self.last_measurement) / dt
+        self.last_measurement = measurement
+        self.primed = true
+        if dt <= 0.0:
+            return clamp_output(p, self.out_min, self.out_max)
+        candidate = self.integral + self.ki * error * dt
+        raw = p + candidate + d
+        out = clamp_output(raw, self.out_min, self.out_max)
+        if out == raw:
+            self.integral = candidate          # only integrate while the output is not saturated
+        elif (raw > self.out_max and error < 0.0) or (raw < self.out_min and error > 0.0):
+            self.integral = candidate          # ... or when the error is already pulling it back
+        return out
+
+fn clamp_output(v: f64, lo: f64, hi: f64) -> f64:
+    if v < lo:
+        return lo
+    if v > hi:
+        return hi
+    return v
+
+public
+struct Kalman[N: usize, M: usize]:
+    x: Mat[N, 1]           # state estimate
+    p: Mat[N, N]           # its covariance
+    f: Mat[N, N]           # state transition model
+    h: Mat[M, N]           # measurement model
+    q: Mat[N, N]           # process noise covariance
+    r: Mat[M, M]           # measurement noise covariance
+
+impl Kalman[N, M]:
+    public
+    fn new(x: Mat[N, 1], p: Mat[N, N], f: Mat[N, N], h: Mat[M, N], q: Mat[N, N], r: Mat[M, M]) -> Kalman[N, M]:
+        return Kalman[N, M]{ x: x, p: p, f: f, h: h, q: q, r: r }
+
+    # Moves the estimate one step forward: x = F x, P = F P F' + Q.
+    fn predict(self: lend Self):
+        self.x = matmul(self.f, self.x)
+        fp = matmul(self.f, self.p)
+        self.p = matmul(fp, self.f.transpose()).add(self.q)
+
+    # Corrects the estimate with the measurement `z`. Returns false (and changes nothing) when the innovation covariance is
+    # singular, which means the measurement model and the noise leave something undetermined.
+    fn update(self: lend Self, z: Mat[M, 1]) -> bool:
+        y = z.sub(matmul(self.h, self.x))
+        ht = self.h.transpose()
+        pht = matmul(self.p, ht)
+        s = matmul(self.h, pht).add(self.r)
+        match s.inverse():
+            Valid(s_inv):
+                k = matmul(pht, s_inv)
+                self.x = self.x.add(matmul(k, y))
+                # Joseph form: stays symmetric and positive semi-definite despite rounding
+                i_kh = Mat[N, N].identity().sub(matmul(k, self.h))
+                self.p = matmul(matmul(i_kh, self.p), i_kh.transpose()).add(matmul(matmul(k, self.r), k.transpose()))
+                return true
+            None:
+                return false

@@ -1,0 +1,65 @@
+{
+ "title": "Callbacks",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Storing a function in a struct field is the basis of event-driven programs: \"when this event happens, call that function\"."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Button:",
+    "    id: i32",
+    "    on_click: fn(i32)",
+    "",
+    "fn notify(id: i32):",
+    "    print(\"button pressed:\", id)",
+    "",
+    "fn main():",
+    "    b = Button{ id: 101, on_click: notify }",
+    "    b.on_click(b.id)"
+   ],
+   "run": true,
+   "output": [
+    "button pressed: 101"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l02-x1",
+   "prompt": "Build a `Timer` struct (`name: str`, `on_finish: fn(str)`). Use a `report(name)` function (printing `finished: ` and the name) as `on_finish`, and call it for `Timer{ name: \"tea\", ... }`.",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Timer:",
+    "    name: str",
+    "    on_finish: fn(str)",
+    "",
+    "fn report(name: str):",
+    "    print(\"finished:\", name)",
+    "",
+    "fn main():",
+    "    t = Timer{ name: \"tea\", on_finish: report }",
+    "    t.on_finish(t.name)"
+   ],
+   "hint": "The field type is `fn(str)`, the call is `t.on_finish(t.name)`.",
+   "expected": [
+    "finished: tea"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l02-q1",
+   "q": "How do you call a function stored in a struct field?",
+   "options": [
+    "`b.on_click(b.id)`",
+    "`call(b.on_click)`",
+    "It cannot be called"
+   ],
+   "answer": 0,
+   "why": "The field is a function value, so it is called with parentheses."
+  }
+ ]
+}

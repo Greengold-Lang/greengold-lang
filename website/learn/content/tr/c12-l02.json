@@ -1,0 +1,80 @@
+{
+ "title": "Atomik sayılar ve Mutex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Birden çok thread aynı belleğe dokunuyorsa veri yarışı oluşmaması gerekir. Tek bir sayı için en basit çözüm **atomik** değişkendir: işlemler bölünmez. `AtomicI64.fetch_and_add(n)` ekler, `load()` okur."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    counter = thread.AtomicI64.new(0)",
+    "    counter.fetch_and_add(10)",
+    "    counter.fetch_and_add(5)",
+    "    print(\"counter:\", counter.load())",
+    "    print(counter.compare_and_swap(15, 100), counter.load())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Daha karmaşık veri için **`Mutex`** kullanılır: `lock()` ile alınır, `unlock()` ile bırakılır. Kilidi unutmamak için daha güvenli bir yol, değeri kilidin içine koyan **`Locked[T]`**'dir: `lock()` bir `Guard` döndürür ve `Guard` kapsamdan çıkınca kilit kendiliğinden açılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn work(c: Arc[thread.Locked[i64]]):",
+    "    for _i in 0..1000:",
+    "        g = c.value.lock()",
+    "        g.value() += 1",
+    "",
+    "fn main():",
+    "    counter = Arc[thread.Locked[i64]](thread.Locked[i64].new(0))",
+    "    workers = List[thread.Thread]()",
+    "    for w in 0..4:",
+    "        c = counter.clone()",
+    "        workers.push(thread.Thread.spawn(fn() =>",
+    "            work(c)))",
+    "    for i in 0..workers.len:",
+    "        workers[i].join()",
+    "    print(counter.value.get())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Arc[T]` birden çok thread'in aynı değere sahip olmasını sağlayan sayaçlı bir paylaşımdır: `clone()` yeni bir sahip ekler, son sahip bırakınca değer silinir."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q1",
+   "q": "`Locked[T]` içindeki değere erişirken kilit ne zaman açılır?",
+   "options": [
+    "Elle `unlock()` yazınca",
+    "`Guard` kapsamdan çıkınca, kendiliğinden",
+    "Hiçbir zaman"
+   ],
+   "answer": 1,
+   "why": "Kilidi unutma hatası bu tasarımda yoktur."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q2",
+   "q": "Tek bir sayacı birden çok thread'den artırmanın en basit güvenli yolu?",
+   "options": [
+    "Sıradan bir `i64`",
+    "`AtomicI64`",
+    "Bir `List`"
+   ],
+   "answer": 1,
+   "why": "Atomik işlemler bölünmez; veri yarışı oluşmaz."
+  }
+ ]
+}

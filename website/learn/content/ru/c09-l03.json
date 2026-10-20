@@ -1,0 +1,87 @@
+{
+ "title": "Лямбда-выражения",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Для небольшой задачи вместо отдельного `fn` можно написать анонимную **лямбду**: `fn(параметры) -> Результат => выражение`. Её хранят в переменной или передают прямо как аргумент."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x * x)",
+    "    adder = fn(a: i32, b: i32) -> i32 => a + b",
+    "    print(\"sum:\", adder(10, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1",
+    "4",
+    "9",
+    "sum: 30"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "В лямбде без результата тип результата опускается, а тело должно быть выражением-вызовом:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    logger = fn(s: str) => print(\"[LOG]\", s)",
+    "    logger(\"the lambda ran\")"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] the lambda ran"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l03-x1",
+   "prompt": "Используйте `transform` с лямбдой, которая прибавляет 10 к каждому числу, и выведите результаты (11, 12, 13 для `[1, 2, 3]`).",
+   "starter": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x)"
+   ],
+   "solution": [
+    "fn transform(items: [3]i32, func: fn(i32) -> i32):",
+    "    for x in items:",
+    "        print(func(x))",
+    "",
+    "fn main():",
+    "    nums: [3]i32 = [1, 2, 3]",
+    "    transform(nums, fn(x: i32) -> i32 => x + 10)"
+   ],
+   "hint": "Пусть тело лямбды будет `x + 10`.",
+   "expected": [
+    "11",
+    "12",
+    "13"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l03-q1",
+   "q": "Что такое `fn(x: i32) -> i32 => x * 2`?",
+   "options": [
+    "Структура",
+    "Анонимная функция (лямбда), умножающая свой аргумент на два",
+    "Ошибка"
+   ],
+   "answer": 1,
+   "why": "`=>` начинает тело лямбды."
+  }
+ ]
+}

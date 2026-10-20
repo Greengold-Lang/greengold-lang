@@ -1,0 +1,58 @@
+{
+ "title": "启动线程",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold 提供操作系统级别的原生线程（`std.thread`）。`Thread.spawn(f)` 在后台启动一个函数，`join()` 等待它结束。要传递参数，有 `spawn_with_param(f, 值)`。它们都不需要 `unsafe`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn worker_a():",
+    "    print(\"worker A running in a background thread\")",
+    "",
+    "fn worker_b(id: i64):",
+    "    print(\"worker B with id\", id)",
+    "",
+    "fn main():",
+    "    t1 = thread.Thread.spawn(worker_a)",
+    "    t1.join()",
+    "    t2 = thread.Thread.spawn_with_param(worker_b, 42)",
+    "    t2.join()",
+    "    print(\"all threads finished\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Thread`、`Mutex`、`Cond` 和通道是**操作系统对象：它们被移动，而不是被复制**。写 `n = m` 会移动 `m`；不会产生第二把独立的锁。`m.clone()` 无法编译（GG0323）。要把锁或通道交给另一个函数，使用 `read`/`lend` 参数。"
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q1",
+   "q": "哪个方法等待线程结束？",
+   "options": [
+    "`wait()`",
+    "`join()`",
+    "`stop()`"
+   ],
+   "answer": 1,
+   "why": "`join()` 会一直等到线程结束。"
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q2",
+   "q": "`Mutex` 可以被复制吗？",
+   "options": [
+    "可以",
+    "不可以，它被移动",
+    "只能用 `clone`"
+   ],
+   "answer": 1,
+   "why": "操作系统对象不会被复制；复制意味着有两把不同的锁。"
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "title": "Tasks: async and await",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "For overlapping waiting work (timers, networking) without opening threads there are **tasks**. `async fn` starts a task and `await` waits for its result. `sleep` and `yield_now` in `std.tasks` suspend the task. The three `sleep`s below **overlap**: the total is about 100 ms, not 300."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.tasks",
+    "import std.time",
+    "",
+    "async fn twice(n: i32) -> i32:",
+    "    tasks.sleep(100)",
+    "    return n * 2",
+    "",
+    "fn main():",
+    "    t = time.Instant.now()",
+    "    a = twice(1)",
+    "    b = twice(2)",
+    "    c = twice(3)",
+    "    print(await a + await b + await c)",
+    "    print(t.elapsed_millis() < 250)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "You can also start a task with a lambda: `h = tasks.spawn(fn() -> string => ...)`, then `h.is_done()` and `await h`."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l04-q1",
+   "q": "If three `async` tasks each `sleep` for 100 ms and are all started first, roughly how long does it take in total?",
+   "options": [
+    "300 ms",
+    "100 ms (they overlap)",
+    "0 ms"
+   ],
+   "answer": 1,
+   "why": "The waits overlap; run one after another they would take 300 ms."
+  }
+ ]
+}

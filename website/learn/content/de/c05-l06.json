@@ -1,0 +1,97 @@
+{
+ "title": "Automatische Aufräumarbeit und defer",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold hat keinen Garbage Collector. Erreicht ein Move-Typ das Ende seines Gültigkeitsbereichs, gibt der Compiler den Speicher **von selbst** frei (`drop`). Du schreibst nie `free` und kannst es nicht vergessen."
+  },
+  {
+   "t": "p",
+   "text": "**`defer`** markiert Aufräumcode, der beim Verlassen eines Bereichs läuft (normales Ende, `return`, `break`, `continue`, ein Fehler: alles gleich). Mehrere `defer` laufen in **umgekehrter Reihenfolge** (das zuletzt geschriebene läuft zuerst)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"started\")",
+    "    defer print(\"cleanup 1 (written first, runs last)\")",
+    "    defer print(\"cleanup 2\")",
+    "    defer print(\"cleanup 3 (written last, runs first)\")",
+    "    print(\"working...\")"
+   ],
+   "run": true,
+   "output": [
+    "started",
+    "working...",
+    "cleanup 3 (written last, runs first)",
+    "cleanup 2",
+    "cleanup 1 (written first, runs last)"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn process(code: i32):",
+    "    print(\"resource opened\")",
+    "    defer print(\"resource closed\")",
+    "    if code < 0:",
+    "        print(\"error, returning early\")",
+    "        return",
+    "    print(\"processed\")",
+    "",
+    "fn main():",
+    "    process(1)",
+    "    process(-1)"
+   ],
+   "run": true,
+   "output": [
+    "resource opened",
+    "processed",
+    "resource closed",
+    "resource opened",
+    "error, returning early",
+    "resource closed"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l06-x1",
+   "prompt": "Gib in `run()` die Meldungen `open`, `use` und `close` aus; schreibe aber `close` mit `defer`, direkt nach `open`. Die erwartete Reihenfolge ist: open, use, close.",
+   "starter": [
+    "fn run():",
+    "    print(\"open\")",
+    "    print(\"use\")",
+    "",
+    "fn main():",
+    "    run()"
+   ],
+   "solution": [
+    "fn run():",
+    "    print(\"open\")",
+    "    defer print(\"close\")",
+    "    print(\"use\")",
+    "",
+    "fn main():",
+    "    run()"
+   ],
+   "hint": "Füge `defer print(\"close\")` unter `print(\"open\")` ein.",
+   "expected": [
+    "open",
+    "use",
+    "close"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l06-q1",
+   "q": "Welches läuft zuerst, wenn drei `defer` geschrieben sind?",
+   "options": [
+    "Das zuerst geschriebene",
+    "Das zuletzt geschriebene",
+    "Ein zufälliges"
+   ],
+   "answer": 1,
+   "why": "`defer` läuft in umgekehrter Reihenfolge (LIFO)."
+  }
+ ]
+}

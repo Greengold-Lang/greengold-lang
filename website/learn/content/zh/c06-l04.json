@@ -1,0 +1,70 @@
+{
+ "title": "作为表达式的 match",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` 也可以产生一个值：用 `=>` 把每个分支绑定到单个表达式，并把结果赋给变量或用 `return` 返回。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn error_message(code: i32) -> str:",
+    "    return match code:",
+    "        0 => \"success\"",
+    "        1 => \"file not found\"",
+    "        2 => \"access denied\"",
+    "        _ => \"general error\"",
+    "",
+    "fn main():",
+    "    print(error_message(2))",
+    "    msg = match 0:",
+    "        0 => \"OK\"",
+    "        _ => \"Error!\"",
+    "    print(msg)"
+   ],
+   "run": true,
+   "output": [
+    "access denied",
+    "OK"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l04-x1",
+   "prompt": "编写 `days_in(month: i32) -> i32`（二月为 28）：2 => 28；4、6、9、11 => 30；其他 => 31。输出 9 月的天数。",
+   "starter": [
+    "fn days_in(month: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "solution": [
+    "fn days_in(month: i32) -> i32:",
+    "    return match month:",
+    "        2 => 28",
+    "        4 | 6 | 9 | 11 => 30",
+    "        _ => 31",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "hint": "在 `return match month:` 之后写三个分支。",
+   "expected": [
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l04-q1",
+   "q": "在表达式形式的 `match` 中，每个分支的值必须怎样？",
+   "options": [
+    "可以是任意类型",
+    "必须是同一类型",
+    "必须是字符串"
+   ],
+   "answer": 1,
+   "why": "结果会放进同一个变量，所以类型必须一致。"
+  }
+ ]
+}

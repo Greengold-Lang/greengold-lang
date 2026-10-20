@@ -1,0 +1,58 @@
+{
+ "title": "Threads starten",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold bietet native Threads auf Betriebssystemebene (`std.thread`). `Thread.spawn(f)` startet eine Funktion im Hintergrund, `join()` wartet, bis sie fertig ist. Zum Übergeben eines Parameters gibt es `spawn_with_param(f, wert)`. Keines davon braucht `unsafe`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn worker_a():",
+    "    print(\"worker A running in a background thread\")",
+    "",
+    "fn worker_b(id: i64):",
+    "    print(\"worker B with id\", id)",
+    "",
+    "fn main():",
+    "    t1 = thread.Thread.spawn(worker_a)",
+    "    t1.join()",
+    "    t2 = thread.Thread.spawn_with_param(worker_b, 42)",
+    "    t2.join()",
+    "    print(\"all threads finished\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Thread`, `Mutex`, `Cond` und Kanäle sind **Betriebssystemobjekte: Sie werden verschoben, nicht kopiert**. `n = m` zu schreiben verschiebt `m`; ein zweites, unabhängiges Schloss entsteht nicht. `m.clone()` kompiliert nicht (GG0323). Um ein Schloss oder einen Kanal an eine andere Funktion zu geben, verwendest du einen `read`/`lend`-Parameter."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q1",
+   "q": "Welche Methode wartet, bis ein Thread fertig ist?",
+   "options": [
+    "`wait()`",
+    "`join()`",
+    "`stop()`"
+   ],
+   "answer": 1,
+   "why": "`join()` wartet, bis der Thread beendet ist."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q2",
+   "q": "Kann ein `Mutex` kopiert werden?",
+   "options": [
+    "Ja",
+    "Nein, er wird verschoben",
+    "Nur mit `clone`"
+   ],
+   "answer": 1,
+   "why": "Betriebssystemobjekte werden nicht kopiert; eine Kopie würde zwei getrennte Schlösser bedeuten."
+  }
+ ]
+}

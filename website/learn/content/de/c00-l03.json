@@ -1,0 +1,80 @@
+{
+ "title": "Entscheidungen treffen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Programme können sich je nach Situation unterschiedlich verhalten. Dafür verwendest du **`if`**: Ist die Bedingung wahr, wird der eingerückte Teil ausgeführt. Vergiss den `:` nach der Bedingung nicht."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    temperature = 31",
+    "    if temperature > 30:",
+    "        print(\"It is hot\")",
+    "    print(\"Done\")"
+   ],
+   "run": true,
+   "output": [
+    "It is hot",
+    "Done"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`else` wird ausgeführt, wenn die Bedingung nicht wahr ist. Vergleichszeichen: `>` größer, `<` kleiner, `>=` größer oder gleich, `==` ist gleich?, `!=` ist ungleich?"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 45",
+    "    if score >= 50:",
+    "        print(\"Passed\")",
+    "    else:",
+    "        print(\"Failed\")"
+   ],
+   "run": true,
+   "output": [
+    "Failed"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l03-x1",
+   "prompt": "Vervollständige das Programm: Gib `Adult` aus, wenn `age` mindestens 18 ist, sonst `Child`. (verwende `>= 18`)",
+   "starter": [
+    "fn main():",
+    "    age = 20",
+    "    if age >= 18:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    age = 20",
+    "    if age >= 18:",
+    "        print(\"Adult\")",
+    "    else:",
+    "        print(\"Child\")"
+   ],
+   "hint": "Ersetze das `?` in beiden `print`-Aufrufen. Die Ausgabe ist `Adult` (weil das Alter 20 ist).",
+   "expected": [
+    "Adult"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l03-q1",
+   "q": "Was bedeutet `==` in `if x == 3:`?",
+   "options": [
+    "weise x den Wert 3 zu",
+    "frage, ob x gleich 3 ist",
+    "ist x größer als 3"
+   ],
+   "answer": 1,
+   "why": "`==` vergleicht; ein einzelnes `=` weist zu."
+  }
+ ]
+}

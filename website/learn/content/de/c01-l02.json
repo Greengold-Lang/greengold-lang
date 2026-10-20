@@ -1,0 +1,81 @@
+{
+ "title": "Zahlen und Typen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Jeder Wert hat einen **Typ**, und der Typ bestimmt, wie viel Speicher der Wert belegt und welche Werte er annehmen kann. Typen für ganze Zahlen: `i8`, `i16`, `i32`, `i64` (mit Vorzeichen, `i` = integer) und `u8`, `u16`, `u32`, `u64` (ohne Vorzeichen, also nie negativ). Die Zahl ist die Bitbreite. Für Bruchzahlen gibt es `f32` und `f64`."
+  },
+  {
+   "t": "p",
+   "text": "Schreibst du keinen Typ, sind ganze Zahlen `i32` und Bruchzahlen `f64`. Um den Typ selbst anzugeben, schreibst du `name: typ = wert`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 42",
+    "    pi: f64 = 3.14159",
+    "    age: u8 = 25",
+    "    big: i64 = 5_000_000_000",
+    "    print(a, pi, age, big)"
+   ],
+   "run": true,
+   "output": [
+    "42 3.14159 25 5000000000"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Mit `_` machst du große Zahlen lesbar. `0x` beginnt eine Hexadezimalzahl und `0b` eine Binärzahl."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    million = 1_000_000",
+    "    color = 0xFF",
+    "    mask = 0b1100",
+    "    print(million, color, mask)"
+   ],
+   "run": true,
+   "output": [
+    "1000000 255 12"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`usize` ist der Typ für Array-Längen und Indizes; du wirst ihn später oft sehen."
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l02-x1",
+   "prompt": "Erstelle eine `f64`-Variable namens `radius` mit dem Wert 2.0. Gib `radius * radius * 3.0` aus.",
+   "starter": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    radius: f64 = 2.0",
+    "    print(radius * radius * 3.0)"
+   ],
+   "hint": "Gib die Berechnung statt `0` aus.",
+   "expected": [
+    "12"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l02-q1",
+   "q": "Welcher Typ ist eine 8-Bit-Ganzzahl, die nie negativ sein kann?",
+   "options": [
+    "i8",
+    "u8",
+    "f32"
+   ],
+   "answer": 1,
+   "why": "`u` bedeutet vorzeichenlos (unsigned); `u8` reicht von 0 bis 255."
+  }
+ ]
+}

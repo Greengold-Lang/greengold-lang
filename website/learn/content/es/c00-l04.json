@@ -1,0 +1,86 @@
+{
+ "title": "Repetir cosas",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Para hacer el mismo trabajo muchas veces se usa un **bucle**. `for i in 0..5:` ejecuta cinco veces la parte con sangría, con `i` valiendo 0, 1, 2, 3, 4 (el 5 no se incluye)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..5:",
+    "        print(\"Round\", i)"
+   ],
+   "run": true,
+   "output": [
+    "Round 0",
+    "Round 1",
+    "Round 2",
+    "Round 3",
+    "Round 4"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Un bucle `while` sigue ejecutándose mientras la condición sea verdadera. ¡Si olvidas hacerla falsa en algún momento, el bucle nunca termina!"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 3",
+    "    while n > 0:",
+    "        print(n)",
+    "        n -= 1",
+    "    print(\"Go!\")"
+   ],
+   "run": true,
+   "output": [
+    "3",
+    "2",
+    "1",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`n -= 1` es la forma corta de `n = n - 1`; `+=` aumenta de la misma manera."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l04-x1",
+   "prompt": "Suma los números del 1 al 5 e imprime el total. (`1..=5` incluye el 1 y el 5.)",
+   "starter": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        pass",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        total += i",
+    "    print(total)"
+   ],
+   "hint": "Sustituye `pass` por `total += i`.",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l04-q1",
+   "q": "¿Cuántas veces se ejecuta `for i in 0..3:`?",
+   "options": [
+    "2",
+    "3",
+    "4"
+   ],
+   "answer": 1,
+   "why": "`i` vale 0, 1 y 2; el 3 no se incluye."
+  }
+ ]
+}

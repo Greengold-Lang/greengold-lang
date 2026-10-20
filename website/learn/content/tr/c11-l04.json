@@ -1,0 +1,85 @@
+{
+ "title": "Test yazmak: gg test",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Harici bir test kütüphanesi gerekmez: `fn test_*():` biçimindeki her fonksiyon otomatik olarak bir birim testidir. Test başarısız olunca `panic` eder."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn test_addition():",
+    "    if add(2, 3) != 5:",
+    "        panic(\"addition failed\")",
+    "",
+    "fn test_negative_numbers():",
+    "    if add(-5, 5) != 0:",
+    "        panic(\"negative numbers failed\")",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Bir `test` bloğu da yazabilirsin; bloğun gövdesi normal koddur ve `require` yanlışsa test başarısız olur. Blok, hemen üstündeki fonksiyona aittir ve `main` onu çağırmaz."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "test:",
+    "    require add(2, 3) == 5",
+    "",
+    "test negatives:",
+    "    require add(-1, 1) == 0",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg test src/",
+    "gg test src/ --json      # the same result as JSON",
+    "gg test --coverage       # also measure coverage"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l04-q1",
+   "q": "Bir `fn test_*()` fonksiyonu nasıl başarısız olur?",
+   "options": [
+    "`panic` ederek",
+    "`return` ederek",
+    "Hiçbir zaman başarısız olmaz"
+   ],
+   "answer": 0,
+   "why": "Bir `panic` testi başarısız sayar."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l04-q2",
+   "q": "`test` bloğunda `require false` ne yapar?",
+   "options": [
+    "Testi başarısız kılar",
+    "Hiçbir şey",
+    "Programı derlemez"
+   ],
+   "answer": 0,
+   "why": "Yanlış bir `require` testi başarısız eder."
+  }
+ ]
+}

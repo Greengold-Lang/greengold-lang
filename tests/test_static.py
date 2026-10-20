@@ -1,4 +1,7 @@
-"""`static` globals, constant data literals, and volatile memory access."""
+"""`static` globals, constant data literals, and volatile memory access.
+
+Spec: 14
+"""
 from .helpers import messages, run_built
 
 

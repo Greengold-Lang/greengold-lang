@@ -1,0 +1,85 @@
+{
+ "title": "Нет значения: Optional",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "В безопасном коде Greengold **нет `null`**. Если функция иногда не может вернуть значение, её тип результата — `Optional[T]`. У него два состояния: `Valid(значение)` (значение есть) и `None` (его нет). С помощью `match` нужно обработать оба."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    match find_index(numbers, 40):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")",
+    "    match find_index(numbers, 7):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")"
+   ],
+   "run": true,
+   "output": [
+    "found at 2",
+    "not in the array"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l01-x1",
+   "prompt": "Напишите `first_negative(items: []i32) -> Optional[i32]`: первое отрицательное число как `Valid` или `None`, если его нет. Для `[3, 8, -2, 5]` выведите результат через `match`.",
+   "starter": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "solution": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    for x in items:",
+    "        if x < 0:",
+    "            return Valid(x)",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "hint": "В цикле `return Valid(x)`, когда `x < 0`.",
+   "expected": [
+    "found -2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l01-q1",
+   "q": "Какие два состояния у `Optional[T]`?",
+   "options": [
+    "`Ok` и `Err`",
+    "`Valid` и `None`",
+    "`True` и `False`"
+   ],
+   "answer": 1,
+   "why": "`Ok`/`Err` относятся к `Result`."
+  }
+ ]
+}

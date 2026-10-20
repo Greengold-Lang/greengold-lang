@@ -1,0 +1,56 @@
+{
+ "title": "Absicherungswerkzeuge und Editor-Unterstützung",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Für Software, die Sicherheit und Qualität braucht, bietet `gg` zusätzliche Prüfungen:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg check --profile safety main.gg   # also rejects unsafe, panic, recursion, heap use,",
+    "                                    # unbounded loops and mutable statics",
+    "gg test --coverage                  # statement, decision, condition and MC/DC coverage",
+    "gg coverage --annotate              # list what never ran",
+    "gg fuzz main.gg                     # run fn fuzz_target(data: []u8) on mutated inputs",
+    "gg sbom main.gg                     # software bill of materials (CycloneDX or SPDX)",
+    "gg repro main.gg                    # build twice, compare the bytes (reproducible build)",
+    "gg unsafe-audit main.gg             # every unsafe block, asm, foreign function and static"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Um die Compiler-Stufen zu untersuchen, gibt es `gg emit-ll` (LLVM IR), `gg emit-bc` (Bitcode), `gg ast` (den Syntaxbaum) und `gg attrs` (Verwendungen von `@Attributen`, als JSON)."
+  },
+  {
+   "t": "p",
+   "text": "**Editor:** Die Greengold-Erweiterung für VS Code zeigt mit dem eingebauten Language Server (LSP) Fehler beim Tippen, Gehe zu Definition (`F12`), Dokumentation beim Darüberfahren, Vervollständigung nach `.`, Formatierung mit `Shift+Alt+F`, die Korrekturen des Compilers im Glühbirnenmenü sowie Run/Release/Build-Schaltflächen. Beim Speichern der Datei werden auch die `safe`-Korrekturen angewendet."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q1",
+   "q": "Welcher Befehl listet jeden `unsafe`-Block eines Programms auf?",
+   "options": [
+    "`gg unsafe-audit`",
+    "`gg fix`",
+    "`gg doctor`"
+   ],
+   "answer": 0,
+   "why": "`unsafe-audit` sammelt die Stellen, an denen du die Speichersicherheit von Hand sicherstellen musst."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q2",
+   "q": "Was lehnt `gg check --profile safety` ab?",
+   "options": [
+    "Nur lange Zeilen",
+    "Dinge wie `unsafe`, `panic`, Rekursion und Heap-Nutzung",
+    "Nichts"
+   ],
+   "answer": 1,
+   "why": "Das Sicherheitsprofil schaltet Merkmale ab, deren Sicherheit schwer zu beweisen ist."
+  }
+ ]
+}

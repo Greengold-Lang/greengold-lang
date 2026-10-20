@@ -1,0 +1,62 @@
+{
+ "title": "Exakte Dezimalzahlen: std.decimal",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.decimal` bietet **exakte Dezimalzahlen**, definiert durch eine 128-Bit-Ganzzahl (`mantissa`) und eine Anzahl von Nachkommastellen (`scale`). `add`, `sub`, `mul` liefern exakte Ergebnisse und halten an, wenn sie nicht passen (nie stillschweigend falsch). `div` und `round` brauchen eine Stellenzahl und eine Rundungsregel (`HALF_EVEN`: kaufmännisches Runden, `HALF_UP`...)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.decimal { Decimal, decimal_parse, decimal_from_int, HALF_EVEN }",
+    "",
+    "fn main():",
+    "    price = decimal_parse(\"19.99\").value_or_panic()",
+    "    total = price.mul(decimal_from_int(3))",
+    "    tax = total.mul(decimal_parse(\"0.0825\").value_or_panic()).round(2, HALF_EVEN)",
+    "    print(total.to_string().as_str())",
+    "    print(total.add(tax).to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "59.97",
+    "64.92"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l02-x1",
+   "prompt": "Lies `0.1` und `0.2` mit `decimal_parse`, addiere sie und gib das Ergebnis aus (es muss exakt `0.3` sein).",
+   "starter": [
+    "import std.decimal { Decimal, decimal_parse }",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.decimal { Decimal, decimal_parse }",
+    "",
+    "fn main():",
+    "    a = decimal_parse(\"0.1\").value_or_panic()",
+    "    b = decimal_parse(\"0.2\").value_or_panic()",
+    "    print(a.add(b).to_string().as_str())"
+   ],
+   "hint": "`a.add(b).to_string().as_str()`",
+   "expected": [
+    "0.3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l02-q1",
+   "q": "Was passiert, wenn das Ergebnis von `Decimal.add` nicht passt?",
+   "options": [
+    "Es liefert stillschweigend ein falsches Ergebnis",
+    "Das Programm hält an (Trap); es erzeugt nie einen falschen Wert",
+    "Es gibt null zurück"
+   ],
+   "answer": 1,
+   "why": "In Greengold ist ein Überlauf nie still."
+  }
+ ]
+}

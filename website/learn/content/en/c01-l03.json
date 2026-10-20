@@ -1,0 +1,91 @@
+{
+ "title": "Operators",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Arithmetic: `+ - * / %`. With whole numbers `/` drops the fraction (`20 / 3` is 6) and `%` gives the remainder (`20 % 3` is 2)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(10 + 20, 30 - 5, 4 * 6)",
+    "    print(20 / 3, 20 % 3)"
+   ],
+   "run": true,
+   "output": [
+    "30 25 24",
+    "6 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "A comparison gives `true` or `false` (a bool): `== != < > <= >=`. The logical operators are written as words: `and`, `or`, `not`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number = 15",
+    "    print(number > 10, number == 20)",
+    "    print(number > 10 and number < 20)",
+    "    print(not (number > 10))"
+   ],
+   "run": true,
+   "output": [
+    "true false",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "The bit operators (`&`, `|`, `^`, `<<`, `>>`) are evaluated **before** comparisons in Greengold, so `bits & 1 == 0` means `(bits & 1) == 0`, as you would expect. (The trap from C is not here.)"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    bits = 6",
+    "    print(bits & 1 == 0)",
+    "    print(1 << 4)"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "16"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l03-x1",
+   "prompt": "Print `true` if `n` is even and `false` if it is odd. (`n % 2 == 0`)",
+   "starter": [
+    "fn main():",
+    "    n = 14",
+    "    print(false)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = 14",
+    "    print(n % 2 == 0)"
+   ],
+   "hint": "Print the condition itself instead of `false`.",
+   "expected": [
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l03-q1",
+   "q": "What is `17 % 5`?",
+   "options": [
+    "3",
+    "2",
+    "3.4"
+   ],
+   "answer": 1,
+   "why": "5 fits into 17 three times with 2 left over; `%` gives the remainder."
+  }
+ ]
+}

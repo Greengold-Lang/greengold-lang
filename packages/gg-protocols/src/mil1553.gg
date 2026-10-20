@@ -1,0 +1,93 @@
+# protocols.mil1553: MIL-STD-1553B command and status words.
+#
+#     import protocols.mil1553 { command_word, parse_command, status_word, parse_status, word_parity }
+#     cw = command_word(5, true, 3, 4)          # RT 5, transmit, subaddress 3, 4 data words
+#     c = parse_command(cw)
+#     print(c.rt_address, c.transmit, c.subaddress, c.word_count)        # 5 true 3 4
+#
+# Every word on the bus is 16 bits of data plus a sync pattern and an odd parity bit. This module deals with the 16 data bits as a
+# `u16` and gives `word_parity` for the parity bit; the sync and the Manchester coding belong to the bus controller hardware.
+#
+# Command word:  bits 15-11 RT address (31 = broadcast), bit 10 transmit(1)/receive(0), bits 9-5 subaddress (0 and 31 mean a mode
+#                code), bits 4-0 data word count (0 means 32) or the mode code.
+# Status word:   bits 15-11 RT address, 10 message error, 9 instrumentation, 8 service request, 7-5 reserved, 4 broadcast command
+#                received, 3 busy, 2 subsystem flag, 1 dynamic bus control acceptance, 0 terminal flag.
+
+import std.bits
+
+public
+const BROADCAST: u16 = 31
+
+struct Command:
+    rt_address: u16
+    transmit: bool
+    subaddress: u16
+    word_count: u16        # 1 to 32 for a data command (the code 0 is returned as 32); the raw 5 bits for a mode command
+    is_mode_code: bool
+
+struct Status:
+    rt_address: u16
+    message_error: bool
+    instrumentation: bool
+    service_request: bool
+    broadcast_received: bool
+    busy: bool
+    subsystem_flag: bool
+    dynamic_bus_control: bool
+    terminal_flag: bool
+
+fn command_word(rt: u16, transmit: bool, subaddress: u16, word_count: u16) -> u16:
+    r: u16 = rt & 31
+    sa: u16 = subaddress & 31
+    wc: u16 = word_count & 31               # 32 words are written as 0: 32 & 31 == 0
+    w: u16 = r << 11
+    if transmit:
+        w = w | (1 << 10)
+    w = w | (sa << 5)
+    return w | wc
+
+fn parse_command(w: u16) -> Command:
+    sub: u16 = (w >> 5) & 31
+    count: u16 = w & 31
+    mode = sub == 0 or sub == 31
+    if not mode and count == 0:
+        count = 32
+    rt: u16 = (w >> 11) & 31
+    return Command{ rt_address: rt, transmit: (w & (1 << 10)) != 0, subaddress: sub, word_count: count, is_mode_code: mode }
+
+fn status_word(s: Status) -> u16:
+    r: u16 = s.rt_address & 31
+    w: u16 = r << 11
+    if s.message_error:
+        w = w | (1 << 10)
+    if s.instrumentation:
+        w = w | (1 << 9)
+    if s.service_request:
+        w = w | (1 << 8)
+    if s.broadcast_received:
+        w = w | (1 << 4)
+    if s.busy:
+        w = w | (1 << 3)
+    if s.subsystem_flag:
+        w = w | (1 << 2)
+    if s.dynamic_bus_control:
+        w = w | (1 << 1)
+    if s.terminal_flag:
+        w = w | 1
+    return w
+
+fn parse_status(w: u16) -> Status:
+    rt: u16 = (w >> 11) & 31
+    return Status{ rt_address: rt, message_error: (w & (1 << 10)) != 0, instrumentation: (w & (1 << 9)) != 0,
+                   service_request: (w & (1 << 8)) != 0, broadcast_received: (w & (1 << 4)) != 0, busy: (w & (1 << 3)) != 0,
+                   subsystem_flag: (w & (1 << 2)) != 0, dynamic_bus_control: (w & (1 << 1)) != 0, terminal_flag: (w & 1) != 0 }
+
+# The odd parity bit that goes after the 16 data bits: 1 when the data has an even number of ones.
+fn word_parity(w: u16) -> u16:
+    if bits.popcount(w) % 2 == 0:
+        return 1
+    return 0
+
+# True when `w` followed by `parity` (0 or 1) has an odd number of ones, as the bus requires.
+fn parity_ok(w: u16, parity: u16) -> bool:
+    return word_parity(w) == (parity & 1)

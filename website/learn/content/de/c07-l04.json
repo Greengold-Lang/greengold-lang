@@ -1,0 +1,72 @@
+{
+ "title": "Eingebaute Schranken",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Der Compiler bietet fertige Schranken für häufige Fähigkeiten: `Num` (numerisch: `+ - * /`), `Int` (nur Ganzzahlen), `Float` (nur Bruchzahlen), `Ord` (ordenbar: `< > <= >=`) und `Eq` (Gleichheit: `== !=`). Sie lassen sich kombinieren: `[T: Num + Ord]`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum3[T: Num](a: T, b: T, c: T) -> T:",
+    "    return a + b + c",
+    "",
+    "fn clamp[T: Num + Ord](x: T, lo: T, hi: T) -> T:",
+    "    if x < lo:",
+    "        return lo",
+    "    if x > hi:",
+    "        return hi",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(sum3(1, 2, 3))",
+    "    print(sum3(0.5, 0.25, 0.25))",
+    "    print(clamp(15, 0, 10))",
+    "    print(clamp(-3, 0, 10))"
+   ],
+   "run": true,
+   "output": [
+    "6",
+    "1",
+    "10",
+    "0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l04-x1",
+   "prompt": "`abs_of[T: Num + Ord](x: T, zero: T)`: gibt `zero - x` zurück, wenn `x` kleiner als null ist, sonst `x`. Probiere es mit `-8` und `2.5`.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn abs_of[T: Num + Ord](x: T, zero: T) -> T:",
+    "    if x < zero:",
+    "        return zero - x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(abs_of(-8, 0))",
+    "    print(abs_of(2.5, 0.0))"
+   ],
+   "hint": "`[T: Num + Ord]` ermöglicht sowohl die Subtraktion als auch den Vergleich.",
+   "expected": [
+    "8",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l04-q1",
+   "q": "Welche Schranke braucht `T`, um in einer generischen Funktion `<` zu verwenden?",
+   "options": [
+    "`Eq`",
+    "`Ord`",
+    "`Int`"
+   ],
+   "answer": 1,
+   "why": "`Ord` liefert die Ordnungsoperatoren; `Eq` nur die Gleichheit."
+  }
+ ]
+}

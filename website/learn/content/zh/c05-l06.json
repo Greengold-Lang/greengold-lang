@@ -1,0 +1,97 @@
+{
+ "title": "自动清理与 defer",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold 没有垃圾回收器。当 Move 类型到达其所在作用域的末尾时，编译器会**自己**释放内存（`drop`）。你从不写 `free`，也不可能忘记。"
+  },
+  {
+   "t": "p",
+   "text": "**`defer`** 标记离开作用域时要运行的清理代码（正常退出、`return`、`break`、`continue`、出错：都一样）。多个 `defer` 按**相反的顺序**运行（最后写的最先运行）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"started\")",
+    "    defer print(\"cleanup 1 (written first, runs last)\")",
+    "    defer print(\"cleanup 2\")",
+    "    defer print(\"cleanup 3 (written last, runs first)\")",
+    "    print(\"working...\")"
+   ],
+   "run": true,
+   "output": [
+    "started",
+    "working...",
+    "cleanup 3 (written last, runs first)",
+    "cleanup 2",
+    "cleanup 1 (written first, runs last)"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn process(code: i32):",
+    "    print(\"resource opened\")",
+    "    defer print(\"resource closed\")",
+    "    if code < 0:",
+    "        print(\"error, returning early\")",
+    "        return",
+    "    print(\"processed\")",
+    "",
+    "fn main():",
+    "    process(1)",
+    "    process(-1)"
+   ],
+   "run": true,
+   "output": [
+    "resource opened",
+    "processed",
+    "resource closed",
+    "resource opened",
+    "error, returning early",
+    "resource closed"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l06-x1",
+   "prompt": "在 `run()` 中输出 `open`、`use` 和 `close` 三条消息；但用 `defer` 写 `close`，紧跟在 `open` 之后。期望的顺序是：open、use、close。",
+   "starter": [
+    "fn run():",
+    "    print(\"open\")",
+    "    print(\"use\")",
+    "",
+    "fn main():",
+    "    run()"
+   ],
+   "solution": [
+    "fn run():",
+    "    print(\"open\")",
+    "    defer print(\"close\")",
+    "    print(\"use\")",
+    "",
+    "fn main():",
+    "    run()"
+   ],
+   "hint": "在 `print(\"open\")` 下面添加 `defer print(\"close\")`。",
+   "expected": [
+    "open",
+    "use",
+    "close"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l06-q1",
+   "q": "写了三个 `defer` 时，哪个最先运行？",
+   "options": [
+    "最先写的",
+    "最后写的",
+    "随机的一个"
+   ],
+   "answer": 1,
+   "why": "`defer` 按相反顺序运行（LIFO）。"
+  }
+ ]
+}

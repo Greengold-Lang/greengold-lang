@@ -1,0 +1,82 @@
+{
+ "title": "实践：用 lambda 排序",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "标准库的 `sort.sort_by` 按你给定的“排在前面”规则对列表排序。你把规则写成 lambda：如果 `a` 应排在 `b` 前面就返回 `true`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a > b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "5",
+    "2",
+    "1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l06-x1",
+   "prompt": "修改 lambda，让同一个列表**从小到大**排序。",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a > b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(2)",
+    "    v.push(9)",
+    "    v.push(1)",
+    "    sort.sort_by(v, fn(a: i32, b: i32) -> bool => a < b)",
+    "    for x in v:",
+    "        print(x)"
+   ],
+   "hint": "用 `a < b` 代替 `a > b`。",
+   "expected": [
+    "1",
+    "2",
+    "5",
+    "9"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l06-q1",
+   "q": "传给 `sort_by` 的 lambda 返回 `true` 意味着什么？",
+   "options": [
+    "`a` 排在 `b` 前面",
+    "`a` 被删除",
+    "列表结束"
+   ],
+   "answer": 0,
+   "why": "lambda 回答的是“是否排在前面？”这个问题。"
+  }
+ ]
+}

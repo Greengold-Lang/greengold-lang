@@ -1,0 +1,60 @@
+{
+ "title": "Документация, список API и REPL",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Комментарии `#`, которые вы пишете прямо над определениями функций и структур, команда `gg doc` превращает в документацию API в формате Markdown:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "# Adds two numbers.",
+    "# Parameters:",
+    "#   a: the first addend",
+    "#   b: the second addend",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg doc src/                 # print to the screen",
+    "gg doc src/ -o API_DOCS.md  # save to a file"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**`gg api`** перечисляет все публичные имена стандартной библиотеки с сигнатурой и однострочным описанием (`gg api --json` выдаёт это в машиночитаемом виде; справочник на этом сайте построен из него). **`gg repl`** открывает интерактивную строку: вы вводите объявления, привязки и выражения и сразу видите результат."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg api                      # the whole standard library",
+    "gg repl                     # an interactive prompt",
+    "gg repl -e \"1 + 2\"          # evaluate one snippet"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l05-q1",
+   "q": "Откуда `gg doc` берёт документацию?",
+   "options": [
+    "Из отдельного файла документации",
+    "Из комментариев `#` над определениями",
+    "Из интернета"
+   ],
+   "answer": 1,
+   "why": "Комментарии остаются рядом с кодом, поэтому документация не устаревает."
+  }
+ ]
+}

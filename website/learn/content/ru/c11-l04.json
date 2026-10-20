@@ -1,0 +1,85 @@
+{
+ "title": "Написание тестов: gg test",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Внешняя библиотека тестов не нужна: каждая функция вида `fn test_*():` автоматически является модульным тестом. Тест проваливается, делая `panic`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn test_addition():",
+    "    if add(2, 3) != 5:",
+    "        panic(\"addition failed\")",
+    "",
+    "fn test_negative_numbers():",
+    "    if add(-5, 5) != 0:",
+    "        panic(\"negative numbers failed\")",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Можно также написать блок `test`; его тело — обычный код, и тест проваливается, если какой-то `require` ложен. Блок относится к функции прямо над ним, а `main` его не вызывает."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "test:",
+    "    require add(2, 3) == 5",
+    "",
+    "test negatives:",
+    "    require add(-1, 1) == 0",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg test src/",
+    "gg test src/ --json      # the same result as JSON",
+    "gg test --coverage       # also measure coverage"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l04-q1",
+   "q": "Как проваливается функция `fn test_*()`?",
+   "options": [
+    "Вызвав `panic`",
+    "Вернув управление",
+    "Она никогда не проваливается"
+   ],
+   "answer": 0,
+   "why": "`panic` считается проваленным тестом."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l04-q2",
+   "q": "Что делает `require false` в блоке `test`?",
+   "options": [
+    "Проваливает тест",
+    "Ничего",
+    "Останавливает сборку"
+   ],
+   "answer": 0,
+   "why": "Ложный `require` проваливает тест."
+  }
+ ]
+}

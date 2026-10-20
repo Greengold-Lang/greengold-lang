@@ -1,0 +1,69 @@
+{
+ "title": "闭包：捕获外部变量",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "lambda 可以使用它所在函数的变量，这叫做**闭包**。可复制的值（数字、普通结构体）在创建 lambda 时会被**复制**；拥有堆内存的值（如 `List`）会以 `read` 方式被**借用**。闭包在使用期间，被借用的变量不能被修改或移动；编译器会检查这一点。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn apply(f: fn(i32) -> i32, x: i32) -> i32:",
+    "    return f(x)",
+    "",
+    "fn main():",
+    "    k = 3",
+    "    add_k = fn(x: i32) -> i32 => x + k",
+    "    print(add_k(1), apply(add_k, 10))",
+    "",
+    "    xs = List[i32]()",
+    "    xs.push(7)",
+    "    has = fn(i: i32) -> bool => xs.len > usize(i)",
+    "    print(has(0))",
+    "    xs.push(8)"
+   ],
+   "run": true,
+   "output": [
+    "4 13",
+    "true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "如果 lambda 的函数体**修改**了被捕获的变量（`fn(x: i32) => out.push(x)`），闭包会以 `lend` 方式借用它：该变量不能是 `fixed`，并且在闭包使用期间不能从其他地方访问。"
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l04-x1",
+   "prompt": "编写一个捕获变量 `factor` 的 lambda：把输入乘以 `factor`（`factor = 4`）。输出 `scale(5)`。",
+   "starter": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x",
+    "    print(scale(5))"
+   ],
+   "solution": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x * factor",
+    "    print(scale(5))"
+   ],
+   "hint": "让函数体为 `x * factor`。",
+   "expected": [
+    "20"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l04-q1",
+   "q": "lambda 捕获一个数字时会怎样？",
+   "options": [
+    "它被复制",
+    "它被移动",
+    "它被删除"
+   ],
+   "answer": 0,
+   "why": "Copy 类型在被捕获时复制；Move 类型被借用或移动。"
+  }
+ ]
+}

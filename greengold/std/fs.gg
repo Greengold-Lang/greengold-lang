@@ -1,13 +1,40 @@
-# std.fs: whole-file read/write over C stdio.
-# Dynamic paths are copied and NUL-terminated before they are passed to C.
+# std.fs: files and directories.
+#
+# Every operation that can fail has a `Result[T, io.IoError]` form (`read_text`, `write_text`, `create_dir_all`,
+# `read_dir`, ...): the error says what went wrong and for which path. The older `Optional`/`bool` functions
+# (`read_file_to_string`, `write_string_to_file`, `make_dir`, ...) stay for short programs.
+# Directories are read with the operating system's own calls (FindFirstFile on Windows, opendir on Linux and
+# macOS), not by running a shell command. Tested on Windows and Linux; macOS is untested. Not here yet: permissions,
+# links, and the modification time on Linux and macOS (`Metadata.modified` is `None` there).
 import std.string
-import std.process
-import std.sort
+import std.io
+
 private
-extern "stdio.h" fn fopen(path: *u8, mode: *u8) -> *u8
-extern "stdio.h" fn fclose(f: *u8) -> i32
-extern "stdio.h" fn fgetc(f: *u8) -> i32
-extern "stdio.h" fn fputc(c: i32, f: *u8) -> i32
+extern "stdio.h" fn remove(path: *u8) -> i32
+extern "stdio.h" fn rename(old_path: *u8, new_path: *u8) -> i32
+extern "stdlib.h" fn malloc(size: usize) -> *mut u8
+extern "stdlib.h" fn free(ptr: *u8)
+extern "stdlib.h" fn getenv(name: *u8) -> *u8
+weak extern "windows.h" fn GetFileAttributesA(path: *u8) -> u32
+weak extern "windows.h" fn GetFileAttributesExA(path: *u8, level: i32, data: *mut u8) -> i32
+weak extern "windows.h" fn CreateDirectoryA(path: *u8, security: *u8) -> i32
+weak extern "windows.h" fn RemoveDirectoryA(path: *u8) -> i32
+weak extern "windows.h" fn FindFirstFileA(pattern: *u8, data: *mut u8) -> *mut u8
+weak extern "windows.h" fn FindNextFileA(h: *mut u8, data: *mut u8) -> i32
+weak extern "windows.h" fn FindClose(h: *mut u8) -> i32
+weak extern "windows.h" fn MoveFileExA(src: *u8, dst: *u8, flags: u32) -> i32
+weak extern "windows.h" fn GetLastError() -> u32
+weak extern "stdlib.h" fn _fullpath(out: *mut u8, path: *u8, size: usize) -> *mut u8
+weak extern "stdlib.h" fn realpath(path: *u8, out: *mut u8) -> *mut u8
+weak extern "direct.h" fn _getcwd(buf: *mut u8, size: i32) -> *mut u8
+weak extern "direct.h" fn _chdir(path: *u8) -> i32
+weak extern "unistd.h" fn getcwd(buf: *mut u8, size: usize) -> *mut u8
+weak extern "unistd.h" fn chdir(path: *u8) -> i32
+weak extern "unistd.h" fn rmdir(path: *u8) -> i32
+weak extern "sys/stat.h" fn mkdir(path: *u8, mode: u32) -> i32
+weak extern "dirent.h" fn opendir(path: *u8) -> *mut u8
+weak extern "dirent.h" fn readdir(d: *mut u8) -> *mut u8
+weak extern "dirent.h" fn closedir(d: *mut u8) -> i32
 
 private
 fn _nul_path(path: str) -> string:
@@ -15,49 +42,402 @@ fn _nul_path(path: str) -> string:
     s.append_byte(0)
     return s
 
+fn _win_attrs(path: str) -> u32:
+    owned = _nul_path(path)
+    unsafe:
+        return GetFileAttributesA(string_to_cstr(owned.as_str()))
+
 public
-fn read_file_to_string(path: str) -> Optional[string]:
-    owned = _nul_path(path)
-    unsafe:
-        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr("rb"))
-        if ptr_to_int(f) == 0:
-            return None
-        s = string.new()
-        c: i32 = fgetc(f)
-        while c >= 0:
-            s.append_byte(u8(c))
-            c = fgetc(f)
-        fclose(f)
-        return Valid(s)
+# One name in a directory.
+struct DirEntry:
+    name: string
+    is_dir: bool
 
-fn write_string_to_file(path: str, data: str) -> bool:
+# What is known about a file or directory. `modified` is seconds since 1970 (UTC); `None` on Linux and macOS.
+struct Metadata:
+    size: u64
+    is_dir: bool
+    is_file: bool
+    modified: Optional[i64]
+
+# True when `path` is an existing directory.
+fn is_dir(path: str) -> bool:
+    if target_os() == "windows":
+        a = _win_attrs(path)
+        return a != 4294967295 and (a & 16) != 0
     owned = _nul_path(path)
     unsafe:
-        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr("wb"))
-        if ptr_to_int(f) == 0:
+        d = opendir(string_to_cstr(owned.as_str()))
+        if d == null:
             return false
-        for i in 0..data.len:
-            fputc(i32(data[i]), f)
-        fclose(f)
+        closedir(d)
         return true
 
+# True when `path` is an existing file or directory.
+fn path_exists(path: str) -> bool:
+    if target_os() == "windows":
+        return _win_attrs(path) != 4294967295
+    if is_dir(path):
+        return true
+    return file_exists(path)
+
+# True when `path` is a file that can be opened for reading.
 fn file_exists(path: str) -> bool:
+    match consume io.File.open(path):
+        Ok(f):
+            return true
+        Err(e):
+            return false
+
+# Size, kind and modification time of `path`.
+fn metadata(path: str) -> Result[Metadata, io.IoError]:
+    if target_os() == "windows":
+        owned = _nul_path(path)
+        unsafe:
+            data = malloc(40)
+            if GetFileAttributesExA(string_to_cstr(owned.as_str()), 0, data) == 0:
+                code = GetLastError()
+                free(data)
+                return Err(io.windows_error(f"cannot stat {path}".as_str(), i32(code)))
+            attrs = ptr_cast[*u32](data)[0]
+            high = ptr_cast[*u32](ptr_offset(data, 28))[0]
+            low = ptr_cast[*u32](ptr_offset(data, 32))[0]
+            wlo = ptr_cast[*u32](ptr_offset(data, 20))[0]
+            whi = ptr_cast[*u32](ptr_offset(data, 24))[0]
+            free(data)
+            ticks = (u64(whi) << 32) | u64(wlo)
+            secs = i64(ticks / 10000000) - 11644473600
+            dir = (attrs & 16) != 0
+            return Ok(Metadata{ size: (u64(high) << 32) | u64(low), is_dir: dir, is_file: not dir, modified: Valid(secs) })
+    if is_dir(path):
+        return Ok(Metadata{ size: 0, is_dir: true, is_file: false, modified: None })
+    f = io.File.open(path)?
+    n = f.size()?
+    return Ok(Metadata{ size: n, is_dir: false, is_file: true, modified: None })
+
+# The whole file as text (bytes).
+fn read_text(path: str) -> Result[string, io.IoError]:
+    f = io.File.open(path)?
+    return f.read_rest()
+
+# Replaces the contents of `path` (or creates it). Returns the number of bytes written.
+fn write_text(path: str, data: str) -> Result[usize, io.IoError]:
+    f = io.File.create(path)?
+    n = f.write(data)?
+    f.flush()?
+    return Ok(n)
+
+# Adds `data` to the end of `path`, creating it when needed.
+fn append_text(path: str, data: str) -> Result[usize, io.IoError]:
+    f = io.File.append(path)?
+    n = f.write(data)?
+    f.flush()?
+    return Ok(n)
+
+# Writes `data` to a temporary file next to `path`, puts it on the disk, and renames it over `path`: a reader
+# (or a crash) sees the old contents or the new, never half of the new.
+fn write_atomic(path: str, data: str) -> Result[usize, io.IoError]:
+    tmp = string.from(path)
+    tmp.append_str(".gg-tmp")
+    n: usize = 0
+    if true:
+        f = io.File.create(tmp.as_str())?
+        n = f.write(data)?
+        f.sync_all()?
+    replace_file(tmp.as_str(), path)?
+    return Ok(n)
+
+# Copies a file; returns the number of bytes copied.
+fn copy_file(from_path: str, to_path: str) -> Result[u64, io.IoError]:
+    src = io.File.open(from_path)?
+    dst = io.File.create(to_path)?
+    total: u64 = 0
+    while true:
+        chunk = src.read_some(65536)?
+        if chunk.len == 0:
+            break
+        dst.write(chunk.as_str())?
+        total += u64(chunk.len)
+    dst.flush()?
+    return Ok(total)
+
+# Deletes a file.
+fn delete_file(path: str) -> Result[bool, io.IoError]:
     owned = _nul_path(path)
     unsafe:
-        f = fopen(string_to_cstr(owned.as_str()), string_to_cstr("rb"))
-        if ptr_to_int(f) == 0:
-            return false
-        fclose(f)
-        return true
+        if remove(string_to_cstr(owned.as_str())) != 0:
+            return Err(io.last_error(f"cannot remove {path}".as_str()))
+    return Ok(true)
+
+# Renames `from_path` to `to_path`. An existing file at `to_path` is replaced.
+fn replace_file(from_path: str, to_path: str) -> Result[bool, io.IoError]:
+    src = _nul_path(from_path)
+    dst = _nul_path(to_path)
+    unsafe:
+        if target_os() == "windows":
+            if MoveFileExA(string_to_cstr(src.as_str()), string_to_cstr(dst.as_str()), 9) == 0:
+                return Err(io.windows_error(f"cannot rename {from_path}".as_str(), i32(GetLastError())))
+        elif rename(string_to_cstr(src.as_str()), string_to_cstr(dst.as_str())) != 0:
+            return Err(io.last_error(f"cannot rename {from_path}".as_str()))
+    return Ok(true)
+
+# Creates one directory; its parent must exist.
+fn create_dir(path: str) -> Result[bool, io.IoError]:
+    owned = _nul_path(path)
+    unsafe:
+        if target_os() == "windows":
+            if CreateDirectoryA(string_to_cstr(owned.as_str()), null) == 0:
+                return Err(io.windows_error(f"cannot create {path}".as_str(), i32(GetLastError())))
+        elif mkdir(string_to_cstr(owned.as_str()), 511) != 0:
+            return Err(io.last_error(f"cannot create {path}".as_str()))
+    return Ok(true)
+
+# Creates a directory and every missing parent. A directory that already exists is not an error.
+fn create_dir_all(path: str) -> Result[bool, io.IoError]:
+    if path.len == 0 or is_dir(path):
+        return Ok(true)
+    parent = path_parent(path)
+    if parent.len > 0 and parent.len < path.len and not is_dir(parent.as_str()):
+        create_dir_all(parent.as_str())?
+    if is_dir(path):
+        return Ok(true)
+    return create_dir(path)
+
+# Removes an empty directory.
+fn remove_dir(path: str) -> Result[bool, io.IoError]:
+    owned = _nul_path(path)
+    unsafe:
+        if target_os() == "windows":
+            if RemoveDirectoryA(string_to_cstr(owned.as_str())) == 0:
+                return Err(io.windows_error(f"cannot remove {path}".as_str(), i32(GetLastError())))
+        elif rmdir(string_to_cstr(owned.as_str())) != 0:
+            return Err(io.last_error(f"cannot remove {path}".as_str()))
+    return Ok(true)
+
+# Removes a directory and everything in it.
+fn remove_dir_all(path: str) -> Result[bool, io.IoError]:
+    entries = read_dir(path)?
+    for e in entries:
+        child = path_join(path, e.name.as_str())
+        if e.is_dir:
+            remove_dir_all(child.as_str())?
+        else:
+            delete_file(child.as_str())?
+    return remove_dir(path)
 
 private
-extern "stdio.h" fn remove(path: *u8) -> i32
+fn _str_less(a: str, b: str) -> bool:
+    n = a.len
+    if b.len < n:
+        n = b.len
+    for i in 0..n:
+        if a[i] < b[i]:
+            return true
+        if b[i] < a[i]:
+            return false
+    return a.len < b.len
+
+fn _sift_entries(v: lend List[DirEntry], start: usize, end: usize):
+    root = start
+    while root * 2 + 1 < end:
+        child = root * 2 + 1
+        if child + 1 < end and _str_less(v[child].name.as_str(), v[child + 1].name.as_str()):
+            child += 1
+        if _str_less(v[root].name.as_str(), v[child].name.as_str()):
+            v.swap(root, child)
+            root = child
+        else:
+            return
+
+# Heap sort by name (entries own text, so the generic sort cannot move them).
+fn _sort_entries(v: lend List[DirEntry]):
+    n = v.len
+    if n < 2:
+        return
+    i = n / 2
+    while i > 0:
+        i -= 1
+        _sift_entries(v, i, n)
+    end = n
+    while end > 1:
+        end -= 1
+        v.swap(0, end)
+        _sift_entries(v, 0, end)
+
+fn _skip_dots(name: str) -> bool:
+    return string.str_eq(name, ".") or string.str_eq(name, "..")
 
 public
-fn remove_file(path: str) -> bool:
+# The entries of a directory, sorted by name, without `.` and `..`.
+fn read_dir(path: str) -> Result[List[DirEntry], io.IoError]:
+    out = List[DirEntry]()
+    if target_os() == "windows":
+        pattern = string.from(path)
+        if path.len > 0 and path[path.len - 1] != '\\' and path[path.len - 1] != '/':
+            pattern.append_byte('\\')
+        pattern.append_byte('*')
+        pattern.append_byte(0)
+        unsafe:
+            data = malloc(320)
+            h = FindFirstFileA(string_to_cstr(pattern.as_str()), data)
+            if ptr_to_int(h) == 18446744073709551615:
+                code = GetLastError()
+                free(data)
+                return Err(io.windows_error(f"cannot read directory {path}".as_str(), i32(code)))
+            more = true
+            while more:
+                name = cstr_to_string(ptr_offset(data, 44))
+                attrs = ptr_cast[*u32](data)[0]
+                if not _skip_dots(name):
+                    out.push(DirEntry{ name: string.from(name), is_dir: (attrs & 16) != 0 })
+                more = FindNextFileA(h, data) != 0
+            FindClose(h)
+            free(data)
+    else:
+        owned = _nul_path(path)
+        name_at: isize = 19
+        type_at: isize = 18
+        if target_os() == "macos":
+            name_at = 21
+            type_at = 20
+        unsafe:
+            d = opendir(string_to_cstr(owned.as_str()))
+            if d == null:
+                return Err(io.last_error(f"cannot read directory {path}".as_str()))
+            ent = readdir(d)
+            while ent != null:
+                name = cstr_to_string(ptr_offset(ent, name_at))
+                kind = ptr_offset(ent, type_at)[0]
+                if not _skip_dots(name):
+                    entry_dir = kind == 4
+                    if kind == 0:
+                        entry_dir = is_dir(path_join(path, name).as_str())
+                    out.push(DirEntry{ name: string.from(name), is_dir: entry_dir })
+                ent = readdir(d)
+            closedir(d)
+    _sort_entries(out)
+    return Ok(out)
+
+# Every file below `path` (not directories), as paths that start with `path`, sorted.
+fn walk(path: str) -> Result[List[string], io.IoError]:
+    out = List[string]()
+    entries = read_dir(path)?
+    for e in entries:
+        child = path_join(path, e.name.as_str())
+        if e.is_dir:
+            inner = walk(child.as_str())?
+            for f in inner:
+                out.push(string.from(f.as_str()))
+        else:
+            out.push(child)
+    return Ok(out)
+
+# The directory for temporary files: `TMPDIR`, `TEMP`, `TMP`, or `/tmp`.
+fn temp_dir() -> string:
+    for name in ["TMPDIR", "TEMP", "TMP"]:
+        owned = _nul_path(name)
+        unsafe:
+            p = getenv(string_to_cstr(owned.as_str()))
+            if p != null:
+                return string.from(cstr_to_string(p))
+    return string.from("/tmp")
+
+# The current directory.
+fn current_dir() -> Result[string, io.IoError]:
+    unsafe:
+        buf = malloc(4096)
+        r: *mut u8 = null
+        if target_os() == "windows":
+            r = _getcwd(buf, 4096)
+        else:
+            r = getcwd(buf, 4096)
+        if r == null:
+            free(buf)
+            return Err(io.last_error("cannot get the current directory"))
+        text = string.from(cstr_to_string(buf))
+        free(buf)
+        return Ok(text)
+
+fn set_current_dir(path: str) -> Result[bool, io.IoError]:
     owned = _nul_path(path)
     unsafe:
-        return remove(string_to_cstr(owned.as_str())) == 0
+        r: i32 = 0
+        if target_os() == "windows":
+            r = _chdir(string_to_cstr(owned.as_str()))
+        else:
+            r = chdir(string_to_cstr(owned.as_str()))
+        if r != 0:
+            return Err(io.last_error(f"cannot enter {path}".as_str()))
+    return Ok(true)
+
+# The absolute path of `path` with `.` and `..` resolved (on Linux and macOS the path must exist).
+fn absolute_path(path: str) -> Result[string, io.IoError]:
+    owned = _nul_path(path)
+    unsafe:
+        buf = malloc(4096)
+        r: *mut u8 = null
+        if target_os() == "windows":
+            r = _fullpath(buf, string_to_cstr(owned.as_str()), 4096)
+        else:
+            r = realpath(string_to_cstr(owned.as_str()), buf)
+        if r == null:
+            free(buf)
+            return Err(io.last_error(f"cannot resolve {path}".as_str()))
+        text = string.from(cstr_to_string(buf))
+        free(buf)
+        return Ok(text)
+
+# -- older, shorter forms ----------------------------------------------------------------------------------
+
+# The file's contents, or `None` when it cannot be read. `read_text` says why.
+fn read_file_to_string(path: str) -> Optional[string]:
+    match consume read_text(path):
+        Ok(text):
+            return Valid(text)
+        Err(e):
+            return None
+
+# True when the file was written. `write_text` says why not.
+fn write_string_to_file(path: str, data: str) -> bool:
+    match consume write_text(path, data):
+        Ok(n):
+            return true
+        Err(e):
+            return false
+
+# True when the file was deleted. `delete_file` says why not.
+fn remove_file(path: str) -> bool:
+    match consume delete_file(path):
+        Ok(b):
+            return true
+        Err(e):
+            return false
+
+# True when the directory was created (its parent must exist). `create_dir` says why not.
+fn make_dir(path: str) -> bool:
+    match consume create_dir(path):
+        Ok(b):
+            return true
+        Err(e):
+            return false
+
+# Names in `path`, one per line, sorted by bytes. `None` when `path` cannot be read. `read_dir` gives a list.
+fn list_dir(path: str) -> Optional[string]:
+    match consume read_dir(path):
+        Ok(entries):
+            names = List[str]()
+            for e in entries:
+                names.push(e.name.as_str())
+            return Valid(string.str_join(names, "\n"))
+        Err(err):
+            return None
+
+# Rename `old_path` to `new_path`. Fails when the destination already exists on Windows. `replace_file` replaces.
+fn rename_file(old_path: str, new_path: str) -> bool:
+    src = _nul_path(old_path)
+    dst = _nul_path(new_path)
+    unsafe:
+        return rename(string_to_cstr(src.as_str()), string_to_cstr(dst.as_str())) == 0
 
 private
 fn _is_sep(c: u8) -> bool:
@@ -124,74 +504,3 @@ fn path_ext(path: str) -> string:
         return string.new()
     return string.from(string.substr(text, dot, text.len))
 
-private
-extern "stdio.h" fn rename(old_path: *u8, new_path: *u8) -> i32
-
-fn _str_less(a: str, b: str) -> bool:
-    n = a.len
-    if b.len < n:
-        n = b.len
-    for i in 0..n:
-        if a[i] < b[i]:
-            return true
-        if b[i] < a[i]:
-            return false
-    return a.len < b.len
-
-public
-# True when `path` is an existing directory.
-fn is_dir(path: str) -> bool:
-    argv = List[str]()
-    argv.push("cd")
-    if process.host_is_windows():
-        argv.push("/d")
-    argv.push(path)
-    match consume process.process_run(argv):
-        Valid(r):
-            return r.code == 0
-        None:
-            return false
-
-# Create one directory. The parent must already exist.
-fn make_dir(path: str) -> bool:
-    argv = List[str]()
-    argv.push("mkdir")
-    argv.push(path)
-    match consume process.process_run(argv):
-        Valid(r):
-            return r.code == 0
-        None:
-            return false
-
-# Names in `path`, one per line, sorted by bytes. `None` when `path` is not a directory.
-fn list_dir(path: str) -> Optional[string]:
-    if not is_dir(path):
-        return None
-    argv = List[str]()
-    if process.host_is_windows():
-        argv.push("dir")
-        argv.push("/b")
-    else:
-        argv.push("ls")
-        argv.push("-1")
-    argv.push(path)
-    match consume process.process_run(argv):
-        Valid(r):
-            if r.code != 0 and r.out.len() == 0:
-                return None
-            kept = List[str]()
-            lines = string.str_lines(r.out.as_str())
-            for i in 0..lines.len:
-                if lines[i].len > 0:
-                    kept.push(lines[i])
-            sort.sort_by[str](kept, _str_less)
-            return Valid(string.str_join(kept, "\n"))
-        None:
-            return None
-
-# Rename `old_path` to `new_path`. Fails when the destination already exists.
-fn rename_file(old_path: str, new_path: str) -> bool:
-    src = _nul_path(old_path)
-    dst = _nul_path(new_path)
-    unsafe:
-        return rename(string_to_cstr(src.as_str()), string_to_cstr(dst.as_str())) == 0

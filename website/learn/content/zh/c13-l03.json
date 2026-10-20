@@ -1,0 +1,66 @@
+{
+ "title": "原始指针与 unsafe",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "在安全代码中，引用通过 `lend` 和 `ref` 管理。在 FFI 和硬件访问中则要用到**原始指针**：`*T` 是只读的（`const T*`），`*mut T` 是可写的（`T*`），`*void` 与类型无关。不指向任何地方的指针是 `null`，在安全代码中可以与 `null` 比较。"
+  },
+  {
+   "t": "p",
+   "text": "读写指针所指的数据、指针运算以及调用原始 C 函数，**只能在 `unsafe:` 块内**进行。在那里编译器的意思是：“保护措施已关闭；内存安全、边界检查和指针有效性完全由程序员负责。”"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number: i32 = 42",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(number)",
+    "        p[0] = 99",
+    "    print(\"updated number:\", number)"
+   ],
+   "run": true,
+   "output": [
+    "updated number: 99"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "辅助函数（都需要 `unsafe:`）：`addr(x)` / `addr_mut(x)` 取变量的地址，`ptr_offset(p, n)` 移动指针，`ptr_cast[*T](p)` 改变其类型，`ptr_to_int` / `int_to_ptr` 在整数与指针之间转换，`string_to_cstr` / `cstr_to_string` 处理 C 字符串。"
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l03-x1",
+   "prompt": "用 `addr_mut` 取得 `x = 5` 的地址，并通过指针把它的值设为 50。输出 `x`。",
+   "starter": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(x)",
+    "        p[0] = 50",
+    "    print(x)"
+   ],
+   "hint": "在 `unsafe:` 块内写 `p[0] = 50`。",
+   "expected": [
+    "50"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l03-q1",
+   "q": "`*mut T` 和 `*T` 有什么区别？",
+   "options": [
+    "没有区别",
+    "`*mut T` 可写，`*T` 只读",
+    "`*T` 更快"
+   ],
+   "answer": 1,
+   "why": "`*T` 类似 C 的 `const T*`，`*mut T` 类似 `T*`。"
+  }
+ ]
+}

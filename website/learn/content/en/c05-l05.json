@@ -1,0 +1,100 @@
+{
+ "title": "The compiler finds the mode",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Good news: most of the time you **do not have to write** these three modes. For a heap-owning type (`List`, `string`, `Box` and structs containing them), if you write no mode on the parameter the compiler **looks at the function body and detects the mode itself**:"
+  },
+  {
+   "t": "p",
+   "text": "If the body only **reads** the parameter → `read`; if it **changes** it → `lend`; if it **moves** it to another owner → `consume`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn add(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn wrap(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add(v)",
+    "    add(v)",
+    "    print(total(v))",
+    "    b = wrap(v)",
+    "    print(b.items.len)"
+   ],
+   "run": true,
+   "output": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "None of the three functions has a mode written. `add` became `lend` because it changes the list, `total` became `read` because it only reads, and `wrap` became `consume` because it puts the list inside `Bag`. After `wrap(v)` the variable `v` can no longer be used; if you try, the compiler reports the error and also tells you **the mode it detected and why**."
+  },
+  {
+   "t": "p",
+   "text": "With Copy types such as numbers and plain structs, if no mode is written the value is **copied** and cannot be changed inside the function; to change it in place you write `lend` out (`n: lend i32`). You can always write the mode yourself (for readability, or to pin the decision down)."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l05-x1",
+   "prompt": "Without writing any mode, write `keep(xs: List[i32]) -> Bag`: it puts the list inside a `Bag` (the compiler detects this as `consume`). In `main` call it with a 3-element list and print `b.items.len`.",
+   "starter": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn keep(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    b = keep(v)",
+    "    print(b.items.len)"
+   ],
+   "hint": "`return Bag{ items: xs }`; then `b = keep(v)` and `print(b.items.len)`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l05-q1",
+   "q": "You wrote no mode on a heap-owning `List` parameter and the body calls `xs.push(1)`. Which mode does the compiler detect?",
+   "options": [
+    "`read`",
+    "`lend`",
+    "`consume`"
+   ],
+   "answer": 1,
+   "why": "The body changes the list, so the mode is `lend`; you do not have to write it."
+  }
+ ]
+}

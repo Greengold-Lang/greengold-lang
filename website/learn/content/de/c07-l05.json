@@ -1,0 +1,97 @@
+{
+ "title": "Operatoren überladen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Du kannst Operatoren wie `+`, `-`, `*`, `==`, `<` mit eigenen Typen verwenden. In Greengold entsprechen Operatoren **bestimmten Methodennamen**: `+` → `add`, `-` → `sub`, `*` → `mul`, `/` → `div`, `%` → `rem`, `-x` → `neg`, `==` → `eq`, `<` → `lt`. `!=`, `>`, `<=`, `>=` werden daraus automatisch abgeleitet."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Vec2:",
+    "    x: f64",
+    "    y: f64",
+    "",
+    "impl Vec2:",
+    "    fn add(self, o: Vec2) -> Vec2:",
+    "        return Vec2{ x: self.x + o.x, y: self.y + o.y }",
+    "",
+    "    fn sub(self, o: Vec2) -> Vec2:",
+    "        return Vec2{ x: self.x - o.x, y: self.y - o.y }",
+    "",
+    "    fn neg(self) -> Vec2:",
+    "        return Vec2{ x: -self.x, y: -self.y }",
+    "",
+    "    fn eq(self, o: Vec2) -> bool:",
+    "        return self.x == o.x and self.y == o.y",
+    "",
+    "fn main():",
+    "    v1 = Vec2{ x: 3.0, y: 4.0 }",
+    "    v2 = Vec2{ x: 1.0, y: 2.0 }",
+    "    v3 = v1 + v2",
+    "    v4 = v1 - v2",
+    "    inv = -v1",
+    "    print(v3.x, v3.y)",
+    "    print(v4.x, v4.y)",
+    "    print(inv.x, inv.y)",
+    "    print(v1 == v2, v1 != v2)"
+   ],
+   "run": true,
+   "output": [
+    "4 6",
+    "2 2",
+    "-3 -4",
+    "false true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l05-x1",
+   "prompt": "Gib dem Struct `Money` (`cents: i32`) die Methoden `add` und `lt`. Gib die Summe `Money{ cents: 250 } + Money{ cents: 175 }` aus und ob das erste `Money` kleiner als das zweite ist.",
+   "starter": [
+    "struct Money:",
+    "    cents: i32",
+    "",
+    "fn main():",
+    "    a = Money{ cents: 250 }",
+    "    b = Money{ cents: 175 }",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Money:",
+    "    cents: i32",
+    "",
+    "impl Money:",
+    "    fn add(self, o: Money) -> Money:",
+    "        return Money{ cents: self.cents + o.cents }",
+    "",
+    "    fn lt(self, o: Money) -> bool:",
+    "        return self.cents < o.cents",
+    "",
+    "fn main():",
+    "    a = Money{ cents: 250 }",
+    "    b = Money{ cents: 175 }",
+    "    total = a + b",
+    "    print(total.cents)",
+    "    print(a < b)"
+   ],
+   "hint": "Schreibe `fn add(self, o: Money) -> Money` und `fn lt(self, o: Money) -> bool` in `impl Money:`.",
+   "expected": [
+    "425",
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l05-q1",
+   "q": "Welche Methode definierst du für `a - b`?",
+   "options": [
+    "`minus`",
+    "`sub`",
+    "`diff`"
+   ],
+   "answer": 1,
+   "why": "Der Operator `-` entspricht der Methode `sub`."
+  }
+ ]
+}

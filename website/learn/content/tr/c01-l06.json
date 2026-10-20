@@ -1,0 +1,76 @@
+{
+ "title": "Sabitler",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`const`, dosya düzeyinde (fonksiyonların dışında) tanımlanan, derleme sırasında bilinen değerlerdir. Tipini yazabilirsin ya da derleyiciye bırakabilirsin. İsimleri genelde BÜYÜK_HARFLE yazılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const MAX_SCORE: i32 = 100",
+    "const APP_NAME = \"Notebook\"",
+    "",
+    "fn main():",
+    "    print(APP_NAME, MAX_SCORE)"
+   ],
+   "run": true,
+   "output": [
+    "Notebook 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Sabitler birçok fonksiyonda aynı sayıyı tekrar yazmaktan kurtarır; değer değişirse tek yeri düzeltmen yeter."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const PI: f64 = 3.14159",
+    "",
+    "fn circle_area(r: f64) -> f64:",
+    "    return PI * r * r",
+    "",
+    "fn main():",
+    "    print(circle_area(2.0))"
+   ],
+   "run": true,
+   "output": [
+    "12.56636"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l06-x1",
+   "prompt": "`TAX_RATE` sabiti 18 olsun. Fiyat 200 iken `price * TAX_RATE / 100` değerini yazdır.",
+   "starter": [
+    "fn main():",
+    "    price = 200",
+    "    print(0)"
+   ],
+   "solution": [
+    "const TAX_RATE = 18",
+    "",
+    "fn main():",
+    "    price = 200",
+    "    print(price * TAX_RATE / 100)"
+   ],
+   "hint": "`const TAX_RATE = 18` satırını `main`'in üstüne yaz.",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l06-q1",
+   "q": "`const` nerede tanımlanır?",
+   "options": [
+    "Yalnızca `main` içinde",
+    "Dosya düzeyinde, fonksiyonların dışında",
+    "Parantez içinde"
+   ],
+   "answer": 1,
+   "why": "`const` dosya düzeyindedir; fonksiyon içinde `fixed` kullanılır."
+  }
+ ]
+}

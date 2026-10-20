@@ -1,0 +1,78 @@
+{
+ "title": "Форматы данных: std.csv, std.uuid, std.log",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.csv` (RFC 4180) правильно читает поля по правилам кавычек и разделителей: `csv.parse(текст, ',')` даёт `Result[List[List[string]], string]`. `csv.format_row` записывает строку, беря в кавычки там, где нужно."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"name,age\\nAda,36\\n\\\"Smith, J\\\",41\\n\", ',').value_or_panic()",
+    "    print(rows.len, rows[2][0].as_str())"
+   ],
+   "run": true,
+   "output": [
+    "3 Smith, J"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`std.uuid` создаёт идентификаторы по RFC 9562: `v4` — случайный, `v7` — упорядоченный по времени, `v5` — на основе имени (одно и то же имя всегда даёт один и тот же id). `std.log` пишет строки с уровнями в stderr (`log.info`, `log.warn`, `log.kv`) и выдаёт JSON через `log.set_json(true)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.uuid",
+    "",
+    "fn main():",
+    "    ns = uuid.namespace_dns()",
+    "    id = uuid.v5(ns, \"example.com\".as_bytes())",
+    "    print(id.to_string().as_str())",
+    "    print(id.version())"
+   ],
+   "run": true,
+   "output": [
+    "cfbff0d1-9375-5685-968c-48ce8b15ae17",
+    "5"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l04-x1",
+   "prompt": "Прочитайте текст `\"a,b\\nc,d\\n\"` через `csv.parse` и выведите число строк.",
+   "starter": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"a,b\\nc,d\\n\", ',').value_or_panic()",
+    "    print(rows.len)"
+   ],
+   "hint": "`csv.parse(...).value_or_panic()` и `rows.len`.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l04-q1",
+   "q": "Какая версия всегда выдаёт один и тот же UUID для одного и того же имени?",
+   "options": [
+    "`v4`",
+    "`v5`",
+    "`v7`"
+   ],
+   "answer": 1,
+   "why": "`v5` вычисляется из имени и пространства имён; `v4` случаен, `v7` зависит от времени."
+  }
+ ]
+}

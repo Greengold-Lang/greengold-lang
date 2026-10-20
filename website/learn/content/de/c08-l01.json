@@ -1,0 +1,85 @@
+{
+ "title": "Kein Wert: Optional",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In sicherem Greengold-Code **gibt es kein `null`**. Kann eine Funktion manchmal keinen Wert zurückgeben, ist ihr Rückgabetyp `Optional[T]`. Er hat zwei Zustände: `Valid(wert)` (es gibt einen Wert) und `None` (es gibt keinen). Mit `match` musst du beide behandeln."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    match find_index(numbers, 40):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")",
+    "    match find_index(numbers, 7):",
+    "        Valid(idx):",
+    "            print(\"found at\", idx)",
+    "        None:",
+    "            print(\"not in the array\")"
+   ],
+   "run": true,
+   "output": [
+    "found at 2",
+    "not in the array"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l01-x1",
+   "prompt": "Schreibe `first_negative(items: []i32) -> Optional[i32]`: die erste negative Zahl als `Valid` oder `None`, falls es keine gibt. Gib das Ergebnis für `[3, 8, -2, 5]` mit `match` aus.",
+   "starter": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "solution": [
+    "fn first_negative(items: []i32) -> Optional[i32]:",
+    "    for x in items:",
+    "        if x < 0:",
+    "            return Valid(x)",
+    "    return None",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [3, 8, -2, 5]",
+    "    match first_negative(data):",
+    "        Valid(x):",
+    "            print(\"found\", x)",
+    "        None:",
+    "            print(\"none\")"
+   ],
+   "hint": "Gib in der Schleife `return Valid(x)` zurück, wenn `x < 0`.",
+   "expected": [
+    "found -2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l01-q1",
+   "q": "Welche zwei Zustände hat `Optional[T]`?",
+   "options": [
+    "`Ok` und `Err`",
+    "`Valid` und `None`",
+    "`True` und `False`"
+   ],
+   "answer": 1,
+   "why": "`Ok`/`Err` gehören zu `Result`."
+  }
+ ]
+}

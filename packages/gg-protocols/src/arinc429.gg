@@ -1,0 +1,104 @@
+# protocols.arinc429: ARINC 429 words, the 32-bit messages of avionics data buses.
+#
+#     import protocols.arinc429 { Word, encode, decode, bnr_to_f64, f64_to_bnr }
+#     w = encode(200, 0, f64_to_bnr(45.5, 18, 180.0), 3)           # label 310 octal (= 200), SDI 0, BNR data, SSM 3 (normal)
+#     d = decode(w)
+#     print(d.parity_ok, bnr_to_f64(d.data, 18, 180.0))            # true 45.5
+#
+# Layout of the 32-bit word, bit 1 being the least significant bit of the `u32`:
+#
+#     bits 1-8    label (stored with its bit order reversed, as ARINC 429 transmits the label most significant bit first; `Word.label`
+#                 holds the label as the number it is written as in the ICD, e.g. octal 310 = 200)
+#     bits 9-10   source/destination identifier (SDI)
+#     bits 11-29  data (19 bits)
+#     bits 30-31  sign/status matrix (SSM)
+#     bit 32      parity: the whole word has an odd number of ones
+#
+# The data field is described by the label's equipment-specific definition: BNR (binary, two's complement, the sign in bit 29)
+# or BCD (digits of 4 bits), both described with the 19-bit data field. `bnr_to_f64` and `f64_to_bnr` handle BNR; `bcd_digits` unpacks BCD. The meaning of a label (what 0o310 is) belongs
+# to the equipment's ICD, not to the bus, so it is not in this module.
+
+import std.bits
+
+public
+struct Word:
+    label: u8
+    sdi: u8
+    data: u32            # 19 bits, bit 11 of the word is bit 0 here
+    ssm: u8
+    parity_ok: bool
+
+private
+fn reverse8(x: u32) -> u32:
+    r: u32 = 0
+    v = x
+    for _i in 0..8:
+        r = (r << 1) | (v & 1)
+        v = v >> 1
+    return r
+
+public
+# The odd parity bit (0 or 1) that makes `word31` (bits 1-31, with bit 32 clear) have an odd number of ones in total.
+fn parity_bit(word31: u32) -> u32:
+    low: u32 = word31 & 0x7FFFFFFF
+    if bits.popcount(low) % 2 == 0:
+        return 1
+    return 0
+
+# Builds the 32-bit word. `label` is the label number (octal 000 to 377, i.e. 0 to 255; write octal 310 as 200), `sdi` 0-3, `data` the low 19 bits are used, `ssm` 0-3.
+fn encode(label: u8, sdi: u8, data: u32, ssm: u8) -> u32:
+    w = reverse8(u32(label))
+    s: u32 = u32(sdi) & 3
+    d: u32 = data & 0x7FFFF
+    m: u32 = u32(ssm) & 3
+    w = w | (s << 8)
+    w = w | (d << 10)
+    w = w | (m << 29)
+    return w | (parity_bit(w) << 31)
+
+fn decode(word: u32) -> Word:
+    return Word{ label: u8(reverse8(word & 255)), sdi: u8((word >> 8) & 3), data: (word >> 10) & 0x7FFFF, ssm: u8((word >> 29) & 3),
+                 parity_ok: bits.popcount(word) % 2 == 1 }
+
+# A BNR parameter occupies the most significant bits of the 19-bit data field, the sign in bit 29 (the top bit of the field); the unused low
+# bits are padding. `sig_bits` counts the significant bits including the sign. This is the signed integer the field holds.
+fn bnr_to_i32(field: u32, sig_bits: u32) -> i32:
+    mask: u32 = (u32(1) << sig_bits) - 1
+    v = (field >> (19 - sig_bits)) & mask
+    sign: u32 = u32(1) << (sig_bits - 1)
+    if (v & sign) != 0:
+        return i32(i64(v) - i64(u32(1) << sig_bits))
+    return i32(v)
+
+# A BNR field scaled to engineering units: the range of the parameter is +-`full_scale`, so one count is `full_scale / 2^(sig_bits-1)`
+# (the ARINC 429 convention: the sign bit carries -`full_scale`).
+fn bnr_to_f64(field: u32, sig_bits: u32, full_scale: f64) -> f64:
+    counts = f64(bnr_to_i32(field, sig_bits))
+    return counts * full_scale / f64(i64(1) << (sig_bits - 1))
+
+# The 19-bit data field for `value`: rounded to the nearest count, saturated to the range that fits, left-aligned.
+fn f64_to_bnr(value: f64, sig_bits: u32, full_scale: f64) -> u32:
+    unit = full_scale / f64(i64(1) << (sig_bits - 1))
+    counts = value / unit
+    top = f64((i64(1) << (sig_bits - 1)) - 1)
+    if counts > top:
+        counts = top
+    if counts < -top - 1.0:
+        counts = -top - 1.0
+    r = i64(counts + 0.5)
+    if counts < 0.0:
+        r = i64(counts - 0.5)
+    mask: u32 = (u32(1) << sig_bits) - 1
+    return (u32(r & i64(mask))) << (19 - sig_bits)
+
+# The decimal digits of a BCD number in the low bits of `data`, most significant first: `digits` digits of 4 bits. A nibble above 9 is not a digit: the result is -1 for that position.
+fn bcd_digits(data: u32, digits: u32) -> List[i32]:
+    out = List[i32]()
+    for i in 0..digits:
+        shift = 4 * (digits - 1 - u32(i))
+        nib = (data >> shift) & 15
+        if nib > 9:
+            out.push(-1)
+        else:
+            out.push(i32(nib))
+    return out

@@ -46,14 +46,18 @@ fn main():
         f.write_line("first").value_or_panic()
         f.write("second\\r\\nthird").value_or_panic()
     g = File.open("{path}").value_or_panic()
-    while let Valid(line) = g.read_line():
-        print(line)
+    while true:
+        line = g.read_line().value_or_panic()
+        if line.is_none():
+            break
+        print(line.value_or_panic())
     h = File.open("{path}").value_or_panic()
-    print(h.read_rest().len)
+    print(h.read_rest().value_or_panic().len)
     a = File.append("{path}").value_or_panic()
     a.write("!").value_or_panic()
     a.flush()
-    print(File.open("{path}").value_or_panic().read_rest().len)
+    k = File.open("{path}").value_or_panic()
+    print(k.read_rest().value_or_panic().len)
 """
     res = run_built(src)
     assert res.returncode == 0, res.stderr

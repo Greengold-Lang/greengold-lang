@@ -1,0 +1,86 @@
+{
+ "title": "Repeating things",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "To do the same work many times you use a **loop**. `for i in 0..5:` runs the indented part five times, with `i` being 0, 1, 2, 3, 4 (5 is not included)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..5:",
+    "        print(\"Round\", i)"
+   ],
+   "run": true,
+   "output": [
+    "Round 0",
+    "Round 1",
+    "Round 2",
+    "Round 3",
+    "Round 4"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "A `while` loop keeps running as long as the condition is true. If you forget to make it false at some point, the loop never ends!"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 3",
+    "    while n > 0:",
+    "        print(n)",
+    "        n -= 1",
+    "    print(\"Go!\")"
+   ],
+   "run": true,
+   "output": [
+    "3",
+    "2",
+    "1",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`n -= 1` is short for `n = n - 1`; `+=` increases in the same way."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l04-x1",
+   "prompt": "Add up the numbers from 1 to 5 and print the total. (`1..=5` includes both 1 and 5.)",
+   "starter": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        pass",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    total = 0",
+    "    for i in 1..=5:",
+    "        total += i",
+    "    print(total)"
+   ],
+   "hint": "Replace `pass` with `total += i`.",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l04-q1",
+   "q": "How many times does `for i in 0..3:` run?",
+   "options": [
+    "2",
+    "3",
+    "4"
+   ],
+   "answer": 1,
+   "why": "`i` is 0, 1 and 2; 3 is not included."
+  }
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "title": "Closures: capturing outer variables",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A lambda can use variables of the function it is written in; this is called a **closure**. Copyable values (numbers, plain structs) are **copied** when the lambda is created; heap-owning values such as `List` are **borrowed** as `read`. While the closure is in use the borrowed variable cannot be changed or moved; the compiler checks this."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn apply(f: fn(i32) -> i32, x: i32) -> i32:",
+    "    return f(x)",
+    "",
+    "fn main():",
+    "    k = 3",
+    "    add_k = fn(x: i32) -> i32 => x + k",
+    "    print(add_k(1), apply(add_k, 10))",
+    "",
+    "    xs = List[i32]()",
+    "    xs.push(7)",
+    "    has = fn(i: i32) -> bool => xs.len > usize(i)",
+    "    print(has(0))",
+    "    xs.push(8)"
+   ],
+   "run": true,
+   "output": [
+    "4 13",
+    "true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "If the lambda's body **changes** the captured variable (`fn(x: i32) => out.push(x)`), the closure borrows it as `lend`: the variable cannot be `fixed` and cannot be reached from elsewhere while the closure is in use."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l04-x1",
+   "prompt": "Write a lambda that captures the variable `factor`: it multiplies its input by `factor` (`factor = 4`). Print `scale(5)`.",
+   "starter": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x",
+    "    print(scale(5))"
+   ],
+   "solution": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x * factor",
+    "    print(scale(5))"
+   ],
+   "hint": "Make the body `x * factor`.",
+   "expected": [
+    "20"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l04-q1",
+   "q": "What happens when a number is captured by a lambda?",
+   "options": [
+    "It is copied",
+    "It is moved",
+    "It is deleted"
+   ],
+   "answer": 0,
+   "why": "Copy types are copied when captured; Move types are borrowed or moved."
+  }
+ ]
+}

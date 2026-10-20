@@ -1,0 +1,66 @@
+{
+ "title": "Rohe Zeiger und unsafe",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In sicherem Code werden Referenzen mit `lend` und `ref` verwaltet. Bei FFI und Hardwarezugriff kommen **rohe Zeiger** ins Spiel: `*T` ist schreibgeschützt (`const T*`), `*mut T` ist beschreibbar (`T*`), `*void` ist typunabhängig. Ein Zeiger, der ins Nichts zeigt, ist `null` und kann in sicherem Code mit `null` verglichen werden."
+  },
+  {
+   "t": "p",
+   "text": "Die Daten lesen/schreiben, auf die ein Zeiger zeigt, Zeigerarithmetik und das Aufrufen roher C-Funktionen geschehen **nur innerhalb eines `unsafe:`-Blocks**. Dort sagt der Compiler: „Die Schutzmaßnahmen sind aus; Speichersicherheit, Grenzprüfungen und Zeigergültigkeit liegen vollständig in der Verantwortung des Programmierers.“"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number: i32 = 42",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(number)",
+    "        p[0] = 99",
+    "    print(\"updated number:\", number)"
+   ],
+   "run": true,
+   "output": [
+    "updated number: 99"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Helfer (alle brauchen `unsafe:`): `addr(x)` / `addr_mut(x)` nehmen die Adresse einer Variablen, `ptr_offset(p, n)` verschiebt den Zeiger, `ptr_cast[*T](p)` ändert seinen Typ, `ptr_to_int` / `int_to_ptr` wandeln zwischen Ganzzahl und Zeiger um, `string_to_cstr` / `cstr_to_string` arbeiten mit C-Strings."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l03-x1",
+   "prompt": "Nimm mit `addr_mut` die Adresse von `x = 5` und setze ihren Wert über den Zeiger auf 50. Gib `x` aus.",
+   "starter": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x: i32 = 5",
+    "    unsafe:",
+    "        p: *mut i32 = addr_mut(x)",
+    "        p[0] = 50",
+    "    print(x)"
+   ],
+   "hint": "`p[0] = 50` innerhalb eines `unsafe:`-Blocks.",
+   "expected": [
+    "50"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l03-q1",
+   "q": "Was ist der Unterschied zwischen `*mut T` und `*T`?",
+   "options": [
+    "Es gibt keinen",
+    "`*mut T` ist beschreibbar, `*T` ist schreibgeschützt",
+    "`*T` ist schneller"
+   ],
+   "answer": 1,
+   "why": "`*T` entspricht dem `const T*` von C, `*mut T` dem `T*`."
+  }
+ ]
+}

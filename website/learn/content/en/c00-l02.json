@@ -1,0 +1,80 @@
+{
+ "title": "Values and variables",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Computers work with **values**: numbers (`42`, `3.5`) and text (`\"Ali\"`). If you give a value a name you can use it again later. That name is called a **variable**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    name = \"Ali\"",
+    "    print(name, age)"
+   ],
+   "run": true,
+   "output": [
+    "Ali 20"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "The `=` sign does not mean \"equals\", it means **\"assign\"**: it puts the value on the right into the name on the left. You can calculate with numbers: `+`, `-`, `*`, `/`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    apple = 5",
+    "    pear = 3",
+    "    total = apple + pear",
+    "    print(total)",
+    "    apple = 10",
+    "    print(apple + pear)"
+   ],
+   "run": true,
+   "output": [
+    "8",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "A variable's value can be changed later. Above, `apple` was 5 first and then 10."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l02-x1",
+   "prompt": "Let `a` be 6 and `b` be 7. Print their product (use `*`).",
+   "starter": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(a * b)"
+   ],
+   "hint": "Replace `print(0)` with `print(a * b)`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l02-q1",
+   "q": "What does the line `x = 5` do?",
+   "options": [
+    "asks whether x equals 5",
+    "puts the value 5 into the name x",
+    "prints 5 on the screen"
+   ],
+   "answer": 1,
+   "why": "`=` is an assignment: it stores the value under the name."
+  }
+ ]
+}

@@ -1,0 +1,84 @@
+{
+ "title": "Para: std.money",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Para hesabında `f64` kullanılmaz (0.1 + 0.2 ≠ 0.3). `std.money`, tutarı **en küçük birimin tam sayısı** (cent) olarak ve para birimiyle birlikte saklar; yuvarlama her zaman açıktır ve kuruş ne kaybolur ne eklenir. Farklı para birimlerini toplamak sessiz bir toplam değil `Err` verir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.money { Money, usd, eur }",
+    "",
+    "fn main():",
+    "    total = usd(1999).times(3)",
+    "    print(total.to_string().as_str())",
+    "    print(usd(5).plus(eur(5)).is_ok())",
+    "    print(usd(5).plus(usd(7)).value_or_panic().to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "59.97 USD",
+    "false",
+    "0.12 USD"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`allocate` bir tutarı oranlara göre böler ve parçalar **tam olarak** toplamı verir: 1,00 USD üçe bölününce 0,34 + 0,33 + 0,33."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.money { Money, usd }",
+    "",
+    "fn main():",
+    "    thirds: [3]i64 = [1, 1, 1]",
+    "    for part in usd(100).allocate(thirds[..]):",
+    "        print(part.to_string().as_str())"
+   ],
+   "run": true,
+   "output": [
+    "0.34 USD",
+    "0.33 USD",
+    "0.33 USD"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l01-x1",
+   "prompt": "`usd(1000)` (10,00 USD) tutarını `[1, 2]` oranında böl ve iki parçayı da yazdır.",
+   "starter": [
+    "import std.money { Money, usd }",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.money { Money, usd }",
+    "",
+    "fn main():",
+    "    ratios: [2]i64 = [1, 2]",
+    "    for part in usd(1000).allocate(ratios[..]):",
+    "        print(part.to_string().as_str())"
+   ],
+   "hint": "`ratios[..]` bir dilimdir; `allocate`'e onu ver.",
+   "expected": [
+    "3.33 USD",
+    "6.67 USD"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l01-q1",
+   "q": "Para için neden `f64` yerine tam sayı kullanılır?",
+   "options": [
+    "Daha hızlı olduğu için",
+    "Ondalık yuvarlama hatalarını önlemek için",
+    "Daha az yer kapladığı için"
+   ],
+   "answer": 1,
+   "why": "0.1 + 0.2 gibi ikili kesir hataları paradan kuruş kaybettirir."
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+import std.decimal { decimal_parse, decimal_from_int, decimal_new, HALF_EVEN, HALF_UP, DOWN, FLOOR, CEILING }
+
+fn main():
+    price = decimal_parse("19.99").value_or_panic()
+    total = price.mul(decimal_from_int(3))
+    tax = total.mul(decimal_parse("0.0825").value_or_panic()).round(2, HALF_EVEN)
+    print(total.to_string(), tax.to_string(), total.add(tax).to_string())
+    a = decimal_parse("0.1").value_or_panic()
+    b = decimal_parse("0.2").value_or_panic()
+    print(a.add(b).to_string(), a.add(b).equals(decimal_parse("0.3").value_or_panic()))
+    print(decimal_parse("2.5").value_or_panic().round(0, HALF_EVEN).to_string(), decimal_parse("3.5").value_or_panic().round(0, HALF_EVEN).to_string(), decimal_parse("2.5").value_or_panic().round(0, HALF_UP).to_string())
+    print(decimal_parse("-2.5").value_or_panic().round(0, HALF_UP).to_string(), decimal_parse("-2.7").value_or_panic().round(0, DOWN).to_string(), decimal_parse("-2.1").value_or_panic().round(0, FLOOR).to_string(), decimal_parse("2.1").value_or_panic().round(0, CEILING).to_string())
+    print(decimal_from_int(10).div(decimal_from_int(3), 6, HALF_EVEN).to_string(), decimal_parse("-1").value_or_panic().div(decimal_parse("8").value_or_panic(), 2, HALF_EVEN).to_string())
+    print(decimal_parse("1.50").value_or_panic().normalize().to_string(), decimal_parse("1.5e3").value_or_panic().to_string(), decimal_parse("12e-3").value_or_panic().to_string(), decimal_parse(".5").value_or_panic().to_string())
+    print(decimal_parse("1.2.3").is_err(), decimal_parse("abc").is_err(), decimal_parse("7.25").value_or_panic().rem(decimal_parse("2").value_or_panic()).to_string())
+    print(decimal_new(-5, 3).to_string(), decimal_parse("12345678901234567890.123456789").value_or_panic().mul(decimal_from_int(2)).to_string())
+    print(decimal_parse("1.50").value_or_panic().compare(decimal_parse("1.5").value_or_panic()), decimal_parse("7.99").value_or_panic().to_i64().value_or(0), decimal_parse("2.5").value_or_panic().to_f64())

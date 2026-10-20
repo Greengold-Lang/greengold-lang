@@ -1,0 +1,75 @@
+{
+ "title": "Program nedir?",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bir **program**, bilgisayara sırayla yapılacak işleri anlatan bir yazıdır. Greengold'da bu yazı bir `.gg` dosyasına yazılır ve derleyici onu bilgisayarın anlayacağı koda çevirir."
+  },
+  {
+   "t": "p",
+   "text": "Her Greengold programı `main` adlı bir **fonksiyonla** başlar. Fonksiyonun içindeki satırlar, soldan 4 boşluk girintiyle yazılır. Girinti, hangi satırların fonksiyona ait olduğunu gösterir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "run": true,
+   "output": [
+    "Hello, world!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`print` ekrana bir şey yazdırır. Tırnak içindeki yazıya **metin** (string) denir. `#` ile başlayan satır bir **yorumdur**: bilgisayar onu çalıştırmaz, insanlar için not düşer."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    # This line is a comment",
+    "    print(\"First line\")",
+    "    print(\"Second line\")"
+   ],
+   "run": true,
+   "output": [
+    "First line",
+    "Second line"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Satırlar yukarıdan aşağıya, sırayla çalışır."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l01-x1",
+   "prompt": "Programı değiştir: ekrana `Hello, Greengold!` yazsın.",
+   "starter": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"Hello, Greengold!\")"
+   ],
+   "hint": "Tırnakların içindeki yazıyı değiştirmen yeterli.",
+   "expected": [
+    "Hello, Greengold!"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l01-q1",
+   "q": "Bir Greengold programı hangi fonksiyonla başlar?",
+   "options": [
+    "start",
+    "main",
+    "begin"
+   ],
+   "answer": 1,
+   "why": "Çalışma her zaman `main` fonksiyonundan başlar."
+  }
+ ]
+}

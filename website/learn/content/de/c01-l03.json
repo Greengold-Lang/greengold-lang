@@ -1,0 +1,91 @@
+{
+ "title": "Operatoren",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Arithmetik: `+ - * / %`. Bei ganzen Zahlen verwirft `/` den Bruchteil (`20 / 3` ist 6) und `%` liefert den Rest (`20 % 3` ist 2)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(10 + 20, 30 - 5, 4 * 6)",
+    "    print(20 / 3, 20 % 3)"
+   ],
+   "run": true,
+   "output": [
+    "30 25 24",
+    "6 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Ein Vergleich liefert `true` oder `false` (einen bool): `== != < > <= >=`. Die logischen Operatoren werden als Wörter geschrieben: `and`, `or`, `not`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    number = 15",
+    "    print(number > 10, number == 20)",
+    "    print(number > 10 and number < 20)",
+    "    print(not (number > 10))"
+   ],
+   "run": true,
+   "output": [
+    "true false",
+    "true",
+    "false"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Die Bit-Operatoren (`&`, `|`, `^`, `<<`, `>>`) werden in Greengold **vor** den Vergleichen ausgewertet, also bedeutet `bits & 1 == 0` wie erwartet `(bits & 1) == 0`. (Die Falle aus C gibt es hier nicht.)"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    bits = 6",
+    "    print(bits & 1 == 0)",
+    "    print(1 << 4)"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "16"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l03-x1",
+   "prompt": "Gib `true` aus, wenn `n` gerade ist, und `false`, wenn es ungerade ist. (`n % 2 == 0`)",
+   "starter": [
+    "fn main():",
+    "    n = 14",
+    "    print(false)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = 14",
+    "    print(n % 2 == 0)"
+   ],
+   "hint": "Gib die Bedingung selbst statt `false` aus.",
+   "expected": [
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l03-q1",
+   "q": "Was ist `17 % 5`?",
+   "options": [
+    "3",
+    "2",
+    "3.4"
+   ],
+   "answer": 1,
+   "why": "5 passt dreimal in 17, es bleiben 2 übrig; `%` liefert den Rest."
+  }
+ ]
+}

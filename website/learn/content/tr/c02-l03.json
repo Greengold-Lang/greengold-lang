@@ -1,0 +1,68 @@
+{
+ "title": "while döngüsü",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`while` koşul doğru olduğu sürece girintili bölümü tekrarlar. Koşulu eninde sonunda yanlış yapan bir şey olmalı, yoksa sonsuz döngü olur."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 5",
+    "    while n > 0:",
+    "        print(\"Countdown:\", n)",
+    "        n -= 1",
+    "    print(\"Fire!\")"
+   ],
+   "run": true,
+   "output": [
+    "Countdown: 5",
+    "Countdown: 4",
+    "Countdown: 3",
+    "Countdown: 2",
+    "Countdown: 1",
+    "Fire!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Koşul her turun **başında** kontrol edilir; ilk bakışta yanlışsa gövde hiç çalışmaz."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l03-x1",
+   "prompt": "`x` 1'den başlayıp her turda iki katına çıksın; `x` 100'ü geçtiğinde döngü bitsin ve `x`'i yazdır.",
+   "starter": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        pass",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        x *= 2",
+    "    print(x)"
+   ],
+   "hint": "`pass` yerine `x *= 2` yaz.",
+   "expected": [
+    "128"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l03-q1",
+   "q": "`n = 0` iken `while n > 0:` gövdesi kaç kez çalışır?",
+   "options": [
+    "Bir kez",
+    "Hiç",
+    "Sonsuz"
+   ],
+   "answer": 1,
+   "why": "Koşul en başta yanlış olduğundan gövde hiç çalışmaz."
+  }
+ ]
+}

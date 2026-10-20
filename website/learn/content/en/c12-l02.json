@@ -1,0 +1,80 @@
+{
+ "title": "Atomics and Mutex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "When several threads touch the same memory, a data race must not happen. For a single number the simplest solution is an **atomic** variable: the operations are indivisible. `AtomicI64.fetch_and_add(n)` adds, `load()` reads."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    counter = thread.AtomicI64.new(0)",
+    "    counter.fetch_and_add(10)",
+    "    counter.fetch_and_add(5)",
+    "    print(\"counter:\", counter.load())",
+    "    print(counter.compare_and_swap(15, 100), counter.load())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "For more complex data you use a **`Mutex`**: you take it with `lock()` and release it with `unlock()`. A safer way that cannot forget the unlock is **`Locked[T]`**, which puts the value inside the lock: `lock()` returns a `Guard` and the lock is released automatically when the `Guard` leaves its scope."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn work(c: Arc[thread.Locked[i64]]):",
+    "    for _i in 0..1000:",
+    "        g = c.value.lock()",
+    "        g.value() += 1",
+    "",
+    "fn main():",
+    "    counter = Arc[thread.Locked[i64]](thread.Locked[i64].new(0))",
+    "    workers = List[thread.Thread]()",
+    "    for w in 0..4:",
+    "        c = counter.clone()",
+    "        workers.push(thread.Thread.spawn(fn() =>",
+    "            work(c)))",
+    "    for i in 0..workers.len:",
+    "        workers[i].join()",
+    "    print(counter.value.get())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Arc[T]` is counted sharing that lets several threads own the same value: `clone()` adds a new owner and the value is dropped when the last owner lets go."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q1",
+   "q": "When is the lock released when you access the value inside `Locked[T]`?",
+   "options": [
+    "When you write `unlock()` by hand",
+    "Automatically, when the `Guard` leaves its scope",
+    "Never"
+   ],
+   "answer": 1,
+   "why": "Forgetting to unlock cannot happen in this design."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q2",
+   "q": "The simplest safe way to increase a single counter from several threads?",
+   "options": [
+    "A plain `i64`",
+    "`AtomicI64`",
+    "A `List`"
+   ],
+   "answer": 1,
+   "why": "Atomic operations are indivisible; no data race occurs."
+  }
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "title": "原子变量与 Mutex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "当多个线程访问同一块内存时，不能发生数据竞争。对于单个数字，最简单的解决办法是**原子**变量：操作是不可分割的。`AtomicI64.fetch_and_add(n)` 做加法，`load()` 读取。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    counter = thread.AtomicI64.new(0)",
+    "    counter.fetch_and_add(10)",
+    "    counter.fetch_and_add(5)",
+    "    print(\"counter:\", counter.load())",
+    "    print(counter.compare_and_swap(15, 100), counter.load())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "对更复杂的数据，使用 **`Mutex`**：用 `lock()` 获取，用 `unlock()` 释放。一种不会忘记解锁、更安全的方式是 **`Locked[T]`**，它把值放进锁里面：`lock()` 返回一个 `Guard`，当 `Guard` 离开作用域时锁会自动释放。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn work(c: Arc[thread.Locked[i64]]):",
+    "    for _i in 0..1000:",
+    "        g = c.value.lock()",
+    "        g.value() += 1",
+    "",
+    "fn main():",
+    "    counter = Arc[thread.Locked[i64]](thread.Locked[i64].new(0))",
+    "    workers = List[thread.Thread]()",
+    "    for w in 0..4:",
+    "        c = counter.clone()",
+    "        workers.push(thread.Thread.spawn(fn() =>",
+    "            work(c)))",
+    "    for i in 0..workers.len:",
+    "        workers[i].join()",
+    "    print(counter.value.get())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Arc[T]` 是带计数的共享，让多个线程拥有同一个值：`clone()` 增加一个新所有者，最后一个所有者放手时值被释放。"
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q1",
+   "q": "访问 `Locked[T]` 内部的值时，锁在什么时候释放？",
+   "options": [
+    "当你手动写 `unlock()` 时",
+    "当 `Guard` 离开作用域时，自动释放",
+    "永不"
+   ],
+   "answer": 1,
+   "why": "这种设计下不可能忘记解锁。"
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q2",
+   "q": "从多个线程增加单个计数器，最简单的安全方式是？",
+   "options": [
+    "普通的 `i64`",
+    "`AtomicI64`",
+    "一个 `List`"
+   ],
+   "answer": 1,
+   "why": "原子操作是不可分割的；不会发生数据竞争。"
+  }
+ ]
+}

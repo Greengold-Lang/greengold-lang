@@ -171,7 +171,7 @@ Buttons are provided in the top-right editor title bar and the right-click conte
   - Attributes: `attribute name(param: kind) on fn, struct, field` declares one, and `@name(args)` above a `fn`, struct, or field uses it. Completion after `@` lists the attributes declared in the program.
 - **Standard library concurrency** (`import std.thread`):
   - `thread.Thread.spawn`, `thread.Thread.spawn_with_param`
-  - `thread.Channel.new()`, `.send()`, `.recv()`, `.close()`
+  - `thread.ChannelI64.new()`, `.send()`, `.recv()`, `.close()`
   - `thread.Mutex.new()`, `.lock()`, `.unlock()`
   - `thread.AtomicI64.new()`
 - **Pattern Matching & Control Flow:**

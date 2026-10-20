@@ -1,0 +1,60 @@
+{
+ "title": "if como expresión",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`if` también puede producir un valor: `if condición then A else B`. Asignas el resultado directamente a una variable. `else` es obligatorio y todas las ramas deben tener el **mismo** tipo."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    status = if age >= 18 then \"Adult\" else \"Child\"",
+    "    print(status)",
+    "",
+    "    score = 75",
+    "    grade = if score >= 90 then \"A\" elif score >= 70 then \"B\" else \"C\"",
+    "    print(\"Grade:\", grade)"
+   ],
+   "run": true,
+   "output": [
+    "Adult",
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l02-x1",
+   "prompt": "Escribe la variable `sign` con `if ... then ... else`: `-1` cuando `n` sea negativo y `1` en caso contrario. Imprímela.",
+   "starter": [
+    "fn main():",
+    "    n = -7",
+    "    sign = 0",
+    "    print(sign)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = -7",
+    "    sign = if n < 0 then -1 else 1",
+    "    print(sign)"
+   ],
+   "hint": "`sign = if n < 0 then -1 else 1`",
+   "expected": [
+    "-1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l02-q1",
+   "q": "¿Es obligatorio `else` en una expresión `if`?",
+   "options": [
+    "No",
+    "Sí",
+    "Solo cuando hay un `elif`"
+   ],
+   "answer": 1,
+   "why": "Un `if` que produce un valor debe dar uno en todos los casos."
+  }
+ ]
+}

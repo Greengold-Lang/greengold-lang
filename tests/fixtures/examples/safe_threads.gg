@@ -27,7 +27,7 @@ fn main():
     mtx.unlock()
 
     # 6. Safe Channel Operations
-    ch = thread.Channel.new()
+    ch = thread.ChannelI64.new()
     ch.send(100)
     ch.send(200)
     if let Valid(val) = ch.recv():

@@ -1,0 +1,100 @@
+{
+ "title": "An Ort und Stelle ändern: match lend",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Wie Funktionsparameter arbeitet auch `match` mit Modi. Standardmäßig (`match s:`) liest es die Daten nur. Mit `match lend s:` kannst du **die Daten in der Variante an Ort und Stelle ändern**; der Name im Muster wird zu einer `lend`-Referenz."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum Item:",
+    "    Weapon(i32)",
+    "    Empty",
+    "",
+    "fn upgrade(item: lend Item):",
+    "    match lend item:",
+    "        Item.Weapon(power):",
+    "            power += 10",
+    "        Item.Empty:",
+    "            pass",
+    "",
+    "fn main():",
+    "    sword = Item.Weapon(50)",
+    "    upgrade(sword)",
+    "    match sword:",
+    "        Item.Weapon(p):",
+    "            print(\"power:\", p)",
+    "        Item.Empty:",
+    "            pass"
+   ],
+   "run": true,
+   "output": [
+    "power: 60"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Der dritte Modus, `match consume s:`, übernimmt den Besitz und verschiebt die Daten zu ihren neuen Besitzern; er wird bei Varianten verwendet, die Typen wie `String`/`List` enthalten."
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l05-x1",
+   "prompt": "Schreibe `double_it(c: lend Cell)`: Ist es `Cell.Number(n)`, verdoppelt es `n`, ist es `Cell.Blank`, tut es nichts. Probiere es mit `Number(21)` und gib das Ergebnis aus.",
+   "starter": [
+    "enum Cell:",
+    "    Number(i32)",
+    "    Blank",
+    "",
+    "fn double_it(c: lend Cell):",
+    "    pass",
+    "",
+    "fn main():",
+    "    c = Cell.Number(21)",
+    "    double_it(c)",
+    "    match c:",
+    "        Cell.Number(n):",
+    "            print(n)",
+    "        Cell.Blank:",
+    "            pass"
+   ],
+   "solution": [
+    "enum Cell:",
+    "    Number(i32)",
+    "    Blank",
+    "",
+    "fn double_it(c: lend Cell):",
+    "    match lend c:",
+    "        Cell.Number(n):",
+    "            n *= 2",
+    "        Cell.Blank:",
+    "            pass",
+    "",
+    "fn main():",
+    "    c = Cell.Number(21)",
+    "    double_it(c)",
+    "    match c:",
+    "        Cell.Number(n):",
+    "            print(n)",
+    "        Cell.Blank:",
+    "            pass"
+   ],
+   "hint": "Schreibe `match lend c:` und `n *= 2` im Zweig `Cell.Number(n)`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l05-q1",
+   "q": "Welche `match`-Form ändert Daten in einer Variante an Ort und Stelle?",
+   "options": [
+    "`match s:`",
+    "`match lend s:`",
+    "`match read s:`"
+   ],
+   "answer": 1,
+   "why": "`lend` dient zum Ändern; das normale `match` liest nur."
+  }
+ ]
+}

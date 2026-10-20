@@ -1,0 +1,75 @@
+import "../src/geo.gg"
+import std.math
+
+fn near(a: f64, b: f64, tol: f64) -> bool:
+    return math.abs(a - b) <= tol
+
+fn test_known_ecef_points():
+    o = geo.lla_to_ecef(geo.Lla{ lat: 0.0, lon: 0.0, alt: 0.0 })
+    require near(o.x, 6378137.0, 1.0e-6) and near(o.y, 0.0, 1.0e-6) and near(o.z, 0.0, 1.0e-6)
+    pole = geo.lla_to_ecef(geo.Lla{ lat: math.pi() / 2.0, lon: 0.0, alt: 0.0 })
+    require near(pole.z, geo.WGS84_B, 1.0e-6) and near(pole.x, 0.0, 1.0e-6)
+    up = geo.lla_to_ecef(geo.Lla{ lat: 0.0, lon: math.pi() / 2.0, alt: 1000.0 })
+    require near(up.y, 6379137.0, 1.0e-6)
+
+fn test_ecef_round_trip_everywhere():
+    lats = [-89.9, -60.0, -33.3, 0.0, 12.5, 47.0, 78.0, 89.99]
+    lons = [-179.0, -90.0, 0.0, 8.0, 135.0, 179.9]
+    alts = [-400.0, 0.0, 11000.0, 400000.0]
+    for i in 0..8:
+        for j in 0..6:
+            for k in 0..4:
+                p = geo.Lla{ lat: geo.deg_to_rad(lats[usize(i)]), lon: geo.deg_to_rad(lons[usize(j)]), alt: alts[usize(k)] }
+                q = geo.ecef_to_lla(geo.lla_to_ecef(p))
+                require near(q.lat, p.lat, 1.0e-10)
+                require near(q.alt, p.alt, 1.0e-4)
+                require near(geo.wrap_pi(q.lon - p.lon), 0.0, 1.0e-10)
+
+fn test_local_frames():
+    origin = geo.Lla{ lat: geo.deg_to_rad(47.0), lon: geo.deg_to_rad(8.0), alt: 400.0 }
+    zero = geo.ecef_to_enu(geo.lla_to_ecef(origin), origin)
+    require near(zero.e, 0.0, 1.0e-6) and near(zero.n, 0.0, 1.0e-6) and near(zero.u, 0.0, 1.0e-6)
+    v = geo.Enu{ e: 1200.0, n: -800.0, u: 150.0 }
+    back = geo.ecef_to_enu(geo.enu_to_ecef(v, origin), origin)
+    require near(back.e, v.e, 1.0e-6) and near(back.n, v.n, 1.0e-6) and near(back.u, v.u, 1.0e-6)
+    # straight up is straight up: 100 m above the origin is 100 m in `u`
+    above = geo.lla_to_enu(geo.Lla{ lat: origin.lat, lon: origin.lon, alt: origin.alt + 100.0 }, origin)
+    require near(above.u, 100.0, 1.0e-6) and near(above.e, 0.0, 1.0e-6) and near(above.n, 0.0, 1.0e-6)
+    ned = geo.enu_to_ned(v)
+    require ned.d == -150.0 and ned.n == -800.0 and ned.e == 1200.0
+    require geo.ned_to_enu(ned).u == 150.0
+
+fn test_haversine_and_bearing():
+    one_degree = geo.MEAN_RADIUS * math.pi() / 180.0
+    require near(geo.haversine(0.0, 0.0, 0.0, geo.deg_to_rad(1.0)), one_degree, 1.0e-6)
+    require near(geo.haversine(0.0, 0.0, math.pi() / 2.0, 0.0), geo.MEAN_RADIUS * math.pi() / 2.0, 1.0e-6)
+    require near(geo.initial_bearing(0.0, 0.0, geo.deg_to_rad(1.0), 0.0), 0.0, 1.0e-12)
+    require near(geo.initial_bearing(0.0, 0.0, 0.0, geo.deg_to_rad(1.0)), math.pi() / 2.0, 1.0e-12)
+    require near(geo.initial_bearing(0.0, 0.0, geo.deg_to_rad(-1.0), 0.0), math.pi(), 1.0e-12)
+    d = geo.destination(geo.deg_to_rad(10.0), geo.deg_to_rad(20.0), geo.deg_to_rad(45.0), 250000.0)
+    back = geo.haversine(geo.deg_to_rad(10.0), geo.deg_to_rad(20.0), d.lat, d.lon)
+    require near(back, 250000.0, 1.0e-3)
+
+fn test_vincenty_matches_the_published_example():
+    # Flinders Peak to Buninyong, the example of Vincenty (1975): 54972.271 m, azimuth 306 52' 05.37"
+    lat1 = geo.deg_to_rad(-(37.0 + 57.0 / 60.0 + 3.72030 / 3600.0))
+    lon1 = geo.deg_to_rad(144.0 + 25.0 / 60.0 + 29.52440 / 3600.0)
+    lat2 = geo.deg_to_rad(-(37.0 + 39.0 / 60.0 + 10.15610 / 3600.0))
+    lon2 = geo.deg_to_rad(143.0 + 55.0 / 60.0 + 35.38390 / 3600.0)
+    g = geo.vincenty_inverse(lat1, lon1, lat2, lon2).value_or_panic()
+    require near(g.distance, 54972.271, 0.001)
+    require near(geo.rad_to_deg(g.azimuth1), 306.0 + 52.0 / 60.0 + 5.37 / 3600.0, 1.0e-5)
+    require near(geo.rad_to_deg(g.azimuth2), 307.0 + 10.0 / 60.0 + 25.07 / 3600.0, 1.0e-5)
+
+fn test_vincenty_edge_cases():
+    same = geo.vincenty_inverse(0.5, 0.5, 0.5, 0.5).value_or_panic()
+    require same.distance == 0.0
+    # along the equator one degree of longitude is a * pi / 180
+    eq = geo.vincenty_inverse(0.0, 0.0, 0.0, geo.deg_to_rad(1.0)).value_or_panic()
+    require near(eq.distance, geo.WGS84_A * math.pi() / 180.0, 1.0e-6)
+    # along a meridian from the equator to the pole: the meridian quarter, 10001965.729 m
+    mer = geo.vincenty_inverse(0.0, 0.0, math.pi() / 2.0, 0.0).value_or_panic()
+    require near(mer.distance, 10001965.729, 0.001)
+
+fn main():
+    pass

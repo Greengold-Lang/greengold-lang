@@ -1,0 +1,65 @@
+{
+ "title": "Hashes und Kodierung: std.hash, std.encoding",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.hash` bietet SHA-256/384/512, SHA-3, SHAKE, HMAC, HKDF und PBKDF2; der Code ist portables Greengold und braucht keine libc. Bytedaten gehen als `[]u8` hinein (eine `List[u8]`, ein Array oder `text.as_bytes()`). `std.encoding` macht aus Byte-Arrays hexadezimalen oder Base64-Text."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hash",
+    "import std.encoding",
+    "",
+    "fn main():",
+    "    d = hash.sha256(\"abc\".as_bytes())",
+    "    print(encoding.hex_encode(d).as_str())"
+   ],
+   "run": true,
+   "output": [
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**Vergleiche** Digests oder MACs **nie mit `==`**: Ein messbarer Zeitunterschied gibt Informationen preis. Verwende `crypto.constant_time_eq`. `std.crypto` bietet außerdem ChaCha20-Poly1305, AES-GCM, X25519, Ed25519 und das sich selbst löschende `SecretBytes`."
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l03-x1",
+   "prompt": "Berechne die SHA-256-Digests von `\"abc\"` und `\"abd\"`, vergleiche sie mit `crypto.constant_time_eq` und gib das Ergebnis aus.",
+   "starter": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    a = hash.sha256(\"abc\".as_bytes())",
+    "    b = hash.sha256(\"abd\".as_bytes())",
+    "    print(crypto.constant_time_eq(a[..], b[..]))"
+   ],
+   "hint": "Die Digests sind `[32]u8`-Arrays; wandle sie mit `a[..]` in Slices um.",
+   "expected": [
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l03-q1",
+   "q": "Warum verwendet man `constant_time_eq` statt `==`, um zwei Digests zu vergleichen?",
+   "options": [
+    "Weil es kürzer ist",
+    "Weil ein Zeitunterschied Informationen preisgeben kann",
+    "Weil `==` nicht funktioniert"
+   ],
+   "answer": 1,
+   "why": "Ein Vergleich in konstanter Zeit hält nicht am ersten abweichenden Byte an."
+  }
+ ]
+}

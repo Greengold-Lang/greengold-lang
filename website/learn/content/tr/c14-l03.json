@@ -1,0 +1,65 @@
+{
+ "title": "Özet ve şifreleme: std.hash, std.encoding",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.hash` SHA-256/384/512, SHA-3, SHAKE, HMAC, HKDF ve PBKDF2 sunar; kod taşınabilir Greengold'dur ve libc gerektirmez. Bayt verisi `[]u8` olarak girer (`List[u8]`, dizi ya da `metin.as_bytes()`). `std.encoding` bayt dizilerini onaltılık (hex) ya da base64 metne çevirir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hash",
+    "import std.encoding",
+    "",
+    "fn main():",
+    "    d = hash.sha256(\"abc\".as_bytes())",
+    "    print(encoding.hex_encode(d).as_str())"
+   ],
+   "run": true,
+   "output": [
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Özetleri ya da MAC'leri **asla `==` ile** karşılaştırma: ölçülebilir zaman farkı bilgi sızdırır. `crypto.constant_time_eq` kullan. `std.crypto` ayrıca ChaCha20-Poly1305, AES-GCM, X25519, Ed25519 ve kendini silen `SecretBytes` sunar."
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l03-x1",
+   "prompt": "`\"abc\"` ve `\"abd\"` metinlerinin SHA-256 özetlerini hesaplayıp `crypto.constant_time_eq` ile karşılaştır ve sonucu yazdır.",
+   "starter": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    a = hash.sha256(\"abc\".as_bytes())",
+    "    b = hash.sha256(\"abd\".as_bytes())",
+    "    print(crypto.constant_time_eq(a[..], b[..]))"
+   ],
+   "hint": "Özetler `[32]u8` dizisidir; `a[..]` ile dilime çevir.",
+   "expected": [
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l03-q1",
+   "q": "İki özeti karşılaştırmak için neden `==` yerine `constant_time_eq` kullanılır?",
+   "options": [
+    "Daha kısa olduğu için",
+    "Zamanlama farkı bilgi sızdırabileceği için",
+    "`==` çalışmadığı için"
+   ],
+   "answer": 1,
+   "why": "Sabit zamanlı karşılaştırma, ilk farklı baytta durmaz."
+  }
+ ]
+}

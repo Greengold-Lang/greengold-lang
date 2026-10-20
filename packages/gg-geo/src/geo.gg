@@ -1,0 +1,233 @@
+# geo: positions on the Earth. WGS84 geodetic <-> ECEF <-> local East-North-Up / North-East-Down frames, great-circle and
+# ellipsoidal distances, bearings. All angles are radians, all lengths metres, unless a name says otherwise.
+#
+#     import geo.geo { Lla, deg_to_rad, lla_to_ecef, ecef_to_enu, vincenty_inverse }
+#     here = Lla{ lat: deg_to_rad(47.0), lon: deg_to_rad(8.0), alt: 400.0 }
+#     p = lla_to_ecef(here)
+#     e = ecef_to_enu(p, here)             # (0, 0, 0): the origin of the local frame
+#
+# Accuracy. The ECEF conversions are exact up to rounding (the inverse iterates to 1e-12 rad). `vincenty_inverse` is accurate to
+# about a millimetre except for nearly antipodal points, where it does not converge and returns None (use `haversine` there, which
+# treats the Earth as a sphere of radius `MEAN_RADIUS` and is good to about 0.3 %).
+
+import std.math
+
+public
+const WGS84_A: f64 = 6378137.0                         # semi-major axis, m
+const WGS84_F: f64 = 1.0 / 298.257223563               # flattening
+const WGS84_B: f64 = 6356752.314245179                 # semi-minor axis, m  (a * (1 - f))
+const WGS84_E2: f64 = 0.0066943799901413165            # first eccentricity squared  (f * (2 - f))
+const MEAN_RADIUS: f64 = 6371008.8                     # IUGG mean radius, m
+
+# A geodetic position: latitude and longitude in radians (north and east positive), height above the ellipsoid in metres.
+struct Lla:
+    lat: f64
+    lon: f64
+    alt: f64
+
+# Earth-centred, Earth-fixed Cartesian coordinates in metres.
+struct Ecef:
+    x: f64
+    y: f64
+    z: f64
+
+# A vector in the local East-North-Up frame at some reference point.
+struct Enu:
+    e: f64
+    n: f64
+    u: f64
+
+# A vector in the local North-East-Down frame (what aircraft navigation uses): `d` is positive downward.
+struct Ned:
+    n: f64
+    e: f64
+    d: f64
+
+fn deg_to_rad(d: f64) -> f64:
+    return d * math.pi() / 180.0
+
+fn rad_to_deg(r: f64) -> f64:
+    return r * 180.0 / math.pi()
+
+# An angle in the range [0, 2 pi).
+fn wrap_two_pi(a: f64) -> f64:
+    two_pi = 2.0 * math.pi()
+    r = a - two_pi * math.floor(a / two_pi)
+    if r >= two_pi:
+        r = 0.0
+    return r
+
+# An angle in the range (-pi, pi].
+fn wrap_pi(a: f64) -> f64:
+    r = wrap_two_pi(a)
+    if r > math.pi():
+        r = r - 2.0 * math.pi()
+    return r
+
+fn lla_to_ecef(p: Lla) -> Ecef:
+    s = math.sin(p.lat)
+    c = math.cos(p.lat)
+    n = WGS84_A / math.sqrt(1.0 - WGS84_E2 * s * s)       # prime vertical radius of curvature
+    return Ecef{ x: (n + p.alt) * c * math.cos(p.lon), y: (n + p.alt) * c * math.sin(p.lon), z: (n * (1.0 - WGS84_E2) + p.alt) * s }
+
+fn ecef_to_lla(p: Ecef) -> Lla:
+    lon = math.atan2(p.y, p.x)
+    r = math.sqrt(p.x * p.x + p.y * p.y)
+    if r < 1.0e-9:               # on the polar axis
+        lat = math.pi() / 2.0
+        if p.z < 0.0:
+            lat = -lat
+        return Lla{ lat: lat, lon: 0.0, alt: math.abs(p.z) - WGS84_B }
+    lat = math.atan2(p.z, r * (1.0 - WGS84_E2))
+    alt = 0.0
+    for _i in 0..20:
+        s = math.sin(lat)
+        n = WGS84_A / math.sqrt(1.0 - WGS84_E2 * s * s)
+        alt = r / math.cos(lat) - n
+        next = math.atan2(p.z, r * (1.0 - WGS84_E2 * n / (n + alt)))
+        done = math.abs(next - lat) < 1.0e-13
+        lat = next
+        if done:
+            break
+    s2 = math.sin(lat)
+    n2 = WGS84_A / math.sqrt(1.0 - WGS84_E2 * s2 * s2)
+    if math.abs(lat) < 1.0:
+        alt = r / math.cos(lat) - n2
+    else:
+        alt = p.z / s2 - n2 * (1.0 - WGS84_E2)         # stable near the poles
+    return Lla{ lat: lat, lon: lon, alt: alt }
+
+# The vector from `origin` to `p` expressed in the East-North-Up frame at `origin`.
+fn ecef_to_enu(p: Ecef, origin: Lla) -> Enu:
+    o = lla_to_ecef(origin)
+    dx = p.x - o.x
+    dy = p.y - o.y
+    dz = p.z - o.z
+    sl = math.sin(origin.lat)
+    cl = math.cos(origin.lat)
+    so = math.sin(origin.lon)
+    co = math.cos(origin.lon)
+    return Enu{ e: -so * dx + co * dy, n: -sl * co * dx - sl * so * dy + cl * dz, u: cl * co * dx + cl * so * dy + sl * dz }
+
+# The point at East-North-Up offset `v` from `origin`.
+fn enu_to_ecef(v: Enu, origin: Lla) -> Ecef:
+    o = lla_to_ecef(origin)
+    sl = math.sin(origin.lat)
+    cl = math.cos(origin.lat)
+    so = math.sin(origin.lon)
+    co = math.cos(origin.lon)
+    return Ecef{ x: o.x - so * v.e - sl * co * v.n + cl * co * v.u,
+                 y: o.y + co * v.e - sl * so * v.n + cl * so * v.u,
+                 z: o.z + cl * v.n + sl * v.u }
+
+fn enu_to_ned(v: Enu) -> Ned:
+    return Ned{ n: v.n, e: v.e, d: -v.u }
+
+fn ned_to_enu(v: Ned) -> Enu:
+    return Enu{ e: v.e, n: v.n, u: -v.d }
+
+fn lla_to_enu(p: Lla, origin: Lla) -> Enu:
+    return ecef_to_enu(lla_to_ecef(p), origin)
+
+fn enu_to_lla(v: Enu, origin: Lla) -> Lla:
+    return ecef_to_lla(enu_to_ecef(v, origin))
+
+# The length of the straight line between two positions through the Earth.
+fn chord_distance(a: Lla, b: Lla) -> f64:
+    pa = lla_to_ecef(a)
+    pb = lla_to_ecef(b)
+    dx = pa.x - pb.x
+    dy = pa.y - pb.y
+    dz = pa.z - pb.z
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+# -- great circle (spherical Earth) --------------------------------------------------------------------------------------------
+
+# The great-circle distance between two points on a sphere of radius `MEAN_RADIUS` (the haversine formula).
+fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64:
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    sa = math.sin(dlat / 2.0)
+    sb = math.sin(dlon / 2.0)
+    h = sa * sa + math.cos(lat1) * math.cos(lat2) * sb * sb
+    if h > 1.0:
+        h = 1.0
+    return 2.0 * MEAN_RADIUS * math.asin(math.sqrt(h))
+
+# The initial true bearing from point 1 to point 2 along the great circle, in [0, 2 pi) measured clockwise from north.
+fn initial_bearing(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64:
+    dlon = lon2 - lon1
+    y = math.sin(dlon) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+    return wrap_two_pi(math.atan2(y, x))
+
+# The point reached by travelling `distance` metres from (lat, lon) on the initial bearing `bearing`, on the sphere.
+fn destination(lat: f64, lon: f64, bearing: f64, distance: f64) -> Lla:
+    d = distance / MEAN_RADIUS
+    lat2 = math.asin(math.sin(lat) * math.cos(d) + math.cos(lat) * math.sin(d) * math.cos(bearing))
+    lon2 = lon + math.atan2(math.sin(bearing) * math.sin(d) * math.cos(lat), math.cos(d) - math.sin(lat) * math.sin(lat2))
+    return Lla{ lat: lat2, lon: wrap_pi(lon2), alt: 0.0 }
+
+# -- ellipsoid (Vincenty) --------------------------------------------------------------------------------------------------
+
+# The result of the inverse geodesic problem.
+struct Geodesic:
+    distance: f64          # metres along the ellipsoid surface
+    azimuth1: f64          # initial azimuth at point 1, radians clockwise from north
+    azimuth2: f64          # azimuth at point 2 (the direction of travel on arrival)
+
+# The shortest path on the WGS84 ellipsoid between two points (Vincenty's iteration). None when the iteration does not converge, which
+# happens for nearly antipodal points.
+fn vincenty_inverse(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> Optional[Geodesic]:
+    if lat1 == lat2 and lon1 == lon2:
+        return Valid(Geodesic{ distance: 0.0, azimuth1: 0.0, azimuth2: 0.0 })
+    u1 = math.atan((1.0 - WGS84_F) * math.tan(lat1))
+    u2 = math.atan((1.0 - WGS84_F) * math.tan(lat2))
+    l = lon2 - lon1
+    lambda_ = l
+    su1 = math.sin(u1)
+    cu1 = math.cos(u1)
+    su2 = math.sin(u2)
+    cu2 = math.cos(u2)
+    sin_sigma = 0.0
+    cos_sigma = 0.0
+    sigma = 0.0
+    cos_sq_alpha = 0.0
+    cos_2sm = 0.0
+    converged = false
+    for _i in 0..200:
+        sl = math.sin(lambda_)
+        cl = math.cos(lambda_)
+        t1 = cu2 * sl
+        t2 = cu1 * su2 - su1 * cu2 * cl
+        sin_sigma = math.sqrt(t1 * t1 + t2 * t2)
+        if sin_sigma == 0.0:
+            return Valid(Geodesic{ distance: 0.0, azimuth1: 0.0, azimuth2: 0.0 })
+        cos_sigma = su1 * su2 + cu1 * cu2 * cl
+        sigma = math.atan2(sin_sigma, cos_sigma)
+        sin_alpha = cu1 * cu2 * sl / sin_sigma
+        cos_sq_alpha = 1.0 - sin_alpha * sin_alpha
+        cos_2sm = 0.0
+        if cos_sq_alpha != 0.0:
+            cos_2sm = cos_sigma - 2.0 * su1 * su2 / cos_sq_alpha
+        c = WGS84_F / 16.0 * cos_sq_alpha * (4.0 + WGS84_F * (4.0 - 3.0 * cos_sq_alpha))
+        prev = lambda_
+        lambda_ = l + (1.0 - c) * WGS84_F * sin_alpha * (sigma + c * sin_sigma * (cos_2sm + c * cos_sigma * (-1.0 + 2.0 * cos_2sm * cos_2sm)))
+        if math.abs(lambda_ - prev) < 1.0e-12:
+            converged = true
+            break
+        if math.abs(lambda_) > math.pi():
+            return None
+    if not converged:
+        return None
+    u_sq = cos_sq_alpha * (WGS84_A * WGS84_A - WGS84_B * WGS84_B) / (WGS84_B * WGS84_B)
+    a = 1.0 + u_sq / 16384.0 * (4096.0 + u_sq * (-768.0 + u_sq * (320.0 - 175.0 * u_sq)))
+    b = u_sq / 1024.0 * (256.0 + u_sq * (-128.0 + u_sq * (74.0 - 47.0 * u_sq)))
+    delta_sigma = b * sin_sigma * (cos_2sm + b / 4.0 * (cos_sigma * (-1.0 + 2.0 * cos_2sm * cos_2sm)
+        - b / 6.0 * cos_2sm * (-3.0 + 4.0 * sin_sigma * sin_sigma) * (-3.0 + 4.0 * cos_2sm * cos_2sm)))
+    s = WGS84_B * a * (sigma - delta_sigma)
+    sl = math.sin(lambda_)
+    cl = math.cos(lambda_)
+    az1 = math.atan2(cu2 * sl, cu1 * su2 - su1 * cu2 * cl)
+    az2 = math.atan2(cu1 * sl, -su1 * cu2 + cu1 * su2 * cl)
+    return Valid(Geodesic{ distance: s, azimuth1: wrap_two_pi(az1), azimuth2: wrap_two_pi(az2) })

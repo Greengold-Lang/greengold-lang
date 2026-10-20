@@ -1,0 +1,69 @@
+{
+ "title": "Closures: capturar variables externas",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Una lambda puede usar variables de la función en la que está escrita; esto se llama **closure**. Los valores copiables (números, structs simples) se **copian** al crear la lambda; los valores que poseen heap, como `List`, se **toman prestados** como `read`. Mientras el closure está en uso, la variable prestada no se puede cambiar ni mover; el compilador lo comprueba."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn apply(f: fn(i32) -> i32, x: i32) -> i32:",
+    "    return f(x)",
+    "",
+    "fn main():",
+    "    k = 3",
+    "    add_k = fn(x: i32) -> i32 => x + k",
+    "    print(add_k(1), apply(add_k, 10))",
+    "",
+    "    xs = List[i32]()",
+    "    xs.push(7)",
+    "    has = fn(i: i32) -> bool => xs.len > usize(i)",
+    "    print(has(0))",
+    "    xs.push(8)"
+   ],
+   "run": true,
+   "output": [
+    "4 13",
+    "true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Si el cuerpo de la lambda **cambia** la variable capturada (`fn(x: i32) => out.push(x)`), el closure la toma prestada como `lend`: la variable no puede ser `fixed` y no se puede acceder a ella desde otro sitio mientras el closure esté en uso."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l04-x1",
+   "prompt": "Escribe una lambda que capture la variable `factor`: multiplica su entrada por `factor` (`factor = 4`). Imprime `scale(5)`.",
+   "starter": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x",
+    "    print(scale(5))"
+   ],
+   "solution": [
+    "fn main():",
+    "    factor = 4",
+    "    scale = fn(x: i32) -> i32 => x * factor",
+    "    print(scale(5))"
+   ],
+   "hint": "Haz que el cuerpo sea `x * factor`.",
+   "expected": [
+    "20"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l04-q1",
+   "q": "¿Qué ocurre cuando una lambda captura un número?",
+   "options": [
+    "Se copia",
+    "Se mueve",
+    "Se elimina"
+   ],
+   "answer": 0,
+   "why": "Los tipos Copy se copian al capturarse; los tipos Move se toman prestados o se mueven."
+  }
+ ]
+}

@@ -143,7 +143,12 @@ def optimize(mod: Any, tm: Any, release: bool) -> None:
             # The inlining threshold stays LLVM's -O3 default: with llvmlite 0.50 a threshold of 275 left
             # even two-line functions (a list `push`) out of line.
         pb = llvm.create_pass_builder(tm, pto)
-        pb.getModulePassManager().run(mod, pb)
+        mpm = pb.getModulePassManager()
+        if not release and hasattr(mpm, "add_global_dead_code_eliminate_pass"):
+            # Library functions that the program never calls are all in the module; drop them so a program
+            # that does not use `std.math` does not need libm (a `--no-std` link has no libm to give).
+            mpm.add_global_dead_code_eliminate_pass()
+        mpm.run(mod, pb)
         return
     pmb = llvm.create_pass_manager_builder()
     pmb.opt_level = 3 if release else 0
@@ -267,6 +272,7 @@ def link_executable(obj_path: Path, exe_path: Path, triple: str, links: list[str
         if "windows" in triple:
             cmd.append("-lws2_32")  # sockets (std.net); unused libraries add nothing
             cmd.append("-lsecur32")  # TLS (std.tls uses SChannel)
+            cmd.append("-Wl,--no-insert-timestamp")  # the same sources give the same bytes
         elif _uses_openssl(obj_path):
             cmd += _openssl_link_args()
     result = subprocess.run(cmd, capture_output=True, text=True)

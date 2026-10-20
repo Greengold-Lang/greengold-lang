@@ -1,0 +1,78 @@
+{
+ "title": "Formatos de datos: std.csv, std.uuid, std.log",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.csv` (RFC 4180) lee los campos correctamente con las reglas de comillas y separadores: `csv.parse(texto, ',')` da un `Result[List[List[string]], string]`. `csv.format_row` escribe una fila, poniendo comillas donde haga falta."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"name,age\\nAda,36\\n\\\"Smith, J\\\",41\\n\", ',').value_or_panic()",
+    "    print(rows.len, rows[2][0].as_str())"
+   ],
+   "run": true,
+   "output": [
+    "3 Smith, J"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`std.uuid` genera identificadores RFC 9562: `v4` aleatorio, `v7` ordenado por tiempo, `v5` basado en nombre (el mismo nombre siempre da el mismo id). `std.log` escribe líneas con niveles en stderr (`log.info`, `log.warn`, `log.kv`) y da salida JSON con `log.set_json(true)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.uuid",
+    "",
+    "fn main():",
+    "    ns = uuid.namespace_dns()",
+    "    id = uuid.v5(ns, \"example.com\".as_bytes())",
+    "    print(id.to_string().as_str())",
+    "    print(id.version())"
+   ],
+   "run": true,
+   "output": [
+    "cfbff0d1-9375-5685-968c-48ce8b15ae17",
+    "5"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l04-x1",
+   "prompt": "Lee el texto `\"a,b\\nc,d\\n\"` con `csv.parse` e imprime el número de filas.",
+   "starter": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"a,b\\nc,d\\n\", ',').value_or_panic()",
+    "    print(rows.len)"
+   ],
+   "hint": "`csv.parse(...).value_or_panic()` y `rows.len`.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l04-q1",
+   "q": "¿Qué versión produce siempre el mismo UUID para el mismo nombre?",
+   "options": [
+    "`v4`",
+    "`v5`",
+    "`v7`"
+   ],
+   "answer": 1,
+   "why": "`v5` se calcula a partir de un nombre y un espacio de nombres; `v4` es aleatorio y `v7` depende del tiempo."
+  }
+ ]
+}

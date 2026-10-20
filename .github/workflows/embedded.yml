@@ -1,0 +1,48 @@
+name: Embedded
+
+# Builds the bare-metal examples for their real targets and checks the ELF files. NOT RUN YET: this workflow was written on a machine
+# without clang for ARM, an ARM linker or QEMU, so its first run on GitHub may need small fixes (package names, the linker flags).
+# Running the firmware under QEMU (semihosting exit code) is the next step once the build job is green.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+    paths:
+      - "examples/embedded/**"
+      - "greengold/targets.py"
+      - "greengold/llvm_driver.py"
+      - "greengold/std/mmio.gg"
+      - "greengold/std/hal.gg"
+      - ".github/workflows/embedded.yml"
+
+jobs:
+  cortex-m:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld gcc-arm-none-eabi qemu-system-arm
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: Build the Cortex-M4 example
+        working-directory: examples/embedded/cortex_m
+        env:
+          GG_BACKEND: clang          # the built-in LLVM has no ARM inline assembly; the outside clang does
+        run: gg build main.gg --no-std --target cortex-m4 --linker-script link.ld -o firmware.elf
+      - name: Inspect the image
+        working-directory: examples/embedded/cortex_m
+        run: |
+          arm-none-eabi-size firmware.elf
+          arm-none-eabi-objdump -h firmware.elf | grep -E "\.vectors|\.text|\.data|\.bss"
+      - name: Stack and heap rules
+        working-directory: examples/embedded/cortex_m
+        env:
+          GG_BACKEND: clang
+        run: |
+          gg build main.gg --no-std --target cortex-m4 --linker-script link.ld --forbid-heap --forbid-recursion --max-stack 1024 -o firmware.elf
+          gg stack-usage main.gg --no-std --target cortex-m4

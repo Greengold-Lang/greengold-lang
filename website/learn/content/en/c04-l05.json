@@ -1,0 +1,73 @@
+{
+ "title": "Slices",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A **slice** (`[]T`) is a view of flexible length over an array (or a block of memory). If a function parameter is `[]i32` it accepts an array of any size. For a sub-range write `array[a..b]` (`b` not included)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total",
+    "",
+    "fn main():",
+    "    data: [5]i32 = [1, 2, 3, 4, 5]",
+    "    print(\"total:\", sum(data))",
+    "    print(\"part:\", sum(data[1..4]))"
+   ],
+   "run": true,
+   "output": [
+    "total: 15",
+    "part: 9"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "A slice is a view, so the array it is made from cannot change, move or disappear while the slice is in use. The compiler checks this, so a slice can never \"dangle\"."
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l05-x1",
+   "prompt": "Write `average(items: []i32) -> i32`: the sum of the elements divided by their count (`items.len` is a `usize`, convert with `i32(items.len)`). Print it for `[2, 4, 6, 8]`.",
+   "starter": [
+    "fn average(items: []i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "solution": [
+    "fn average(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total / i32(items.len)",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "hint": "First find the total, then divide by `i32(items.len)`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l05-q1",
+   "q": "Which can be passed to a `[]i32` parameter?",
+   "options": [
+    "Only a 5-element array",
+    "A `[N]i32` array of any size, or a sub-range",
+    "Only text"
+   ],
+   "answer": 1,
+   "why": "A slice does not fix the length, so it works with any size."
+  }
+ ]
+}

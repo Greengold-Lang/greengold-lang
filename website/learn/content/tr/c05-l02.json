@@ -1,0 +1,96 @@
+{
+ "title": "lend: ödünç al ve değiştir",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`lend`, fonksiyonun veriyi geçici olarak ödünç alıp **yerinde değiştirmesine** izin verir. Değişiklik çağıranın değişkeninde görünür. Çağrıda `lend` yazılmaz; ama o değişken `fixed` olamaz."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn take_damage(p: lend Player, amount: i32):",
+    "    p.health -= amount",
+    "",
+    "fn inc(n: lend i32):",
+    "    n += 1",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    take_damage(hero, 25)",
+    "    print(hero.health)",
+    "",
+    "    score = 10",
+    "    inc(score)",
+    "    print(score)"
+   ],
+   "run": true,
+   "output": [
+    "75",
+    "11"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Heap'e sahip tiplerde `lend` yazman bile gerekmez: gövde parametreyi değiştiriyorsa derleyici modu **otomatik olarak `lend` tespit eder**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add_one(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add_one(v)",
+    "    add_one(v)",
+    "    print(v.len)"
+   ],
+   "run": true,
+   "output": [
+    "2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l02-x1",
+   "prompt": "`reset(n: lend i32)` fonksiyonu `n`'i 0 yapsın. `x = 42` için çağır ve `x`'i yazdır.",
+   "starter": [
+    "fn reset(n: lend i32):",
+    "    pass",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn reset(n: lend i32):",
+    "    n = 0",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "hint": "`pass` yerine `n = 0`.",
+   "expected": [
+    "0"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l02-q1",
+   "q": "`lend` ile verilen değişken `fixed` olabilir mi?",
+   "options": [
+    "Evet",
+    "Hayır, çünkü değiştirilecek",
+    "Yalnızca sayıysa"
+   ],
+   "answer": 1,
+   "why": "Değişmeyeceğini söylediğin bir değeri değiştirmek derleme hatasıdır."
+  }
+ ]
+}

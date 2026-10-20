@@ -1,0 +1,70 @@
+{
+ "title": "Rastgele sayılar: std.rand",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.rand` bir **tohum** (seed) ile başlayan, aynı tohumda her zaman aynı diziyi üreten bir üreteç verir: `rand.rng_new(42)`. `below(n)` 0 ile `n-1` arası, `range(a, b)` `a` dahil, `b` hariç aralıkta, `next_f64()` 0–1 arası sayı verir. Gerçek rastgelelik için `rand.rng_from_entropy()` ya da `secure_u64()` vardır (şifreleme için `secure_*`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(42)",
+    "    for i in 0..3:",
+    "        print(r.below(100))",
+    "    print(r.range(1, 6))"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "98",
+    "46",
+    "1"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Tohumu sabit tutmak testlerde ve oyunlarda yeniden üretilebilir sonuç almanın en kolay yoludur."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l06-x1",
+   "prompt": "Tohum 7 ile bir zarı (1–6) üç kez at ve sonuçları yazdır. Üst sınır dahil olmadığı için `range(1, 7)` kullan.",
+   "starter": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    for i in 0..3:",
+    "        print(r.range(1, 7))"
+   ],
+   "hint": "Döngüde `r.range(1, 7)` yazdır.",
+   "expected": [
+    "5",
+    "3",
+    "1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l06-q1",
+   "q": "Aynı tohumla `rng_new(42)` iki kez çalışırsa?",
+   "options": [
+    "Farklı diziler üretir",
+    "Aynı diziyi üretir",
+    "Hata verir"
+   ],
+   "answer": 1,
+   "why": "Bu bir sözde-rastgele üreteçtir: tohum diziyi belirler."
+  }
+ ]
+}

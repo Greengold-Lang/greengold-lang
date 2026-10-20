@@ -1,0 +1,61 @@
+{
+ "title": "Otomatik düzeltme ve biçimlendirme",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Derleyici bir hatanın çözümünü biliyorsa bunu hatanın yanına yazar ve düzeltmeyi bir kopya üzerinde deneyerek **doğrular** (`fix (verified)`). `gg fix` doğrulanmış düzeltmeleri dosyaya uygular ve düzeltme kalmayana kadar tekrarlar."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg fix                 # every .gg file in the folder",
+    "gg fix src/main.gg     # one file",
+    "gg fix --dry-run       # only print what would be done",
+    "gg fix --likely        # also apply guess-based fixes that compile"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "İki tür düzeltme vardır: **`safe`** (tek mantıklı onarım: başka dillerden gelen yazımlar `&&`, `||`, `x++`, `;`, `let x = 5`, satır sonunda unutulmuş `:`, eksik `import std.math`...) ve **`likely`** (derlenen bir tahmin: yanlış yazılmış ad, eksik `match` kolu, `i32(...)` dönüşümü...)."
+  },
+  {
+   "t": "p",
+   "text": "`gg fmt` her dosyayı tek bir biçime getirir: blok başına dört boşluk, `else`/`elif` kendi `if`'iyle hizalı, satır sonu boşlukları temiz. İkinci kez çalıştırmak hiçbir şeyi değiştirmez."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg fmt src/             # rewrite files",
+    "gg fmt --check src/     # only check (for CI)"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l03-q1",
+   "q": "`gg fix --dry-run` ne yapar?",
+   "options": [
+    "Dosyaları siler",
+    "Yalnızca ne yapılacağını yazdırır",
+    "Programı çalıştırır"
+   ],
+   "answer": 1,
+   "why": "`--dry-run` dosyaya dokunmaz."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l03-q2",
+   "q": "CI'da biçimi yalnızca denetlemek için hangi komut kullanılır?",
+   "options": [
+    "`gg fmt --check src/`",
+    "`gg fix --likely`",
+    "`gg doc`"
+   ],
+   "answer": 0,
+   "why": "`--check` dosyaları değiştirmez, uygun değilse hata koduyla çıkar."
+  }
+ ]
+}

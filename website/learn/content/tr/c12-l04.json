@@ -1,0 +1,46 @@
+{
+ "title": "Görevler: async ve await",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bekleyen işleri (zamanlayıcı, ağ) thread açmadan örtüştürmek için **görevler** vardır. `async fn` bir görev başlatır, `await` sonucunu bekler. `std.tasks` içindeki `sleep` ve `yield_now` görevi askıya alır. Aşağıdaki üç `sleep` birbirine **örtüşür**: toplam süre 300 değil, yaklaşık 100 ms'dir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.tasks",
+    "import std.time",
+    "",
+    "async fn twice(n: i32) -> i32:",
+    "    tasks.sleep(100)",
+    "    return n * 2",
+    "",
+    "fn main():",
+    "    t = time.Instant.now()",
+    "    a = twice(1)",
+    "    b = twice(2)",
+    "    c = twice(3)",
+    "    print(await a + await b + await c)",
+    "    print(t.elapsed_millis() < 250)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Bir görevi bir lambda ile de başlatabilirsin: `h = tasks.spawn(fn() -> string => ...)`, ardından `h.is_done()` ve `await h`."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l04-q1",
+   "q": "Üç `async` görev 100 ms `sleep` yapıyorsa, hepsi başlatıldıktan sonra toplam süre kabaca ne kadardır?",
+   "options": [
+    "300 ms",
+    "100 ms (örtüşürler)",
+    "0 ms"
+   ],
+   "answer": 1,
+   "why": "Beklemeler üst üste biner; sıralı çalışsalardı 300 ms olurdu."
+  }
+ ]
+}

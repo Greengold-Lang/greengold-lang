@@ -1,0 +1,115 @@
+{
+ "title": "Métodos e impl",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Para añadir comportamiento a un tipo escribes un bloque **`impl`**. El primer parámetro de un método es `self`; accedes a los campos del objeto con `self.campo`. Una llamada se ve así: `objeto.metodo()`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rectangle:",
+    "    width: f64",
+    "    height: f64",
+    "",
+    "impl Rectangle:",
+    "    fn area(self) -> f64:",
+    "        return self.width * self.height",
+    "",
+    "fn main():",
+    "    rect = Rectangle{ width: 10.0, height: 5.0 }",
+    "    print(\"Area:\", rect.area())"
+   ],
+   "run": true,
+   "output": [
+    "Area: 50"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Un método que cambia el objeto en el sitio escribe `self: lend Tipo` (aprenderás `lend` en el capítulo 5: \"tomar prestado y cambiar\"). Los métodos que no reciben `self` son métodos **estáticos** y se usan a menudo como constructores: `Tipo.nombre(...)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    name: str",
+    "    health: i32",
+    "",
+    "impl Player:",
+    "    fn new(name: str) -> Player:",
+    "        return Player{ name: name, health: 100 }",
+    "",
+    "    fn is_alive(self) -> bool:",
+    "        return self.health > 0",
+    "",
+    "    fn take_damage(self: lend Player, amount: i32):",
+    "        self.health -= amount",
+    "        if self.health < 0:",
+    "            self.health = 0",
+    "",
+    "fn main():",
+    "    hero = Player.new(\"Aragorn\")",
+    "    hero.take_damage(35)",
+    "    print(\"Health:\", hero.health)",
+    "    print(\"Alive?\", hero.is_alive())"
+   ],
+   "run": true,
+   "output": [
+    "Health: 65",
+    "Alive? true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l02-x1",
+   "prompt": "Añade un método `increment` al struct `Counter` (`value: i32`): aumenta `value` en 1. Llámalo tres veces e imprime `value`.",
+   "starter": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        pass",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "solution": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        self.value += 1",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "hint": "Sustituye `pass` por `self.value += 1`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l02-q1",
+   "q": "¿Cómo se llama un método sin `self`?",
+   "options": [
+    "Método privado",
+    "Método estático (a menudo un constructor)",
+    "Método roto"
+   ],
+   "answer": 1,
+   "why": "Los métodos que se llaman como `Player.new(...)` son estáticos."
+  }
+ ]
+}

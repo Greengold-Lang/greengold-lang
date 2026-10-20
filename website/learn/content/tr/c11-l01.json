@@ -1,0 +1,79 @@
+{
+ "title": "Yeni proje ve gg.toml",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold'un bütün araçları tek bir komutta toplanır: **`gg`**. Dış paket yöneticisi, biçimlendirici ya da test kütüphanesi kurmana gerek yok. Bu dersten itibaren komutları **kendi bilgisayarındaki bir terminalde** çalıştırırsın (tarayıcıdaki editörde çalışmazlar). Yeni bir proje için:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg new my_project",
+    "cd my_project"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Bu, standart klasör yapısını kurar:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "my_project/",
+    "├── gg.toml         # package and dependency manifest",
+    "└── src/",
+    "    └── main.gg     # the entry point with sample code"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "`gg.toml` projenin kimliğini, giriş dosyasını ve bağımlılıklarını tutar:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "[package]",
+    "name = \"my_project\"",
+    "version = \"0.1.0\"",
+    "main = \"src/main.gg\"",
+    "",
+    "[dependencies]",
+    "# math_utils = { path = \"../shared/math_utils\" }"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Bir bağımlılık ekledikten sonra projenin bir dosyasında `import math_utils.matrix` yazabilirsin; bu, o dosyada `matrix` adını bağlar. `import math_utils.matrix as m` yeniden adlandırır, `import math_utils.matrix { mul }` seçili adı doğrudan alır. Her dosya kendi `import` satırlarını yazar; `fn main` yalnızca derlediğin kök dosyada bulunur."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q1",
+   "q": "Yeni bir Greengold projesini hangi komut kurar?",
+   "options": [
+    "`gg init`",
+    "`gg new my_project`",
+    "`gg create`"
+   ],
+   "answer": 1,
+   "why": "`gg new` `gg.toml` ve `src/main.gg` dosyalarını oluşturur."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q2",
+   "q": "Bağımlılıklar hangi dosyada tanımlanır?",
+   "options": [
+    "`main.gg`",
+    "`gg.toml`",
+    "`README.md`"
+   ],
+   "answer": 1,
+   "why": "Proje bildirimi `gg.toml` dosyasındadır."
+  }
+ ]
+}

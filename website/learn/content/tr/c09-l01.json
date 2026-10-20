@@ -1,0 +1,80 @@
+{
+ "title": "Fonksiyonlar değer olarak",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold'da fonksiyonlar da birer değerdir: bir değişkende saklayabilir, parametre olarak verebilir ya da bir struct alanına koyabilirsin. Fonksiyon tipi `fn(T1, T2) -> R` biçiminde yazılır; uzun olduğu için çoğunlukla `type` ile adlandırılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn multiply(a: i32, b: i32) -> i32:",
+    "    return a * b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    current: MathOp = multiply",
+    "    print(apply_op(current, 6, 7))",
+    "    print(apply_op(add, 6, 7))"
+   ],
+   "run": true,
+   "output": [
+    "42",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`apply_op` hangi işlemi yapacağını bilmez; ona verilen fonksiyon karar verir. Bu, davranışı parametre olarak geçirmenin temel yoludur."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l01-x1",
+   "prompt": "`subtract` fonksiyonunu yaz ve `apply_op(subtract, 10, 4)` sonucunu yazdır.",
+   "starter": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(apply_op(subtract, 10, 4))"
+   ],
+   "hint": "`fn subtract(a: i32, b: i32) -> i32:` yaz ve `main`'den ona geçir.",
+   "expected": [
+    "6"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l01-q1",
+   "q": "`fn(i32, i32) -> i32` ne tür bir tiptir?",
+   "options": [
+    "Bir sayı tipi",
+    "İki `i32` alıp `i32` döndüren fonksiyonların tipi",
+    "Bir struct"
+   ],
+   "answer": 1,
+   "why": "Fonksiyon tipi, parametre ve dönüş tiplerini anlatır."
+  }
+ ]
+}

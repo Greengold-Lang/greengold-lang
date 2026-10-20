@@ -1,0 +1,93 @@
+{
+ "title": "Параметры и результаты",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Функции могут вызывать друг друга; результат одной может быть аргументом другой. `return` сразу выходит из функции, поэтому его используют и для **раннего возврата**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn abs_value(x: i32) -> i32:",
+    "    if x < 0:",
+    "        return -x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(square(abs_value(-4)))"
+   ],
+   "run": true,
+   "output": [
+    "16"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Функции, возвращающие `bool`, читаются как вопросы (`is_even`, `is_positive`) и хорошо смотрятся внутри `if`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn is_even(n: i32) -> bool:",
+    "    return n % 2 == 0",
+    "",
+    "fn main():",
+    "    for i in 1..=4:",
+    "        if is_even(i):",
+    "            print(i, \"is even\")",
+    "        else:",
+    "            print(i, \"is odd\")"
+   ],
+   "run": true,
+   "output": [
+    "1 is odd",
+    "2 is even",
+    "3 is odd",
+    "4 is even"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l02-x1",
+   "prompt": "Напишите `max_of(a, b)`: она возвращает большее число.",
+   "starter": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "solution": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "hint": "Верните `a`, если `a > b`, иначе верните `b`.",
+   "expected": [
+    "12",
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l02-q1",
+   "q": "Что происходит, когда `return` выполняется посреди функции?",
+   "options": [
+    "Функция сразу завершается",
+    "Выполняется следующая строка",
+    "Это ошибка"
+   ],
+   "answer": 0,
+   "why": "`return` немедленно покидает функцию; строки ниже не выполняются."
+  }
+ ]
+}

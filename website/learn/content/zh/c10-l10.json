@@ -1,0 +1,42 @@
+{
+ "title": "文件：std.fs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.fs` 与操作系统无关地操作文件系统。写入 `fs.write_string_to_file(路径, 文本)` 返回 `bool`；读取 `fs.read_file_to_string(路径)` 返回 `Optional[string]`；另外还有 `fs.file_exists` 和 `fs.remove_file`。如果需要更详细的错误信息，`std.io` 中的 `File.open`/`File.create` 返回 `Result`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.fs",
+    "",
+    "fn main():",
+    "    path = \"record.txt\"",
+    "    if fs.write_string_to_file(path, \"First line\\nSecond line\"):",
+    "        print(\"written\")",
+    "    match fs.read_file_to_string(path):",
+    "        Valid(text):",
+    "            print(text.as_str())",
+    "        None:",
+    "            print(\"could not read\")",
+    "    if fs.file_exists(path):",
+    "        fs.remove_file(path)",
+    "        print(\"cleaned up\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l10-q1",
+   "q": "当文件找不到时，`fs.read_file_to_string` 返回什么？",
+   "options": [
+    "`None`",
+    "一个空字符串",
+    "程序崩溃"
+   ],
+   "answer": 0,
+   "why": "返回类型是 `Optional[string]`；不存在用 `None` 表示。"
+  }
+ ]
+}

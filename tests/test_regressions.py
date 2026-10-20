@@ -146,7 +146,7 @@ def test_temporary_is_kept_when_the_result_points_into_it():
 def test_local_in_imported_module_does_not_clash_with_program_names():
     from tests.helpers import messages
     # std.thread has locals named `w`; the program's own `fn w` must not reach into that module
-    src = 'import std.thread\n\nfn w():\n    print("w")\n\nfn main():\n    c = thread.Channel.new()\n'
+    src = 'import std.thread\n\nfn w():\n    print("w")\n\nfn main():\n    c = thread.ChannelI64.new()\n'
     assert not any("conflicts with a function/struct name" in m for m in messages(src))
     # a clash inside the program itself is still reported
     assert any("conflicts with a function/struct name" in m for m in messages("fn w():\n    pass\n\nfn main():\n    w = 1\n"))

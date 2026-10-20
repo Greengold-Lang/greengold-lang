@@ -34,7 +34,14 @@ ALIASES: dict[str, str] = {
     "windows-arm64": "aarch64-w64-windows-gnu",
     "wasm32": "wasm32-unknown-unknown",
     "wasm32-wasi": "wasm32-unknown-wasi",
+    "cortex-m0": "thumbv6m-none-eabi",
+    "cortex-m3": "thumbv7m-none-eabi",
     "cortex-m4": "thumbv7em-none-eabihf",
+    "cortex-m7": "thumbv7em-none-eabihf",
+    "cortex-m33": "thumbv8m.main-none-eabihf",
+    "riscv32": "riscv32-unknown-none-elf",
+    "riscv64-bare": "riscv64-unknown-none-elf",
+    "aarch64-bare": "aarch64-unknown-none",
 }
 
 

@@ -17,15 +17,17 @@ from .typeinfo import INT_RANGES
 # Conversions that keep every value: a smaller integer into a wider one, an integer into a float that holds
 # it exactly, `f32` into `f64`. `isize`/`usize` are 64-bit on every supported host.
 WIDENS: dict[str, frozenset[str]] = {
-    "i8": frozenset({"i16", "i32", "i64", "isize", "f32", "f64"}),
-    "i16": frozenset({"i32", "i64", "isize", "f32", "f64"}),
-    "i32": frozenset({"i64", "isize", "f64"}),
-    "i64": frozenset({"isize"}),
+    "i8": frozenset({"i128", "i16", "i32", "i64", "isize", "f32", "f64"}),
+    "i16": frozenset({"i128", "i32", "i64", "isize", "f32", "f64"}),
+    "i32": frozenset({"i128", "i64", "isize", "f64"}),
+    "i64": frozenset({"isize", "i128"}),
     "isize": frozenset({"i64"}),
-    "u8": frozenset({"u16", "u32", "u64", "usize", "i16", "i32", "i64", "isize", "f32", "f64"}),
-    "u16": frozenset({"u32", "u64", "usize", "i32", "i64", "isize", "f32", "f64"}),
-    "u32": frozenset({"u64", "usize", "i64", "isize", "f64"}),
-    "u64": frozenset({"usize"}),
+    "u8": frozenset({"u128", "i128", "u16", "u32", "u64", "usize", "i16", "i32", "i64", "isize", "f32", "f64"}),
+    "u16": frozenset({"u128", "i128", "u32", "u64", "usize", "i32", "i64", "isize", "f32", "f64"}),
+    "u32": frozenset({"u128", "i128", "u64", "usize", "i64", "isize", "f64"}),
+    "u64": frozenset({"usize", "u128", "i128"}),
+    "i128": frozenset(),
+    "u128": frozenset(),
     "usize": frozenset({"u64"}),
     "f32": frozenset({"f64"}),
 }

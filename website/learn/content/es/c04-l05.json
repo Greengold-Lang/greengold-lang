@@ -1,0 +1,73 @@
+{
+ "title": "Slices",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Un **slice** (`[]T`) es una vista de longitud flexible sobre un array (o un bloque de memoria). Si un parámetro de función es `[]i32`, acepta un array de cualquier tamaño. Para un subrango escribe `array[a..b]` (`b` no se incluye)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total",
+    "",
+    "fn main():",
+    "    data: [5]i32 = [1, 2, 3, 4, 5]",
+    "    print(\"total:\", sum(data))",
+    "    print(\"part:\", sum(data[1..4]))"
+   ],
+   "run": true,
+   "output": [
+    "total: 15",
+    "part: 9"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Un slice es una vista, así que el array del que procede no puede cambiar, moverse ni desaparecer mientras el slice se usa. El compilador lo comprueba, de modo que un slice nunca puede quedar \"colgando\"."
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l05-x1",
+   "prompt": "Escribe `average(items: []i32) -> i32`: la suma de los elementos dividida por su cantidad (`items.len` es un `usize`, conviértelo con `i32(items.len)`). Imprímela para `[2, 4, 6, 8]`.",
+   "starter": [
+    "fn average(items: []i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "solution": [
+    "fn average(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total / i32(items.len)",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "hint": "Primero halla el total y luego divide por `i32(items.len)`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l05-q1",
+   "q": "¿Qué se puede pasar a un parámetro `[]i32`?",
+   "options": [
+    "Solo un array de 5 elementos",
+    "Un array `[N]i32` de cualquier tamaño, o un subrango",
+    "Solo texto"
+   ],
+   "answer": 1,
+   "why": "Un slice no fija la longitud, así que funciona con cualquier tamaño."
+  }
+ ]
+}

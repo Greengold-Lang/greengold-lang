@@ -1,0 +1,61 @@
+{
+ "title": "可存储的闭包：Fn",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`fn(...)` 是普通的函数指针。要从函数中**返回**一个闭包，或把它**存放**在结构体字段或列表里，使用 **`Fn(...) -> R`** 类型。写在需要 `Fn` 的位置的 lambda **拥有**它捕获的东西（堆值被移入其中，其他的被复制），因此不能修改它们。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn make_adder(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x + k",
+    "",
+    "fn main():",
+    "    add5 = make_adder(5)",
+    "    print(add5(1), make_adder(2)(3))",
+    "    steps = List[Fn(i32) -> i32]()",
+    "    steps.push(make_adder(10))",
+    "    steps.push(make_adder(20))",
+    "    print(steps[0](1), steps[1](1))"
+   ],
+   "run": true,
+   "output": [
+    "6 5",
+    "11 21"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l05-x1",
+   "prompt": "编写 `make_multiplier(k)`：它返回一个把输入乘以 `k` 的 `Fn(i32) -> i32`。输出 `make_multiplier(3)(7)`。",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn make_multiplier(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x * k",
+    "",
+    "fn main():",
+    "    print(make_multiplier(3)(7))"
+   ],
+   "hint": "看看 `make_adder` 的例子；把 `+` 改写成 `*`。",
+   "expected": [
+    "21"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l05-q1",
+   "q": "从函数返回闭包需要哪种类型？",
+   "options": [
+    "`fn(...)`",
+    "`Fn(...)`",
+    "`str`"
+   ],
+   "answer": 1,
+   "why": "`Fn` 是可存储的闭包，拥有它捕获的内容。"
+  }
+ ]
+}

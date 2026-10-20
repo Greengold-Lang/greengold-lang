@@ -1,0 +1,60 @@
+{
+ "title": "Documentación, la lista de API y el REPL",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Los comentarios `#` que escribes justo encima de las definiciones de funciones y structs se convierten en documentación de API en Markdown con `gg doc`:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "# Adds two numbers.",
+    "# Parameters:",
+    "#   a: the first addend",
+    "#   b: the second addend",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg doc src/                 # print to the screen",
+    "gg doc src/ -o API_DOCS.md  # save to a file"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**`gg api`** lista cada nombre público de la biblioteca estándar con su firma y una descripción de una línea (`gg api --json` lo da en formato legible por máquinas; la referencia de este sitio se construye a partir de ahí). **`gg repl`** abre una consola interactiva: escribes declaraciones, enlaces y expresiones y ves el resultado al instante."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg api                      # the whole standard library",
+    "gg repl                     # an interactive prompt",
+    "gg repl -e \"1 + 2\"          # evaluate one snippet"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l05-q1",
+   "q": "¿De dónde toma `gg doc` la documentación?",
+   "options": [
+    "De un archivo de documentación aparte",
+    "De los comentarios `#` encima de las definiciones",
+    "De internet"
+   ],
+   "answer": 1,
+   "why": "Los comentarios se quedan junto al código, así que la documentación no se queda obsoleta."
+  }
+ ]
+}

@@ -49,7 +49,7 @@ fn main():
     lock.unlock()
     print("unlocked")
 
-    ch = thread.Channel.new()
+    ch = thread.ChannelI64.new()
     ch.send(42)
     ch.send(99)
     if let Valid(v1) = ch.recv():
@@ -107,7 +107,7 @@ fn main():
     t.join()
     thread.Thread.yield_now()
 
-    ch = thread.Channel.new()
+    ch = thread.ChannelI64.new()
     ch.send(77)
     if let Valid(x) = ch.recv():
         print("received:", x)
@@ -193,7 +193,7 @@ def test_channel_copy_is_rejected(tmp_path):
     diags = _check_json(tmp_path, """import std.thread
 
 fn main():
-    c = thread.Channel.new()
+    c = thread.ChannelI64.new()
     d = c
     c.send(1)
     print(d.recv().value_or(0))
@@ -285,3 +285,23 @@ fn main():
     r = run_gg_source(tmp_path, src)
     assert r.returncode != 0
     assert "already joined" in r.stdout + r.stderr
+
+
+def test_queue_keeps_fifo_order_when_sends_and_receives_interleave(tmp_path):
+    from tests.helpers import run_gg_source
+    r = run_gg_source(tmp_path, """import std.thread { Queue }
+
+fn main():
+    q = Queue[i32].new()
+    q.send(1)
+    q.send(2)
+    q.send(3)
+    print(q.recv().value_or(-1))
+    q.send(4)
+    print(q.recv().value_or(-1), q.recv().value_or(-1))
+    q.send(5)
+    q.close()
+    print(q.recv().value_or(-1), q.recv().value_or(-1))
+""")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.split() == ["1", "2", "3", "4", "5"]

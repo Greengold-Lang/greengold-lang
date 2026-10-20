@@ -1,0 +1,65 @@
+{
+ "title": "数学：std.math",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.math` 提供 `f64` 函数，如 `sqrt`、`pow`、`sin`、`cos`、`floor`、`ceil`、`round`、`hypot`、`ln`、`log10`……以及常量。常量像函数一样调用：`math.pi()`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(2.0))",
+    "    print(math.floor(2.7), math.ceil(2.1), math.round(2.5))",
+    "    print(math.hypot(3.0, 4.0))",
+    "    print(math.pi())",
+    "    print(math.pow_i64(2, 20))"
+   ],
+   "run": true,
+   "output": [
+    "1.4142135623731",
+    "2 3 3",
+    "5",
+    "3.14159265358979",
+    "1048576"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l05-x1",
+   "prompt": "用 `pi * r * r` 计算半径为 3 的圆的面积，并用 `math.floor` 向下取整后输出。",
+   "starter": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    r = 3.0",
+    "    print(0.0)"
+   ],
+   "solution": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    r = 3.0",
+    "    print(math.floor(math.pi() * r * r))"
+   ],
+   "hint": "`math.floor(math.pi() * r * r)`",
+   "expected": [
+    "28"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l05-q1",
+   "q": "如何获得 `pi` 的值？",
+   "options": [
+    "`math.pi`",
+    "`math.pi()`",
+    "`PI`"
+   ],
+   "answer": 1,
+   "why": "在 `std.math` 中，常量通过函数调用获得。"
+  }
+ ]
+}

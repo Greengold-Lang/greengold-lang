@@ -1,0 +1,60 @@
+{
+ "title": "Belge üretimi, API ve etkileşimli kabuk",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Fonksiyon ve struct tanımlarının hemen üstüne yazdığın `#` yorumları, `gg doc` ile otomatik olarak Markdown API belgesine dönüşür:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "# Adds two numbers.",
+    "# Parameters:",
+    "#   a: the first addend",
+    "#   b: the second addend",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg doc src/                 # print to the screen",
+    "gg doc src/ -o API_DOCS.md  # save to a file"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**`gg api`** standart kütüphanenin bütün genel adlarını imza ve tek satırlık açıklamayla listeler (`gg api --json` makine okunur biçimde verir; bu sitedeki referans da oradan üretilir). **`gg repl`** etkileşimli bir kabuk açar: bildirimleri, değişkenleri ve ifadeleri yazıp hemen sonucunu görürsün."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg api                      # the whole standard library",
+    "gg repl                     # an interactive prompt",
+    "gg repl -e \"1 + 2\"          # evaluate one snippet"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l05-q1",
+   "q": "`gg doc` belgeyi nereden üretir?",
+   "options": [
+    "Ayrı bir belge dosyasından",
+    "Tanımların üstündeki `#` yorumlarından",
+    "İnternetten"
+   ],
+   "answer": 1,
+   "why": "Yorumlar kodun yanında kaldığı için belge eskimez."
+  }
+ ]
+}

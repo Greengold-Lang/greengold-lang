@@ -1,0 +1,69 @@
+{
+ "title": "C-kompatible Daten: extern struct",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Das eigene Struct-Layout von Greengold kann der Compiler optimieren. Ein Struct, das an C-Funktionen übergeben wird, muss aber **genau** dem Speicherlayout (Ausrichtung, Padding) entsprechen, das C-Compiler erwarten. Dafür verwendest du **`extern struct`**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern struct Point2D:",
+    "    x: f32",
+    "    y: f32",
+    "",
+    "extern struct RectInfo:",
+    "    top_left: Point2D",
+    "    width: i32",
+    "    height: i32",
+    "",
+    "fn main():",
+    "    r = RectInfo{ top_left: Point2D{ x: 1.0, y: 2.0 }, width: 30, height: 40 }",
+    "    print(r.width * r.height)"
+   ],
+   "run": true,
+   "output": [
+    "1200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Regel: Die Felder eines `extern struct` können nur Zahlen, `bool`, rohe Zeiger oder andere `extern struct` sein; Heap-Typen wie `Box` und `List` sind nicht erlaubt."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l02-x1",
+   "prompt": "Definiere ein `extern struct` namens `Color` (`r`, `g`, `b`: alle `u8`). Erzeuge `Color{ r: 255, g: 128, b: 0 }` und gib die Summe der drei Werte aus.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "extern struct Color:",
+    "    r: u8",
+    "    g: u8",
+    "    b: u8",
+    "",
+    "fn main():",
+    "    c = Color{ r: 255, g: 128, b: 0 }",
+    "    print(i32(c.r) + i32(c.g) + i32(c.b))"
+   ],
+   "hint": "Wandle beim Addieren mit `i32(...)` um, damit die `u8`-Werte nicht überlaufen.",
+   "expected": [
+    "383"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l02-q1",
+   "q": "Kann ein `extern struct` ein Feld `List[i32]` haben?",
+   "options": [
+    "Ja",
+    "Nein, Heap-Typen sind nicht erlaubt",
+    "Nur zusammen mit Zahlen"
+   ],
+   "answer": 1,
+   "why": "Das flache Speicherlayout, das C kennt, enthält keine Heap-Typen."
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "title": "类型转换",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "当不会丢失任何值时，Greengold 会自己转换：小整数转成更宽的整数（`i32` → `i64`）、`i32` → `f64`，等等。如果运算两侧不同，较窄的一侧会被加宽。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a: i32 = 100",
+    "    b: i64 = 200",
+    "    c = a + b",
+    "    ratio: f64 = a",
+    "    print(c, ratio)"
+   ],
+   "run": true,
+   "output": [
+    "300 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "可能丢失值的转换（`f64` → `i32`、`i64` → `i32`）需要**你自己**写：`i32(...)`。编译器也会在错误信息里建议这个修复。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    value: f64 = 9.81",
+    "    truncated = i32(value)",
+    "    print(truncated)"
+   ],
+   "run": true,
+   "output": [
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l05-x1",
+   "prompt": "把 `f64` 的 `price` 转成 `i32` 并输出（小数部分被舍去）。",
+   "starter": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(price)"
+   ],
+   "solution": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(i32(price))"
+   ],
+   "hint": "写 `print(i32(price))`。",
+   "expected": [
+    "19"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l05-q1",
+   "q": "为什么从 `f64` 到 `i32` 要手写转换？",
+   "options": [
+    "因为它更快",
+    "因为小数部分可能丢失",
+    "因为编译器不知道怎么做"
+   ],
+   "answer": 1,
+   "why": "为了不让数值丢失悄悄发生，这种转换必须明确写出来。"
+  }
+ ]
+}

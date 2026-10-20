@@ -1,0 +1,76 @@
+{
+ "title": "Konstanten",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`const` definiert auf Dateiebene (außerhalb von Funktionen) einen Wert, der zur Kompilierzeit bekannt ist. Du kannst seinen Typ angeben oder dem Compiler überlassen. Ihre Namen werden meist IN_GROSSBUCHSTABEN geschrieben."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const MAX_SCORE: i32 = 100",
+    "const APP_NAME = \"Notebook\"",
+    "",
+    "fn main():",
+    "    print(APP_NAME, MAX_SCORE)"
+   ],
+   "run": true,
+   "output": [
+    "Notebook 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Konstanten ersparen dir, dieselbe Zahl in vielen Funktionen zu wiederholen; ändert sich der Wert, korrigierst du nur eine Stelle."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const PI: f64 = 3.14159",
+    "",
+    "fn circle_area(r: f64) -> f64:",
+    "    return PI * r * r",
+    "",
+    "fn main():",
+    "    print(circle_area(2.0))"
+   ],
+   "run": true,
+   "output": [
+    "12.56636"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l06-x1",
+   "prompt": "Lege eine Konstante `TAX_RATE` mit dem Wert 18 an. Gib bei einem Preis von 200 `price * TAX_RATE / 100` aus.",
+   "starter": [
+    "fn main():",
+    "    price = 200",
+    "    print(0)"
+   ],
+   "solution": [
+    "const TAX_RATE = 18",
+    "",
+    "fn main():",
+    "    price = 200",
+    "    print(price * TAX_RATE / 100)"
+   ],
+   "hint": "Schreibe die Zeile `const TAX_RATE = 18` über `main`.",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l06-q1",
+   "q": "Wo wird eine `const` definiert?",
+   "options": [
+    "Nur innerhalb von `main`",
+    "Auf Dateiebene, außerhalb von Funktionen",
+    "In Klammern"
+   ],
+   "answer": 1,
+   "why": "`const` steht auf Dateiebene; innerhalb einer Funktion verwendest du `fixed`."
+  }
+ ]
+}

@@ -1,0 +1,122 @@
+{
+ "title": "Enums and match",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "An **`enum`** lists the options (**variants**) a value can take. To look at an enum value you use **`match`**. Its most important feature: the compiler checks that **all cases** are handled. If you forget a variant, the code does not compile."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn action(light: TrafficLight):",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            print(\"Stop!\")",
+    "        TrafficLight.Yellow:",
+    "            print(\"Get ready...\")",
+    "        TrafficLight.Green:",
+    "            print(\"Go!\")",
+    "",
+    "fn main():",
+    "    action(TrafficLight.Red)",
+    "    action(TrafficLight.Green)"
+   ],
+   "run": true,
+   "output": [
+    "Stop!",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "If you do not want to write them all out, `_:` catches everything else."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn is_stop(light: TrafficLight) -> bool:",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            return true",
+    "        _:",
+    "            return false",
+    "",
+    "fn main():",
+    "    print(is_stop(TrafficLight.Red), is_stop(TrafficLight.Yellow))"
+   ],
+   "run": true,
+   "output": [
+    "true false"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l01-x1",
+   "prompt": "For the enum `Direction` (`North`, `South`, `East`, `West`), write `name(d)`: it prints its own name (`north`, `south`...). Call it for `West`.",
+   "starter": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        _:",
+    "            print(\"?\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "solution": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        Direction.South:",
+    "            print(\"south\")",
+    "        Direction.East:",
+    "            print(\"east\")",
+    "        Direction.West:",
+    "            print(\"west\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "hint": "Write one branch for each variant; leave out the `_`.",
+   "expected": [
+    "west"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l01-q1",
+   "q": "What happens if you forget a variant inside `match`?",
+   "options": [
+    "It crashes at run time",
+    "The code does not compile",
+    "It is skipped silently"
+   ],
+   "answer": 1,
+   "why": "`match` is exhaustive: a missing case is a compile error."
+  }
+ ]
+}

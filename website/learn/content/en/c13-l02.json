@@ -1,0 +1,69 @@
+{
+ "title": "C-compatible data: extern struct",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold's own struct layout can be optimised by the compiler. But a struct that is passed to C functions must match **exactly** the memory layout (alignment, padding) that C compilers expect. For that you use **`extern struct`**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern struct Point2D:",
+    "    x: f32",
+    "    y: f32",
+    "",
+    "extern struct RectInfo:",
+    "    top_left: Point2D",
+    "    width: i32",
+    "    height: i32",
+    "",
+    "fn main():",
+    "    r = RectInfo{ top_left: Point2D{ x: 1.0, y: 2.0 }, width: 30, height: 40 }",
+    "    print(r.width * r.height)"
+   ],
+   "run": true,
+   "output": [
+    "1200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Rule: the fields of an `extern struct` can only be numbers, `bool`, raw pointers or other `extern struct`s; heap types such as `Box` and `List` are not allowed."
+  },
+  {
+   "t": "exercise",
+   "id": "c13-l02-x1",
+   "prompt": "Define an `extern struct` named `Color` (`r`, `g`, `b`: all `u8`). Create `Color{ r: 255, g: 128, b: 0 }` and print the sum of the three values.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "extern struct Color:",
+    "    r: u8",
+    "    g: u8",
+    "    b: u8",
+    "",
+    "fn main():",
+    "    c = Color{ r: 255, g: 128, b: 0 }",
+    "    print(i32(c.r) + i32(c.g) + i32(c.b))"
+   ],
+   "hint": "Convert with `i32(...)` when adding so that the `u8` values do not overflow.",
+   "expected": [
+    "383"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l02-q1",
+   "q": "Can an `extern struct` have a `List[i32]` field?",
+   "options": [
+    "Yes",
+    "No, heap types are not allowed",
+    "Only together with numbers"
+   ],
+   "answer": 1,
+   "why": "The flat memory layout C knows does not contain heap types."
+  }
+ ]
+}

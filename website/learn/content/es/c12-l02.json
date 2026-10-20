@@ -1,0 +1,80 @@
+{
+ "title": "Atómicos y Mutex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Cuando varios threads tocan la misma memoria no debe producirse una carrera de datos. Para un solo número la solución más sencilla es una variable **atómica**: las operaciones son indivisibles. `AtomicI64.fetch_and_add(n)` suma, `load()` lee."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    counter = thread.AtomicI64.new(0)",
+    "    counter.fetch_and_add(10)",
+    "    counter.fetch_and_add(5)",
+    "    print(\"counter:\", counter.load())",
+    "    print(counter.compare_and_swap(15, 100), counter.load())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Para datos más complejos se usa un **`Mutex`**: se toma con `lock()` y se libera con `unlock()`. Una forma más segura, que no puede olvidar el desbloqueo, es **`Locked[T]`**, que mete el valor dentro del bloqueo: `lock()` devuelve un `Guard` y el bloqueo se libera automáticamente cuando el `Guard` sale de su ámbito."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn work(c: Arc[thread.Locked[i64]]):",
+    "    for _i in 0..1000:",
+    "        g = c.value.lock()",
+    "        g.value() += 1",
+    "",
+    "fn main():",
+    "    counter = Arc[thread.Locked[i64]](thread.Locked[i64].new(0))",
+    "    workers = List[thread.Thread]()",
+    "    for w in 0..4:",
+    "        c = counter.clone()",
+    "        workers.push(thread.Thread.spawn(fn() =>",
+    "            work(c)))",
+    "    for i in 0..workers.len:",
+    "        workers[i].join()",
+    "    print(counter.value.get())"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Arc[T]` es una compartición con conteo que permite que varios threads posean el mismo valor: `clone()` añade un nuevo propietario y el valor se libera cuando el último propietario lo suelta."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q1",
+   "q": "¿Cuándo se libera el bloqueo al acceder al valor dentro de `Locked[T]`?",
+   "options": [
+    "Cuando escribes `unlock()` a mano",
+    "Automáticamente, cuando el `Guard` sale de su ámbito",
+    "Nunca"
+   ],
+   "answer": 1,
+   "why": "En este diseño no se puede olvidar desbloquear."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l02-q2",
+   "q": "¿La forma segura más sencilla de incrementar un solo contador desde varios threads?",
+   "options": [
+    "Un `i64` normal",
+    "`AtomicI64`",
+    "Una `List`"
+   ],
+   "answer": 1,
+   "why": "Las operaciones atómicas son indivisibles; no se produce carrera de datos."
+  }
+ ]
+}

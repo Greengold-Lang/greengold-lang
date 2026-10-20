@@ -1,0 +1,86 @@
+{
+ "title": "Sıralama ve arama: std.sort",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`sort.sort(liste)` bir `List`'i yerinde sıralar (`T: Ord` olmalı); `sort.sort_by(liste, kural)` kendi kuralınla sıralar; `sort.binary_search(liste, x)` **sıralı** bir listede hızlı arama yapar ve `Optional[usize]` (konum) döndürür."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(40)",
+    "    v.push(10)",
+    "    v.push(30)",
+    "    v.push(20)",
+    "    sort.sort(v)",
+    "    for x in v:",
+    "        print(x)",
+    "    print(sort.is_sorted(v))",
+    "    match sort.binary_search(v, 30):",
+    "        Valid(i):",
+    "            print(\"30 is at index\", i)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "10",
+    "20",
+    "30",
+    "40",
+    "true",
+    "30 is at index 2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l04-x1",
+   "prompt": "Listeyi sırala ve ortadaki (en küçükten sayınca 3.) elemanı yazdır: `[9, 2, 7, 4, 5]`.",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(v[0])"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    sort.sort(v)",
+    "    print(v[2])"
+   ],
+   "hint": "`sort.sort(v)` ve ardından `v[2]`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l04-q1",
+   "q": "`binary_search` hangi koşulda doğru çalışır?",
+   "options": [
+    "Liste sıralıysa",
+    "Liste boşsa",
+    "Her zaman"
+   ],
+   "answer": 0,
+   "why": "İkili arama listenin sıralı olmasına dayanır."
+  }
+ ]
+}

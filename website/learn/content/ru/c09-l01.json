@@ -1,0 +1,80 @@
+{
+ "title": "Функции как значения",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "В Greengold функции — тоже значения: их можно хранить в переменной, передавать как параметр или класть в поле структуры. Тип функции пишется `fn(T1, T2) -> R`; поскольку он длинный, ему часто дают имя через `type`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn multiply(a: i32, b: i32) -> i32:",
+    "    return a * b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    current: MathOp = multiply",
+    "    print(apply_op(current, 6, 7))",
+    "    print(apply_op(add, 6, 7))"
+   ],
+   "run": true,
+   "output": [
+    "42",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`apply_op` не знает, какую операцию она выполнит; решает переданная функция. Это основной способ передать поведение как параметр."
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l01-x1",
+   "prompt": "Напишите функцию `subtract` и выведите результат `apply_op(subtract, 10, 4)`.",
+   "starter": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "type MathOp = fn(i32, i32) -> i32",
+    "",
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn apply_op(op: MathOp, x: i32, y: i32) -> i32:",
+    "    return op(x, y)",
+    "",
+    "fn main():",
+    "    print(apply_op(subtract, 10, 4))"
+   ],
+   "hint": "Напишите `fn subtract(a: i32, b: i32) -> i32:` и передайте её в `main`.",
+   "expected": [
+    "6"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l01-q1",
+   "q": "Что за тип `fn(i32, i32) -> i32`?",
+   "options": [
+    "Числовой тип",
+    "Тип функций, принимающих два `i32` и возвращающих `i32`",
+    "Структура"
+   ],
+   "answer": 1,
+   "why": "Тип функции описывает типы параметров и результата."
+  }
+ ]
+}

@@ -1,0 +1,107 @@
+{
+ "title": "Feature",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**`feature`** 是一份契约，规定了一个类型必须具备的能力和方法签名（在其他语言中叫“接口”或“trait”）。不写方法体；类型本身写作 `Self`。"
+  },
+  {
+   "t": "p",
+   "text": "Greengold **没有**类似 `impl Feature for Type` 的声明。如果一个类型定义了某个 feature 的所有方法，且名称、参数个数、模式和返回类型都相同，它就**自动**满足该 feature。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "feature Measurable:",
+    "    fn area(self: Self) -> f64",
+    "",
+    "struct Circle:",
+    "    radius: f64",
+    "",
+    "impl Circle:",
+    "    fn area(self) -> f64:",
+    "        return 3.0 * self.radius * self.radius",
+    "",
+    "struct Square:",
+    "    side: f64",
+    "",
+    "impl Square:",
+    "    fn area(self) -> f64:",
+    "        return self.side * self.side",
+    "",
+    "fn print_area[T: Measurable](item: T):",
+    "    print(\"area:\", item.area())",
+    "",
+    "fn main():",
+    "    print_area(Circle{ radius: 2.0 })",
+    "    print_area(Square{ side: 5.0 })"
+   ],
+   "run": true,
+   "output": [
+    "area: 12",
+    "area: 25"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`[T: Measurable]` 是一个 **feature 约束**：只接受具备该能力的类型。多个约束用 `+` 书写：`[T: Measurable + Printable]`。"
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l03-x1",
+   "prompt": "定义一个 `Named` feature（`fn name(self: Self) -> str`）。让结构体 `Dog` 和 `Cat` 各自写出方法 `name`（`Rex`、`Tom`）。`hello[T: Named](x: T)` 应该对两者都适用，并输出 `hello, <名字>`。",
+   "starter": [
+    "struct Dog:",
+    "    id: i32",
+    "",
+    "struct Cat:",
+    "    id: i32",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "feature Named:",
+    "    fn name(self: Self) -> str",
+    "",
+    "struct Dog:",
+    "    id: i32",
+    "",
+    "impl Dog:",
+    "    fn name(self) -> str:",
+    "        return \"Rex\"",
+    "",
+    "struct Cat:",
+    "    id: i32",
+    "",
+    "impl Cat:",
+    "    fn name(self) -> str:",
+    "        return \"Tom\"",
+    "",
+    "fn hello[T: Named](x: T):",
+    "    print(\"hello,\", x.name())",
+    "",
+    "fn main():",
+    "    hello(Dog{ id: 1 })",
+    "    hello(Cat{ id: 2 })"
+   ],
+   "hint": "写 `feature Named:`，给两个结构体都加上 `name` 方法，然后用 `[T: Named]` 定义 `hello`。",
+   "expected": [
+    "hello, Rex",
+    "hello, Tom"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l03-q1",
+   "q": "类型如何满足一个 feature？",
+   "options": [
+    "通过写 `impl Feature for Type`",
+    "通过用相同的签名定义所需的方法",
+    "通过在文件开头写 `use`"
+   ],
+   "answer": 1,
+   "why": "结构化匹配：只要签名吻合，feature 就自动满足。"
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "title": "Variables",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Una **variable** es un nombre para un valor. En Greengold se define con `=`; el compilador deduce el tipo a partir del valor."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    x = 42",
+    "    name = \"Ahmet\"",
+    "    x = 50",
+    "    print(x, name)"
+   ],
+   "run": true,
+   "output": [
+    "50 Ahmet"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Por defecto las variables se pueden cambiar. Para un valor que nunca cambia, escribe `fixed`; intentar cambiarlo después es un error de compilación."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    fixed limit = 10",
+    "    print(limit)"
+   ],
+   "run": true,
+   "output": [
+    "10"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l01-x1",
+   "prompt": "Empieza `counter` en 0, auméntalo dos veces con `+= 1` e imprime el resultado.",
+   "starter": [
+    "fn main():",
+    "    counter = 0",
+    "    print(counter)"
+   ],
+   "solution": [
+    "fn main():",
+    "    counter = 0",
+    "    counter += 1",
+    "    counter += 1",
+    "    print(counter)"
+   ],
+   "hint": "Escribe dos veces la línea `counter += 1`.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l01-q1",
+   "q": "¿Qué palabra clave define una variable que nunca cambia?",
+   "options": [
+    "const",
+    "fixed",
+    "let"
+   ],
+   "answer": 1,
+   "why": "Dentro de una función se usa `fixed`; `const` es para constantes a nivel de archivo."
+  }
+ ]
+}

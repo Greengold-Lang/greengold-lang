@@ -1,0 +1,96 @@
+{
+ "title": "lend: borrow and change",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`lend` lets the function borrow the data for a while and **change it in place**. The change shows in the caller's variable. You do not write `lend` at the call; but the variable cannot be `fixed`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn take_damage(p: lend Player, amount: i32):",
+    "    p.health -= amount",
+    "",
+    "fn inc(n: lend i32):",
+    "    n += 1",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    take_damage(hero, 25)",
+    "    print(hero.health)",
+    "",
+    "    score = 10",
+    "    inc(score)",
+    "    print(score)"
+   ],
+   "run": true,
+   "output": [
+    "75",
+    "11"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "With heap-owning types you do not even need to write `lend`: when the body changes the parameter, the compiler **detects `lend` automatically**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add_one(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add_one(v)",
+    "    add_one(v)",
+    "    print(v.len)"
+   ],
+   "run": true,
+   "output": [
+    "2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l02-x1",
+   "prompt": "Make `reset(n: lend i32)` set `n` to 0. Call it for `x = 42` and print `x`.",
+   "starter": [
+    "fn reset(n: lend i32):",
+    "    pass",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn reset(n: lend i32):",
+    "    n = 0",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "hint": "Replace `pass` with `n = 0`.",
+   "expected": [
+    "0"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l02-q1",
+   "q": "Can a variable passed with `lend` be `fixed`?",
+   "options": [
+    "Yes",
+    "No, because it will be changed",
+    "Only if it is a number"
+   ],
+   "answer": 1,
+   "why": "Changing a value you declared constant is a compile error."
+  }
+ ]
+}

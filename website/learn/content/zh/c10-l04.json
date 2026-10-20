@@ -1,0 +1,86 @@
+{
+ "title": "排序与查找：std.sort",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`sort.sort(列表)` 就地对 `List` 排序（需要 `T: Ord`）；`sort.sort_by(列表, 规则)` 按你自己的规则排序；`sort.binary_search(列表, x)` 在**已排序**的列表中快速查找，返回 `Optional[usize]`（位置）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(40)",
+    "    v.push(10)",
+    "    v.push(30)",
+    "    v.push(20)",
+    "    sort.sort(v)",
+    "    for x in v:",
+    "        print(x)",
+    "    print(sort.is_sorted(v))",
+    "    match sort.binary_search(v, 30):",
+    "        Valid(i):",
+    "            print(\"30 is at index\", i)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "10",
+    "20",
+    "30",
+    "40",
+    "true",
+    "30 is at index 2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l04-x1",
+   "prompt": "对列表排序并输出中间的元素（从小到大第 3 个）：`[9, 2, 7, 4, 5]`。",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(v[0])"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    sort.sort(v)",
+    "    print(v[2])"
+   ],
+   "hint": "`sort.sort(v)`，然后 `v[2]`。",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l04-q1",
+   "q": "`binary_search` 在什么条件下才能正确工作？",
+   "options": [
+    "列表已排序时",
+    "列表为空时",
+    "总是"
+   ],
+   "answer": 0,
+   "why": "二分查找依赖列表已经排好序。"
+  }
+ ]
+}

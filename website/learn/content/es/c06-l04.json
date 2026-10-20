@@ -1,0 +1,70 @@
+{
+ "title": "match como expresión",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` también puede producir un valor: ligas cada rama a una sola expresión con `=>` y asignas el resultado a una variable o lo devuelves con `return`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn error_message(code: i32) -> str:",
+    "    return match code:",
+    "        0 => \"success\"",
+    "        1 => \"file not found\"",
+    "        2 => \"access denied\"",
+    "        _ => \"general error\"",
+    "",
+    "fn main():",
+    "    print(error_message(2))",
+    "    msg = match 0:",
+    "        0 => \"OK\"",
+    "        _ => \"Error!\"",
+    "    print(msg)"
+   ],
+   "run": true,
+   "output": [
+    "access denied",
+    "OK"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l04-x1",
+   "prompt": "Escribe `days_in(month: i32) -> i32` (28 para febrero): 2 => 28; 4, 6, 9, 11 => 30; el resto => 31. Imprime el mes 9.",
+   "starter": [
+    "fn days_in(month: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "solution": [
+    "fn days_in(month: i32) -> i32:",
+    "    return match month:",
+    "        2 => 28",
+    "        4 | 6 | 9 | 11 => 30",
+    "        _ => 31",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "hint": "Escribe tres ramas después de `return match month:`.",
+   "expected": [
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l04-q1",
+   "q": "En un `match` como expresión, ¿cómo debe ser el valor de cada rama?",
+   "options": [
+    "Puede ser de cualquier tipo",
+    "Debe ser del mismo tipo",
+    "Debe ser una cadena"
+   ],
+   "answer": 1,
+   "why": "El resultado va a una sola variable, así que los tipos deben coincidir."
+  }
+ ]
+}

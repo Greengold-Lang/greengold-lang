@@ -1,0 +1,73 @@
+{
+ "title": "if, elif, else",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Koşulun etrafında parantez gerekmez; sonunda `:` yazılır ve altındaki satırlar 4 boşluk girintilenir. Birden çok durum için `elif` zincirlenir, `else` kalan her şeyi yakalar."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    score = 85",
+    "    if score >= 90:",
+    "        print(\"Grade: A\")",
+    "    elif score >= 80:",
+    "        print(\"Grade: B\")",
+    "    elif score >= 70:",
+    "        print(\"Grade: C\")",
+    "    else:",
+    "        print(\"Grade: F\")"
+   ],
+   "run": true,
+   "output": [
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "İlk doğru çıkan dal çalışır ve geri kalanlar atlanır. Bu yüzden büyük eşikleri başa koy."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l01-x1",
+   "prompt": "`temperature` 10'dan küçükse `Cold`, 25'ten büyükse `Hot`, aksi halde `Mild` yazdıran zinciri tamamla.",
+   "starter": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"?\")",
+    "    elif temperature > 25:",
+    "        print(\"?\")",
+    "    else:",
+    "        print(\"?\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    temperature = 5",
+    "    if temperature < 10:",
+    "        print(\"Cold\")",
+    "    elif temperature > 25:",
+    "        print(\"Hot\")",
+    "    else:",
+    "        print(\"Mild\")"
+   ],
+   "hint": "Üç `?` yerine sırayla `Cold`, `Hot`, `Mild` yaz.",
+   "expected": [
+    "Cold"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l01-q1",
+   "q": "Birden fazla dal doğru olursa kaç tanesi çalışır?",
+   "options": [
+    "Hepsi",
+    "Yalnızca ilk doğru olan",
+    "Yalnızca sonuncusu"
+   ],
+   "answer": 1,
+   "why": "`if`/`elif` zinciri ilk doğru dalda durur."
+  }
+ ]
+}

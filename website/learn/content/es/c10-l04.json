@@ -1,0 +1,86 @@
+{
+ "title": "Ordenar y buscar: std.sort",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`sort.sort(lista)` ordena una `List` en el sitio (se requiere `T: Ord`); `sort.sort_by(lista, regla)` ordena con tu propia regla; `sort.binary_search(lista, x)` busca rápidamente en una lista **ordenada** y devuelve un `Optional[usize]` (la posición)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(40)",
+    "    v.push(10)",
+    "    v.push(30)",
+    "    v.push(20)",
+    "    sort.sort(v)",
+    "    for x in v:",
+    "        print(x)",
+    "    print(sort.is_sorted(v))",
+    "    match sort.binary_search(v, 30):",
+    "        Valid(i):",
+    "            print(\"30 is at index\", i)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "10",
+    "20",
+    "30",
+    "40",
+    "true",
+    "30 is at index 2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l04-x1",
+   "prompt": "Ordena la lista e imprime el elemento central (el 3.º empezando por el menor): `[9, 2, 7, 4, 5]`.",
+   "starter": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(v[0])"
+   ],
+   "solution": [
+    "import std.sort",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(9)",
+    "    v.push(2)",
+    "    v.push(7)",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    sort.sort(v)",
+    "    print(v[2])"
+   ],
+   "hint": "`sort.sort(v)` y luego `v[2]`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l04-q1",
+   "q": "¿Cuándo funciona correctamente `binary_search`?",
+   "options": [
+    "Si la lista está ordenada",
+    "Si la lista está vacía",
+    "Siempre"
+   ],
+   "answer": 0,
+   "why": "La búsqueda binaria se apoya en que la lista esté ordenada."
+  }
+ ]
+}

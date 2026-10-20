@@ -1,0 +1,155 @@
+# std.bits: bit counting, rotation, byte order and power-of-two helpers for every integer type.
+# Every function is generic over `Int` (`bits.popcount(x)`, `bits.rotate_left[u32](x, 3)`), uses no libc, and
+# works with `--no-std`. Signed values are treated as their two's complement bits.
+
+fn bit_width[T: Int]() -> u32:
+    hi = max_value[T]()
+    n: u32 = 0
+    while hi > T(0):
+        hi = hi >> 1
+        n += 1
+    if min_value[T]() < T(0):
+        n += 1
+    return n
+
+# The bits of `x` as a `u64`, without sign extension.
+fn to_bits[T: Int](x: T) -> u64:
+    w = bit_width[T]()
+    v = u64(x)
+    if w < 64:
+        v = v & ((u64(1) << w) - 1)
+    return v
+
+fn from_bits[T: Int](v: u64) -> T:
+    return T(v)
+
+fn popcount[T: Int](x: T) -> u32:
+    v = to_bits(x)
+    n: u32 = 0
+    while v != 0:
+        v = v & (v - 1)
+        n += 1
+    return n
+
+fn leading_zeros[T: Int](x: T) -> u32:
+    w = bit_width[T]()
+    v = to_bits(x)
+    n: u32 = 0
+    while n < w and (v >> (w - 1 - n)) & 1 == 0:
+        n += 1
+    return n
+
+fn trailing_zeros[T: Int](x: T) -> u32:
+    w = bit_width[T]()
+    v = to_bits(x)
+    if v == 0:
+        return w
+    n: u32 = 0
+    while (v >> n) & 1 == 0:
+        n += 1
+    return n
+
+fn leading_ones[T: Int](x: T) -> u32:
+    return leading_zeros(from_bits[T](~to_bits(x)))
+
+fn trailing_ones[T: Int](x: T) -> u32:
+    return trailing_zeros(from_bits[T](~to_bits(x)))
+
+fn rotate_left[T: Int](x: T, n: u32) -> T:
+    w = bit_width[T]()
+    k = n % w
+    v = to_bits(x)
+    if k == 0:
+        return x
+    mask = to_bits(from_bits[T](~u64(0)))
+    r = ((v << k) | (v >> (w - k))) & mask
+    return from_bits[T](r)
+
+fn rotate_right[T: Int](x: T, n: u32) -> T:
+    w = bit_width[T]()
+    return rotate_left(x, w - (n % w))
+
+fn reverse_bits[T: Int](x: T) -> T:
+    w = bit_width[T]()
+    v = to_bits(x)
+    r: u64 = 0
+    i: u32 = 0
+    while i < w:
+        r = (r << 1) | ((v >> i) & 1)
+        i += 1
+    return from_bits[T](r)
+
+# Reverses the byte order (big-endian <-> little-endian).
+fn swap_bytes[T: Int](x: T) -> T:
+    w = bit_width[T]()
+    v = to_bits(x)
+    r: u64 = 0
+    i: u32 = 0
+    while i < w:
+        r = (r << 8) | ((v >> i) & 255)
+        i += 8
+    return from_bits[T](r)
+
+fn is_power_of_two[T: Int](x: T) -> bool:
+    return x > T(0) and popcount(x) == 1
+
+# Smallest power of two that is >= x (1 for x <= 1). Panics when it does not fit in `T`.
+fn next_power_of_two[T: Int](x: T) -> T:
+    if x <= T(1):
+        return T(1)
+    w = bit_width[T]()
+    if min_value[T]() < T(0):
+        w = w - 1
+    need = bit_width[T]() - leading_zeros(x - T(1))
+    if need >= w + 1 or (min_value[T]() < T(0) and need >= w):
+        panic("next_power_of_two: overflow")
+    return from_bits[T](u64(1) << need)
+
+# Position of the highest set bit (floor of log2); panics for x <= 0.
+fn ilog2[T: Int](x: T) -> u32:
+    if x <= T(0):
+        panic("ilog2: argument must be positive")
+    return bit_width[T]() - 1 - leading_zeros(x)
+
+fn bit_get[T: Int](x: T, i: u32) -> bool:
+    if i >= bit_width[T]():
+        panic("bit_get: bit index out of range")
+    return (to_bits(x) >> i) & 1 == 1
+
+fn bit_set[T: Int](x: T, i: u32) -> T:
+    if i >= bit_width[T]():
+        panic("bit_set: bit index out of range")
+    return from_bits[T](to_bits(x) | (u64(1) << i))
+
+fn bit_clear[T: Int](x: T, i: u32) -> T:
+    if i >= bit_width[T]():
+        panic("bit_clear: bit index out of range")
+    return from_bits[T](to_bits(x) & ~(u64(1) << i))
+
+fn bit_toggle[T: Int](x: T, i: u32) -> T:
+    if i >= bit_width[T]():
+        panic("bit_toggle: bit index out of range")
+    return from_bits[T](to_bits(x) ^ (u64(1) << i))
+
+# `width` bits of `x` starting at bit `lo`, as an unsigned value (a bit-field read).
+fn bits_extract[T: Int](x: T, lo: u32, width: u32) -> u64:
+    if width == 0:
+        return 0
+    if lo + width > bit_width[T]():
+        panic("bits_extract: field out of range")
+    v = to_bits(x) >> lo
+    if width < 64:
+        v = v & ((u64(1) << width) - 1)
+    return v
+
+# `x` with the `width` bits at `lo` replaced by the low bits of `value` (a bit-field write).
+fn bits_insert[T: Int](x: T, lo: u32, width: u32, value: u64) -> T:
+    if width == 0:
+        return x
+    if lo + width > bit_width[T]():
+        panic("bits_insert: field out of range")
+    mask: u64 = ~u64(0)
+    if width < 64:
+        mask = (u64(1) << width) - 1
+    cleared = to_bits(x) & ~(mask << lo)
+    return from_bits[T](cleared | ((value & mask) << lo))

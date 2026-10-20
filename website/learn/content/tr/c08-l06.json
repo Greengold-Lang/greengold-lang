@@ -1,0 +1,77 @@
+{
+ "title": "Hata dönüşümü ve panic",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Farklı kütüphaneler farklı hata tipleri üretir. Çağıran fonksiyon `Result[T, AppError]` döndürüyor, çağrılan `Result[T, i32]` döndürüyorsa ve `impl AppError:` içinde `fn from(e: i32) -> AppError` tanımlıysa, `?` dönüşümü **kendiliğinden** yapar."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum AppError:",
+    "    Database(i32)",
+    "    Network(str)",
+    "",
+    "impl AppError:",
+    "    fn from(code: i32) -> AppError:",
+    "        return AppError.Database(code)",
+    "",
+    "fn query_db() -> Result[str, i32]:",
+    "    return Err(500)",
+    "",
+    "fn handle_request() -> Result[str, AppError]:",
+    "    data = query_db()?",
+    "    return Ok(data)",
+    "",
+    "fn main():",
+    "    if let Err(e) = handle_request():",
+    "        print(\"application error caught\")"
+   ],
+   "run": true,
+   "output": [
+    "application error caught"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Programın devam edemeyeceği düzeltilemez durumlarda **`panic`** kullanılır: mesaj `stderr`'e yazılır ve program 101 çıkış koduyla hemen biter. Beklenen hatalar için `Result`, \"bu asla olmamalı\" durumları için `panic`."
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l06-x1",
+   "prompt": "`check_level(level: i32)` yaz: `level < 0` ise `panic(\"invalid level\")`, değilse `access granted` yazdırsın. Yalnızca geçerli bir seviyeyle (3) çağır.",
+   "starter": [
+    "fn check_level(level: i32):",
+    "    print(\"?\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "solution": [
+    "fn check_level(level: i32):",
+    "    if level < 0:",
+    "        panic(\"invalid level\")",
+    "    print(\"access granted\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "hint": "`if level < 0:` içinde `panic(...)`.",
+   "expected": [
+    "access granted"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l06-q1",
+   "q": "Hangi durumda `panic` yerine `Result` kullanılır?",
+   "options": [
+    "Beklenen, kurtarılabilir hatalarda",
+    "Hiçbir zaman",
+    "Yalnızca sayılarla"
+   ],
+   "answer": 0,
+   "why": "`panic` düzeltilemez durumlar içindir."
+  }
+ ]
+}

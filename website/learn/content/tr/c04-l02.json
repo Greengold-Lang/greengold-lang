@@ -1,0 +1,115 @@
+{
+ "title": "Metotlar ve impl",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bir tipe işlev eklemek için **`impl`** bloğu yazılır. Metodun ilk parametresi `self`'tir; nesnenin alanlarına `self.alan` ile ulaşırsın. Çağrı `nesne.metot()` biçimindedir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rectangle:",
+    "    width: f64",
+    "    height: f64",
+    "",
+    "impl Rectangle:",
+    "    fn area(self) -> f64:",
+    "        return self.width * self.height",
+    "",
+    "fn main():",
+    "    rect = Rectangle{ width: 10.0, height: 5.0 }",
+    "    print(\"Area:\", rect.area())"
+   ],
+   "run": true,
+   "output": [
+    "Area: 50"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Nesneyi yerinde değiştiren bir metot `self: lend Tip` yazar (`lend`'i Bölüm 5'te öğreneceksin: \"ödünç al ve değiştir\"). `self` almayan metotlar **statik** metottur ve genellikle yapıcı olarak kullanılır: `Tip.isim(...)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    name: str",
+    "    health: i32",
+    "",
+    "impl Player:",
+    "    fn new(name: str) -> Player:",
+    "        return Player{ name: name, health: 100 }",
+    "",
+    "    fn is_alive(self) -> bool:",
+    "        return self.health > 0",
+    "",
+    "    fn take_damage(self: lend Player, amount: i32):",
+    "        self.health -= amount",
+    "        if self.health < 0:",
+    "            self.health = 0",
+    "",
+    "fn main():",
+    "    hero = Player.new(\"Aragorn\")",
+    "    hero.take_damage(35)",
+    "    print(\"Health:\", hero.health)",
+    "    print(\"Alive?\", hero.is_alive())"
+   ],
+   "run": true,
+   "output": [
+    "Health: 65",
+    "Alive? true"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l02-x1",
+   "prompt": "`Counter` struct'ına (`value: i32`) `increment` metodu ekle: `value`'yu 1 artırsın. Üç kez çağır ve `value`'yu yazdır.",
+   "starter": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        pass",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "solution": [
+    "struct Counter:",
+    "    value: i32",
+    "",
+    "impl Counter:",
+    "    fn increment(self: lend Counter):",
+    "        self.value += 1",
+    "",
+    "fn main():",
+    "    c = Counter{ value: 0 }",
+    "    c.increment()",
+    "    c.increment()",
+    "    c.increment()",
+    "    print(c.value)"
+   ],
+   "hint": "`pass` yerine `self.value += 1`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l02-q1",
+   "q": "`self` almayan bir metoda ne ad verilir?",
+   "options": [
+    "Özel metot",
+    "Statik metot (genelde yapıcı)",
+    "Hatalı metot"
+   ],
+   "answer": 1,
+   "why": "`Player.new(...)` gibi çağrılan metotlar statiktir."
+  }
+ ]
+}

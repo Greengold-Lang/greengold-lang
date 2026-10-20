@@ -1,0 +1,80 @@
+{
+ "title": "Werte und Variablen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Computer arbeiten mit **Werten**: Zahlen (`42`, `3.5`) und Text (`\"Ali\"`). Wenn du einem Wert einen Namen gibst, kannst du ihn später wieder verwenden. Dieser Name heißt **Variable**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    name = \"Ali\"",
+    "    print(name, age)"
+   ],
+   "run": true,
+   "output": [
+    "Ali 20"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Das Zeichen `=` bedeutet nicht „gleich“, sondern **„zuweisen“**: Es legt den Wert rechts in den Namen links. Mit Zahlen kannst du rechnen: `+`, `-`, `*`, `/`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    apple = 5",
+    "    pear = 3",
+    "    total = apple + pear",
+    "    print(total)",
+    "    apple = 10",
+    "    print(apple + pear)"
+   ],
+   "run": true,
+   "output": [
+    "8",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Der Wert einer Variablen kann später geändert werden. Oben war `apple` zuerst 5 und dann 10."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l02-x1",
+   "prompt": "Sei `a` gleich 6 und `b` gleich 7. Gib ihr Produkt aus (verwende `*`).",
+   "starter": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(a * b)"
+   ],
+   "hint": "Ersetze `print(0)` durch `print(a * b)`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l02-q1",
+   "q": "Was bewirkt die Zeile `x = 5`?",
+   "options": [
+    "fragt, ob x gleich 5 ist",
+    "legt den Wert 5 in den Namen x",
+    "gibt 5 auf dem Bildschirm aus"
+   ],
+   "answer": 1,
+   "why": "`=` ist eine Zuweisung: Es speichert den Wert unter dem Namen."
+  }
+ ]
+}

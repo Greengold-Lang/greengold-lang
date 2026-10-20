@@ -1,0 +1,63 @@
+{
+ "title": "Ausführen, bauen, prüfen",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Die drei Befehle, die du beim Entwickeln am häufigsten brauchst: `gg run` (kompilieren und ausführen), `gg build` (eine verteilbare ausführbare Datei erzeugen) und `gg check` (nur Typprüfung, ohne Code zu erzeugen; am schnellsten)."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg run                      # debug mode: every run-time check on",
+    "gg run --release            # LLVM -O3 optimizations",
+    "gg build -o my_app          # a debug executable",
+    "gg build --release -o my_app_release",
+    "gg check src/main.gg        # errors and warnings only"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**Intelligenter Cache:** `gg build` hält den SHA-256-Hash des Quelltexts in `.gg-cache/`; hat sich der Code nicht geändert, sagt es `Up to date (cached)` und baut nicht neu. Mit `--target` kannst du auch für andere Plattformen bauen (`gg targets` listet auf, welche es linken kann)."
+  },
+  {
+   "t": "p",
+   "text": "Für eine ausführliche Erklärung eines Fehlercodes gibt es `gg explain`; für den Zustand von Rechner und Installation gibt es `gg doctor`:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg explain GG0207",
+    "gg doctor",
+    "gg toolchain"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q1",
+   "q": "Welcher Befehl zeigt nur die Fehler an, ohne Code zu erzeugen?",
+   "options": [
+    "`gg run`",
+    "`gg check`",
+    "`gg build`"
+   ],
+   "answer": 1,
+   "why": "`gg check` prüft Typen und erzeugt keinen Code."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l02-q2",
+   "q": "Was tut `gg build`, wenn sich der Code nicht geändert hat?",
+   "options": [
+    "Baut immer neu",
+    "Sagt `Up to date (cached)`",
+    "Meldet einen Fehler"
+   ],
+   "answer": 1,
+   "why": "Der Hash des Quelltexts wird mit dem Cache verglichen."
+  }
+ ]
+}

@@ -1,0 +1,70 @@
+{
+ "title": "Dynamische Listen: List",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Ein Array hat eine feste Länge. Für Daten, die wachsen und schrumpfen, gibt es **`List[T]`**: `List[i32]()` erzeugt eine leere Liste, `push` fügt hinzu, `len` ist die Länge, `list[i]` liefert ein Element. Eine Liste hält ihre Daten auf dem Heap und räumt von selbst auf, wenn du fertig bist."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    xs = List[i32]()",
+    "    xs.push(10)",
+    "    xs.push(20)",
+    "    xs.push(30)",
+    "    print(\"len:\", xs.len)",
+    "    print(\"second:\", xs[1])",
+    "    for x in xs:",
+    "        print(x)"
+   ],
+   "run": true,
+   "output": [
+    "len: 3",
+    "second: 20",
+    "10",
+    "20",
+    "30"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l06-x1",
+   "prompt": "Füge der Liste `squares` die Quadrate der Zahlen 1 bis 5 hinzu und gib sie alle aus.",
+   "starter": [
+    "fn main():",
+    "    squares = List[i32]()",
+    "    for x in squares:",
+    "        print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    squares = List[i32]()",
+    "    for i in 1..=5:",
+    "        squares.push(i * i)",
+    "    for x in squares:",
+    "        print(x)"
+   ],
+   "hint": "Führe zuerst `squares.push(i * i)` innerhalb von `for i in 1..=5:` aus.",
+   "expected": [
+    "1",
+    "4",
+    "9",
+    "16",
+    "25"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l06-q1",
+   "q": "Welche Struktur kann wachsen, während das Programm läuft?",
+   "options": [
+    "ein `[4]i32`-Array",
+    "`List[i32]`",
+    "ein Tupel"
+   ],
+   "answer": 1,
+   "why": "Arrays und Tupel sind fest; `List` wächst."
+  }
+ ]
+}

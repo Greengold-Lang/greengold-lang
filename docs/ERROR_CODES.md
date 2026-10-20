@@ -122,6 +122,14 @@ Bands: `GG01xx` syntax, `GG02xx` names and types, `GG03xx` ownership and referen
 | `GG0408` | `bad-attribute` | other | An `@attribute` does not match its declaration. |
 | `GG0409` | `attribute-check` | other | The body of an `attribute` rejected this use. |
 | `GG0410` | `attribute-print` | other | The body of an `attribute` printed this while compiling. |
+| `GG0501` | `profile-unsafe` | profile | `unsafe:` is not allowed by the safety profile. |
+| `GG0502` | `profile-panic` | profile | The safety profile does not allow code that stops the program on purpose. |
+| `GG0503` | `profile-recursion` | profile | The safety profile does not allow recursion. |
+| `GG0504` | `profile-heap` | profile | The safety profile does not allow the heap. |
+| `GG0505` | `profile-unbounded-loop` | profile | The safety profile does not allow a `while` loop without a stated bound. |
+| `GG0506` | `profile-mutable-static` | profile | The safety profile does not allow global mutable state. |
+| `GG0507` | `profile-complexity` | profile | A function is more complex than the profile allows. |
+| `GG0508` | `profile-long-function` | profile | A function is longer than the profile allows. |
 | `GG0499` | `unclassified` | other | This diagnostic has no specific code yet. |
 
 ## Details

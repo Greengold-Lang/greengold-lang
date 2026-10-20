@@ -1,0 +1,72 @@
+{
+ "title": "Типы Copy и Move",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Тип относится к одной из двух групп. **Типы Copy** (числа, `bool`, `str`, простые структуры, массивы из элементов Copy) живут в стеке и дёшево копируются. **Типы Move** (`List`, `Box`, `string` и всё, что их содержит) владеют памятью кучи; они никогда не копируются, а только **перемещаются** (поэтому двойного освобождения не бывает)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 5",
+    "    b = a",
+    "    b += 1",
+    "    print(a, b)",
+    "",
+    "    list_a = List[i32]()",
+    "    list_a.push(10)",
+    "    list_b = list_a",
+    "    list_c = list_b.clone()",
+    "    list_c.push(20)",
+    "    print(list_b.len, list_c.len)"
+   ],
+   "run": true,
+   "output": [
+    "5 6",
+    "1 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "С числами `b = a` копирует; `a` остаётся пригодной. Со списками `list_b = list_a` перемещает владение: теперь действителен только `list_b`. Если нужна независимая копия, пишут `.clone()`."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l04-x1",
+   "prompt": "Сделайте `.clone()` списка `original` под именем `dup`, добавьте в `dup` число 99 и выведите длину обоих списков.",
+   "starter": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    print(original.len)"
+   ],
+   "solution": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    dup = original.clone()",
+    "    dup.push(99)",
+    "    print(original.len, dup.len)"
+   ],
+   "hint": "`dup = original.clone()` и `dup.push(99)`.",
+   "expected": [
+    "2 3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l04-q1",
+   "q": "Какой тип относится к Move?",
+   "options": [
+    "`i32`",
+    "`List[i32]`",
+    "`bool`"
+   ],
+   "answer": 1,
+   "why": "`List` живёт в куче, поэтому перемещается; числа копируются."
+  }
+ ]
+}

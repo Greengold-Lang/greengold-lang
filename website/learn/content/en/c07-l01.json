@@ -1,0 +1,69 @@
+{
+ "title": "Generic functions",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "To use the same algorithm with different types you write it **generic**. The type parameter goes in square brackets: `[T]`. `T: Ord` is a **bound**: `T` must be an orderable (`<`, `>`) type. At the call the type is usually inferred; you can also write it out, `larger[i64](...)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn larger[T: Ord](a: T, b: T) -> T:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(larger(10, 25))",
+    "    print(larger(3.14, 2.71))",
+    "    print(larger[i64](100, 200))"
+   ],
+   "run": true,
+   "output": [
+    "25",
+    "3.14",
+    "200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "For every combination of types the compiler produces code specialised and optimised for that type (like C++ templates). There is no extra run-time cost, boxing or type erasure."
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l01-x1",
+   "prompt": "Write `smaller[T: Ord](a, b)`: it returns the smaller one. Print `smaller(7, 3)` and `smaller(2.5, 9.5)`.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn smaller[T: Ord](a: T, b: T) -> T:",
+    "    if a < b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(smaller(7, 3))",
+    "    print(smaller(2.5, 9.5))"
+   ],
+   "hint": "Start with `fn smaller[T: Ord](a: T, b: T) -> T:`.",
+   "expected": [
+    "3",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l01-q1",
+   "q": "Is a generic function slower at run time?",
+   "options": [
+    "Yes, the type is looked up on every call",
+    "No, separate code is compiled for each type",
+    "Only with numbers"
+   ],
+   "answer": 1,
+   "why": "The type is resolved at compile time (monomorphization)."
+  }
+ ]
+}

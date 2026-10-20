@@ -1,0 +1,91 @@
+# protocols.ccsds: CCSDS Space Packets (CCSDS 133.0-B), the packet format of spacecraft telemetry and telecommand.
+#
+#     import protocols.ccsds { PacketHeader, build_packet, parse_packet }
+#     h = PacketHeader{ version: 0, is_command: false, secondary_header: true, apid: 0x123, seq_flags: 3, seq_count: 7 }
+#     bytes = build_packet(h, payload, true)             # appends the CRC-16 packet error control field
+#     p = parse_packet(bytes[..], true).value_or_panic()
+#
+# Primary header (6 bytes, big-endian): version (3 bits), type (1: command, 0: telemetry), secondary-header flag (1), APID (11 bits),
+# sequence flags (2: 3 = unsegmented), sequence count (14 bits), data length (16 bits) = number of bytes of the data field minus one.
+# The data field follows. With `with_crc` the last two bytes of the data field are the packet error control: CRC-16/CCITT-FALSE
+# (polynomial 0x1021, initial value 0xFFFF) over the whole packet before them, the form used by ECSS-E-ST-70-41 (PUS).
+
+import std.encoding
+
+public
+const HEADER_LEN: usize = 6
+const MAX_DATA_LEN: usize = 65536
+
+struct PacketHeader:
+    version: u8
+    is_command: bool
+    secondary_header: bool
+    apid: u16                # 11 bits
+    seq_flags: u8            # 2 bits
+    seq_count: u16           # 14 bits
+
+struct Packet:
+    header: PacketHeader
+    data: List[u8]           # the data field without the CRC when `with_crc` was asked for
+
+# The wire form of a packet. `payload` is the data field (the standard needs at least one byte); the header's length field is filled in. With `with_crc` two bytes of CRC are added at the end.
+fn build_packet(h: PacketHeader, payload: []u8, with_crc: bool) -> List[u8]:
+    extra: usize = 0
+    if with_crc:
+        extra = 2
+    total = payload.len + extra
+    if total == 0 or total > MAX_DATA_LEN:
+        panic("build_packet: the data field must have 1 to 65536 bytes")
+    out = List[u8]()
+    first = (u16(h.version & 7) << 13) | (u16(h.apid & 0x7FF))
+    if h.is_command:
+        first = first | (1 << 12)
+    if h.secondary_header:
+        first = first | (1 << 11)
+    second = (u16(h.seq_flags & 3) << 14) | (h.seq_count & 0x3FFF)
+    length = u16(total - 1)
+    out.push(u8(first >> 8))
+    out.push(u8(first & 255))
+    out.push(u8(second >> 8))
+    out.push(u8(second & 255))
+    out.push(u8(length >> 8))
+    out.push(u8(length & 255))
+    for b in payload:
+        out.push(b)
+    if with_crc:
+        crc = encoding.crc16_ccitt(out[..])
+        out.push(u8(crc >> 8))
+        out.push(u8(crc & 255))
+    return out
+
+# Reads one packet from the start of `data`. Returns the packet and, through the error text, what is wrong when it cannot: a short buffer,
+# a length that runs past the end, or a CRC mismatch. Bytes after the packet are ignored (use `packet_len` to find where the next starts).
+fn parse_packet(data: []u8, with_crc: bool) -> Result[Packet, string]:
+    if data.len < HEADER_LEN + 1:
+        return Err("packet shorter than its primary header")
+    first = (u16(data[0]) << 8) | u16(data[1])
+    second = (u16(data[2]) << 8) | u16(data[3])
+    total = usize((u16(data[4]) << 8) | u16(data[5])) + 1
+    if HEADER_LEN + total > data.len:
+        return Err("the data length field runs past the end of the buffer")
+    h = PacketHeader{ version: u8(first >> 13), is_command: (first & (1 << 12)) != 0, secondary_header: (first & (1 << 11)) != 0,
+                      apid: first & 0x7FF, seq_flags: u8(second >> 14), seq_count: second & 0x3FFF }
+    body_len = total
+    if with_crc:
+        if total < 3:
+            return Err("the data field is too short for the CRC")
+        want = (u16(data[HEADER_LEN + total - 2]) << 8) | u16(data[HEADER_LEN + total - 1])
+        got = encoding.crc16_ccitt(data[0..HEADER_LEN + total - 2])
+        if got != want:
+            return Err("CRC mismatch")
+        body_len = total - 2
+    body = List[u8]()
+    for i in 0..body_len:
+        body.push(data[HEADER_LEN + usize(i)])
+    return Ok(Packet{ header: h, data: body })
+
+# The total number of bytes of the packet that starts `data` (header plus data field), or None when the length field is not there yet.
+fn packet_len(data: []u8) -> Optional[usize]:
+    if data.len < HEADER_LEN:
+        return None
+    return Valid(HEADER_LEN + usize((u16(data[4]) << 8) | u16(data[5])) + 1)

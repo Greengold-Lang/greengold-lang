@@ -1,0 +1,76 @@
+{
+ "title": "模块与 import",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "标准库由 `std.*` 模块组成。在文件开头用 `import std.模块` 引入模块；名字要带上模块名：`math.sqrt(...)`。想直接引入选定的名字，写 `import std.math { sqrt }`；想重命名，写 `import std.math as m`。核心部分（prelude）和内建功能不需要 import（`print`、`List`、`Optional`、`Result`……）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math",
+    "",
+    "fn main():",
+    "    print(math.sqrt(16.0))",
+    "    print(math.pow(2.0, 10.0))"
+   ],
+   "run": true,
+   "output": [
+    "4",
+    "1024"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.math { sqrt, floor }",
+    "",
+    "fn main():",
+    "    print(sqrt(81.0))",
+    "    print(floor(3.99))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "3"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "每个 import 只对所在文件有效，不会传给其他文件。想知道哪个模块里有什么，可以查看左侧菜单中的**标准库参考**；在终端里 `gg api` 会打印同样的列表。"
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l01-x1",
+   "prompt": "直接从 `std.math` 导入 `sqrt` 和 `pow`。输出 `sqrt(49.0)` 和 `pow(3.0, 4.0)`。",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.math { sqrt, pow }",
+    "",
+    "fn main():",
+    "    print(sqrt(49.0))",
+    "    print(pow(3.0, 4.0))"
+   ],
+   "hint": "写 `import std.math { sqrt, pow }`。",
+   "expected": [
+    "7",
+    "81"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l01-q1",
+   "q": "下面哪个不需要 `import`？",
+   "options": [
+    "`math.sqrt`",
+    "`List` 和 `print`",
+    "`sort.sort`"
+   ],
+   "answer": 1,
+   "why": "核心 prelude 和内建功能始终在作用域内。"
+  }
+ ]
+}

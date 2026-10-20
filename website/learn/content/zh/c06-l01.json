@@ -1,0 +1,122 @@
+{
+ "title": "枚举与 match",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**`enum`** 列出一个值可以取的选项（**变体**）。要查看枚举值，使用 **`match`**。它最重要的特点是：编译器会检查是否处理了**所有情况**。如果漏掉一个变体，代码就无法编译。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn action(light: TrafficLight):",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            print(\"Stop!\")",
+    "        TrafficLight.Yellow:",
+    "            print(\"Get ready...\")",
+    "        TrafficLight.Green:",
+    "            print(\"Go!\")",
+    "",
+    "fn main():",
+    "    action(TrafficLight.Red)",
+    "    action(TrafficLight.Green)"
+   ],
+   "run": true,
+   "output": [
+    "Stop!",
+    "Go!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "如果不想把它们全部写出来，`_:` 会接住其余所有情况。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum TrafficLight:",
+    "    Red",
+    "    Yellow",
+    "    Green",
+    "",
+    "fn is_stop(light: TrafficLight) -> bool:",
+    "    match light:",
+    "        TrafficLight.Red:",
+    "            return true",
+    "        _:",
+    "            return false",
+    "",
+    "fn main():",
+    "    print(is_stop(TrafficLight.Red), is_stop(TrafficLight.Yellow))"
+   ],
+   "run": true,
+   "output": [
+    "true false"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l01-x1",
+   "prompt": "对枚举 `Direction`（`North`、`South`、`East`、`West`），编写 `name(d)`：输出它自己的名字（`north`、`south`……）。对 `West` 调用它。",
+   "starter": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        _:",
+    "            print(\"?\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "solution": [
+    "enum Direction:",
+    "    North",
+    "    South",
+    "    East",
+    "    West",
+    "",
+    "fn name(d: Direction):",
+    "    match d:",
+    "        Direction.North:",
+    "            print(\"north\")",
+    "        Direction.South:",
+    "            print(\"south\")",
+    "        Direction.East:",
+    "            print(\"east\")",
+    "        Direction.West:",
+    "            print(\"west\")",
+    "",
+    "fn main():",
+    "    name(Direction.West)"
+   ],
+   "hint": "为每个变体写一个分支；不要使用 `_`。",
+   "expected": [
+    "west"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l01-q1",
+   "q": "如果在 `match` 中漏掉一个变体会怎样？",
+   "options": [
+    "运行时崩溃",
+    "代码无法编译",
+    "被悄悄跳过"
+   ],
+   "answer": 1,
+   "why": "`match` 是穷尽的：缺少一种情况就是编译错误。"
+  }
+ ]
+}

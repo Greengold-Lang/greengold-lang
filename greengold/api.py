@@ -6,6 +6,7 @@ builtins that have no source declaration (`print`, `List`, pointer intrinsics).
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from . import __version__
@@ -21,12 +22,53 @@ CORE = ROOT / "core" / "core.gg"
 STD = ROOT / "std"
 
 
+_HEAP = re.compile(r"\b(List|Box|Shared|Arc|string|dyn|HashMap|HashSet|Deque|PriorityQueue|SortedMap|SortedSet|BitSet|Arena|Queue|Channel)\b|Fn\(")
+_IMPORT = re.compile(r"^import\s+std\.(\w+)", re.M)
+_RANK = {"no": 0, "alloc": 1, "yes": 2}
+_tags: dict[str, str] = {}
+
+
+def no_std_tag(module: str) -> str:
+    """Whether a library module can be used with `--no-std`, for the `no_std` column of `gg api`:
+
+    * `yes`    needs neither libc nor an allocator (numbers, bit tricks, fixed-capacity containers, checksums);
+    * `alloc`  needs an allocator (it uses `List`, `string`, `Box`, ...) but no libc: provide `@allocator` functions;
+    * `no`     calls libc or the operating system (`extern` functions), or imports a module that does.
+
+    It is a static reading of the module's source and its `import std.*` lines, so it is a floor, not a proof: a module tagged
+    `yes` that is later changed to call libc is caught by `tests/test_api_nostd.py`, which builds each such module with `--no-std`.
+    """
+    if module in _tags:
+        return _tags[module]
+    _tags[module] = "no"                      # a cycle counts as not proven
+    if module == "builtin":
+        tag = "yes"
+    else:
+        path = CORE if module == "core" else STD / (module.removeprefix("std.") + ".gg")
+        text = re.sub(r'"(?:\\.|[^"\\\n])*"', '""', path.read_text(encoding="utf-8-sig"))
+        text = re.sub(r"(?m)#.*$", "", text)
+        diags = DiagnosticBag()
+        program = parse(tokenize(text, diags), diags, filename=str(path))
+        if any(isinstance(d, ExternFuncDecl) for d in program.decls):
+            tag = "no"
+        else:
+            tag = "alloc" if _HEAP.search(text) or module == "core" else "yes"
+            for dep in _IMPORT.findall(text):
+                other = no_std_tag(f"std.{dep}")
+                if _RANK[other] < _RANK[tag]:
+                    tag = other
+    _tags[module] = tag
+    return tag
+
+
 def library() -> dict:
     symbols: list[dict] = []
     symbols.extend(_builtins())
     symbols.extend(_file("core", CORE))
     for path in sorted(STD.glob("*.gg")):
         symbols.extend(_file(f"std.{path.stem}", path))
+    for sym in symbols:
+        sym["no_std"] = no_std_tag(sym["module"])
     return {
         "schema_version": 1,
         "tool": {"name": "gg", "version": __version__},
@@ -43,7 +85,7 @@ def library_text(doc: dict | None = None) -> str:
             current = sym["module"]
             if lines:
                 lines.append("")
-            lines.append(f"# {current}")
+            lines.append(f"# {current}  [no_std: {sym['no_std']}]")
         lines.append(sym["signature"])
         if sym["description"]:
             lines.append(f"    {sym['description']}")

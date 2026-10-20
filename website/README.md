@@ -9,7 +9,8 @@ The site is published by uploading this folder directly to Cloudflare Pages (not
 1. **Compiler, standard library, `docs/`, or any `playground/*.js` changed?** Rebuild what the site embeds (`build_site.py` also stamps the scripts' content hash into `playground.html`, so a changed script is never served from a stale cache):
    ```bash
    python tools/build_playground.py   # playground/gg-bundle.zip: the compiler the playground runs
-   python tools/build_site.py         # every *.html page, spec.md, sitemap.xml
+   python tools/build_site.py         # every *.html page (learn/index.html too), spec.md, sitemap.xml
+   python tools/build_learn_reference.py   # learn/content/stdlib.json, the Learn app's library reference (after any std change)
    ```
    Also regenerate `diagnostics/use-after-consume.txt` and `.json` with `gg check` when diagnostics output changed, and refresh `benchmarks/data.json` after a new benchmark run.
 2. **Check that the LLVM files are present** (they are git-ignored, so a fresh clone does not have them):
@@ -25,6 +26,11 @@ The site is published by uploading this folder directly to Cloudflare Pages (not
 7. Commit the generated files (`gg-bundle.zip`, the `*.html` pages) so the repository matches what is live. Do not commit `playground/llvm/`.
 
 Do not run `python tools/fetch_llvm.py` on every update; the files only change if the pinned versions in that script change.
+
+
+## The Learn app (`learn/`)
+
+A lesson viewer with an editor that runs the playground's compiler. Lessons are JSON under `learn/content/<lang>/` (English is the source; `tr`, `es`, `de`, `ru`, `zh` carry the same code and outputs), `learn/ui.js` holds the interface strings, and `learn/content/stdlib.json` is generated (see above). `python -m pytest tests/test_learn_content.py` runs every lesson example and checks that all languages match. To add a language: add it to `langs` and `strings` in `ui.js`, copy `content/en/` to `content/<lang>/` and translate the prose fields, and add its name to every chapter title in `content/manifest.json`.
 
 ## Cloudflare Pages (connect to Git instead)
 

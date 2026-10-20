@@ -1,0 +1,72 @@
+{
+ "title": "Typen umwandeln",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold wandelt selbst um, wenn kein Wert verloren gehen kann: eine kleine Ganzzahl in eine breitere (`i32` → `i64`), `i32` → `f64` und so weiter. Unterscheiden sich die beiden Seiten einer Operation, wird die schmalere erweitert."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a: i32 = 100",
+    "    b: i64 = 200",
+    "    c = a + b",
+    "    ratio: f64 = a",
+    "    print(c, ratio)"
+   ],
+   "run": true,
+   "output": [
+    "300 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Umwandlungen, die einen Wert verlieren könnten (`f64` → `i32`, `i64` → `i32`), schreibst **du**: `i32(...)`. Der Compiler schlägt diese Korrektur auch in seiner Fehlermeldung vor."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    value: f64 = 9.81",
+    "    truncated = i32(value)",
+    "    print(truncated)"
+   ],
+   "run": true,
+   "output": [
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l05-x1",
+   "prompt": "Wandle den `f64`-Wert `price` in `i32` um und gib ihn aus (der Bruchteil wird verworfen).",
+   "starter": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(price)"
+   ],
+   "solution": [
+    "fn main():",
+    "    price: f64 = 19.99",
+    "    print(i32(price))"
+   ],
+   "hint": "Schreibe `print(i32(price))`.",
+   "expected": [
+    "19"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l05-q1",
+   "q": "Warum wird der Wechsel von `f64` zu `i32` von Hand geschrieben?",
+   "options": [
+    "Weil es schneller ist",
+    "Weil der Bruchteil verloren gehen kann",
+    "Weil der Compiler nicht weiß, wie es geht"
+   ],
+   "answer": 1,
+   "why": "Damit ein Wertverlust nie stillschweigend passiert, wird diese Umwandlung ausdrücklich hingeschrieben."
+  }
+ ]
+}

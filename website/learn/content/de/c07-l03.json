@@ -1,0 +1,107 @@
+{
+ "title": "Features",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Ein **`feature`** ist ein Vertrag, der die Fähigkeiten und Methodensignaturen festlegt, die ein Typ haben muss (in anderen Sprachen ein „Interface“ oder „Trait“). Es wird kein Rumpf geschrieben; der Typ selbst wird `Self` geschrieben."
+  },
+  {
+   "t": "p",
+   "text": "Greengold hat **keine** Deklaration wie `impl Feature for Typ`. Definiert ein Typ alle Methoden eines Features mit gleichem Namen, gleicher Parameterzahl, gleichem Modus und gleichem Rückgabetyp, erfüllt er das Feature **automatisch**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "feature Measurable:",
+    "    fn area(self: Self) -> f64",
+    "",
+    "struct Circle:",
+    "    radius: f64",
+    "",
+    "impl Circle:",
+    "    fn area(self) -> f64:",
+    "        return 3.0 * self.radius * self.radius",
+    "",
+    "struct Square:",
+    "    side: f64",
+    "",
+    "impl Square:",
+    "    fn area(self) -> f64:",
+    "        return self.side * self.side",
+    "",
+    "fn print_area[T: Measurable](item: T):",
+    "    print(\"area:\", item.area())",
+    "",
+    "fn main():",
+    "    print_area(Circle{ radius: 2.0 })",
+    "    print_area(Square{ side: 5.0 })"
+   ],
+   "run": true,
+   "output": [
+    "area: 12",
+    "area: 25"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`[T: Measurable]` ist eine **Feature-Schranke**: Nur Typen mit dieser Fähigkeit werden akzeptiert. Mehrere Schranken werden mit `+` geschrieben: `[T: Measurable + Printable]`."
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l03-x1",
+   "prompt": "Definiere ein Feature `Named` (`fn name(self: Self) -> str`). Lass die Structs `Dog` und `Cat` die Methode `name` schreiben (`Rex`, `Tom`). `hello[T: Named](x: T)` soll mit beiden funktionieren und `hello, <name>` ausgeben.",
+   "starter": [
+    "struct Dog:",
+    "    id: i32",
+    "",
+    "struct Cat:",
+    "    id: i32",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "feature Named:",
+    "    fn name(self: Self) -> str",
+    "",
+    "struct Dog:",
+    "    id: i32",
+    "",
+    "impl Dog:",
+    "    fn name(self) -> str:",
+    "        return \"Rex\"",
+    "",
+    "struct Cat:",
+    "    id: i32",
+    "",
+    "impl Cat:",
+    "    fn name(self) -> str:",
+    "        return \"Tom\"",
+    "",
+    "fn hello[T: Named](x: T):",
+    "    print(\"hello,\", x.name())",
+    "",
+    "fn main():",
+    "    hello(Dog{ id: 1 })",
+    "    hello(Cat{ id: 2 })"
+   ],
+   "hint": "Schreibe `feature Named:`, gib beiden Structs eine Methode `name` und definiere dann `hello` mit `[T: Named]`.",
+   "expected": [
+    "hello, Rex",
+    "hello, Tom"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l03-q1",
+   "q": "Wie erfüllt ein Typ ein Feature?",
+   "options": [
+    "Indem er `impl Feature for Typ` schreibt",
+    "Indem er die verlangten Methoden mit derselben Signatur definiert",
+    "Indem er `use` an den Dateianfang schreibt"
+   ],
+   "answer": 1,
+   "why": "Strukturelles Matching: Passt die Signatur, ist das Feature automatisch erfüllt."
+  }
+ ]
+}

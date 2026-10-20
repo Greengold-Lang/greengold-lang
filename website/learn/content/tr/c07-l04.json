@@ -1,0 +1,72 @@
+{
+ "title": "Hazır sınırlar",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Derleyici sık gereken yetenekler için hazır sınırlar sağlar: `Num` (sayısal: `+ - * /`), `Int` (yalnızca tam sayılar), `Float` (yalnızca ondalıklılar), `Ord` (sıralanabilir: `< > <= >=`) ve `Eq` (eşitlik: `== !=`). Birleştirilebilirler: `[T: Num + Ord]`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum3[T: Num](a: T, b: T, c: T) -> T:",
+    "    return a + b + c",
+    "",
+    "fn clamp[T: Num + Ord](x: T, lo: T, hi: T) -> T:",
+    "    if x < lo:",
+    "        return lo",
+    "    if x > hi:",
+    "        return hi",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(sum3(1, 2, 3))",
+    "    print(sum3(0.5, 0.25, 0.25))",
+    "    print(clamp(15, 0, 10))",
+    "    print(clamp(-3, 0, 10))"
+   ],
+   "run": true,
+   "output": [
+    "6",
+    "1",
+    "10",
+    "0"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l04-x1",
+   "prompt": "`abs_of[T: Num + Ord](x: T, zero: T)`: `x` sıfırdan küçükse `zero - x`, değilse `x` döndürsün. `-8` ve `2.5` ile dene.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn abs_of[T: Num + Ord](x: T, zero: T) -> T:",
+    "    if x < zero:",
+    "        return zero - x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(abs_of(-8, 0))",
+    "    print(abs_of(2.5, 0.0))"
+   ],
+   "hint": "`[T: Num + Ord]` hem çıkarmayı hem karşılaştırmayı mümkün kılar.",
+   "expected": [
+    "8",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l04-q1",
+   "q": "Bir generic fonksiyonda `<` kullanmak için `T`'ye hangi sınır gerekir?",
+   "options": [
+    "`Eq`",
+    "`Ord`",
+    "`Int`"
+   ],
+   "answer": 1,
+   "why": "`Ord` sıralama işleçlerini sağlar; `Eq` yalnızca eşitliği."
+  }
+ ]
+}

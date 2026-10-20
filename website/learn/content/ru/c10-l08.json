@@ -1,0 +1,78 @@
+{
+ "title": "Регулярные выражения: std.regex",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`regex.compile(шаблон)` возвращает `Result[Regex, string]` (шаблон может быть неверным). `is_match` говорит, есть ли совпадение, `find` находит первое (`Optional[Match]`), `find_all` — все, `replace_all` заменяет; `Match.text()` даёт найденный текст."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[0-9]+\"):",
+    "        Ok(re):",
+    "            print(re.is_match(\"order 42\"))",
+    "            for m in re.find_all(\"a1 b22 c333\"):",
+    "                print(m.text().as_str())",
+    "            print(re.replace_all(\"a1 b22\", \"#\").as_str())",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "1",
+    "22",
+    "333",
+    "a# b#"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l08-x1",
+   "prompt": "Найдите шаблон `[a-z]+` в `\"Hi 42 you\"` и выведите текст первого совпадения (`find` и `Valid`).",
+   "starter": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            print(\"?\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "solution": [
+    "import std.regex",
+    "",
+    "fn main():",
+    "    match regex.compile(\"[a-z]+\"):",
+    "        Ok(re):",
+    "            match re.find(\"Hi 42 you\"):",
+    "                Valid(m):",
+    "                    print(m.text().as_str())",
+    "                None:",
+    "                    print(\"no match\")",
+    "        Err(msg):",
+    "            print(\"bad pattern\")"
+   ],
+   "hint": "`re.find(...)` возвращает `Optional`; раскройте его через `match`.",
+   "expected": [
+    "i"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l08-q1",
+   "q": "Почему `regex.compile` возвращает `Result`?",
+   "options": [
+    "Шаблон может быть записан неверно",
+    "Потому что он медленный",
+    "Потому что текст может быть пустым"
+   ],
+   "answer": 0,
+   "why": "Неверный шаблон возвращается как значение-ошибка."
+  }
+ ]
+}

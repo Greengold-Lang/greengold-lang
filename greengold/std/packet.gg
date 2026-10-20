@@ -21,7 +21,12 @@
 #     while let Valid(msg) = frames.next(65536)?:
 #         handle(msg)
 #
+# Also here: big endian signed and floating point numbers (`put_i32_be`, `put_f64_be`, ...), CRC trailers (`put_crc16`,
+# `check_crc16`, `put_crc32`), and `BitWriter` / `BitReader` for values that are not a whole number of bytes.
+#
 # A message on a TCP stream is a 4-byte big endian length, then that many bytes: the format `TcpStream.send_frame` writes.
+
+import std.encoding
 
 public
 # Builds a message byte by byte.
@@ -268,3 +273,170 @@ impl FrameBuffer:
         msg = string.from(d[self.start + 4..self.start + 4 + n])
         self.start += 4 + n
         return Ok(Valid(msg))
+
+# -- big endian signed and floating point, checksums --------------------------------------------------------------
+
+public
+impl ByteWriter:
+    fn put_i16_be(self: lend Self, v: i16):
+        self.put_u16_be(u16(i32(v) & 65535))
+
+    fn put_i32_be(self: lend Self, v: i32):
+        self.put_u32_be(u32(i64(v) & 4294967295))
+
+    fn put_i64_be(self: lend Self, v: i64):
+        unsafe:
+            bits = ptr_cast[*u64](addr(v))[0]
+            self.put_u64_be(bits)
+
+    fn put_f32_be(self: lend Self, v: f32):
+        unsafe:
+            bits = ptr_cast[*u32](addr(v))[0]
+            self.put_u32_be(bits)
+
+    fn put_f64_be(self: lend Self, v: f64):
+        unsafe:
+            bits = ptr_cast[*u64](addr(v))[0]
+            self.put_u64_be(bits)
+
+    # Appends the CRC-16/CCITT-FALSE of everything written so far, big endian (as most serial and avionics protocols do).
+    fn put_crc16(self: lend Self):
+        c = encoding.crc16_ccitt(self.buf.as_str().as_bytes())
+        self.put_u16_be(c)
+
+    # Appends the CRC-32 of everything written so far, big endian.
+    fn put_crc32(self: lend Self):
+        c = encoding.crc32(self.buf.as_str().as_bytes())
+        self.put_u32_be(c)
+
+impl ByteReader:
+    fn get_i16_be(self: lend Self) -> Result[i16, string]:
+        v = self.get_u16_be()?
+        unsafe:
+            return Ok(ptr_cast[*i16](addr(v))[0])
+
+    fn get_i32_be(self: lend Self) -> Result[i32, string]:
+        v = self.get_u32_be()?
+        unsafe:
+            return Ok(ptr_cast[*i32](addr(v))[0])
+
+    fn get_i64_be(self: lend Self) -> Result[i64, string]:
+        v = self.get_u64_be()?
+        unsafe:
+            return Ok(ptr_cast[*i64](addr(v))[0])
+
+    fn get_f32_be(self: lend Self) -> Result[f32, string]:
+        v = self.get_u32_be()?
+        unsafe:
+            return Ok(ptr_cast[*f32](addr(v))[0])
+
+    fn get_f64_be(self: lend Self) -> Result[f64, string]:
+        v = self.get_u64_be()?
+        unsafe:
+            return Ok(ptr_cast[*f64](addr(v))[0])
+
+# True when `message` (bytes, then a big endian CRC-16/CCITT-FALSE written by `put_crc16`) is intact.
+fn check_crc16(message: str) -> bool:
+    if message.len < 2:
+        return false
+    body = message[..message.len - 2]
+    want = (u16(message[message.len - 2]) << 8) | u16(message[message.len - 1])
+    return encoding.crc16_ccitt(body.as_bytes()) == want
+
+# True when `message` (bytes, then a big endian CRC-32 written by `put_crc32`) is intact.
+fn check_crc32(message: str) -> bool:
+    if message.len < 4:
+        return false
+    body = message[..message.len - 4]
+    n = message.len
+    want = (u32(message[n - 4]) << 24) | (u32(message[n - 3]) << 16) | (u32(message[n - 2]) << 8) | u32(message[n - 1])
+    return encoding.crc32(body.as_bytes()) == want
+
+# -- bit fields -----------------------------------------------------------------------------------------------------
+
+# Packs values of 1 to 64 bits, most significant bit first (the order of ARINC 429 words, CCSDS headers, and CAN signals
+# in Motorola format). `finish` pads the last byte with zero bits.
+public
+struct BitWriter:
+    private
+    buf: string
+    cur: u8
+    used: u32
+
+# Reads values of 1 to 64 bits, most significant bit first; every read checks that the bits are there.
+public
+struct BitReader:
+    private
+    data: string
+    pos: usize
+
+impl BitWriter:
+    public
+    fn new() -> BitWriter:
+        return BitWriter{ buf: string.new(), cur: 0, used: 0 }
+
+    # Adds the low `n` bits of `value`.
+    fn put_bits(self: lend Self, value: u64, n: u32):
+        if n == 0 or n > 64:
+            panic("BitWriter.put_bits: n is 1 to 64")
+        i = n
+        while i > 0:
+            i -= 1
+            bit = u8((value >> i) & 1)
+            self.cur = (self.cur << 1) | bit
+            self.used += 1
+            if self.used == 8:
+                self.buf.append_byte(self.cur)
+                self.cur = 0
+                self.used = 0
+
+    fn put_bool(self: lend Self, v: bool):
+        self.put_bits(if v then 1 else 0, 1)
+
+    # How many bits have been written.
+    fn bit_len(self: read Self) -> usize:
+        return self.buf.len() * 8 + usize(self.used)
+
+    # The bytes, with the last one padded with zero bits.
+    fn finish(self: lend Self) -> string:
+        out = string.from(self.buf.as_str())
+        if self.used > 0:
+            out.append_byte(self.cur << (8 - self.used))
+        return out
+
+impl BitReader:
+    public
+    fn new(data: str) -> BitReader:
+        return BitReader{ data: string.from(data), pos: 0 }
+
+    fn bits_left(self: read Self) -> usize:
+        return self.data.len() * 8 - self.pos
+
+    fn get_bits(self: lend Self, n: u32) -> Result[u64, string]:
+        if n == 0 or n > 64:
+            return Err("n is 1 to 64")
+        if self.bits_left() < usize(n):
+            return Err("the packet is too short")
+        v: u64 = 0
+        for _ in 0..n:
+            byte = self.data.as_str()[self.pos / 8]
+            bit = (byte >> u32(7 - self.pos % 8)) & 1
+            v = (v << 1) | u64(bit)
+            self.pos += 1
+        return Ok(v)
+
+    fn get_bool(self: lend Self) -> Result[bool, string]:
+        v = self.get_bits(1)?
+        return Ok(v == 1)
+
+    # Reads `n` bits as a two's complement number.
+    fn get_signed(self: lend Self, n: u32) -> Result[i64, string]:
+        v = self.get_bits(n)?
+        if n < 64 and ((v >> (n - 1)) & 1) == 1:
+            return Ok(i64(v) - (i64(1) << n))
+        unsafe:
+            return Ok(ptr_cast[*i64](addr(v))[0])
+
+    # Skips to the next byte boundary.
+    fn align(self: lend Self):
+        self.pos = (self.pos + 7) / 8 * 8

@@ -1,0 +1,79 @@
+{
+ "title": "Optional helpers",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Instead of writing `match` every time there are handy methods: `.has_value()` tells whether there is a value, `.value_or(default)` gives the default when there is none, and `.value_or_panic()` unwraps the value when you are sure it exists (otherwise the program crashes; use it only in tests and prototypes)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(find_index(numbers, 25).has_value())",
+    "    print(find_index(numbers, 99).has_value())",
+    "    print(find_index(numbers, 99).value_or(0))",
+    "    print(find_index(numbers, 25).value_or_panic())"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "false",
+    "0",
+    "1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l02-x1",
+   "prompt": "Use `value_or` to print 1000 when `find_index(numbers, 99)` finds nothing; for 40 print the index found.",
+   "starter": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(0)",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn find_index(items: []i32, target: i32) -> Optional[usize]:",
+    "    for idx, val in items:",
+    "        if val == target:",
+    "            return Valid(idx)",
+    "    return None",
+    "",
+    "fn main():",
+    "    numbers: [4]i32 = [10, 25, 40, 85]",
+    "    print(find_index(numbers, 99).value_or(1000))",
+    "    print(find_index(numbers, 40).value_or(1000))"
+   ],
+   "hint": "Put `.value_or(1000)` at the end of both calls.",
+   "expected": [
+    "1000",
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l02-q1",
+   "q": "What does `value_or_panic()` do on an `Optional` that is `None`?",
+   "options": [
+    "Returns 0",
+    "Stops the program with `panic`",
+    "Returns a new `Optional`"
+   ],
+   "answer": 1,
+   "why": "That is why it is used only when you are sure of the value."
+  }
+ ]
+}

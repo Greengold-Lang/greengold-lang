@@ -1,0 +1,68 @@
+{
+ "title": "Die while-Schleife",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`while` wiederholt den eingerückten Teil, solange die Bedingung wahr ist. Irgendetwas muss sie irgendwann falsch machen, sonst entsteht eine Endlosschleife."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    n = 5",
+    "    while n > 0:",
+    "        print(\"Countdown:\", n)",
+    "        n -= 1",
+    "    print(\"Fire!\")"
+   ],
+   "run": true,
+   "output": [
+    "Countdown: 5",
+    "Countdown: 4",
+    "Countdown: 3",
+    "Countdown: 2",
+    "Countdown: 1",
+    "Fire!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Die Bedingung wird am **Anfang** jeder Runde geprüft; ist sie auf den ersten Blick falsch, läuft der Rumpf nie."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l03-x1",
+   "prompt": "Setze `x` auf 1 und verdopple es in jeder Runde; höre auf, wenn `x` größer als 100 ist, und gib dann `x` aus.",
+   "starter": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        pass",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    x = 1",
+    "    while x <= 100:",
+    "        x *= 2",
+    "    print(x)"
+   ],
+   "hint": "Ersetze `pass` durch `x *= 2`.",
+   "expected": [
+    "128"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l03-q1",
+   "q": "Wie oft läuft der Rumpf von `while n > 0:` bei `n = 0`?",
+   "options": [
+    "Einmal",
+    "Nie",
+    "Endlos"
+   ],
+   "answer": 1,
+   "why": "Die Bedingung ist sofort falsch, also läuft der Rumpf nie."
+  }
+ ]
+}

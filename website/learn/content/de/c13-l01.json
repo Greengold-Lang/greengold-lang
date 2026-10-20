@@ -1,0 +1,38 @@
+{
+ "title": "C-Funktionen aufrufen: extern",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold spricht über die C-ABI direkt mit C-Bibliotheken, ohne Zusatzaufwand dazwischen. Um eine vorhandene C-Funktion zu deklarieren, verwendest du **`extern`**:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sin(x: f64) -> f64",
+    "extern \"math.h\" fn cos(x: f64) -> f64",
+    "",
+    "fn main():",
+    "    unsafe:",
+    "        print(sin(0.0), cos(0.0))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Eine deklarierte C-Funktion aufzurufen heißt, einem Vertrag zu vertrauen, den der Compiler nicht prüfen kann; deshalb erfolgt der Aufruf in einem **`unsafe:`**-Block. C-Funktionen mit variabler Parameterzahl (`printf`) werden in der Signatur mit `...` markiert."
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l01-q1",
+   "q": "Wo wird eine `extern`-C-Funktion aufgerufen?",
+   "options": [
+    "Überall",
+    "In einem `unsafe:`-Block",
+    "Nur in `main`"
+   ],
+   "answer": 1,
+   "why": "Der Compiler kann die C-Seite nicht prüfen; die Verantwortung liegt beim Programmierer."
+  }
+ ]
+}

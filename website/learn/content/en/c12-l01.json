@@ -1,0 +1,58 @@
+{
+ "title": "Starting threads",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold offers operating-system-level native threads (`std.thread`). `Thread.spawn(f)` starts a function in the background, `join()` waits for it to finish. To pass a parameter there is `spawn_with_param(f, value)`. None of them needs `unsafe`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn worker_a():",
+    "    print(\"worker A running in a background thread\")",
+    "",
+    "fn worker_b(id: i64):",
+    "    print(\"worker B with id\", id)",
+    "",
+    "fn main():",
+    "    t1 = thread.Thread.spawn(worker_a)",
+    "    t1.join()",
+    "    t2 = thread.Thread.spawn_with_param(worker_b, 42)",
+    "    t2.join()",
+    "    print(\"all threads finished\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Thread`, `Mutex`, `Cond` and channels are **operating system objects: they are moved, not copied**. Writing `n = m` moves `m`; a second, independent lock is not made. `m.clone()` does not compile (GG0323). To hand a lock or a channel to another function you use a `read`/`lend` parameter."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q1",
+   "q": "Which method waits for a thread to finish?",
+   "options": [
+    "`wait()`",
+    "`join()`",
+    "`stop()`"
+   ],
+   "answer": 1,
+   "why": "`join()` waits until the thread has finished."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q2",
+   "q": "Can a `Mutex` be copied?",
+   "options": [
+    "Yes",
+    "No, it is moved",
+    "Only with `clone`"
+   ],
+   "answer": 1,
+   "why": "Operating system objects are not copied; a copy would mean two separate locks."
+  }
+ ]
+}

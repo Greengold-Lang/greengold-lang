@@ -5,6 +5,10 @@
 #     print(t.elapsed_millis())
 #     print(time.now_utc().to_iso())                      # 2026-10-11T08:30:00.123Z
 #     d = time.parse_iso("2024-02-29T12:00:00Z")          # Result[DateTime, string]
+#     ny = time.zone_by_name("America/New_York").value_or_panic()
+#     print(ny.to_local(time.unix_millis()).to_iso())     # 2026-10-11T04:30:00-04:00
+import std.string
+
 private
 extern "time.h" fn time(out: *mut i64) -> i64
 extern "time.h" fn clock() -> i64
@@ -214,3 +218,517 @@ fn parse_iso(text: str) -> Result[DateTime, string]:
         off = (oh * 60 + om) * 60000
         return Ok(dt.add_millis(if text[i] == '+' then -off else off))
     return Err(string.from("unexpected text after the time"))
+
+# -- more calendar arithmetic ---------------------------------------------------------------------------
+
+private
+fn _mod(a: i64, b: i64) -> i64:
+    r = a % b
+    return if r < 0 then r + b else r
+
+public
+impl DateTime:
+    # Days since 1970-01-01 of this date.
+    fn unix_day(self: read Self) -> i64:
+        return days_from_civil(self.year, self.month, self.day)
+
+    # 1 for January 1st.
+    fn day_of_year(self: read Self) -> i64:
+        return days_from_civil(self.year, self.month, self.day) - days_from_civil(self.year, 1, 1) + 1
+
+    fn is_weekend(self: read Self) -> bool:
+        return self.weekday() >= 5
+
+    fn add_days(self: read Self, n: i64) -> DateTime:
+        return self.add_millis(n * 86400000)
+
+    # Moves by whole months; the day is kept, or cut back to the last day of a shorter month (Jan 31 + 1 month = Feb 28 or 29).
+    fn add_months(self: read Self, n: i64) -> DateTime:
+        total = self.year * 12 + (self.month - 1) + n
+        y = _floor_div(total, 12)
+        m = _mod(total, 12) + 1
+        d = self.day
+        last = days_in_month(y, m)
+        if d > last:
+            d = last
+        return DateTime{ year: y, month: m, day: d, hour: self.hour, minute: self.minute, second: self.second, millis: self.millis }
+
+    fn add_years(self: read Self, n: i64) -> DateTime:
+        return self.add_months(n * 12)
+
+    # Midnight at the start of this day.
+    fn start_of_day(self: read Self) -> DateTime:
+        return DateTime{ year: self.year, month: self.month, day: self.day, hour: 0, minute: 0, second: 0, millis: 0 }
+
+    # Whole days from this date to `other` (negative when `other` is earlier); the time of day is ignored.
+    fn days_until(self: read Self, other: DateTime) -> i64:
+        return days_from_civil(other.year, other.month, other.day) - days_from_civil(self.year, self.month, self.day)
+
+    # The date that is `n` business days later (earlier for negative `n`), skipping Saturdays and Sundays and the
+    # days in `holidays` (each a `days_from_civil` number). The time of day is kept.
+    fn add_business_days(self: read Self, n: i64, holidays: read List[i64]) -> DateTime:
+        cur = DateTime{ year: self.year, month: self.month, day: self.day, hour: self.hour, minute: self.minute, second: self.second, millis: self.millis }
+        step: i64 = if n < 0 then -1 else 1
+        left = if n < 0 then -n else n
+        while left > 0:
+            cur = cur.add_days(step)
+            if cur.is_weekend():
+                continue
+            skip = false
+            day = cur.unix_day()
+            for h in holidays:
+                if h == day:
+                    skip = true
+            if not skip:
+                left -= 1
+        return cur
+
+    fn month_name(self: read Self) -> str:
+        return _month_names()[self.month - 1]
+
+    fn weekday_name(self: read Self) -> str:
+        return _weekday_names()[self.weekday()]
+
+    # Fills in a pattern: `YYYY`, `YY`, `MM`, `DD`, `HH`, `mm`, `ss`, `SSS` (milliseconds), `MMMM` and `MMM` (month
+    # name, full or short), `dddd` and `ddd` (weekday name). Any other character is copied.
+    # `dt.format("DD/MM/YYYY HH:mm")` is `29/02/2024 12:00`.
+    fn format(self: read Self, pattern: str) -> string:
+        out = string.new()
+        i: usize = 0
+        while i < pattern.len:
+            if _at(pattern, i, "YYYY"):
+                out.append(f"{self.year:04}")
+                i += 4
+            elif _at(pattern, i, "YY"):
+                out.append(f"{_mod(self.year, 100):02}")
+                i += 2
+            elif _at(pattern, i, "MMMM"):
+                out.append_str(self.month_name())
+                i += 4
+            elif _at(pattern, i, "MMM"):
+                out.append_str(string.substr(self.month_name(), 0, 3))
+                i += 3
+            elif _at(pattern, i, "MM"):
+                out.append(f"{self.month:02}")
+                i += 2
+            elif _at(pattern, i, "DD"):
+                out.append(f"{self.day:02}")
+                i += 2
+            elif _at(pattern, i, "HH"):
+                out.append(f"{self.hour:02}")
+                i += 2
+            elif _at(pattern, i, "mm"):
+                out.append(f"{self.minute:02}")
+                i += 2
+            elif _at(pattern, i, "SSS"):
+                out.append(f"{self.millis:03}")
+                i += 3
+            elif _at(pattern, i, "ss"):
+                out.append(f"{self.second:02}")
+                i += 2
+            elif _at(pattern, i, "dddd"):
+                out.append_str(self.weekday_name())
+                i += 4
+            elif _at(pattern, i, "ddd"):
+                out.append_str(string.substr(self.weekday_name(), 0, 3))
+                i += 3
+            else:
+                out.append_byte(pattern[i])
+                i += 1
+        return out
+
+private
+fn _at(text: str, i: usize, token: str) -> bool:
+    if i + token.len > text.len:
+        return false
+    for k in 0..token.len:
+        if text[i + k] != token[k]:
+            return false
+    return true
+
+fn _month_names() -> [12]str:
+    return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+fn _weekday_names() -> [7]str:
+    return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+public
+# Reads a date and time written the way `DateTime.format` writes it: `YYYY`, `MM`, `DD`, `HH`, `mm`, `ss`, `SSS`; every
+# other character must match. `parse_format("29/02/2024", "DD/MM/YYYY")`.
+fn parse_format(text: str, pattern: str) -> Result[DateTime, string]:
+    dt = DateTime{ year: 1970, month: 1, day: 1, hour: 0, minute: 0, second: 0, millis: 0 }
+    i: usize = 0
+    j: usize = 0
+    while i < pattern.len:
+        if _at(pattern, i, "YYYY"):
+            v = _digits(text, j, 4)
+            if v < 0:
+                return Err(string.from("expected a 4-digit year"))
+            dt.year = v
+            i += 4
+            j += 4
+        elif _at(pattern, i, "MM") or _at(pattern, i, "DD") or _at(pattern, i, "HH") or _at(pattern, i, "mm") or _at(pattern, i, "ss"):
+            v = _digits(text, j, 2)
+            if v < 0:
+                return Err(f"expected 2 digits at position {j}")
+            if _at(pattern, i, "MM"):
+                dt.month = v
+            elif _at(pattern, i, "DD"):
+                dt.day = v
+            elif _at(pattern, i, "HH"):
+                dt.hour = v
+            elif _at(pattern, i, "mm"):
+                dt.minute = v
+            else:
+                dt.second = v
+            i += 2
+            j += 2
+        elif _at(pattern, i, "SSS"):
+            v = _digits(text, j, 3)
+            if v < 0:
+                return Err(string.from("expected 3 digits of milliseconds"))
+            dt.millis = v
+            i += 3
+            j += 3
+        else:
+            if j >= text.len or text[j] != pattern[i]:
+                return Err(f"expected `{string.substr(pattern, i, i + 1)}` at position {j}")
+            i += 1
+            j += 1
+    if j != text.len:
+        return Err(string.from("unexpected text at the end"))
+    if dt.month < 1 or dt.month > 12 or dt.day < 1 or dt.day > days_in_month(dt.year, dt.month):
+        return Err(string.from("no such date"))
+    if dt.hour > 23 or dt.minute > 59 or dt.second > 59:
+        return Err(string.from("no such time"))
+    return Ok(dt)
+
+# -- Duration: a length of time ------------------------------------------------------------------------
+
+public
+# A length of time in nanoseconds (about 292 years either way). Negative lengths are allowed.
+struct Duration:
+    nanos: i64
+
+fn duration_nanos(n: i64) -> Duration:
+    return Duration{ nanos: n }
+
+fn duration_micros(n: i64) -> Duration:
+    return Duration{ nanos: n * 1000 }
+
+fn duration_millis(n: i64) -> Duration:
+    return Duration{ nanos: n * 1000000 }
+
+fn duration_secs(n: i64) -> Duration:
+    return Duration{ nanos: n * 1000000000 }
+
+fn duration_minutes(n: i64) -> Duration:
+    return Duration{ nanos: n * 60000000000 }
+
+fn duration_hours(n: i64) -> Duration:
+    return Duration{ nanos: n * 3600000000000 }
+
+fn duration_from_secs_f64(s: f64) -> Duration:
+    return Duration{ nanos: i64(s * 1000000000.0) }
+
+impl Duration:
+    fn as_nanos(self: read Self) -> i64:
+        return self.nanos
+
+    fn as_micros(self: read Self) -> i64:
+        return self.nanos / 1000
+
+    fn as_millis(self: read Self) -> i64:
+        return self.nanos / 1000000
+
+    fn as_secs(self: read Self) -> i64:
+        return self.nanos / 1000000000
+
+    fn as_secs_f64(self: read Self) -> f64:
+        return f64(self.nanos) / 1000000000.0
+
+    fn add(self: read Self, other: Duration) -> Duration:
+        return Duration{ nanos: self.nanos + other.nanos }
+
+    fn sub(self: read Self, other: Duration) -> Duration:
+        return Duration{ nanos: self.nanos - other.nanos }
+
+    fn scale(self: read Self, factor: i64) -> Duration:
+        return Duration{ nanos: self.nanos * factor }
+
+    fn is_negative(self: read Self) -> bool:
+        return self.nanos < 0
+
+    fn is_zero(self: read Self) -> bool:
+        return self.nanos == 0
+
+    # -1, 0 or 1.
+    fn compare(self: read Self, other: Duration) -> i64:
+        if self.nanos < other.nanos:
+            return -1
+        if self.nanos > other.nanos:
+            return 1
+        return 0
+
+    # `1h02m03.5s`, `250ms`, `42us`, `7ns`: the largest unit that fits.
+    fn describe(self: read Self) -> string:
+        n = self.nanos
+        sign = ""
+        if n < 0:
+            sign = "-"
+            n = -n
+        if n < 1000:
+            return f"{sign}{n}ns"
+        if n < 1000000:
+            return f"{sign}{n / 1000}us"
+        if n < 1000000000:
+            return f"{sign}{n / 1000000}ms"
+        total_ms = n / 1000000
+        h = total_ms / 3600000
+        m = total_ms / 60000 % 60
+        s = total_ms / 1000 % 60
+        ms = total_ms % 1000
+        out = string.from(sign)
+        if h > 0:
+            out.append(f"{h}h{m:02}m")
+        elif m > 0:
+            out.append(f"{m}m")
+        if h > 0 or m > 0:
+            out.append(f"{s:02}")
+        else:
+            out.append(f"{s}")
+        if ms != 0:
+            out.append(f".{ms:03}")
+        out.append_str("s")
+        return out
+
+public
+impl Instant:
+    fn elapsed(self: read Self) -> Duration:
+        return Duration{ nanos: monotonic_nanos() - self.nanos }
+
+    # The time from `earlier` to this reading.
+    fn duration_since(self: read Self, earlier: Instant) -> Duration:
+        return Duration{ nanos: self.nanos - earlier.nanos }
+
+    fn plus(self: read Self, d: Duration) -> Instant:
+        return Instant{ nanos: self.nanos + d.nanos }
+
+fn sleep(d: Duration):
+    sleep_millis((d.nanos + 999999) / 1000000)
+
+# -- time zones ------------------------------------------------------------------------------------------
+
+public
+# When a daylight-saving change happens: the `week`-th `weekday` (0 Monday .. 6 Sunday) of `month`, at `minutes`
+# after midnight, in local wall time, or in UTC when `utc` is true. `week` 1..4 counts from the start of the month,
+# 5 means the last one.
+struct ZoneRule:
+    month: i64
+    week: i64
+    weekday: i64
+    minutes: i64
+    utc: bool
+
+# A time zone: a standard offset from UTC in minutes, plus an optional daylight-saving rule. `Zone.fixed` and
+# `zone_by_name` build them. The built-in rules are today's: dates before the rules came into force (the US
+# before 2007, the EU before 1996) are not covered.
+struct Zone:
+    name: string
+    std_minutes: i64
+    dst_extra: i64     # minutes added in summer; 0 for a zone without daylight saving
+    start: ZoneRule
+    end: ZoneRule
+
+# A date and time as the people in a zone read it.
+struct ZonedDateTime:
+    local: DateTime
+    offset_minutes: i64
+    zone: string
+    is_dst: bool
+
+fn _no_rule() -> ZoneRule:
+    return ZoneRule{ month: 1, week: 1, weekday: 0, minutes: 0, utc: false }
+
+fn zone_fixed(name: str, offset_minutes: i64) -> Zone:
+    return Zone{ name: string.from(name), std_minutes: offset_minutes, dst_extra: 0, start: _no_rule(), end: _no_rule() }
+
+fn zone_utc() -> Zone:
+    return zone_fixed("UTC", 0)
+
+fn zone_with_rules(name: str, std_minutes: i64, dst_extra: i64, start: ZoneRule, end: ZoneRule) -> Zone:
+    return Zone{ name: string.from(name), std_minutes: std_minutes, dst_extra: dst_extra, start: start, end: end }
+
+private
+fn _rule_day(y: i64, r: ZoneRule) -> i64:
+    first = (days_from_civil(y, r.month, 1) % 7 + 10) % 7
+    if r.week >= 5:
+        last = days_in_month(y, r.month)
+        lastwd = (days_from_civil(y, r.month, last) % 7 + 10) % 7
+        return last - _mod(lastwd - r.weekday, 7)
+    return 1 + _mod(r.weekday - first, 7) + (r.week - 1) * 7
+
+# The instant (unix milliseconds) when `r` takes effect in year `y`, given the offset in force just before it.
+fn _rule_instant(y: i64, r: ZoneRule, offset_before: i64) -> i64:
+    day = days_from_civil(y, r.month, _rule_day(y, r))
+    ms = day * 86400000 + r.minutes * 60000
+    if r.utc:
+        return ms
+    return ms - offset_before * 60000
+
+
+public
+impl Zone:
+    # True when daylight saving is in force at the instant `unix_ms`.
+    fn is_dst_at(self: read Self, unix_ms: i64) -> bool:
+        if self.dst_extra == 0:
+            return false
+        y = datetime_from_unix_millis(unix_ms + self.std_minutes * 60000).year
+        start = _rule_instant(y, self.start, self.std_minutes)
+        end = _rule_instant(y, self.end, self.std_minutes + self.dst_extra)
+        if self.start.month > self.end.month:
+            return unix_ms >= start or unix_ms < end
+        return unix_ms >= start and unix_ms < end
+
+    # Minutes east of UTC at the instant `unix_ms`.
+    fn offset_at(self: read Self, unix_ms: i64) -> i64:
+        if self.is_dst_at(unix_ms):
+            return self.std_minutes + self.dst_extra
+        return self.std_minutes
+
+    # The wall-clock reading in this zone at the instant `unix_ms`.
+    fn to_local(self: read Self, unix_ms: i64) -> ZonedDateTime:
+        off = self.offset_at(unix_ms)
+        return ZonedDateTime{ local: datetime_from_unix_millis(unix_ms + off * 60000), offset_minutes: off,
+            zone: string.from(self.name.as_str()), is_dst: self.is_dst_at(unix_ms) }
+
+    # The instant for a wall-clock reading in this zone. In the hour that is repeated when clocks go back, the first
+    # (summer) reading is taken; a reading in the hour that is skipped when clocks go forward is read with the standard offset.
+    fn from_local(self: read Self, local: DateTime) -> i64:
+        guess = local.to_unix_millis() - self.std_minutes * 60000
+        if self.is_dst_at(guess - self.dst_extra * 60000):
+            return guess - self.dst_extra * 60000
+        return guess
+
+impl ZonedDateTime:
+    # `2026-03-08T09:30:00-04:00`, with `.123` before the offset when there are milliseconds.
+    fn to_iso(self: read Self) -> string:
+        iso = self.local.to_iso()
+        out = string.from(string.substr(iso.as_str(), 0, iso.len - 1))
+        sign = if self.offset_minutes < 0 then "-" else "+"
+        a = if self.offset_minutes < 0 then -self.offset_minutes else self.offset_minutes
+        out.append(f"{sign}{a / 60:02}:{a % 60:02}")
+        return out
+
+    fn to_unix_millis(self: read Self) -> i64:
+        return self.local.to_unix_millis() - self.offset_minutes * 60000
+
+fn _us_rules(std_minutes: i64, name: str) -> Zone:
+    return zone_with_rules(name, std_minutes, 60, ZoneRule{ month: 3, week: 2, weekday: 6, minutes: 120, utc: false },
+        ZoneRule{ month: 11, week: 1, weekday: 6, minutes: 120, utc: false })
+
+fn _eu_rules(std_minutes: i64, name: str) -> Zone:
+    return zone_with_rules(name, std_minutes, 60, ZoneRule{ month: 3, week: 5, weekday: 6, minutes: 60, utc: true },
+        ZoneRule{ month: 10, week: 5, weekday: 6, minutes: 60, utc: true })
+
+public
+# A zone by its IANA name. Built in: UTC, GMT, and the zones of the main exchanges and capitals (New York, Chicago,
+# Denver, Los Angeles, Toronto, Sao Paulo, London, Dublin, Lisbon, Paris, Berlin, Frankfurt, Madrid, Rome, Amsterdam,
+# Zurich, Stockholm, Warsaw, Athens, Istanbul, Moscow, Dubai, Riyadh, Tehran, Karachi, Mumbai/Kolkata, Dhaka, Bangkok,
+# Jakarta, Singapore, Hong Kong, Shanghai, Taipei, Seoul, Tokyo, Sydney, Melbourne, Brisbane, Perth, Auckland,
+# Johannesburg, Cairo, Lagos, Nairobi). Daylight-saving rules are today's.
+fn zone_by_name(name: str) -> Optional[Zone]:
+    if string.str_eq(name, "UTC") or string.str_eq(name, "GMT") or string.str_eq(name, "Etc/UTC"):
+        return Valid(zone_fixed(name, 0))
+    if string.str_eq(name, "America/New_York") or string.str_eq(name, "America/Toronto"):
+        return Valid(_us_rules(-300, name))
+    if string.str_eq(name, "America/Chicago"):
+        return Valid(_us_rules(-360, name))
+    if string.str_eq(name, "America/Denver"):
+        return Valid(_us_rules(-420, name))
+    if string.str_eq(name, "America/Los_Angeles"):
+        return Valid(_us_rules(-480, name))
+    if string.str_eq(name, "America/Sao_Paulo"):
+        return Valid(zone_fixed(name, -180))
+    if string.str_eq(name, "Europe/London") or string.str_eq(name, "Europe/Dublin") or string.str_eq(name, "Europe/Lisbon"):
+        return Valid(_eu_rules(0, name))
+    if string.str_eq(name, "Europe/Paris") or string.str_eq(name, "Europe/Berlin") or string.str_eq(name, "Europe/Frankfurt") or string.str_eq(name, "Europe/Madrid") or string.str_eq(name, "Europe/Rome") or string.str_eq(name, "Europe/Amsterdam") or string.str_eq(name, "Europe/Zurich") or string.str_eq(name, "Europe/Stockholm") or string.str_eq(name, "Europe/Warsaw"):
+        return Valid(_eu_rules(60, name))
+    if string.str_eq(name, "Europe/Athens"):
+        return Valid(_eu_rules(120, name))
+    if string.str_eq(name, "Europe/Istanbul") or string.str_eq(name, "Europe/Moscow") or string.str_eq(name, "Asia/Riyadh") or string.str_eq(name, "Africa/Nairobi"):
+        return Valid(zone_fixed(name, 180))
+    if string.str_eq(name, "Asia/Dubai"):
+        return Valid(zone_fixed(name, 240))
+    if string.str_eq(name, "Asia/Tehran"):
+        return Valid(zone_fixed(name, 210))
+    if string.str_eq(name, "Asia/Karachi"):
+        return Valid(zone_fixed(name, 300))
+    if string.str_eq(name, "Asia/Mumbai") or string.str_eq(name, "Asia/Kolkata"):
+        return Valid(zone_fixed(name, 330))
+    if string.str_eq(name, "Asia/Dhaka"):
+        return Valid(zone_fixed(name, 360))
+    if string.str_eq(name, "Asia/Bangkok") or string.str_eq(name, "Asia/Jakarta"):
+        return Valid(zone_fixed(name, 420))
+    if string.str_eq(name, "Asia/Singapore") or string.str_eq(name, "Asia/Hong_Kong") or string.str_eq(name, "Asia/Shanghai") or string.str_eq(name, "Asia/Taipei") or string.str_eq(name, "Australia/Perth"):
+        return Valid(zone_fixed(name, 480))
+    if string.str_eq(name, "Asia/Seoul") or string.str_eq(name, "Asia/Tokyo"):
+        return Valid(zone_fixed(name, 540))
+    if string.str_eq(name, "Australia/Brisbane"):
+        return Valid(zone_fixed(name, 600))
+    if string.str_eq(name, "Australia/Sydney") or string.str_eq(name, "Australia/Melbourne"):
+        return Valid(zone_with_rules(name, 600, 60, ZoneRule{ month: 10, week: 1, weekday: 6, minutes: 120, utc: false },
+            ZoneRule{ month: 4, week: 1, weekday: 6, minutes: 180, utc: false }))
+    if string.str_eq(name, "Pacific/Auckland"):
+        return Valid(zone_with_rules(name, 720, 60, ZoneRule{ month: 9, week: 5, weekday: 6, minutes: 120, utc: false },
+            ZoneRule{ month: 4, week: 1, weekday: 6, minutes: 180, utc: false }))
+    if string.str_eq(name, "Africa/Johannesburg") or string.str_eq(name, "Africa/Cairo"):
+        return Valid(zone_fixed(name, 120))
+    if string.str_eq(name, "Africa/Lagos"):
+        return Valid(zone_fixed(name, 60))
+    return None
+
+# -- leap seconds, TAI and GPS time --------------------------------------------------------------------------
+#
+# UTC has leap seconds, GPS time and TAI do not. TAI is ahead of UTC by 37 s since 2017-01-01; GPS time is
+# 19 s behind TAI and started on 1980-01-06. Unix milliseconds ignore leap seconds (a leap second repeats a second).
+
+private
+fn _leap_table() -> [28][3]i64:
+    return [[1972, 1, 10], [1972, 7, 11], [1973, 1, 12], [1974, 1, 13], [1975, 1, 14], [1976, 1, 15], [1977, 1, 16],
+        [1978, 1, 17], [1979, 1, 18], [1980, 1, 19], [1981, 7, 20], [1982, 7, 21], [1983, 7, 22], [1985, 7, 23],
+        [1988, 1, 24], [1990, 1, 25], [1991, 1, 26], [1992, 7, 27], [1993, 7, 28], [1994, 7, 29], [1996, 1, 30],
+        [1997, 7, 31], [1999, 1, 32], [2006, 1, 33], [2009, 1, 34], [2012, 7, 35], [2015, 7, 36], [2017, 1, 37]]
+
+public
+# TAI minus UTC, in seconds, at the UTC instant `unix_ms`. Before 1972 this returns 10. Dates after the last known leap
+# second (2017-01-01) use 37 until the table is updated.
+fn tai_minus_utc(unix_ms: i64) -> i64:
+    table = _leap_table()
+    result: i64 = 10
+    for row in table:
+        if unix_ms >= days_from_civil(row[0], row[1], 1) * 86400000:
+            result = row[2]
+    return result
+
+fn unix_to_tai_millis(unix_ms: i64) -> i64:
+    return unix_ms + tai_minus_utc(unix_ms) * 1000
+
+fn tai_to_unix_millis(tai_ms: i64) -> i64:
+    guess = tai_ms - tai_minus_utc(tai_ms) * 1000
+    return tai_ms - tai_minus_utc(guess) * 1000
+
+# Milliseconds of GPS time (since 1980-01-06 00:00:00 UTC, no leap seconds) at the UTC instant `unix_ms`.
+fn unix_to_gps_millis(unix_ms: i64) -> i64:
+    return unix_ms + (tai_minus_utc(unix_ms) - 19) * 1000 - 315964800000
+
+fn gps_to_unix_millis(gps_ms: i64) -> i64:
+    base = gps_ms + 315964800000
+    guess = base - (tai_minus_utc(base) - 19) * 1000
+    return base - (tai_minus_utc(guess) - 19) * 1000
+
+# GPS week number and the seconds into that week, as navigation messages carry them.
+fn gps_week_and_seconds(unix_ms: i64) -> Tuple2[i64, f64]:
+    g = unix_to_gps_millis(unix_ms)
+    week = g / 604800000
+    return Tuple2{ f0: week, f1: f64(g - week * 604800000) / 1000.0 }

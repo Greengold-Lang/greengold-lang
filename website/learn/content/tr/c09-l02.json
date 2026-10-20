@@ -1,0 +1,65 @@
+{
+ "title": "Geri çağırma (callback)",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bir fonksiyonu struct alanında saklamak, olay tabanlı programların temelidir: \"bu olay olunca şu fonksiyonu çağır\"."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Button:",
+    "    id: i32",
+    "    on_click: fn(i32)",
+    "",
+    "fn notify(id: i32):",
+    "    print(\"button pressed:\", id)",
+    "",
+    "fn main():",
+    "    b = Button{ id: 101, on_click: notify }",
+    "    b.on_click(b.id)"
+   ],
+   "run": true,
+   "output": [
+    "button pressed: 101"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l02-x1",
+   "prompt": "`Timer` struct'ı (`name: str`, `on_finish: fn(str)`) kur. `on_finish` olarak `report(name)` fonksiyonunu ver (`finished: ` ve adı yazdırsın), `Timer{ name: \"tea\", ... }` için çağır.",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Timer:",
+    "    name: str",
+    "    on_finish: fn(str)",
+    "",
+    "fn report(name: str):",
+    "    print(\"finished:\", name)",
+    "",
+    "fn main():",
+    "    t = Timer{ name: \"tea\", on_finish: report }",
+    "    t.on_finish(t.name)"
+   ],
+   "hint": "Alan tipi `fn(str)`, çağrı `t.on_finish(t.name)`.",
+   "expected": [
+    "finished: tea"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l02-q1",
+   "q": "Struct alanındaki bir fonksiyon nasıl çağrılır?",
+   "options": [
+    "`b.on_click(b.id)`",
+    "`call(b.on_click)`",
+    "Çağrılamaz"
+   ],
+   "answer": 0,
+   "why": "Alan bir fonksiyon değeri olduğundan parantezle çağrılır."
+  }
+ ]
+}

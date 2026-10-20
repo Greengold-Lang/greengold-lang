@@ -1,0 +1,58 @@
+{
+ "title": "Thread başlatmak",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold işletim sistemi seviyesinde yerel thread'ler sunar (`std.thread`). `Thread.spawn(f)` bir fonksiyonu arka planda başlatır, `join()` bitmesini bekler. Parametre geçmek için `spawn_with_param(f, değer)` vardır. Hiçbiri `unsafe` gerektirmez."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn worker_a():",
+    "    print(\"worker A running in a background thread\")",
+    "",
+    "fn worker_b(id: i64):",
+    "    print(\"worker B with id\", id)",
+    "",
+    "fn main():",
+    "    t1 = thread.Thread.spawn(worker_a)",
+    "    t1.join()",
+    "    t2 = thread.Thread.spawn_with_param(worker_b, 42)",
+    "    t2.join()",
+    "    print(\"all threads finished\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "`Thread`, `Mutex`, `Cond` ve kanallar **işletim sistemi nesneleridir: taşınırlar, kopyalanmazlar**. `n = m` yazmak `m`'yi taşır; ikinci, bağımsız bir kilit oluşmaz. `m.clone()` derlenmez (GG0323). Bir kilidi ya da kanalı başka bir fonksiyona vermek için `read`/`lend` parametre kullanırsın."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q1",
+   "q": "Bir thread'in bitmesini beklemek için hangi metot çağrılır?",
+   "options": [
+    "`wait()`",
+    "`join()`",
+    "`stop()`"
+   ],
+   "answer": 1,
+   "why": "`join()` thread bitene kadar bekler."
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l01-q2",
+   "q": "Bir `Mutex` kopyalanabilir mi?",
+   "options": [
+    "Evet",
+    "Hayır, taşınır",
+    "Yalnızca `clone` ile"
+   ],
+   "answer": 1,
+   "why": "İşletim sistemi nesneleri kopyalanmaz; kopya, iki ayrı kilit demek olurdu."
+  }
+ ]
+}

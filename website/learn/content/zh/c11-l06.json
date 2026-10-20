@@ -1,0 +1,56 @@
+{
+ "title": "保证类工具与编辑器支持",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "对需要安全性和质量的软件，`gg` 提供额外的检查："
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg check --profile safety main.gg   # also rejects unsafe, panic, recursion, heap use,",
+    "                                    # unbounded loops and mutable statics",
+    "gg test --coverage                  # statement, decision, condition and MC/DC coverage",
+    "gg coverage --annotate              # list what never ran",
+    "gg fuzz main.gg                     # run fn fuzz_target(data: []u8) on mutated inputs",
+    "gg sbom main.gg                     # software bill of materials (CycloneDX or SPDX)",
+    "gg repro main.gg                    # build twice, compare the bytes (reproducible build)",
+    "gg unsafe-audit main.gg             # every unsafe block, asm, foreign function and static"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "要查看编译器的各个阶段，有 `gg emit-ll`（LLVM IR）、`gg emit-bc`（位码）、`gg ast`（语法树）和 `gg attrs`（`@属性` 的使用情况，JSON 格式）。"
+  },
+  {
+   "t": "p",
+   "text": "**编辑器：** Greengold 的 VS Code 扩展带有内置语言服务器（LSP），支持边输入边显示错误、转到定义（`F12`）、悬停显示文档、输入 `.` 后补全、用 `Shift+Alt+F` 格式化、灯泡菜单中的编译器修复，以及 Run/Release/Build 按钮。保存文件时也会应用 `safe` 修复。"
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q1",
+   "q": "哪个命令列出程序中的每个 `unsafe` 块？",
+   "options": [
+    "`gg unsafe-audit`",
+    "`gg fix`",
+    "`gg doctor`"
+   ],
+   "answer": 0,
+   "why": "`unsafe-audit` 汇总了你必须亲手保证内存安全的地方。"
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q2",
+   "q": "`gg check --profile safety` 会拒绝什么？",
+   "options": [
+    "只拒绝过长的行",
+    "诸如 `unsafe`、`panic`、递归和堆的使用",
+    "什么也不拒绝"
+   ],
+   "answer": 1,
+   "why": "安全配置文件会关闭那些难以证明安全的特性。"
+  }
+ ]
+}

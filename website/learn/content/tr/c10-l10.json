@@ -1,0 +1,42 @@
+{
+ "title": "Dosyalar: std.fs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.fs` dosya sistemiyle işletim sisteminden bağımsız çalışır. Yazma `fs.write_string_to_file(yol, metin)` bir `bool` verir; okuma `fs.read_file_to_string(yol)` bir `Optional[string]` verir; `fs.file_exists` ve `fs.remove_file` de vardır. Daha ayrıntılı hata bilgisi gerekiyorsa `std.io`'daki `File.open`/`File.create` `Result` verir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.fs",
+    "",
+    "fn main():",
+    "    path = \"record.txt\"",
+    "    if fs.write_string_to_file(path, \"First line\\nSecond line\"):",
+    "        print(\"written\")",
+    "    match fs.read_file_to_string(path):",
+    "        Valid(text):",
+    "            print(text.as_str())",
+    "        None:",
+    "            print(\"could not read\")",
+    "    if fs.file_exists(path):",
+    "        fs.remove_file(path)",
+    "        print(\"cleaned up\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l10-q1",
+   "q": "`fs.read_file_to_string` dosya bulunamazsa ne döndürür?",
+   "options": [
+    "`None`",
+    "Boş metin",
+    "Program çöker"
+   ],
+   "answer": 0,
+   "why": "Dönüş tipi `Optional[string]`'dir; yokluk `None` ile bildirilir."
+  }
+ ]
+}

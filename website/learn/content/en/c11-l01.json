@@ -1,0 +1,79 @@
+{
+ "title": "A new project and gg.toml",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "All of Greengold's tools live in a single command: **`gg`**. You do not need an external package manager, formatter or test library. From this lesson on you run the commands **in a terminal on your own computer** (they do not run in the browser editor). For a new project:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg new my_project",
+    "cd my_project"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "This sets up the standard folder layout:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "my_project/",
+    "├── gg.toml         # package and dependency manifest",
+    "└── src/",
+    "    └── main.gg     # the entry point with sample code"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "`gg.toml` holds the project's identity, its entry file and its dependencies:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "[package]",
+    "name = \"my_project\"",
+    "version = \"0.1.0\"",
+    "main = \"src/main.gg\"",
+    "",
+    "[dependencies]",
+    "# math_utils = { path = \"../shared/math_utils\" }"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "After adding a dependency you can write `import math_utils.matrix` in a file of your project; this binds the name `matrix` in that file. `import math_utils.matrix as m` renames it and `import math_utils.matrix { mul }` takes a chosen name directly. Every file writes its own `import` lines; `fn main` exists only in the root file you compile."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q1",
+   "q": "Which command sets up a new Greengold project?",
+   "options": [
+    "`gg init`",
+    "`gg new my_project`",
+    "`gg create`"
+   ],
+   "answer": 1,
+   "why": "`gg new` creates `gg.toml` and `src/main.gg`."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l01-q2",
+   "q": "In which file are dependencies defined?",
+   "options": [
+    "`main.gg`",
+    "`gg.toml`",
+    "`README.md`"
+   ],
+   "answer": 1,
+   "why": "The project manifest is in `gg.toml`."
+  }
+ ]
+}

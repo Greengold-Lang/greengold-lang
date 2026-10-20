@@ -1,0 +1,42 @@
+{
+ "title": "Files: std.fs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.fs` works with the file system independently of the operating system. Writing, `fs.write_string_to_file(path, text)`, gives a `bool`; reading, `fs.read_file_to_string(path)`, gives an `Optional[string]`; there are also `fs.file_exists` and `fs.remove_file`. If you need more detailed error information, `File.open`/`File.create` in `std.io` give a `Result`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.fs",
+    "",
+    "fn main():",
+    "    path = \"record.txt\"",
+    "    if fs.write_string_to_file(path, \"First line\\nSecond line\"):",
+    "        print(\"written\")",
+    "    match fs.read_file_to_string(path):",
+    "        Valid(text):",
+    "            print(text.as_str())",
+    "        None:",
+    "            print(\"could not read\")",
+    "    if fs.file_exists(path):",
+    "        fs.remove_file(path)",
+    "        print(\"cleaned up\")"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l10-q1",
+   "q": "What does `fs.read_file_to_string` return when the file is not found?",
+   "options": [
+    "`None`",
+    "An empty string",
+    "The program crashes"
+   ],
+   "answer": 0,
+   "why": "The return type is `Optional[string]`; absence is reported with `None`."
+  }
+ ]
+}

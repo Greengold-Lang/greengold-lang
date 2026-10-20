@@ -1,0 +1,56 @@
+{
+ "title": "Herramientas de garantía y soporte del editor",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Para software que necesita seguridad y calidad, `gg` ofrece comprobaciones adicionales:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg check --profile safety main.gg   # also rejects unsafe, panic, recursion, heap use,",
+    "                                    # unbounded loops and mutable statics",
+    "gg test --coverage                  # statement, decision, condition and MC/DC coverage",
+    "gg coverage --annotate              # list what never ran",
+    "gg fuzz main.gg                     # run fn fuzz_target(data: []u8) on mutated inputs",
+    "gg sbom main.gg                     # software bill of materials (CycloneDX or SPDX)",
+    "gg repro main.gg                    # build twice, compare the bytes (reproducible build)",
+    "gg unsafe-audit main.gg             # every unsafe block, asm, foreign function and static"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "Para inspeccionar las fases del compilador existen `gg emit-ll` (LLVM IR), `gg emit-bc` (bitcode), `gg ast` (el árbol sintáctico) y `gg attrs` (usos de `@atributos`, como JSON)."
+  },
+  {
+   "t": "p",
+   "text": "**Editor:** la extensión de VS Code de Greengold, con el servidor de lenguaje integrado (LSP), muestra errores mientras escribes, ir a la definición (`F12`), documentación al pasar el ratón, autocompletado tras `.`, formato con `Shift+Alt+F`, las correcciones del compilador en el menú de la bombilla y botones de Run/Release/Build. Al guardar el archivo también se aplican las correcciones `safe`."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q1",
+   "q": "¿Qué comando lista cada bloque `unsafe` de un programa?",
+   "options": [
+    "`gg unsafe-audit`",
+    "`gg fix`",
+    "`gg doctor`"
+   ],
+   "answer": 0,
+   "why": "`unsafe-audit` reúne los lugares donde debes garantizar a mano la seguridad de memoria."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q2",
+   "q": "¿Qué rechaza `gg check --profile safety`?",
+   "options": [
+    "Solo las líneas largas",
+    "Cosas como `unsafe`, `panic`, recursión y uso del heap",
+    "Nada"
+   ],
+   "answer": 1,
+   "why": "El perfil de seguridad desactiva las características difíciles de demostrar seguras."
+  }
+ ]
+}

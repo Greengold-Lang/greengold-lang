@@ -1,0 +1,39 @@
+{
+ "title": "通道：通过消息来共享",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "与其通过共享内存来通信，不如**通过通信来共享**，这是最安全的方式。**通道**让一个线程接收另一个线程发送的值。`ChannelI64` 传递 `i64`；对任意类型的值有 `Queue[T]`。`send` 发送，`recv` 返回 `Optional`（通道关闭且为空后返回 `None`），`close` 关闭它。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.thread",
+    "",
+    "fn main():",
+    "    ch = thread.ChannelI64.new()",
+    "    ch.send(100)",
+    "    ch.send(200)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    if let Valid(val) = ch.recv():",
+    "        print(\"received:\", val)",
+    "    ch.close()"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c12-l03-q1",
+   "q": "在已关闭且为空的通道上，`recv()` 给出什么？",
+   "options": [
+    "`0`",
+    "`None`",
+    "一个错误"
+   ],
+   "answer": 1,
+   "why": "所以 `while let Valid(v) = ch.recv()` 循环会自行结束。"
+  }
+ ]
+}

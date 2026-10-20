@@ -87,6 +87,13 @@ _TEMPLATES = {
 }
 
 
+def _write_cortex_m(root: Path, name: str) -> None:
+    from . import templates
+    (root / "src" / "main.gg").write_text(templates.CORTEX_M_MAIN, encoding="utf-8", newline="\n")
+    (root / "link.ld").write_text(templates.CORTEX_M_LINK, encoding="utf-8", newline="\n")
+    (root / "README.md").write_text(templates.CORTEX_M_README.replace("@NAME@", name), encoding="utf-8", newline="\n")
+
+
 def cmd_new(name: str, path: str | None = None, template: str = "bin") -> int:
     root = Path(path or name)
     if root.exists() and any(root.iterdir()):
@@ -96,6 +103,10 @@ def cmd_new(name: str, path: str | None = None, template: str = "bin") -> int:
     (root / MANIFEST).write_text(
         f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2026"\nmain = "src/main.gg"\n\n[dependencies]\n'
         '# mylib = { path = "../mylib" }   # then: import mylib.module\n', encoding="utf-8")
+    if template == "cortex-m":
+        _write_cortex_m(root, name)
+        print(f"Created package `{name}` in {root}\nNext: cd {root}; read README.md (gg build --no-std --target cortex-m4 --linker-script link.ld)")
+        return 0
     (root / "src" / "main.gg").write_text(_TEMPLATES[template].replace("@NAME@", name), encoding="utf-8")
     print(f"Created package `{name}` in {root}\nNext: cd {root}; gg run   (also: gg test, gg fmt, gg doctor)")
     return 0
@@ -197,8 +208,13 @@ def _test_document(results: list[dict]) -> dict:
     }
 
 
-def cmd_test(paths: list[str], release: bool = False, as_json: bool = False) -> int:
+def cmd_test(paths: list[str], release: bool = False, as_json: bool = False, coverage: bool = False) -> int:
     files = collect_gg_files(paths)
+    cov_out = None
+    if coverage:
+        import os
+        cov_out = os.path.abspath(os.environ.get('GG_COV_OUT', '.gg-coverage'))
+        Path(cov_out).unlink(missing_ok=True)
     results: list[dict] = []
     for f in files:
         source = f.read_text(encoding="utf-8-sig")
@@ -213,7 +229,11 @@ def cmd_test(paths: list[str], release: bool = False, as_json: bool = False) -> 
                 cmd = [sys.executable, "-m", "greengold", "run", str(tmp)]
                 if release:
                     cmd.append("--release")
-                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=300)
+                env = None
+                if coverage:
+                    import os
+                    env = dict(os.environ, GG_COVERAGE="1", GG_COV_OUT=cov_out, GG_COV_REMAP=f"{tmp.resolve()}|{f.resolve()}")
+                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=300, env=env)
             finally:
                 tmp.unlink(missing_ok=True)
             message = "" if r.returncode == 0 else ((r.stderr or r.stdout).strip() or "failed")
@@ -240,6 +260,10 @@ def cmd_test(paths: list[str], release: bool = False, as_json: bool = False) -> 
         sys.stdout.write("\n")
     else:
         print(f"\ntest result: {'ok' if not failed else 'FAILED'}. {passed} passed; {failed} failed")
+    if coverage and cov_out and Path(cov_out).is_file() and not as_json:
+        from .coverage import run_report
+        print()
+        run_report(cov_out, False, None)
     return 1 if failed else 0
 
 

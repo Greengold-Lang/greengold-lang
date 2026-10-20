@@ -1,0 +1,67 @@
+{
+ "title": "break, continue, pass",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`break` ends the loop at once. `continue` skips the rest of this round and goes on to the next. `pass` does nothing: Greengold does not allow an empty body, so you write it where you leave one empty on purpose."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..10:",
+    "        if i == 3:",
+    "            continue",
+    "        if i == 7:",
+    "            break",
+    "        print(i)"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "1",
+    "2",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Above, 3 was skipped and the loop ended at 7."
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l06-x1",
+   "prompt": "Among the numbers from 1 to 20, find the first one divisible by 7, print it, then leave the loop.",
+   "starter": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        pass"
+   ],
+   "solution": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        if i % 7 == 0:",
+    "            print(i)",
+    "            break"
+   ],
+   "hint": "Inside `if i % 7 == 0:` write `print(i)` and `break`.",
+   "expected": [
+    "7"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l06-q1",
+   "q": "What does `continue` do?",
+   "options": [
+    "Ends the loop",
+    "Skips the rest of this round and goes to the next",
+    "Stops the program"
+   ],
+   "answer": 1,
+   "why": "It is `break` that ends the loop."
+  }
+ ]
+}

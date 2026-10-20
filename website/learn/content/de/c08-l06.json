@@ -1,0 +1,77 @@
+{
+ "title": "Fehler umwandeln und panic",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Verschiedene Bibliotheken erzeugen verschiedene Fehlertypen. Gibt die aufrufende Funktion `Result[T, AppError]` zurück, die aufgerufene `Result[T, i32]` und definiert `impl AppError:` `fn from(e: i32) -> AppError`, dann führt `?` die Umwandlung **selbst** durch."
+  },
+  {
+   "t": "code",
+   "code": [
+    "enum AppError:",
+    "    Database(i32)",
+    "    Network(str)",
+    "",
+    "impl AppError:",
+    "    fn from(code: i32) -> AppError:",
+    "        return AppError.Database(code)",
+    "",
+    "fn query_db() -> Result[str, i32]:",
+    "    return Err(500)",
+    "",
+    "fn handle_request() -> Result[str, AppError]:",
+    "    data = query_db()?",
+    "    return Ok(data)",
+    "",
+    "fn main():",
+    "    if let Err(e) = handle_request():",
+    "        print(\"application error caught\")"
+   ],
+   "run": true,
+   "output": [
+    "application error caught"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Für nicht behebbare Situationen, in denen das Programm nicht weitermachen kann, verwende **`panic`**: Die Meldung wird nach `stderr` geschrieben und das Programm endet sofort mit dem Exit-Code 101. Verwende `Result` für erwartete Fehler und `panic` für „das darf nie passieren“-Fälle."
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l06-x1",
+   "prompt": "Schreibe `check_level(level: i32)`: `panic(\"invalid level\")`, wenn `level < 0`, sonst `access granted` ausgeben. Rufe es nur mit einem gültigen Level (3) auf.",
+   "starter": [
+    "fn check_level(level: i32):",
+    "    print(\"?\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "solution": [
+    "fn check_level(level: i32):",
+    "    if level < 0:",
+    "        panic(\"invalid level\")",
+    "    print(\"access granted\")",
+    "",
+    "fn main():",
+    "    check_level(3)"
+   ],
+   "hint": "Verwende `panic(...)` innerhalb von `if level < 0:`.",
+   "expected": [
+    "access granted"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l06-q1",
+   "q": "Wann wird `Result` statt `panic` verwendet?",
+   "options": [
+    "Für erwartete, behebbare Fehler",
+    "Nie",
+    "Nur bei Zahlen"
+   ],
+   "answer": 0,
+   "why": "`panic` ist für nicht behebbare Situationen."
+  }
+ ]
+}

@@ -1,0 +1,94 @@
+{
+ "title": "if let и while let",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Если вас интересует только один вариант, можно написать **`if let`** вместо `match`: когда шаблон совпадает, он привязывается к переменной и выполняется блок, иначе выполняется `else`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    maybe: Optional[i32] = Valid(42)",
+    "    if let Valid(x) = maybe:",
+    "        print(\"found\", x)",
+    "    else:",
+    "        print(\"nothing\")",
+    "",
+    "    none_here: Optional[i32] = None",
+    "    if let Valid(y) = none_here:",
+    "        print(\"found\", y)",
+    "    else:",
+    "        print(\"nothing\")"
+   ],
+   "run": true,
+   "output": [
+    "found 42",
+    "nothing"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**`while let`** повторяется, пока шаблон совпадает. `List.pop()` даёт `Valid(элемент)`, пока список не опустеет, затем `None`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    stack = List[str]()",
+    "    stack.push(\"first\")",
+    "    stack.push(\"second\")",
+    "    stack.push(\"third\")",
+    "    while let Valid(item) = stack.pop():",
+    "        print(\"popped:\", item)"
+   ],
+   "run": true,
+   "output": [
+    "popped: third",
+    "popped: second",
+    "popped: first"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c08-l05-x1",
+   "prompt": "С помощью `while let` и `pop` извлеките числа из списка `nums` и выведите их сумму.",
+   "starter": [
+    "fn main():",
+    "    nums = List[i32]()",
+    "    nums.push(4)",
+    "    nums.push(5)",
+    "    nums.push(6)",
+    "    total = 0",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    nums = List[i32]()",
+    "    nums.push(4)",
+    "    nums.push(5)",
+    "    nums.push(6)",
+    "    total = 0",
+    "    while let Valid(n) = nums.pop():",
+    "        total += n",
+    "    print(total)"
+   ],
+   "hint": "Выполните `total += n` внутри `while let Valid(n) = nums.pop():`.",
+   "expected": [
+    "15"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c08-l05-q1",
+   "q": "Когда останавливается `while let`?",
+   "options": [
+    "Через 10 витков",
+    "Когда шаблон перестаёт совпадать (например, `pop()` даёт `None`)",
+    "Никогда"
+   ],
+   "answer": 1,
+   "why": "Цикл заканчивается, когда сопоставление не удаётся."
+  }
+ ]
+}

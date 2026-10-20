@@ -1,0 +1,70 @@
+{
+ "title": "Random numbers: std.rand",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.rand` gives a generator that starts from a **seed** and always produces the same sequence for the same seed: `rand.rng_new(42)`. `below(n)` gives a number from 0 to `n-1`, `range(a, b)` one from `a` up to but not including `b`, `next_f64()` one between 0 and 1. For true randomness there is `rand.rng_from_entropy()` or `secure_u64()` (use `secure_*` for cryptography)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(42)",
+    "    for i in 0..3:",
+    "        print(r.below(100))",
+    "    print(r.range(1, 6))"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "98",
+    "46",
+    "1"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Keeping the seed fixed is the easiest way to get reproducible results in tests and games."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l06-x1",
+   "prompt": "With seed 7 roll a die (1–6) three times and print the results. The upper bound is excluded, so use `range(1, 7)`.",
+   "starter": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.rand",
+    "",
+    "fn main():",
+    "    r = rand.rng_new(7)",
+    "    for i in 0..3:",
+    "        print(r.range(1, 7))"
+   ],
+   "hint": "Print `r.range(1, 7)` in a loop.",
+   "expected": [
+    "5",
+    "3",
+    "1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l06-q1",
+   "q": "If `rng_new(42)` runs twice with the same seed?",
+   "options": [
+    "It produces different sequences",
+    "It produces the same sequence",
+    "It is an error"
+   ],
+   "answer": 1,
+   "why": "This is a pseudo-random generator: the seed decides the sequence."
+  }
+ ]
+}

@@ -1,4 +1,7 @@
-"""Global constants."""
+"""Global constants.
+
+Spec: 14
+"""
 from pathlib import Path
 import subprocess
 import sys

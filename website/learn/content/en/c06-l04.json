@@ -1,0 +1,70 @@
+{
+ "title": "match as an expression",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` can also produce a value: you tie each branch to a single expression with `=>` and assign the result to a variable or `return` it."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn error_message(code: i32) -> str:",
+    "    return match code:",
+    "        0 => \"success\"",
+    "        1 => \"file not found\"",
+    "        2 => \"access denied\"",
+    "        _ => \"general error\"",
+    "",
+    "fn main():",
+    "    print(error_message(2))",
+    "    msg = match 0:",
+    "        0 => \"OK\"",
+    "        _ => \"Error!\"",
+    "    print(msg)"
+   ],
+   "run": true,
+   "output": [
+    "access denied",
+    "OK"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l04-x1",
+   "prompt": "Write `days_in(month: i32) -> i32` (28 for February): 2 => 28; 4, 6, 9, 11 => 30; others => 31. Print month 9.",
+   "starter": [
+    "fn days_in(month: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "solution": [
+    "fn days_in(month: i32) -> i32:",
+    "    return match month:",
+    "        2 => 28",
+    "        4 | 6 | 9 | 11 => 30",
+    "        _ => 31",
+    "",
+    "fn main():",
+    "    print(days_in(9))"
+   ],
+   "hint": "Write three branches after `return match month:`.",
+   "expected": [
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l04-q1",
+   "q": "In an expression `match`, how must the value of every branch be?",
+   "options": [
+    "It may be of any type",
+    "It must be the same type",
+    "It must be a string"
+   ],
+   "answer": 1,
+   "why": "The result goes into a single variable, so the types must match."
+  }
+ ]
+}

@@ -4,7 +4,7 @@ import std.rand
 import std.process
 
 fn main():
-    print(math.sqrt(16.0), math.pow_i64(3, 4), math.gcd_u64(48, 18), math.abs_i64(-5), math.clamp_i64(15, 0, 10))
+    print(math.sqrt(16.0), math.pow_i64(3, 4), math.gcd_u64(48, 18), math.abs(-5), math.clamp(15, 0, 10))
     print(math.floor(2.7), math.ceil(2.1), math.pow(2.0, 10.0))
     r = rand.rng_new(42)
     a = r.next_u64()

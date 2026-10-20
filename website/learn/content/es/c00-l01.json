@@ -1,0 +1,75 @@
+{
+ "title": "¿Qué es un programa?",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Un **programa** es un texto que le dice al ordenador qué hacer, paso a paso. En Greengold lo escribes en un archivo `.gg` y el compilador lo convierte en código que el ordenador entiende."
+  },
+  {
+   "t": "p",
+   "text": "Todo programa de Greengold empieza con una **función** llamada `main`. Las líneas dentro de la función llevan una sangría de 4 espacios. La sangría indica qué líneas pertenecen a la función."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "run": true,
+   "output": [
+    "Hello, world!"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`print` escribe algo en la pantalla. El texto entre comillas se llama **cadena** (string). Una línea que empieza con `#` es un **comentario**: el ordenador lo ignora, es una nota para las personas."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    # This line is a comment",
+    "    print(\"First line\")",
+    "    print(\"Second line\")"
+   ],
+   "run": true,
+   "output": [
+    "First line",
+    "Second line"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Las líneas se ejecutan de arriba abajo, en orden."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l01-x1",
+   "prompt": "Cambia el programa para que imprima `Hello, Greengold!`.",
+   "starter": [
+    "fn main():",
+    "    print(\"Hello, world!\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"Hello, Greengold!\")"
+   ],
+   "hint": "Solo hay que cambiar el texto entre las comillas.",
+   "expected": [
+    "Hello, Greengold!"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l01-q1",
+   "q": "¿Con qué función empieza un programa de Greengold?",
+   "options": [
+    "start",
+    "main",
+    "begin"
+   ],
+   "answer": 1,
+   "why": "La ejecución siempre empieza en `main`."
+  }
+ ]
+}

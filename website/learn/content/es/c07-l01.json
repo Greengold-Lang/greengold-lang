@@ -1,0 +1,69 @@
+{
+ "title": "Funciones genéricas",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Para usar el mismo algoritmo con tipos distintos lo escribes **genérico**. El parámetro de tipo va entre corchetes: `[T]`. `T: Ord` es una **restricción**: `T` debe ser un tipo ordenable (`<`, `>`). En la llamada el tipo suele deducirse; también puedes escribirlo explícitamente, `larger[i64](...)`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn larger[T: Ord](a: T, b: T) -> T:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(larger(10, 25))",
+    "    print(larger(3.14, 2.71))",
+    "    print(larger[i64](100, 200))"
+   ],
+   "run": true,
+   "output": [
+    "25",
+    "3.14",
+    "200"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Para cada combinación de tipos el compilador produce código especializado y optimizado para ese tipo (como las plantillas de C++). No hay coste adicional en ejecución, ni boxing ni borrado de tipos."
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l01-x1",
+   "prompt": "Escribe `smaller[T: Ord](a, b)`: devuelve el menor. Imprime `smaller(7, 3)` y `smaller(2.5, 9.5)`.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn smaller[T: Ord](a: T, b: T) -> T:",
+    "    if a < b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(smaller(7, 3))",
+    "    print(smaller(2.5, 9.5))"
+   ],
+   "hint": "Empieza con `fn smaller[T: Ord](a: T, b: T) -> T:`.",
+   "expected": [
+    "3",
+    "2.5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l01-q1",
+   "q": "¿Es más lenta una función genérica en ejecución?",
+   "options": [
+    "Sí, el tipo se busca en cada llamada",
+    "No, se compila código distinto para cada tipo",
+    "Solo con números"
+   ],
+   "answer": 1,
+   "why": "El tipo se resuelve en tiempo de compilación (monomorfización)."
+  }
+ ]
+}

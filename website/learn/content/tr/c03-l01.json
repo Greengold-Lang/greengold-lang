@@ -1,0 +1,65 @@
+{
+ "title": "Fonksiyon tanımlamak",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Fonksiyon `fn` ile tanımlanır. Parametre tipleri `:` ile, dönüş tipi `->` ile yazılır. `-> Tip` yazılmazsa fonksiyon bir değer döndürmez (`void`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn log_message(msg: str):",
+    "    print(\"[LOG]\", msg)",
+    "",
+    "fn main():",
+    "    result = add(15, 27)",
+    "    log_message(\"addition finished\")",
+    "    print(\"Result:\", result)"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] addition finished",
+    "Result: 42"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Kural: `-> Tip` olan her fonksiyon, kodun **her yolunda** bir `return` ile bitmelidir. Aksi halde derleyici hata verir."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l01-x1",
+   "prompt": "`subtract(a, b)` fonksiyonunu yaz: `a - b` döndürsün. `main` onu çağırıp sonucu yazdırsın.",
+   "starter": [
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "solution": [
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "hint": "`main`'in üstüne `fn subtract(a: i32, b: i32) -> i32:` yaz.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l01-q1",
+   "q": "`-> Tip` yazılmayan bir fonksiyon ne döndürür?",
+   "options": [
+    "0",
+    "Hiçbir değer (void)",
+    "Boş metin"
+   ],
+   "answer": 1,
+   "why": "Dönüş tipi yazılmazsa fonksiyon değer döndürmez."
+  }
+ ]
+}

@@ -1,0 +1,273 @@
+# std.fixedpoint: fixed-point numbers, for code without a floating-point unit or where results must be identical on
+# every machine. `Fx[S]` keeps a number as a 64-bit integer holding the value times 2^S, so `Fx[16]` has 16 bits
+# after the point (a step of about 0.0000153) and 47 before it. Addition and subtraction are exact. `mul` and
+# `div` round toward zero. Every operation that can overflow traps, like integer arithmetic does; the
+# `saturating_*` forms clamp instead. No libc, no floating point (except the `from_f64`/`to_f64` conversions).
+#
+#     import std.fixedpoint { Fx }
+#     a = Fx[16].from_int(3)
+#     b = Fx[16].from_f64(0.25)
+#     print(a.mul(b).to_f64())        # 0.75
+#
+# Pick `S` once per program (`Fx[16]` and `Fx[8]` are different types and do not mix). `S` is from 1 to 31.
+
+struct Fx[S: usize]:
+    raw: i64
+
+impl Fx[S]:
+    # The number whose raw integer is `raw` (value = raw / 2^S).
+    public
+    fn from_raw(raw: i64) -> Fx[S]:
+        return Fx[S]{ raw: raw }
+
+    fn from_int(n: i64) -> Fx[S]:
+        return Fx[S]{ raw: n << u32(S) }
+
+    # The nearest fixed-point number (ties away from zero). Panics on NaN or a value out of range.
+    fn from_f64(x: f64) -> Fx[S]:
+        if x != x:
+            panic("Fx.from_f64: not a number")
+        scaled = x * f64(i64(1) << u32(S))
+        if scaled >= 9223372036854775807.0 or scaled <= -9223372036854775808.0:
+            panic("Fx.from_f64: out of range")
+        if scaled < 0.0:
+            return Fx[S]{ raw: i64(scaled - 0.5) }
+        return Fx[S]{ raw: i64(scaled + 0.5) }
+
+    fn to_f64(self: read Self) -> f64:
+        return f64(self.raw) / f64(i64(1) << u32(S))
+
+    fn zero() -> Fx[S]:
+        return Fx[S]{ raw: 0 }
+
+    fn one() -> Fx[S]:
+        return Fx[S]{ raw: i64(1) << u32(S) }
+
+    fn add(self: read Self, other: Fx[S]) -> Fx[S]:
+        return Fx[S]{ raw: self.raw + other.raw }
+
+    fn sub(self: read Self, other: Fx[S]) -> Fx[S]:
+        return Fx[S]{ raw: self.raw - other.raw }
+
+    fn neg(self: read Self) -> Fx[S]:
+        return Fx[S]{ raw: 0 - self.raw }
+
+    fn abs(self: read Self) -> Fx[S]:
+        if self.raw < 0:
+            return Fx[S]{ raw: 0 - self.raw }
+        return Fx[S]{ raw: self.raw }
+
+    # The product, rounded toward zero. Traps when it does not fit.
+    fn mul(self: read Self, other: Fx[S]) -> Fx[S]:
+        p = _mul_shift(self.raw, other.raw, u32(S))
+        return Fx[S]{ raw: p }
+
+    # The quotient, rounded toward zero. Traps on division by zero or overflow.
+    fn div(self: read Self, other: Fx[S]) -> Fx[S]:
+        if other.raw == 0:
+            panic("Fx.div: division by zero")
+        return Fx[S]{ raw: _div_shift(self.raw, other.raw, u32(S)) }
+
+    fn saturating_add(self: read Self, other: Fx[S]) -> Fx[S]:
+        return Fx[S]{ raw: saturating_add[i64](self.raw, other.raw) }
+
+    fn saturating_sub(self: read Self, other: Fx[S]) -> Fx[S]:
+        return Fx[S]{ raw: saturating_sub[i64](self.raw, other.raw) }
+
+    fn saturating_mul(self: read Self, other: Fx[S]) -> Fx[S]:
+        return Fx[S]{ raw: _mul_shift_sat(self.raw, other.raw, u32(S)) }
+
+    # -1, 0, or 1.
+    fn compare(self: read Self, other: Fx[S]) -> i64:
+        if self.raw < other.raw:
+            return -1
+        if self.raw > other.raw:
+            return 1
+        return 0
+
+    fn lt(self: read Self, other: Fx[S]) -> bool:
+        return self.raw < other.raw
+
+    fn le(self: read Self, other: Fx[S]) -> bool:
+        return self.raw <= other.raw
+
+    fn min(self: read Self, other: Fx[S]) -> Fx[S]:
+        if other.raw < self.raw:
+            return Fx[S]{ raw: other.raw }
+        return Fx[S]{ raw: self.raw }
+
+    fn max(self: read Self, other: Fx[S]) -> Fx[S]:
+        if other.raw > self.raw:
+            return Fx[S]{ raw: other.raw }
+        return Fx[S]{ raw: self.raw }
+
+    fn clamp(self: read Self, lo: Fx[S], hi: Fx[S]) -> Fx[S]:
+        if self.raw < lo.raw:
+            return Fx[S]{ raw: lo.raw }
+        if self.raw > hi.raw:
+            return Fx[S]{ raw: hi.raw }
+        return Fx[S]{ raw: self.raw }
+
+    # The whole part, rounded toward minus infinity.
+    fn floor_int(self: read Self) -> i64:
+        return self.raw >> u32(S)
+
+    # The whole part, rounded to nearest (ties away from zero).
+    fn round_int(self: read Self) -> i64:
+        half = i64(1) << u32(S - 1)
+        if self.raw >= 0:
+            return (self.raw + half) >> u32(S)
+        return 0 - ((half - self.raw) >> u32(S))
+
+    # The whole part, rounded toward zero.
+    fn trunc_int(self: read Self) -> i64:
+        if self.raw >= 0:
+            return self.raw >> u32(S)
+        return 0 - ((0 - self.raw) >> u32(S))
+
+    # The square root (Newton's method in fixed point; traps for a negative number).
+    fn sqrt(self: read Self) -> Fx[S]:
+        if self.raw < 0:
+            panic("Fx.sqrt: negative number")
+        if self.raw == 0:
+            return Fx[S]{ raw: 0 }
+        x = i64(_isqrt_u64(u64(self.raw)) + 1) << u32(S - S / 2)
+        if x <= 0:
+            x = 1
+        # x starts at or above the root; each step moves it down until it stops improving
+        for _ in 0..80:
+            nx = (x + _div_shift(self.raw, x, u32(S))) >> 1
+            if nx >= x:
+                break
+            x = nx
+        return Fx[S]{ raw: x }
+
+    # Text like `3.14159` with `digits` places after the point (truncated, not rounded).
+    fn format(self: read Self, digits: usize) -> string:
+        out = string.new()
+        raw = self.raw
+        if raw < 0:
+            out.append_byte('-')
+            raw = 0 - raw
+        whole = raw >> u32(S)
+        frac = raw - (whole << u32(S))
+        out.append_i64(whole)
+        if digits > 0:
+            out.append_byte('.')
+            scale = i64(1) << u32(S)
+            for _ in 0..digits:
+                frac = frac * 10
+                out.append_byte(u8(48 + (frac >> u32(S))))
+                frac = frac - ((frac >> u32(S)) << u32(S))
+        return out
+
+private
+fn _neg_result(a: i64, b: i64) -> bool:
+    an = a < 0
+    bn = b < 0
+    return an != bn
+
+# Does the magnitude `r` not fit an i64 of that sign?
+fn _too_big(r: u64, neg: bool) -> bool:
+    limit: u64 = 9223372036854775807
+    if neg:
+        limit = 9223372036854775808
+    return r > limit
+
+# (a * b) >> s, rounded toward zero, without a 128-bit intermediate: split into whole and fractional halves.
+fn _mul_shift(a: i64, b: i64, s: u32) -> i64:
+    neg = _neg_result(a, b)
+    ua = _abs_u64(a)
+    ub = _abs_u64(b)
+    r = _umul_shift(ua, ub, s)
+    if _too_big(r, neg):
+        panic("Fx.mul: overflow")
+    if neg:
+        return wrapping_sub[i64](0, i64(r))
+    return i64(r)
+
+fn _mul_shift_sat(a: i64, b: i64, s: u32) -> i64:
+    neg = _neg_result(a, b)
+    r = _umul_shift_sat(_abs_u64(a), _abs_u64(b), s)
+    if r > 9223372036854775807:
+        if neg:
+            return min_value[i64]()
+        return max_value[i64]()
+    if neg:
+        return 0 - i64(r)
+    return i64(r)
+
+fn _abs_u64(x: i64) -> u64:
+    if x < 0:
+        return wrapping_sub[u64](0, u64(x))
+    return u64(x)
+
+# (a * b) >> s for unsigned operands; saturates at u64 max.
+fn _umul_shift_sat(a: u64, b: u64, s: u32) -> u64:
+    # a = ah * 2^32 + al: four 32x32 partial products, each fits in 64 bits; the 128-bit sum is kept as (hi, lo)
+    mask: u64 = 4294967295
+    ah: u64 = a >> 32
+    al: u64 = a & mask
+    bh: u64 = b >> 32
+    bl: u64 = b & mask
+    ll: u64 = al * bl
+    lh: u64 = al * bh
+    hl: u64 = ah * bl
+    hh: u64 = ah * bh
+    t: u64 = ll >> 32
+    mid: u64 = t + (lh & mask) + (hl & mask)
+    lo: u64 = (ll & mask) | ((mid & mask) << 32)
+    hi: u64 = hh + (lh >> 32) + (hl >> 32) + (mid >> 32)
+    if s == 0:
+        if hi != 0:
+            return 18446744073709551615
+        return lo
+    # shift (hi, lo) right by s (0 < s < 64)
+    if (hi >> s) != 0:
+        return 18446744073709551615
+    return (lo >> s) | (hi << (64 - s))
+
+fn _umul_shift(a: u64, b: u64, s: u32) -> u64:
+    r = _umul_shift_sat(a, b, s)
+    if r == 18446744073709551615:
+        panic("Fx.mul: overflow")
+    return r
+
+# (a << s) / b, rounded toward zero, for the signed operands.
+fn _div_shift(a: i64, b: i64, s: u32) -> i64:
+    neg = _neg_result(a, b)
+    ua = _abs_u64(a)
+    ub = _abs_u64(b)
+    # long division of (ua << s) by ub, one bit at a time over the s extra bits
+    q = ua / ub
+    rem = ua % ub
+    if q >> (63 - s) != 0 and s > 0:
+        panic("Fx.div: overflow")
+    result = q << s
+    i: u32 = 0
+    while i < s:
+        rem = rem << 1
+        if rem >= ub:
+            result = result | (u64(1) << (s - 1 - i))
+            rem = rem - ub
+        i += 1
+    if _too_big(result, neg):
+        panic("Fx.div: overflow")
+    if neg:
+        return wrapping_sub[i64](0, i64(result))
+    return i64(result)
+
+fn _isqrt_u64(n0: u64) -> u64:
+    n = n0
+    res: u64 = 0
+    bit: u64 = u64(1) << 62
+    while bit > n:
+        bit = bit >> 2
+    while bit != 0:
+        if n >= res + bit:
+            n = n - (res + bit)
+            res = (res >> 1) + bit
+        else:
+            res = res >> 1
+        bit = bit >> 2
+    return res

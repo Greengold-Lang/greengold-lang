@@ -1,0 +1,66 @@
+{
+ "title": "Generic struct'lar",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Struct ve enum'lar da tip parametresi alabilir. `Pair[A, B]` iki farklı tipten iki değer tutar. Metotlar `impl Pair[A, B]:` bloğunda yazılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Pair[A, B]:",
+    "    first: A",
+    "    second: B",
+    "",
+    "impl Pair[A, B]:",
+    "    fn swap(self) -> Pair[B, A]:",
+    "        return Pair[B, A]{ first: self.second.clone(), second: self.first.clone() }",
+    "",
+    "fn main():",
+    "    p = Pair[i32, str]{ first: 1, second: \"one\" }",
+    "    s = p.swap()",
+    "    print(s.first, s.second)"
+   ],
+   "run": true,
+   "output": [
+    "one 1"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c07-l02-x1",
+   "prompt": "Tek bir değer tutan `Wrapper[T]` struct'ı yaz (`value: T`). `Wrapper[i32]{ value: 5 }` ve `Wrapper[str]{ value: \"hi\" }` oluşturup değerlerini yazdır.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "struct Wrapper[T]:",
+    "    value: T",
+    "",
+    "fn main():",
+    "    a = Wrapper[i32]{ value: 5 }",
+    "    b = Wrapper[str]{ value: \"hi\" }",
+    "    print(a.value)",
+    "    print(b.value)"
+   ],
+   "hint": "`struct Wrapper[T]:` ve altında `value: T`.",
+   "expected": [
+    "5",
+    "hi"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c07-l02-q1",
+   "q": "`Pair[i32, str]` ile `Pair[f64, f64]` aynı tip midir?",
+   "options": [
+    "Evet",
+    "Hayır, farklı tiplerdir",
+    "Yalnızca derleyiciye bağlı"
+   ],
+   "answer": 1,
+   "why": "Her tip argümanı birleşimi ayrı bir tip üretir."
+  }
+ ]
+}

@@ -1,0 +1,61 @@
+{
+ "title": "Speicherbare Closures: Fn",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`fn(...)` ist ein einfacher Funktionszeiger. Um eine Closure aus einer Funktion **zurückzugeben** oder in einem Struct-Feld oder einer Liste zu **speichern**, verwendest du den Typ **`Fn(...) -> R`**. Eine Lambda, die dort geschrieben wird, wo `Fn` erwartet wird, **besitzt**, was sie einfängt (Heap-Werte werden hineinverschoben, die anderen kopiert) und kann sie deshalb nicht ändern."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn make_adder(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x + k",
+    "",
+    "fn main():",
+    "    add5 = make_adder(5)",
+    "    print(add5(1), make_adder(2)(3))",
+    "    steps = List[Fn(i32) -> i32]()",
+    "    steps.push(make_adder(10))",
+    "    steps.push(make_adder(20))",
+    "    print(steps[0](1), steps[1](1))"
+   ],
+   "run": true,
+   "output": [
+    "6 5",
+    "11 21"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l05-x1",
+   "prompt": "Schreibe `make_multiplier(k)`: Es gibt ein `Fn(i32) -> i32` zurück, das seine Eingabe mit `k` multipliziert. Gib `make_multiplier(3)(7)` aus.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn make_multiplier(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x * k",
+    "",
+    "fn main():",
+    "    print(make_multiplier(3)(7))"
+   ],
+   "hint": "Sieh dir das Beispiel `make_adder` an; schreibe `*` statt `+`.",
+   "expected": [
+    "21"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l05-q1",
+   "q": "Welchen Typ brauchst du, um eine Closure aus einer Funktion zurückzugeben?",
+   "options": [
+    "`fn(...)`",
+    "`Fn(...)`",
+    "`str`"
+   ],
+   "answer": 1,
+   "why": "`Fn` ist eine speicherbare Closure, die besitzt, was sie einfängt."
+  }
+ ]
+}

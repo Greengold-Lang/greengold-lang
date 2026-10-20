@@ -236,6 +236,8 @@ greengold/
   core/core.gg     Core library: Optional, Result, string (written in Greengold)
   std/*.gg         Standard library (math, string, collections, fs, process, thread, ...)
 examples/          Example programs (run by the test suite)
+packages/          Domain libraries, each a package with its own tests: gg-units, gg-linalg, gg-geo, gg-dsp, gg-protocols
+conformance/       Programs that pin down what docs/SPEC.md says
 tests/             pytest suite (`python -m pytest -q`)
 selfhost/          Self-hosted compiler, frozen at tag `selfhost-freeze`
 docs/
@@ -244,6 +246,10 @@ docs/
   DESIGN.md              Design decisions and rationale
   FEATURES_DEFER_REF.md  Guide: features, defer, references, ownership
   ERROR_CODES.md         Diagnostic codes
+  CERTIFICATION.md       What Greengold gives a certified project, and what it does not
+  TRACEABILITY.md        Spec sections traced to conformance programs and tests (generated)
+  RTOS.md                Using an RTOS (FreeRTOS, Zephyr, RTEMS, ARINC 653)
+  VERIFY_RELEASES.md     Checking the signature of a release
 Learn/             Step-by-step tutorial
 ```
 

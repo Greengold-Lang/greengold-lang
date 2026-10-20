@@ -1,0 +1,73 @@
+{
+ "title": "Slices",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Ein **Slice** (`[]T`) ist eine Sicht mit flexibler Länge auf ein Array (oder einen Speicherblock). Ist ein Funktionsparameter `[]i32`, akzeptiert er ein Array beliebiger Größe. Für einen Teilbereich schreibst du `array[a..b]` (`b` nicht enthalten)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total",
+    "",
+    "fn main():",
+    "    data: [5]i32 = [1, 2, 3, 4, 5]",
+    "    print(\"total:\", sum(data))",
+    "    print(\"part:\", sum(data[1..4]))"
+   ],
+   "run": true,
+   "output": [
+    "total: 15",
+    "part: 9"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Ein Slice ist eine Sicht, daher darf sich das Array, aus dem er stammt, nicht ändern, verschieben oder verschwinden, solange der Slice benutzt wird. Der Compiler prüft das, sodass ein Slice nie „ins Leere zeigen“ kann."
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l05-x1",
+   "prompt": "Schreibe `average(items: []i32) -> i32`: die Summe der Elemente geteilt durch ihre Anzahl (`items.len` ist ein `usize`, wandle mit `i32(items.len)` um). Gib sie für `[2, 4, 6, 8]` aus.",
+   "starter": [
+    "fn average(items: []i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "solution": [
+    "fn average(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total / i32(items.len)",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "hint": "Ermittle zuerst die Summe und teile dann durch `i32(items.len)`.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l05-q1",
+   "q": "Was kann an einen `[]i32`-Parameter übergeben werden?",
+   "options": [
+    "Nur ein Array mit 5 Elementen",
+    "Ein `[N]i32`-Array beliebiger Größe oder ein Teilbereich",
+    "Nur Text"
+   ],
+   "answer": 1,
+   "why": "Ein Slice legt die Länge nicht fest, daher funktioniert er mit jeder Größe."
+  }
+ ]
+}

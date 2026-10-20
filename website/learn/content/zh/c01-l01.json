@@ -1,0 +1,72 @@
+{
+ "title": "变量",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**变量**是值的名字。在 Greengold 中用 `=` 来定义；编译器会根据值推断类型。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    x = 42",
+    "    name = \"Ahmet\"",
+    "    x = 50",
+    "    print(x, name)"
+   ],
+   "run": true,
+   "output": [
+    "50 Ahmet"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "变量默认可以修改。对永远不变的值，写 `fixed`；以后再尝试修改会产生编译错误。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    fixed limit = 10",
+    "    print(limit)"
+   ],
+   "run": true,
+   "output": [
+    "10"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l01-x1",
+   "prompt": "让 `counter` 从 0 开始，用 `+= 1` 把它增加两次，然后输出结果。",
+   "starter": [
+    "fn main():",
+    "    counter = 0",
+    "    print(counter)"
+   ],
+   "solution": [
+    "fn main():",
+    "    counter = 0",
+    "    counter += 1",
+    "    counter += 1",
+    "    print(counter)"
+   ],
+   "hint": "把 `counter += 1` 这一行写两遍。",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l01-q1",
+   "q": "哪个关键字用来定义永远不变的变量？",
+   "options": [
+    "const",
+    "fixed",
+    "let"
+   ],
+   "answer": 1,
+   "why": "在函数内部使用 `fixed`；`const` 用于文件级常量。"
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+ "title": "Doku, API-Liste und REPL",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Die `#`-Kommentare, die du direkt über Funktions- und Struct-Definitionen schreibst, werden von `gg doc` in eine Markdown-API-Dokumentation umgewandelt:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "# Adds two numbers.",
+    "# Parameters:",
+    "#   a: the first addend",
+    "#   b: the second addend",
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn main():",
+    "    print(add(1, 2))"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg doc src/                 # print to the screen",
+    "gg doc src/ -o API_DOCS.md  # save to a file"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "**`gg api`** listet jeden öffentlichen Namen der Standardbibliothek mit Signatur und einzeiliger Beschreibung auf (`gg api --json` gibt sie maschinenlesbar aus; die Referenz auf dieser Seite wird daraus gebaut). **`gg repl`** öffnet eine interaktive Eingabe: Du tippst Deklarationen, Bindungen und Ausdrücke und siehst das Ergebnis sofort."
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg api                      # the whole standard library",
+    "gg repl                     # an interactive prompt",
+    "gg repl -e \"1 + 2\"          # evaluate one snippet"
+   ],
+   "run": false
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l05-q1",
+   "q": "Woher nimmt `gg doc` die Dokumentation?",
+   "options": [
+    "Aus einer separaten Dokumentationsdatei",
+    "Aus den `#`-Kommentaren über den Definitionen",
+    "Aus dem Internet"
+   ],
+   "answer": 1,
+   "why": "Die Kommentare bleiben beim Code, sodass die Doku nicht veraltet."
+  }
+ ]
+}

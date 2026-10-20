@@ -1,0 +1,71 @@
+{
+ "title": "Pratik: fonksiyonlarla program",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Büyük bir işi küçük fonksiyonlara bölmek kodu okunur ve test edilebilir yapar. Aşağıda sıcaklık dönüştürücü, her biri tek iş yapan fonksiyonlardan kuruluyor."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const FREEZING_F: f64 = 32.0",
+    "",
+    "fn to_fahrenheit(c: f64) -> f64:",
+    "    return c * 9.0 / 5.0 + FREEZING_F",
+    "",
+    "fn to_celsius(f: f64) -> f64:",
+    "    return (f - FREEZING_F) * 5.0 / 9.0",
+    "",
+    "fn main():",
+    "    print(\"25 C =\", to_fahrenheit(25.0), \"F\")",
+    "    print(\"212 F =\", to_celsius(212.0), \"C\")"
+   ],
+   "run": true,
+   "output": [
+    "25 C = 77 F",
+    "212 F = 100 C"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l04-x1",
+   "prompt": "`is_leap(year)` yaz: yıl 4'e bölünüyor ama 100'e bölünmüyorsa, ya da 400'e bölünüyorsa `true` döndürsün. 2024, 1900 ve 2000'i yazdır.",
+   "starter": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return false",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "solution": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "hint": "`and` ve `or` ile üç koşulu birleştir; parantez kullan.",
+   "expected": [
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l04-q1",
+   "q": "Küçük fonksiyonların başlıca faydası nedir?",
+   "options": [
+    "Program daha çok yer kaplar",
+    "Kod okunur, tekrar kullanılır ve test edilir",
+    "Derleyici daha yavaş çalışır"
+   ],
+   "answer": 1,
+   "why": "Her fonksiyon tek bir işi yaparsa onu ayrı ayrı anlamak ve denemek kolaylaşır."
+  }
+ ]
+}

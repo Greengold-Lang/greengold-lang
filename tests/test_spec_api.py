@@ -50,7 +50,7 @@ def test_api_json_lists_the_library(capsys):
     ):
         assert key in names
     for sym in doc["symbols"]:
-        assert set(sym) == {"module", "name", "kind", "signature", "description"}
+        assert set(sym) == {"module", "name", "kind", "signature", "description", "no_std"}
         assert not sym["name"].startswith("_")
         assert sym["signature"]
     wrap = next(s for s in doc["symbols"] if s["name"] == "wrapping_add")

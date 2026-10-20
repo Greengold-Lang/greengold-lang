@@ -1,0 +1,70 @@
+{
+ "title": "Dynamic lists: List",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "An array has a fixed length. For data that grows and shrinks there is **`List[T]`**: `List[i32]()` makes an empty list, `push` adds, `len` is the length, `list[i]` gives an element. A list keeps its data on the heap and cleans up on its own when you are done."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    xs = List[i32]()",
+    "    xs.push(10)",
+    "    xs.push(20)",
+    "    xs.push(30)",
+    "    print(\"len:\", xs.len)",
+    "    print(\"second:\", xs[1])",
+    "    for x in xs:",
+    "        print(x)"
+   ],
+   "run": true,
+   "output": [
+    "len: 3",
+    "second: 20",
+    "10",
+    "20",
+    "30"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l06-x1",
+   "prompt": "Add the squares of the numbers 1 to 5 to the `squares` list and print them all.",
+   "starter": [
+    "fn main():",
+    "    squares = List[i32]()",
+    "    for x in squares:",
+    "        print(x)"
+   ],
+   "solution": [
+    "fn main():",
+    "    squares = List[i32]()",
+    "    for i in 1..=5:",
+    "        squares.push(i * i)",
+    "    for x in squares:",
+    "        print(x)"
+   ],
+   "hint": "First do `squares.push(i * i)` inside `for i in 1..=5:`.",
+   "expected": [
+    "1",
+    "4",
+    "9",
+    "16",
+    "25"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l06-q1",
+   "q": "Which structure can grow while the program runs?",
+   "options": [
+    "a `[4]i32` array",
+    "`List[i32]`",
+    "a tuple"
+   ],
+   "answer": 1,
+   "why": "Arrays and tuples are fixed; `List` grows."
+  }
+ ]
+}

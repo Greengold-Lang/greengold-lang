@@ -266,7 +266,7 @@ fn rope_table(pos: usize, head_dim: usize, base: f32, factors: []f32, linear: f3
             span = high - low
             if span < 0.001:
                 span = 0.001
-            ramp = 1.0 - math.min_f64(1.0, math.max_f64(0.0, (f64(i) - low) / span))
+            ramp = 1.0 - math.min(1.0, math.max(0.0, (f64(i) - low) / span))
             mix = ramp * ext
             theta = theta * (1.0 - mix) + extrap * mix
         cos[i] = f32(math.cos(theta) * mscale)

@@ -1,0 +1,96 @@
+{
+ "title": "Tuples",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A **tuple** keeps a few values together without defining a struct: `(100, 3.14, \"Greengold\")`. You reach the elements with `.0`, `.1`, `.2`. Its most common use is returning several values from a function."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn divmod(a: i32, b: i32) -> (i32, i32):",
+    "    return (a / b, a % b)",
+    "",
+    "fn main():",
+    "    res = divmod(17, 5)",
+    "    print(\"quotient:\", res.0, \"remainder:\", res.1)"
+   ],
+   "run": true,
+   "output": [
+    "quotient: 3 remainder: 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**Destructuring** splits a tuple into separate variables on one line. You can skip an element you do not need with `_`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn divmod(a: i32, b: i32) -> (i32, i32):",
+    "    return (a / b, a % b)",
+    "",
+    "fn user() -> (i32, str, str):",
+    "    return (101, \"Ali Veli\", \"ali@example.com\")",
+    "",
+    "fn main():",
+    "    quotient, remainder = divmod(27, 4)",
+    "    print(quotient, remainder)",
+    "    id, _, email = user()",
+    "    print(id, email)"
+   ],
+   "run": true,
+   "output": [
+    "6 3",
+    "101 ali@example.com"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l03-x1",
+   "prompt": "Make `min_max(a, b, c)` return a tuple: the smallest and the biggest number. Destructure it and print `3 9` (for `min_max(5, 3, 9)`).",
+   "starter": [
+    "fn min_max(a: i32, b: i32, c: i32) -> (i32, i32):",
+    "    return (0, 0)",
+    "",
+    "fn main():",
+    "    lo, hi = min_max(5, 3, 9)",
+    "    print(lo, hi)"
+   ],
+   "solution": [
+    "fn min_max(a: i32, b: i32, c: i32) -> (i32, i32):",
+    "    lo = a",
+    "    hi = a",
+    "    if b < lo:",
+    "        lo = b",
+    "    if c < lo:",
+    "        lo = c",
+    "    if b > hi:",
+    "        hi = b",
+    "    if c > hi:",
+    "        hi = c",
+    "    return (lo, hi)",
+    "",
+    "fn main():",
+    "    lo, hi = min_max(5, 3, 9)",
+    "    print(lo, hi)"
+   ],
+   "hint": "Start `lo` and `hi` at `a` and update them by comparing with `b` and `c`.",
+   "expected": [
+    "3 9"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l03-q1",
+   "q": "With `t = (7, \"a\")`, what is `t.1`?",
+   "options": [
+    "7",
+    "\"a\"",
+    "An error"
+   ],
+   "answer": 1,
+   "why": "Counting starts at 0: `.0` is the first, `.1` the second element."
+  }
+ ]
+}

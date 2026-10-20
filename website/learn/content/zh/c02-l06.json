@@ -1,0 +1,67 @@
+{
+ "title": "break、continue、pass",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`break` 立即结束循环。`continue` 跳过本轮剩余部分，进入下一轮。`pass` 什么也不做：Greengold 不允许空的代码体，所以在你有意留空的地方写它。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    for i in 0..10:",
+    "        if i == 3:",
+    "            continue",
+    "        if i == 7:",
+    "            break",
+    "        print(i)"
+   ],
+   "run": true,
+   "output": [
+    "0",
+    "1",
+    "2",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "上面跳过了 3，并且循环在 7 处结束。"
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l06-x1",
+   "prompt": "在 1 到 20 的数字中，找出第一个能被 7 整除的，输出它，然后退出循环。",
+   "starter": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        pass"
+   ],
+   "solution": [
+    "fn main():",
+    "    for i in 1..=20:",
+    "        if i % 7 == 0:",
+    "            print(i)",
+    "            break"
+   ],
+   "hint": "在 `if i % 7 == 0:` 里写 `print(i)` 和 `break`。",
+   "expected": [
+    "7"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l06-q1",
+   "q": "`continue` 做什么？",
+   "options": [
+    "结束循环",
+    "跳过本轮剩余部分，进入下一轮",
+    "停止程序"
+   ],
+   "answer": 1,
+   "why": "结束循环的是 `break`。"
+  }
+ ]
+}

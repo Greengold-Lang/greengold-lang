@@ -1,0 +1,72 @@
+{
+ "title": "Texto y caracteres",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "El texto entre comillas dobles es una **cadena** (`str`): una vista inmutable de memoria UTF-8, así que puede contener cualquier idioma. `'A'` entre comillas simples es un único carácter y su valor es el número ASCII (`u8`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    greeting = \"Hello\"",
+    "    letter = 'A'",
+    "    print(greeting, letter)"
+   ],
+   "run": true,
+   "output": [
+    "Hello 65"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Los caracteres especiales se escriben con `\\`: `\\n` una nueva línea, `\\t` un tabulador, `\\\\` una barra invertida, `\\\"` unas comillas dobles."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"First\\nSecond\")",
+    "    print(\"Name:\\tAli\")",
+    "    print(\"He said \\\"hello\\\"\")"
+   ],
+   "run": true,
+   "output": [
+    "First",
+    "Second",
+    "Name:\tAli",
+    "He said \"hello\""
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l04-x1",
+   "prompt": "Con un solo `print`, muestra dos líneas: `One` y `Two`. (usa `\\n`)",
+   "starter": [
+    "fn main():",
+    "    print(\"Bir İki\")"
+   ],
+   "solution": [
+    "fn main():",
+    "    print(\"One\\nTwo\")"
+   ],
+   "hint": "Pon `\\n` donde está el espacio.",
+   "expected": [
+    "One",
+    "Two"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l04-q1",
+   "q": "¿Son lo mismo `'A'` y `\"A\"`?",
+   "options": [
+    "Sí",
+    "No: uno es un carácter, el otro una cadena",
+    "No: uno es un error"
+   ],
+   "answer": 1,
+   "why": "Las comillas simples crean un carácter (un número), las comillas dobles crean una cadena."
+  }
+ ]
+}

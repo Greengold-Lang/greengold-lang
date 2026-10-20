@@ -1,0 +1,78 @@
+{
+ "title": "consume: ceder la propiedad",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`consume` cede la **propiedad** de los datos a la función. Tras la llamada, esa variable es **inválida**; no se puede leer. Así la misma memoria no se puede liberar desde dos sitios y no queda ninguna referencia \"colgante\". En la llamada no se escribe `consume`, solo en el parámetro."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn archive(p: consume Player):",
+    "    print(\"archived with health\", p.health)",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    archive(hero)",
+    "    hero = Player{ health: 50 }",
+    "    print(hero.health)"
+   ],
+   "run": true,
+   "output": [
+    "archived with health 100",
+    "50"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Nota: en este ejemplo escribimos `consume` explícitamente, pero en los tipos que poseen heap, cuando el cuerpo mueve el parámetro a otro propietario (por ejemplo, lo mete dentro de un struct), el compilador **también lo detecta por sí mismo**; lo verás en las próximas lecciones."
+  },
+  {
+   "t": "p",
+   "text": "Arriba, `hero` era inválido después de `archive(hero)`; la nueva asignación lo devolvió a la vida. Si hubieras escrito `print(hero.health)` justo después de `archive`, habrías obtenido un error de compilación."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l03-x1",
+   "prompt": "Para `Task` (`title: str`) escribe `finish(t: consume Task)`: imprime `done: ` seguido del título. Llámala en `main`.",
+   "starter": [
+    "struct Task:",
+    "    title: str",
+    "",
+    "fn main():",
+    "    t = Task{ title: \"write docs\" }",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Task:",
+    "    title: str",
+    "",
+    "fn finish(t: consume Task):",
+    "    print(\"done:\", t.title)",
+    "",
+    "fn main():",
+    "    t = Task{ title: \"write docs\" }",
+    "    finish(t)"
+   ],
+   "hint": "Añade `finish`, que hace `print(\"done:\", t.title)`, y llama a `finish(t)` en `main`.",
+   "expected": [
+    "done: write docs"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l03-q1",
+   "q": "¿Qué le ocurre a una variable que fue `consume`d, después de la llamada?",
+   "options": [
+    "Se puede usar como antes",
+    "Pasa a ser inválida; no se puede leer hasta que se le asigne de nuevo",
+    "Se restablece"
+   ],
+   "answer": 1,
+   "why": "La propiedad pasó a la función; la variable antigua ya no tiene los datos."
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "title": "Хеши и кодирование: std.hash, std.encoding",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.hash` предлагает SHA-256/384/512, SHA-3, SHAKE, HMAC, HKDF и PBKDF2; код — переносимый Greengold и не требует libc. Байтовые данные передаются как `[]u8` (`List[u8]`, массив или `текст.as_bytes()`). `std.encoding` превращает массивы байт в шестнадцатеричный текст или base64."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.hash",
+    "import std.encoding",
+    "",
+    "fn main():",
+    "    d = hash.sha256(\"abc\".as_bytes())",
+    "    print(encoding.hex_encode(d).as_str())"
+   ],
+   "run": true,
+   "output": [
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "**Никогда не сравнивайте** дайджесты или MAC **через `==`**: измеримая разница во времени раскрывает информацию. Используйте `crypto.constant_time_eq`. `std.crypto` также предлагает ChaCha20-Poly1305, AES-GCM, X25519, Ed25519 и самостирающийся `SecretBytes`."
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l03-x1",
+   "prompt": "Вычислите дайджесты SHA-256 для `\"abc\"` и `\"abd\"`, сравните их через `crypto.constant_time_eq` и выведите результат.",
+   "starter": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "import std.hash",
+    "import std.crypto",
+    "",
+    "fn main():",
+    "    a = hash.sha256(\"abc\".as_bytes())",
+    "    b = hash.sha256(\"abd\".as_bytes())",
+    "    print(crypto.constant_time_eq(a[..], b[..]))"
+   ],
+   "hint": "Дайджесты — это массивы `[32]u8`; превратите их в срезы через `a[..]`.",
+   "expected": [
+    "false"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l03-q1",
+   "q": "Почему для сравнения двух дайджестов используют `constant_time_eq`, а не `==`?",
+   "options": [
+    "Потому что короче",
+    "Потому что разница во времени может раскрыть информацию",
+    "Потому что `==` не работает"
+   ],
+   "answer": 1,
+   "why": "Сравнение за постоянное время не останавливается на первом отличающемся байте."
+  }
+ ]
+}

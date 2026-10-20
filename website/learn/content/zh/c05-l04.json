@@ -1,0 +1,72 @@
+{
+ "title": "Copy 与 Move 类型",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "类型分属两组。**Copy 类型**（数字、`bool`、`str`、普通结构体、由 Copy 元素组成的数组）生活在栈上，复制开销很小。**Move 类型**（`List`、`Box`、`string` 以及包含它们的任何类型）拥有堆内存；它们从不被复制，只会被**移动**（这样就不会重复释放）。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 5",
+    "    b = a",
+    "    b += 1",
+    "    print(a, b)",
+    "",
+    "    list_a = List[i32]()",
+    "    list_a.push(10)",
+    "    list_b = list_a",
+    "    list_c = list_b.clone()",
+    "    list_c.push(20)",
+    "    print(list_b.len, list_c.len)"
+   ],
+   "run": true,
+   "output": [
+    "5 6",
+    "1 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "对数字来说，`b = a` 是复制；`a` 仍然可用。对列表来说，`list_b = list_a` 是移动所有权：现在只有 `list_b` 有效。如果想要独立的副本，就写 `.clone()`。"
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l04-x1",
+   "prompt": "对列表 `original` 做一次 `.clone()`，命名为 `dup`，向 `dup` 中加入 99，并输出两个列表的长度。",
+   "starter": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    print(original.len)"
+   ],
+   "solution": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    dup = original.clone()",
+    "    dup.push(99)",
+    "    print(original.len, dup.len)"
+   ],
+   "hint": "`dup = original.clone()` 和 `dup.push(99)`。",
+   "expected": [
+    "2 3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l04-q1",
+   "q": "哪个是 Move 类型？",
+   "options": [
+    "`i32`",
+    "`List[i32]`",
+    "`bool`"
+   ],
+   "answer": 1,
+   "why": "`List` 存在于堆上，所以是移动；数字则是复制。"
+  }
+ ]
+}

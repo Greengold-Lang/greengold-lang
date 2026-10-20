@@ -134,6 +134,10 @@ impl Pool:
 
     # Calls `f(start, end, ctx)` for pieces of `0..n`, of about n / (4 * size) items each, and waits for all.
     fn for_range(self: lend Pool, n: usize, f: fn(usize, usize, *u8), ctx: *u8):
+        if self.size == 1:
+            if n > 0:
+                f(0, n, ctx)
+            return
         chunk = (n + self.size * 4 - 1) / (self.size * 4)
         self.for_range_chunked(n, chunk, f, ctx)
 
@@ -145,7 +149,15 @@ impl Pool:
         if n == 0:
             return
         if self.size == 1 or n <= size:
-            f(0, n, ctx)
+            # the pieces are the same ones a bigger pool would hand out, so a piece function that depends on its boundaries
+            # (as `reduce_*` does) gives the same result on one thread
+            start: usize = 0
+            while start < n:
+                end = start + size
+                if end > n:
+                    end = n
+                f(start, end, ctx)
+                start = end
             return
         unsafe:
             base = ptr_cast[*mut i64](self.cell)
@@ -182,3 +194,116 @@ impl Pool:
             self.threads[i].join()
         unsafe:
             free(self.cell)
+
+# -- map and reduce over slices ---------------------------------------------------------------------------------
+
+# The ready-made jobs for the two common element types. Write your own piece function with `for_range` for anything else.
+#
+#     pool = parallel.Pool.new(0)
+#     parallel.map_f64(pool, xs, ys, fn_square)             # ys[i] = fn_square(xs[i]) for every i
+#     total = parallel.reduce_i64(pool, values, 0, fn_add)   # ((0 op v0) op v1) op ... , see below
+#
+# `reduce_*` cuts the input into pieces of `REDUCE_CHUNK` items, folds each piece from its first item, and then combines the piece results
+# from left to right. The pieces do not depend on the number of threads, so the answer is the same on 1 thread and on 64, even for
+# a float operation whose result depends on the order (`+` on `f64`). `op` should be associative for the answer to equal a plain loop.
+
+public
+const REDUCE_CHUNK: usize = 4096
+
+private
+struct _MapI64:
+    src: []i64
+    dst: *mut i64
+    f: fn(i64) -> i64
+
+struct _MapF64:
+    src: []f64
+    dst: *mut f64
+    f: fn(f64) -> f64
+
+struct _RedI64:
+    src: []i64
+    out: *mut i64
+    op: fn(i64, i64) -> i64
+
+struct _RedF64:
+    src: []f64
+    out: *mut f64
+    op: fn(f64, f64) -> f64
+
+fn _map_i64_piece(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_MapI64](ctx)
+        f = job[0].f
+        for i in start..end:
+            job[0].dst[usize(i)] = f(job[0].src[usize(i)])
+
+fn _map_f64_piece(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_MapF64](ctx)
+        f = job[0].f
+        for i in start..end:
+            job[0].dst[usize(i)] = f(job[0].src[usize(i)])
+
+fn _red_i64_piece(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_RedI64](ctx)
+        op = job[0].op
+        acc = job[0].src[start]
+        for i in (start + 1)..end:
+            acc = op(acc, job[0].src[usize(i)])
+        job[0].out[start / REDUCE_CHUNK] = acc
+
+fn _red_f64_piece(start: usize, end: usize, ctx: *u8):
+    unsafe:
+        job = ptr_cast[*_RedF64](ctx)
+        op = job[0].op
+        acc = job[0].src[start]
+        for i in (start + 1)..end:
+            acc = op(acc, job[0].src[usize(i)])
+        job[0].out[start / REDUCE_CHUNK] = acc
+
+public
+# `dst[i] = f(src[i])` for every `i`, the work shared between the threads of `pool`. The slices must have the same length.
+fn map_i64(pool: lend Pool, src: []i64, dst: lend []i64, f: fn(i64) -> i64):
+    if src.len != dst.len:
+        panic("map_i64: the slices differ in length")
+    unsafe:
+        job = _MapI64{ src: src, dst: ptr_cast[*mut i64](addr_mut(dst)), f: f }
+        pool.for_range(src.len, _map_i64_piece, ptr_cast[*u8](addr(job)))
+
+fn map_f64(pool: lend Pool, src: []f64, dst: lend []f64, f: fn(f64) -> f64):
+    if src.len != dst.len:
+        panic("map_f64: the slices differ in length")
+    unsafe:
+        job = _MapF64{ src: src, dst: ptr_cast[*mut f64](addr_mut(dst)), f: f }
+        pool.for_range(src.len, _map_f64_piece, ptr_cast[*u8](addr(job)))
+
+# `init op src[0] op src[1] ...`, folded in pieces as described at the top. An empty slice gives `init`.
+fn reduce_i64(pool: lend Pool, src: []i64, init: i64, op: fn(i64, i64) -> i64) -> i64:
+    if src.len == 0:
+        return init
+    parts = List[i64]()
+    for _i in 0..((src.len + REDUCE_CHUNK - 1) / REDUCE_CHUNK):
+        parts.push(0)
+    unsafe:
+        job = _RedI64{ src: src, out: ptr_cast[*mut i64](addr_mut(parts[..])), op: op }
+        pool.for_range_chunked(src.len, REDUCE_CHUNK, _red_i64_piece, ptr_cast[*u8](addr(job)))
+    acc = init
+    for p in parts:
+        acc = op(acc, p)
+    return acc
+
+fn reduce_f64(pool: lend Pool, src: []f64, init: f64, op: fn(f64, f64) -> f64) -> f64:
+    if src.len == 0:
+        return init
+    parts = List[f64]()
+    for _i in 0..((src.len + REDUCE_CHUNK - 1) / REDUCE_CHUNK):
+        parts.push(0.0)
+    unsafe:
+        job = _RedF64{ src: src, out: ptr_cast[*mut f64](addr_mut(parts[..])), op: op }
+        pool.for_range_chunked(src.len, REDUCE_CHUNK, _red_f64_piece, ptr_cast[*u8](addr(job)))
+    acc = init
+    for p in parts:
+        acc = op(acc, p)
+    return acc

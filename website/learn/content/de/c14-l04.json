@@ -1,0 +1,78 @@
+{
+ "title": "Datenformate: std.csv, std.uuid, std.log",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.csv` (RFC 4180) liest Felder mit den Regeln für Anführungszeichen und Trennzeichen korrekt: `csv.parse(text, ',')` liefert ein `Result[List[List[string]], string]`. `csv.format_row` schreibt eine Zeile und setzt dabei Anführungszeichen, wo nötig."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"name,age\\nAda,36\\n\\\"Smith, J\\\",41\\n\", ',').value_or_panic()",
+    "    print(rows.len, rows[2][0].as_str())"
+   ],
+   "run": true,
+   "output": [
+    "3 Smith, J"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`std.uuid` erzeugt RFC-9562-Kennungen: `v4` zufällig, `v7` zeitlich geordnet, `v5` namensbasiert (derselbe Name ergibt immer dieselbe Kennung). `std.log` schreibt Zeilen mit Stufen nach stderr (`log.info`, `log.warn`, `log.kv`) und gibt mit `log.set_json(true)` JSON aus."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.uuid",
+    "",
+    "fn main():",
+    "    ns = uuid.namespace_dns()",
+    "    id = uuid.v5(ns, \"example.com\".as_bytes())",
+    "    print(id.to_string().as_str())",
+    "    print(id.version())"
+   ],
+   "run": true,
+   "output": [
+    "cfbff0d1-9375-5685-968c-48ce8b15ae17",
+    "5"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c14-l04-x1",
+   "prompt": "Lies den Text `\"a,b\\nc,d\\n\"` mit `csv.parse` und gib die Anzahl der Zeilen aus.",
+   "starter": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "import std.csv",
+    "",
+    "fn main():",
+    "    rows = csv.parse(\"a,b\\nc,d\\n\", ',').value_or_panic()",
+    "    print(rows.len)"
+   ],
+   "hint": "`csv.parse(...).value_or_panic()` und `rows.len`.",
+   "expected": [
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c14-l04-q1",
+   "q": "Welche Version erzeugt für denselben Namen immer dieselbe UUID?",
+   "options": [
+    "`v4`",
+    "`v5`",
+    "`v7`"
+   ],
+   "answer": 1,
+   "why": "`v5` wird aus einem Namen und einem Namensraum berechnet; `v4` ist zufällig, `v7` hängt von der Zeit ab."
+  }
+ ]
+}

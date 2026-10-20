@@ -14,11 +14,26 @@ Standard library modules are imported by writing `import std.<module_name>` at t
 | `std.string` | Advanced text manipulation | `string.str_contains`, `string.str_split`, `string.str_trim`, `string.parse_i64` |
 | `std.collections` | Dynamic data structures | `collections.hashmap_new[str, i32]()`, `collections.hashset_new[i32]()` |
 | `std.sort` | Sorting algorithms | `sort.sort`, `sort.sort_by`, `sort.binary_search` |
-| `std.math` | Math functions and constants | `math.sqrt`, `math.sin`, `math.cos`, `math.pow`, `math.abs_i64` |
+| `std.math` | Math functions and constants | `math.sqrt`, `math.sin`, `math.cos`, `math.pow`, `math.abs` |
 | `std.rand` | Random number generation | `rand.rng_new`, `r.next_u64`, `r.below`, `r.range` |
 | `std.time` | Time measurement and CPU ticks | `time.current_time`, `time.current_time_millis`, `time.clock_ticks` |
 | `std.process` | Process management and environment variables | `process.process_exit`, `process.env_get` |
-| `std.thread` | Concurrency and threads | `thread.Thread.spawn`, `thread.Mutex`, `thread.Channel`, `thread.AtomicI64` |
+| `std.thread` | Concurrency and threads | `thread.Thread.spawn`, `thread.Mutex`, `thread.ChannelI64`, `thread.AtomicI64` |
+| `std.mmio` | Hardware registers (volatile) | `mmio.reg32`, `set_bits`, `modify`, `Field`, `wait_bits_set` |
+| `std.hal` | Driver interfaces shared by boards | `OutputPin`, `InputPin`, `I2c`, `SpiBus`, `Uart`, `Delay` |
+| `std.dmath` | Math with identical bits on every machine | `dmath.exp`, `dmath.sin`, `dmath.pow`, `dmath.atan2` |
+| `std.unicode` | Characters, case, width | `unicode.to_upper`, `unicode.width`, `unicode.grapheme_count` |
+| `std.log` | Leveled log lines on stderr | `log.info`, `log.warn`, `log.kv`, `log.set_json` |
+| `std.uuid` | RFC 9562 identifiers | `uuid.v4`, `uuid.v7`, `uuid.parse`, `uuid.format` |
+| `std.csv` | CSV (RFC 4180) | `csv.parse`, `csv.format_row` |
+| `std.toml` | TOML documents as a JSON tree | `toml.parse`, `toml.to_text` |
+| `std.can` | CAN bus frames, CRC-15, J1939 | `can.CanFrame.data_frame`, `can.frame_crc15`, `can.j1939_id` |
+| `std.money` | Money in minor units | `money.usd`, `plus`, `scaled`, `allocate` |
+| `std.audit` | Tamper-evident append-only log | `audit.AuditLog.open`, `append`, `audit.verify` |
+| `std.fix` | FIX trading messages | `fix.parse`, `FixBuilder`, `get`, `get_all` |
+| `std.compress` | DEFLATE, zlib, gzip (with an output limit) | `compress.gzip_compress`, `compress.gzip_decompress` |
+
+Each module starts with a comment block that shows its use; `gg api` lists every public name.
 
 ---
 
@@ -171,7 +186,7 @@ fn worker_job():
     lock.unlock()
 ```
 
-`Thread`, `Mutex`, `Cond`, `AtomicI64`, and `Channel` are operating system objects: **they are moved, not copied**.
+`Thread`, `Mutex`, `Cond`, `AtomicI64`, and `ChannelI64` are operating system objects: **they are moved, not copied**.
 Writing `n = m` moves `m`; a second, independent lock is not created. `m.clone()` and `copy m` do not compile (GG0323).
 To give a lock or a channel to another function, pass it as a `read`/`lend` parameter.
 
@@ -182,7 +197,7 @@ Instead of communicating by sharing memory, sharing memory by communicating is t
 import std.thread
 
 fn main():
-    ch = thread.Channel.new()
+    ch = thread.ChannelI64.new()
     
     # Sending and receiving a value
     ch.send(42)

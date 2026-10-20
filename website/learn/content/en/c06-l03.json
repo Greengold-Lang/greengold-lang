@@ -1,0 +1,108 @@
+{
+ "title": "Numbers, ranges and alternatives",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`match` is not limited to enums; it also works with integers, characters, bools and strings. `|` matches several alternatives, `a..=b` matches a range."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn classify(code: i32):",
+    "    match code:",
+    "        200 | 201 | 204:",
+    "            print(\"success\")",
+    "        301 | 302:",
+    "            print(\"redirect\")",
+    "        400..=499:",
+    "            print(\"client error\")",
+    "        500..=599:",
+    "            print(\"server error\")",
+    "        _:",
+    "            print(\"unknown\")",
+    "",
+    "fn main():",
+    "    classify(201)",
+    "    classify(404)",
+    "    classify(503)",
+    "    classify(99)"
+   ],
+   "run": true,
+   "output": [
+    "success",
+    "client error",
+    "server error",
+    "unknown"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn kind(c: u8):",
+    "    match c:",
+    "        'a'..='z' | 'A'..='Z':",
+    "            print(\"letter\")",
+    "        '0'..='9':",
+    "            print(\"digit\")",
+    "        _:",
+    "            print(\"other\")",
+    "",
+    "fn main():",
+    "    kind('q')",
+    "    kind('7')",
+    "    kind('!')"
+   ],
+   "run": true,
+   "output": [
+    "letter",
+    "digit",
+    "other"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c06-l03-x1",
+   "prompt": "`grade(score: i32)`: print `A` for 90..=100, `B` for 80..=89, `C` for 70..=79, `F` for the rest. Call it with 85.",
+   "starter": [
+    "fn grade(score: i32):",
+    "    match score:",
+    "        _:",
+    "            print(\"F\")",
+    "",
+    "fn main():",
+    "    grade(85)"
+   ],
+   "solution": [
+    "fn grade(score: i32):",
+    "    match score:",
+    "        90..=100:",
+    "            print(\"A\")",
+    "        80..=89:",
+    "            print(\"B\")",
+    "        70..=79:",
+    "            print(\"C\")",
+    "        _:",
+    "            print(\"F\")",
+    "",
+    "fn main():",
+    "    grade(85)"
+   ],
+   "hint": "Add three range branches above the `_` branch.",
+   "expected": [
+    "B"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c06-l03-q1",
+   "q": "In the pattern `200 | 201:` what does `|` mean?",
+   "options": [
+    "and",
+    "or (alternative)",
+    "a bit operation"
+   ],
+   "answer": 1,
+   "why": "Inside a pattern `|` means \"one of these\"."
+  }
+ ]
+}

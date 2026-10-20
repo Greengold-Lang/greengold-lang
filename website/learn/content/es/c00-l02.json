@@ -1,0 +1,80 @@
+{
+ "title": "Valores y variables",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Los ordenadores trabajan con **valores**: números (`42`, `3.5`) y texto (`\"Ali\"`). Si le das un nombre a un valor, puedes volver a usarlo más tarde. Ese nombre se llama **variable**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    name = \"Ali\"",
+    "    print(name, age)"
+   ],
+   "run": true,
+   "output": [
+    "Ali 20"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "El signo `=` no significa \"igual\", significa **\"asignar\"**: pone el valor de la derecha en el nombre de la izquierda. Con los números puedes calcular: `+`, `-`, `*`, `/`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    apple = 5",
+    "    pear = 3",
+    "    total = apple + pear",
+    "    print(total)",
+    "    apple = 10",
+    "    print(apple + pear)"
+   ],
+   "run": true,
+   "output": [
+    "8",
+    "13"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "El valor de una variable se puede cambiar más tarde. Arriba, `apple` valía 5 al principio y luego 10."
+  },
+  {
+   "t": "exercise",
+   "id": "c00-l02-x1",
+   "prompt": "Sea `a` igual a 6 y `b` igual a 7. Imprime su producto (usa `*`).",
+   "starter": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn main():",
+    "    a = 6",
+    "    b = 7",
+    "    print(a * b)"
+   ],
+   "hint": "Sustituye `print(0)` por `print(a * b)`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c00-l02-q1",
+   "q": "¿Qué hace la línea `x = 5`?",
+   "options": [
+    "pregunta si x es igual a 5",
+    "pone el valor 5 en el nombre x",
+    "imprime 5 en la pantalla"
+   ],
+   "answer": 1,
+   "why": "`=` es una asignación: guarda el valor bajo ese nombre."
+  }
+ ]
+}

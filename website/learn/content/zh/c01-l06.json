@@ -1,0 +1,76 @@
+{
+ "title": "常量",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`const` 在文件级别（函数外部）定义一个编译期已知的值。你可以写出它的类型，也可以交给编译器。它们的名字通常用大写字母书写。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "const MAX_SCORE: i32 = 100",
+    "const APP_NAME = \"Notebook\"",
+    "",
+    "fn main():",
+    "    print(APP_NAME, MAX_SCORE)"
+   ],
+   "run": true,
+   "output": [
+    "Notebook 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "常量让你不必在许多函数里重复同一个数字；值变了，只需改一个地方。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "const PI: f64 = 3.14159",
+    "",
+    "fn circle_area(r: f64) -> f64:",
+    "    return PI * r * r",
+    "",
+    "fn main():",
+    "    print(circle_area(2.0))"
+   ],
+   "run": true,
+   "output": [
+    "12.56636"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c01-l06-x1",
+   "prompt": "定义常量 `TAX_RATE` 等于 18。价格为 200 时，输出 `price * TAX_RATE / 100`。",
+   "starter": [
+    "fn main():",
+    "    price = 200",
+    "    print(0)"
+   ],
+   "solution": [
+    "const TAX_RATE = 18",
+    "",
+    "fn main():",
+    "    price = 200",
+    "    print(price * TAX_RATE / 100)"
+   ],
+   "hint": "把 `const TAX_RATE = 18` 这一行写在 `main` 上面。",
+   "expected": [
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c01-l06-q1",
+   "q": "`const` 在哪里定义？",
+   "options": [
+    "只能在 `main` 里面",
+    "在文件级别，函数外部",
+    "在圆括号里"
+   ],
+   "answer": 1,
+   "why": "`const` 在文件级别；函数内部使用 `fixed`。"
+  }
+ ]
+}

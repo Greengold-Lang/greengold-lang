@@ -1,0 +1,66 @@
+{
+ "title": "Güvenli sarmalayıcılar",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Profesyonel sistem programlamanın en iyi uygulaması, `unsafe` kodu küçük fonksiyonların içine hapsedip dış dünyaya **tamamen güvenli** bir API sunmaktır. Çağıranın `unsafe` yazmasına gerek kalmaz ve geçersiz girdiler sarmalayıcıda elenir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"stdlib.h\" fn rand() -> i32",
+    "extern \"stdlib.h\" fn srand(seed: u32)",
+    "",
+    "fn get_c_random(max: i32) -> i32:",
+    "    if max <= 0:",
+    "        return 0",
+    "    unsafe:",
+    "        raw = rand()",
+    "        return raw % max",
+    "",
+    "fn main():",
+    "    dice = get_c_random(6) + 1",
+    "    print(\"dice:\", dice)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "p",
+   "text": "Aşağıdaki örnekte C'nin `sqrt`'ı `Result` döndüren güvenli bir fonksiyonun içinde saklanıyor:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "extern \"math.h\" fn sqrt(x: f64) -> f64",
+    "",
+    "fn square_root(x: f64) -> Result[f64, str]:",
+    "    if x < 0.0:",
+    "        return Err(\"negative number\")",
+    "    unsafe:",
+    "        return Ok(sqrt(x))",
+    "",
+    "fn main():",
+    "    match square_root(16.0):",
+    "        Ok(v):",
+    "            print(v)",
+    "        Err(m):",
+    "            print(m)"
+   ],
+   "run": false,
+   "local": true
+  },
+  {
+   "t": "quiz",
+   "id": "c13-l04-q1",
+   "q": "Güvenli bir sarmalayıcının amacı nedir?",
+   "options": [
+    "Kodu yavaşlatmak",
+    "`unsafe` kodu küçük bir yerde toplayıp çağıranı güvende tutmak",
+    "`extern`'i kaldırmak"
+   ],
+   "answer": 1,
+   "why": "Denetlenecek `unsafe` yüzeyi küçülür."
+  }
+ ]
+}

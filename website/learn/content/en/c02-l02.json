@@ -1,0 +1,60 @@
+{
+ "title": "if as an expression",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`if` can also produce a value: `if condition then A else B`. You assign the result straight to a variable. `else` is required and all branches must have the **same** type."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    age = 20",
+    "    status = if age >= 18 then \"Adult\" else \"Child\"",
+    "    print(status)",
+    "",
+    "    score = 75",
+    "    grade = if score >= 90 then \"A\" elif score >= 70 then \"B\" else \"C\"",
+    "    print(\"Grade:\", grade)"
+   ],
+   "run": true,
+   "output": [
+    "Adult",
+    "Grade: B"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l02-x1",
+   "prompt": "Write the variable `sign` with `if ... then ... else`: `-1` when `n` is negative, otherwise `1`. Print it.",
+   "starter": [
+    "fn main():",
+    "    n = -7",
+    "    sign = 0",
+    "    print(sign)"
+   ],
+   "solution": [
+    "fn main():",
+    "    n = -7",
+    "    sign = if n < 0 then -1 else 1",
+    "    print(sign)"
+   ],
+   "hint": "`sign = if n < 0 then -1 else 1`",
+   "expected": [
+    "-1"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l02-q1",
+   "q": "Is `else` required in an `if` expression?",
+   "options": [
+    "No",
+    "Yes",
+    "Only when there is an `elif`"
+   ],
+   "answer": 1,
+   "why": "An `if` that produces a value must give one in every case."
+  }
+ ]
+}

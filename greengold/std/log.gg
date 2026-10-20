@@ -1,0 +1,161 @@
+# std.log: leveled messages to the standard error stream.
+#
+#     import std.log
+#     log.info("server started")
+#     log.warn(f"disk at {pct}%")
+#     log.kv(log.ERROR, "request failed", "status", "503")
+#     log.set_level(log.DEBUG)          # default is INFO; `GG_LOG=debug` in the environment sets the start level
+#     log.set_json(true)                # one JSON object per line instead of text
+#
+# A line is `2026-10-20T11:55:00.123Z INFO  message key=value` (the time is UTC). Messages below the level are dropped before
+# they are formatted, so `log.debug(...)` in a hot loop costs a comparison. Output goes to standard error with one write per
+# line, which keeps lines from different threads whole. The level is a global: set it at start-up.
+
+import std.time
+import std.process
+import std.io
+import std.string
+
+const ERROR: i32 = 0
+const WARN: i32 = 1
+const INFO: i32 = 2
+const DEBUG: i32 = 3
+const TRACE: i32 = 4
+
+static level: i32 = 2
+static json_mode: bool = false
+static started: bool = false
+
+private
+fn _init():
+    unsafe:
+        if started:
+            return
+        started = true
+    match consume process.env_get("GG_LOG"):
+        Valid(v):
+            t = v.as_str()
+            unsafe:
+                if t.eq_ignore_case("error"):
+                    level = 0
+                elif t.eq_ignore_case("warn"):
+                    level = 1
+                elif t.eq_ignore_case("info"):
+                    level = 2
+                elif t.eq_ignore_case("debug"):
+                    level = 3
+                elif t.eq_ignore_case("trace"):
+                    level = 4
+        None: pass
+
+fn _name(lvl: i32) -> str:
+    if lvl <= 0:
+        return "ERROR"
+    if lvl == 1:
+        return "WARN"
+    if lvl == 2:
+        return "INFO"
+    if lvl == 3:
+        return "DEBUG"
+    return "TRACE"
+
+fn _escape(out: lend string, text: str):
+    out.append_byte('"')
+    for i in 0..text.len:
+        c = text[i]
+        if c == '"':
+            out.append_str("\\\"")
+        elif c == '\\':
+            out.append_str("\\\\")
+        elif c == '\n':
+            out.append_str("\\n")
+        elif c == '\r':
+            out.append_str("\\r")
+        elif c == '\t':
+            out.append_str("\\t")
+        elif c < 32:
+            out.append_str("\\u00")
+            out.append_byte(u8(48 + c / 16))
+            out.append_byte(if c % 16 < 10 then u8(48 + c % 16) else u8(87 + c % 16))
+        else:
+            out.append_byte(c)
+    out.append_byte('"')
+
+fn _emit(lvl: i32, msg: str, key: str, value: str):
+    _init()
+    cur: i32 = 0
+    js = false
+    unsafe:
+        cur = level
+        js = json_mode
+    if lvl > cur:
+        return
+    stamp = time.now_utc().to_iso()
+    line = string.new()
+    if js:
+        line.append_str("{\"time\":\"")
+        line.append_str(stamp.as_str())
+        line.append_str("\",\"level\":\"")
+        line.append_str(_name(lvl))
+        line.append_str("\",\"msg\":")
+        _escape(line, msg)
+        if key.len > 0:
+            line.append_byte(',')
+            _escape(line, key)
+            line.append_byte(':')
+            _escape(line, value)
+        line.append_byte('}')
+    else:
+        line.append_str(stamp.as_str())
+        line.append_byte(' ')
+        line.append_str(_name(lvl))
+        if lvl != 0 and lvl != 3 and lvl != 4:
+            line.append_byte(' ')
+        line.append_byte(' ')
+        line.append_str(msg)
+        if key.len > 0:
+            line.append_byte(' ')
+            line.append_str(key)
+            line.append_byte('=')
+            line.append_str(value)
+    line.append_byte('\n')
+    err = io.stderr()
+    err.write(line.as_str())
+
+public
+fn set_level(lvl: i32):
+    _init()
+    unsafe:
+        level = lvl
+
+fn get_level() -> i32:
+    _init()
+    unsafe:
+        return level
+
+fn set_json(on: bool):
+    unsafe:
+        json_mode = on
+
+fn error(msg: str):
+    _emit(0, msg, "", "")
+
+fn warn(msg: str):
+    _emit(1, msg, "", "")
+
+fn info(msg: str):
+    _emit(2, msg, "", "")
+
+fn debug(msg: str):
+    _emit(3, msg, "", "")
+
+fn trace(msg: str):
+    _emit(4, msg, "", "")
+
+# A message with one `key=value` pair (`lvl` is `log.ERROR` ... `log.TRACE`).
+fn kv(lvl: i32, msg: str, key: str, value: str):
+    _emit(lvl, msg, key, value)
+
+# True when messages of this level would be written (to skip building an expensive message).
+fn enabled(lvl: i32) -> bool:
+    return lvl <= get_level()

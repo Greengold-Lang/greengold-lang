@@ -1,0 +1,71 @@
+{
+ "title": "实践：用函数组成程序",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "把大任务拆成小函数，能让代码更易读、更易测试。下面的温度转换器由一些各只做一件事的函数构成。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "const FREEZING_F: f64 = 32.0",
+    "",
+    "fn to_fahrenheit(c: f64) -> f64:",
+    "    return c * 9.0 / 5.0 + FREEZING_F",
+    "",
+    "fn to_celsius(f: f64) -> f64:",
+    "    return (f - FREEZING_F) * 5.0 / 9.0",
+    "",
+    "fn main():",
+    "    print(\"25 C =\", to_fahrenheit(25.0), \"F\")",
+    "    print(\"212 F =\", to_celsius(212.0), \"C\")"
+   ],
+   "run": true,
+   "output": [
+    "25 C = 77 F",
+    "212 F = 100 C"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l04-x1",
+   "prompt": "编写 `is_leap(year)`：当年份能被 4 整除但不能被 100 整除，或者能被 400 整除时返回 `true`。输出 2024、1900 和 2000 的结果。",
+   "starter": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return false",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "solution": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "hint": "用 `and` 和 `or` 组合这三个条件；使用括号。",
+   "expected": [
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l04-q1",
+   "q": "小函数的主要好处是什么？",
+   "options": [
+    "程序占用更多空间",
+    "代码可读、可复用、可测试",
+    "编译器运行得更慢"
+   ],
+   "answer": 1,
+   "why": "当每个函数只做一件事时，就很容易单独理解和试验它。"
+  }
+ ]
+}

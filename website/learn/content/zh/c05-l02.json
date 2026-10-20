@@ -1,0 +1,96 @@
+{
+ "title": "lend：借用并修改",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`lend` 让函数暂时借用数据并**就地修改**。修改在调用者的变量中可见。调用时不写 `lend`；但这个变量不能是 `fixed`。"
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn take_damage(p: lend Player, amount: i32):",
+    "    p.health -= amount",
+    "",
+    "fn inc(n: lend i32):",
+    "    n += 1",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    take_damage(hero, 25)",
+    "    print(hero.health)",
+    "",
+    "    score = 10",
+    "    inc(score)",
+    "    print(score)"
+   ],
+   "run": true,
+   "output": [
+    "75",
+    "11"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "对拥有堆内存的类型，你甚至不需要写 `lend`：当函数体修改参数时，编译器会**自动检测出 `lend`**："
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add_one(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    add_one(v)",
+    "    add_one(v)",
+    "    print(v.len)"
+   ],
+   "run": true,
+   "output": [
+    "2"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l02-x1",
+   "prompt": "让 `reset(n: lend i32)` 把 `n` 设为 0。用 `x = 42` 调用它并输出 `x`。",
+   "starter": [
+    "fn reset(n: lend i32):",
+    "    pass",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "solution": [
+    "fn reset(n: lend i32):",
+    "    n = 0",
+    "",
+    "fn main():",
+    "    x = 42",
+    "    reset(x)",
+    "    print(x)"
+   ],
+   "hint": "把 `pass` 换成 `n = 0`。",
+   "expected": [
+    "0"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l02-q1",
+   "q": "用 `lend` 传入的变量可以是 `fixed` 吗？",
+   "options": [
+    "可以",
+    "不可以，因为它将被修改",
+    "只有当它是数字时"
+   ],
+   "answer": 1,
+   "why": "修改一个你声明为常量的值是编译错误。"
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-# std.collections: HashMap, HashSet, a handle-based Arena, Deque, Heap, PriorityQueue, and SortedMap.
+# std.collections: HashMap, HashSet, a handle-based Arena, Deque, Heap, PriorityQueue, SortedMap, SortedSet and BitSet.
 #
 # Keys and values may be any type, including heap-owning ones (`string`, `List[T]`). Keys are hashed with
 # the built-in `hash(key)` and compared with `==`: integers, bool, text, and structs, enums, and lists of
@@ -707,3 +707,204 @@ impl SortedMap[K, V]:
             else:
                 hi = mid
         return lo
+
+# -- SortedSet (members kept in order) -----------------------------------------------------------
+# Like `SortedMap` without values: lookups are a binary search; `insert` and `remove` move later members.
+
+public
+struct SortedSet[K: Ord]:
+    private
+    items: List[K]
+
+public
+fn sorted_set[K: Ord]() -> SortedSet[K]:
+    return SortedSet[K]{ items: List[K]() }
+
+impl SortedSet[K]:
+    fn len(self: read Self) -> usize:
+        return self.items.len
+
+    fn is_empty(self: read Self) -> bool:
+        return self.items.len == 0
+
+    fn contains(self: read Self, key: K) -> bool:
+        i = self.lower_bound(key)
+        return i < self.items.len and self.items.get(i) == key
+
+    # Adds `key`; false when it was already a member.
+    fn insert(self: lend Self, key: K) -> bool:
+        i = self.lower_bound(key)
+        if i < self.items.len and self.items.get(i) == key:
+            return false
+        self.items.insert(i, key)
+        return true
+
+    fn remove(self: lend Self, key: K) -> bool:
+        i = self.lower_bound(key)
+        if i < self.items.len and self.items.get(i) == key:
+            old = self.items.remove(i)
+            return true
+        return false
+
+    fn first(self: read Self) -> Optional[K]:
+        if self.items.len == 0:
+            return None
+        return Valid(self.items[0].clone())
+
+    fn last(self: read Self) -> Optional[K]:
+        if self.items.len == 0:
+            return None
+        return Valid(self.items[self.items.len - 1].clone())
+
+    # The largest member `<= key`.
+    fn floor(self: read Self, key: K) -> Optional[K]:
+        i = self.lower_bound(key.clone())
+        if i < self.items.len and self.items.get(i) == key:
+            return Valid(self.items[i].clone())
+        if i == 0:
+            return None
+        return Valid(self.items[i - 1].clone())
+
+    # The smallest member `>= key`.
+    fn ceiling(self: read Self, key: K) -> Optional[K]:
+        i = self.lower_bound(key)
+        if i == self.items.len:
+            return None
+        return Valid(self.items[i].clone())
+
+    # Copies of the members `k` with `lo <= k < hi`, in order.
+    fn between(self: read Self, lo: K, hi: K) -> List[K]:
+        out = List[K]()
+        i = self.lower_bound(lo)
+        while i < self.items.len and self.items.get(i) < hi:
+            out.push(self.items[i].clone())
+            i += 1
+        return out
+
+    # Copies of the members, in order.
+    fn to_list(self: read Self) -> List[K]:
+        return self.items.clone()
+
+    fn clear(self: lend Self):
+        self.items.clear()
+
+    private
+    fn lower_bound(self: read Self, key: K) -> usize:
+        lo: usize = 0
+        hi = self.items.len
+        while lo < hi:
+            mid = (lo + hi) / 2
+            if self.items.get(mid) < key:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+# -- BitSet (a growable set of small numbers) -----------------------------------------------------
+# One bit per number: a set of `n` numbers takes `n / 8` bytes. It grows when a larger number is inserted.
+
+public
+struct BitSet:
+    private
+    words: List[u64]
+
+public
+fn bitset_new() -> BitSet:
+    return BitSet{ words: List[u64]() }
+
+# A set that already has room for the numbers `0 .. n` (it still grows past that).
+fn bitset_with_capacity(n: usize) -> BitSet:
+    s = BitSet{ words: List[u64]() }
+    s.words.reserve((n + 63) / 64)
+    return s
+
+impl BitSet:
+    # Adds `i`; false when it was already a member.
+    fn insert(self: lend Self, i: usize) -> bool:
+        w = i / 64
+        while self.words.len <= w:
+            self.words.push(0)
+        bit = u64(1) << u32(i % 64)
+        was = (self.words[w] & bit) != 0
+        self.words[w] = self.words[w] | bit
+        return not was
+
+    fn remove(self: lend Self, i: usize) -> bool:
+        w = i / 64
+        if w >= self.words.len:
+            return false
+        bit = u64(1) << u32(i % 64)
+        was = (self.words[w] & bit) != 0
+        self.words[w] = self.words[w] & ~bit
+        return was
+
+    fn contains(self: read Self, i: usize) -> bool:
+        w = i / 64
+        if w >= self.words.len:
+            return false
+        return (self.words[w] >> u32(i % 64)) & 1 == 1
+
+    # How many numbers are in the set.
+    fn count(self: read Self) -> usize:
+        n: usize = 0
+        for w in self.words:
+            v = w
+            while v != 0:
+                v = v & (v - 1)
+                n += 1
+        return n
+
+    fn is_empty(self: read Self) -> bool:
+        for w in self.words:
+            if w != 0:
+                return false
+        return true
+
+    fn clear(self: lend Self):
+        self.words.clear()
+
+    # The smallest member that is at least `from`, or `None`.
+    fn next_from(self: read Self, from: usize) -> Optional[usize]:
+        i = from
+        limit = self.words.len * 64
+        while i < limit:
+            if self.words[i / 64] == 0:
+                i = (i / 64 + 1) * 64
+            elif self.contains(i):
+                return Valid(i)
+            else:
+                i += 1
+        return None
+
+    # Adds every member of `other`.
+    fn union_with(self: lend Self, other: read BitSet):
+        while self.words.len < other.words.len:
+            self.words.push(0)
+        for i in 0..other.words.len:
+            self.words[i] = self.words[i] | other.words[i]
+
+    # Keeps only the members that `other` also has.
+    fn intersect_with(self: lend Self, other: read BitSet):
+        for i in 0..self.words.len:
+            if i < other.words.len:
+                self.words[i] = self.words[i] & other.words[i]
+            else:
+                self.words[i] = 0
+
+    # Removes every member of `other`.
+    fn subtract(self: lend Self, other: read BitSet):
+        n = self.words.len
+        if other.words.len < n:
+            n = other.words.len
+        for i in 0..n:
+            self.words[i] = self.words[i] & ~other.words[i]
+
+    # The members, smallest first.
+    fn to_list(self: read Self) -> List[usize]:
+        out = List[usize]()
+        i = self.next_from(0)
+        while i.has_value():
+            m = i.value_or_panic()
+            out.push(m)
+            i = self.next_from(m + 1)
+        return out

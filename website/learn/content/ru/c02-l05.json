@@ -1,0 +1,87 @@
+{
+ "title": "Обход коллекций",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Список в квадратных скобках называется **массивом**: `[2, 3, 5]`. Его тип пишется `[N]тип` (`N` — число элементов). С помощью `for` вы берёте элементы по одному. Если нужна ещё и позиция, пишут две переменные: `for индекс, элемент in массив`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    primes: [4]i32 = [2, 3, 5, 7]",
+    "    for p in primes:",
+    "        print(\"Prime:\", p)",
+    "    names: [3]str = [\"Ali\", \"Ayşe\", \"Zeynep\"]",
+    "    for idx, name in names:",
+    "        print(idx, name)"
+   ],
+   "run": true,
+   "output": [
+    "Prime: 2",
+    "Prime: 3",
+    "Prime: 5",
+    "Prime: 7",
+    "0 Ali",
+    "1 Ayşe",
+    "2 Zeynep"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Если тело меняет элемент, изменение записывается прямо в массив:"
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    numbers: [3]i32 = [10, 20, 30]",
+    "    for s in numbers:",
+    "        s *= 2",
+    "    for s in numbers:",
+    "        print(s)"
+   ],
+   "run": true,
+   "output": [
+    "20",
+    "40",
+    "60"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c02-l05-x1",
+   "prompt": "Найдите сумму чисел в массиве и выведите её.",
+   "starter": [
+    "fn main():",
+    "    numbers: [4]i32 = [3, 4, 5, 6]",
+    "    total = 0",
+    "    print(total)"
+   ],
+   "solution": [
+    "fn main():",
+    "    numbers: [4]i32 = [3, 4, 5, 6]",
+    "    total = 0",
+    "    for s in numbers:",
+    "        total += s",
+    "    print(total)"
+   ],
+   "hint": "Внутри `for s in numbers:` сделайте `total += s`.",
+   "expected": [
+    "18"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c02-l05-q1",
+   "q": "Что хранит `i` в `for i, x in array:`?",
+   "options": [
+    "Значение элемента",
+    "Позицию (индекс) элемента",
+    "Длину массива"
+   ],
+   "answer": 1,
+   "why": "Первая переменная — позиция, вторая — элемент."
+  }
+ ]
+}

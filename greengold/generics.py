@@ -83,13 +83,24 @@ def _key_feature() -> FeatureDecl:
 # One type of each kind in a closed builtin bound: a body that works for these works for the whole set.
 BOUND_REPRESENTATIVES: dict[str, list[str]] = {
     "Int": ["i8", "u8", "i64", "usize"],
-    "Float": ["f32", "f64"],
+    "Float": ["f16", "f32", "f64"],
     "Num": ["i8", "u8", "i64", "usize", "f32", "f64"],
     "Ord": ["i8", "u8", "i64", "usize", "f32", "f64", "str"],
     "Eq": ["i8", "u8", "i64", "usize", "f32", "f64", "bool", "str"],
 }
 
 MAX_INSTANTIATION_DEPTH = 64
+
+
+def _has_cast(e: Expr) -> bool:
+    """A constant expression that names a type (`u64(7)`, `u64(1) << 63`) has that type, so it is not a bare literal."""
+    if isinstance(e, Cast):
+        return True
+    if isinstance(e, Unary):
+        return _has_cast(e.operand)
+    if isinstance(e, Binary):
+        return _has_cast(e.left) or _has_cast(e.right)
+    return False
 
 
 class GenericsMixin:
@@ -210,6 +221,7 @@ class GenericsMixin:
                 if m.name in seen:
                     self._err(m, f"`{m.name}` declared twice in feature `{d.name}`.")
                 seen.add(m.name)
+        self._finish_selective(quiet=True)  # `import std.io { Writer }`: a bound may name an imported feature
         known = list(self.features) + list(BUILTIN_FEATURES)
         for d in self.decls:
             if not isinstance(d, (StructDecl, EnumDecl, FuncDecl)):
@@ -448,6 +460,8 @@ class GenericsMixin:
         info.archetype_copy = "Copy" in bounds  # type: ignore[attr-defined]
         self.structs[tp] = info
         self.type_order.append(tp)
+        saved_scope = self.scope_slug
+        self.scope_slug = getattr(site, "module_slug", "") or ""   # names in a bound mean what they mean where the generic is written
         for b in bounds:
             slug = getattr(site, "module_slug", "")
             own = f"{slug}::{b}"  # a feature of the module that declares the generic, wherever it is checked from
@@ -462,11 +476,13 @@ class GenericsMixin:
                 stub.owner = tp
                 stub.body = []
                 stub.archetype_stub = True  # type: ignore[attr-defined]
-                stub.module_slug = getattr(site, "module_slug", "")
+                stub.is_pub = True  # type: ignore[attr-defined]
+                stub.module_slug = getattr(feature, "module_slug", "")  # its types resolve where the feature is written
                 from .ast_nodes import subst_self_func
                 subst_self_func(stub, tp, [])
                 self.decls.append(stub)
                 self._declare_function(stub, f"{tp}.{m.name}")
+        self.scope_slug = saved_scope
         return tp
 
     def _check_template_round(self, d: FuncDecl, params: list[str], binding: dict[str, str],
@@ -806,7 +822,7 @@ class GenericsMixin:
             pattern = param.type_ref
             if not any(self._pattern_mentions(pattern, t) for t in tparams):
                 continue
-            if is_const_expr(target) and pattern.name in tparams:
+            if is_const_expr(target) and pattern.name in tparams and not _has_cast(target):
                 deferred.append((pattern.name, target))
                 continue
             if isinstance(target, SliceExpr):
@@ -900,7 +916,7 @@ class GenericsMixin:
         if isinstance(e, Binary):
             return self._is_float_const(e.left) or self._is_float_const(e.right)
         if isinstance(e, Cast):
-            return e.target_type in ("f32", "f64")
+            return e.target_type in ("f16", "f32", "f64")
         return False
 
     # -- T(x): numeric conversion with type parameter ------------------------------------------------

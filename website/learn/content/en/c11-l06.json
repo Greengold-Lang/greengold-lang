@@ -1,0 +1,56 @@
+{
+ "title": "Assurance tools and editor support",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "For software that needs safety and quality `gg` offers extra checks:"
+  },
+  {
+   "t": "code",
+   "lang": "sh",
+   "code": [
+    "gg check --profile safety main.gg   # also rejects unsafe, panic, recursion, heap use,",
+    "                                    # unbounded loops and mutable statics",
+    "gg test --coverage                  # statement, decision, condition and MC/DC coverage",
+    "gg coverage --annotate              # list what never ran",
+    "gg fuzz main.gg                     # run fn fuzz_target(data: []u8) on mutated inputs",
+    "gg sbom main.gg                     # software bill of materials (CycloneDX or SPDX)",
+    "gg repro main.gg                    # build twice, compare the bytes (reproducible build)",
+    "gg unsafe-audit main.gg             # every unsafe block, asm, foreign function and static"
+   ],
+   "run": false
+  },
+  {
+   "t": "p",
+   "text": "To inspect the compiler stages there are `gg emit-ll` (LLVM IR), `gg emit-bc` (bitcode), `gg ast` (the syntax tree) and `gg attrs` (uses of `@attributes`, as JSON)."
+  },
+  {
+   "t": "p",
+   "text": "**Editor:** the Greengold VS Code extension, with the built-in language server (LSP), shows errors as you type, go to definition (`F12`), documentation on hover, completion after `.`, formatting with `Shift+Alt+F`, the compiler's fixes in the lightbulb menu and Run/Release/Build buttons. Saving the file also applies the `safe` fixes."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q1",
+   "q": "Which command lists every `unsafe` block of a program?",
+   "options": [
+    "`gg unsafe-audit`",
+    "`gg fix`",
+    "`gg doctor`"
+   ],
+   "answer": 0,
+   "why": "`unsafe-audit` collects the places where you must ensure memory safety by hand."
+  },
+  {
+   "t": "quiz",
+   "id": "c11-l06-q2",
+   "q": "What does `gg check --profile safety` reject?",
+   "options": [
+    "Only long lines",
+    "Things like `unsafe`, `panic`, recursion and heap use",
+    "Nothing"
+   ],
+   "answer": 1,
+   "why": "The safety profile switches off features that are hard to prove safe."
+  }
+ ]
+}

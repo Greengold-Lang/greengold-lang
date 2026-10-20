@@ -1,0 +1,61 @@
+{
+ "title": "Closures que puedes guardar: Fn",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`fn(...)` es un simple puntero a función. Para **devolver** un closure desde una función, o **guardarlo** en un campo de struct o en una lista, usa el tipo **`Fn(...) -> R`**. Una lambda escrita donde se espera `Fn` **posee** lo que captura (los valores del heap se mueven dentro, los demás se copian) y por eso no puede cambiarlos."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn make_adder(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x + k",
+    "",
+    "fn main():",
+    "    add5 = make_adder(5)",
+    "    print(add5(1), make_adder(2)(3))",
+    "    steps = List[Fn(i32) -> i32]()",
+    "    steps.push(make_adder(10))",
+    "    steps.push(make_adder(20))",
+    "    print(steps[0](1), steps[1](1))"
+   ],
+   "run": true,
+   "output": [
+    "6 5",
+    "11 21"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c09-l05-x1",
+   "prompt": "Escribe `make_multiplier(k)`: devuelve un `Fn(i32) -> i32` que multiplica su entrada por `k`. Imprime `make_multiplier(3)(7)`.",
+   "starter": [
+    "fn main():",
+    "    print(0)"
+   ],
+   "solution": [
+    "fn make_multiplier(k: i32) -> Fn(i32) -> i32:",
+    "    return fn(x: i32) -> i32 => x * k",
+    "",
+    "fn main():",
+    "    print(make_multiplier(3)(7))"
+   ],
+   "hint": "Mira el ejemplo de `make_adder`; escribe `*` en lugar de `+`.",
+   "expected": [
+    "21"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c09-l05-q1",
+   "q": "¿Qué tipo necesitas para devolver un closure desde una función?",
+   "options": [
+    "`fn(...)`",
+    "`Fn(...)`",
+    "`str`"
+   ],
+   "answer": 1,
+   "why": "`Fn` es un closure almacenable que posee lo que captura."
+  }
+ ]
+}

@@ -1,0 +1,98 @@
+{
+ "title": "HashMap ve HashSet",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`std.collections` anahtar → değer sözlüğü **`HashMap[K, V]`** ve tekrarsız küme **`HashSet[K]`** sunar. `hashmap_new[K, V]()` boş bir sözlük kurar; `insert` ekler, `get` bir `Optional` döndürür, `get_or` varsayılan verir, `contains` var mı diye bakar, `len` kaç eleman olduğunu söyler."
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    ages = collections.hashmap_new[str, i32]()",
+    "    ages.insert(\"ali\", 30)",
+    "    ages.insert(\"ayse\", 25)",
+    "    print(ages.len())",
+    "    print(ages.get_or(\"ali\", 0))",
+    "    print(ages.contains(\"zeynep\"))",
+    "    match ages.get(\"ayse\"):",
+    "        Valid(a):",
+    "            print(\"ayse is\", a)",
+    "        None:",
+    "            print(\"not found\")"
+   ],
+   "run": true,
+   "output": [
+    "2",
+    "30",
+    "false",
+    "ayse is 25"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    seen = collections.hashset_new[i32]()",
+    "    print(seen.insert(3))",
+    "    print(seen.insert(7))",
+    "    print(seen.insert(3))",
+    "    print(seen.len(), seen.contains(7))"
+   ],
+   "run": true,
+   "output": [
+    "true",
+    "true",
+    "false",
+    "2 true"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`HashSet.insert` yeni eklendiyse `true`, zaten varsa `false` döndürür; tekrarları bulmak için kullanışlıdır."
+  },
+  {
+   "t": "exercise",
+   "id": "c10-l03-x1",
+   "prompt": "`words` listesindeki `\"a\"`, `\"b\"`, `\"a\"`, `\"c\"`, `\"b\"`, `\"a\"` kelimelerinin her birinin kaç kez geçtiğini bir `HashMap[str, i32]` ile say ve `\"a\"` için sayıyı yazdır.",
+   "starter": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    words: [6]str = [\"a\", \"b\", \"a\", \"c\", \"b\", \"a\"]",
+    "    counts = collections.hashmap_new[str, i32]()",
+    "    print(counts.get_or(\"a\", 0))"
+   ],
+   "solution": [
+    "import std.collections",
+    "",
+    "fn main():",
+    "    words: [6]str = [\"a\", \"b\", \"a\", \"c\", \"b\", \"a\"]",
+    "    counts = collections.hashmap_new[str, i32]()",
+    "    for w in words:",
+    "        counts.insert(w, counts.get_or(w, 0) + 1)",
+    "    print(counts.get_or(\"a\", 0))"
+   ],
+   "hint": "Her kelime için `counts.insert(w, counts.get_or(w, 0) + 1)`.",
+   "expected": [
+    "3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c10-l03-q1",
+   "q": "Bir anahtar yoksa `get_or(key, 0)` ne verir?",
+   "options": [
+    "Hata",
+    "0 (verilen varsayılan)",
+    "`None`"
+   ],
+   "answer": 1,
+   "why": "`get_or` bir varsayılan alır; `get` ise `Optional` döndürür."
+  }
+ ]
+}
