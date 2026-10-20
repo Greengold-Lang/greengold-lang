@@ -28,6 +28,10 @@
   },
   {
    "t": "p",
+   "text": "Note: we wrote `consume` out in this example, but for heap-owning types, when the body moves the parameter to another owner (for example puts it inside a struct) the compiler **detects that by itself** too; you will see it in the next lessons."
+  },
+  {
+   "t": "p",
    "text": "Above, `hero` was invalid after `archive(hero)`; the new assignment brought it back to life. If you had written `print(hero.health)` right after `archive`, you would have got a compile error."
   },
   {

@@ -54,3 +54,4 @@
 .learn-side a.next { font-weight: 600; }
 .notice { padding: 8px 12px; border: 1px dashed var(--gold); border-radius: 10px; color: var(--gold-soft); }
 .notice a { color: inherit; text-decoration: underline; }
+.exercise.active { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 55%, transparent); }

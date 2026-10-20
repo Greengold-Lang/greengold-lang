@@ -34,7 +34,7 @@
   },
   {
    "t": "p",
-   "text": "Heap'e sahip tiplerde de, gövde değiştiriyorsa mod kendiliğinden `lend` olur:"
+   "text": "Heap'e sahip tiplerde `lend` yazman bile gerekmez: gövde parametreyi değiştiriyorsa derleyici modu **otomatik olarak `lend` tespit eder**:"
   },
   {
    "t": "code",

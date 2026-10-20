@@ -34,7 +34,7 @@
   },
   {
    "t": "p",
-   "text": "With heap-owning types too, the mode becomes `lend` by itself when the body changes the parameter:"
+   "text": "With heap-owning types you do not even need to write `lend`: when the body changes the parameter, the compiler **detects `lend` automatically**:"
   },
   {
    "t": "code",

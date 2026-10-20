@@ -31,7 +31,7 @@
   },
   {
    "t": "p",
-   "text": "`List` gibi heap'e sahip tiplerde mod yazılmazsa derleyici **gövdeden çıkarır**: yalnızca okunuyorsa `read` olur. `read` birçok yerde aynı anda olabilir, kimse değiştirmediği için güvenlidir."
+   "text": "**Modu çoğu zaman yazmana gerek yok: derleyici otomatik tespit eder.** `List` gibi heap'e sahip tiplerde mod yazılmazsa derleyici fonksiyonun gövdesine bakar: parametre yalnızca okunuyorsa `read` olur. `read` birçok yerde aynı anda olabilir, kimse değiştirmediği için güvenlidir."
   },
   {
    "t": "code",

@@ -1,86 +1,97 @@
 {
- "title": "Practice: a bank account",
+ "title": "Automatic cleanup and defer",
  "blocks": [
   {
    "t": "p",
-   "text": "An example using all three modes: `deposit` changes the account in place (`lend`), `close_and_transfer` closes the account and hands its money over (`consume`), and `defer` guarantees the closing message."
+   "text": "Greengold has no garbage collector. When a Move type reaches the end of the scope it was defined in, the compiler frees the memory **by itself** (`drop`). You never write `free` and you cannot forget it."
+  },
+  {
+   "t": "p",
+   "text": "**`defer`** marks cleanup code to run when a scope is left (a normal exit, `return`, `break`, `continue`, an error: all the same). Several `defer`s run in **reverse order** (the last written runs first)."
   },
   {
    "t": "code",
    "code": [
-    "struct Account:",
-    "    id: i32",
-    "    balance: f64",
-    "",
-    "fn deposit(acc: lend Account, amount: f64):",
-    "    acc.balance += amount",
-    "",
-    "fn close_and_transfer(acc: consume Account, target: lend Account):",
-    "    defer print(\"Account\", acc.id, \"closed.\")",
-    "    target.balance += acc.balance",
-    "",
     "fn main():",
-    "    mine = Account{ id: 101, balance: 500.0 }",
-    "    savings = Account{ id: 202, balance: 1000.0 }",
-    "    deposit(mine, 250.0)",
-    "    print(\"after deposit:\", mine.balance)",
-    "    close_and_transfer(mine, savings)",
-    "    print(\"savings:\", savings.balance)"
+    "    print(\"started\")",
+    "    defer print(\"cleanup 1 (written first, runs last)\")",
+    "    defer print(\"cleanup 2\")",
+    "    defer print(\"cleanup 3 (written last, runs first)\")",
+    "    print(\"working...\")"
    ],
    "run": true,
    "output": [
-    "after deposit: 750",
-    "Account 101 closed.",
-    "savings: 1750"
+    "started",
+    "working...",
+    "cleanup 3 (written last, runs first)",
+    "cleanup 2",
+    "cleanup 1 (written first, runs last)"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn process(code: i32):",
+    "    print(\"resource opened\")",
+    "    defer print(\"resource closed\")",
+    "    if code < 0:",
+    "        print(\"error, returning early\")",
+    "        return",
+    "    print(\"processed\")",
+    "",
+    "fn main():",
+    "    process(1)",
+    "    process(-1)"
+   ],
+   "run": true,
+   "output": [
+    "resource opened",
+    "processed",
+    "resource closed",
+    "resource opened",
+    "error, returning early",
+    "resource closed"
    ]
   },
   {
    "t": "exercise",
    "id": "c05-l06-x1",
-   "prompt": "Write `withdraw(acc: lend Account, amount: f64)`: subtract when the balance is enough, otherwise do nothing. From a balance of 100 withdraw 30, then 90, and print the balance.",
+   "prompt": "In `run()` print the messages `open`, `use` and `close`; but write `close` with `defer`, right after `open`. The expected order is: open, use, close.",
    "starter": [
-    "struct Account:",
-    "    balance: f64",
-    "",
-    "fn withdraw(acc: lend Account, amount: f64):",
-    "    pass",
+    "fn run():",
+    "    print(\"open\")",
+    "    print(\"use\")",
     "",
     "fn main():",
-    "    a = Account{ balance: 100.0 }",
-    "    withdraw(a, 30.0)",
-    "    withdraw(a, 90.0)",
-    "    print(a.balance)"
+    "    run()"
    ],
    "solution": [
-    "struct Account:",
-    "    balance: f64",
-    "",
-    "fn withdraw(acc: lend Account, amount: f64):",
-    "    if acc.balance >= amount:",
-    "        acc.balance -= amount",
+    "fn run():",
+    "    print(\"open\")",
+    "    defer print(\"close\")",
+    "    print(\"use\")",
     "",
     "fn main():",
-    "    a = Account{ balance: 100.0 }",
-    "    withdraw(a, 30.0)",
-    "    withdraw(a, 90.0)",
-    "    print(a.balance)"
+    "    run()"
    ],
-   "hint": "If `acc.balance >= amount` then `acc.balance -= amount`.",
+   "hint": "Add `defer print(\"close\")` below `print(\"open\")`.",
    "expected": [
-    "70"
+    "open",
+    "use",
+    "close"
    ]
   },
   {
    "t": "quiz",
    "id": "c05-l06-q1",
-   "q": "When closing an account and handing over its money, which mode should the account parameter use?",
+   "q": "With three `defer`s written, which runs first?",
    "options": [
-    "`read`",
-    "`lend`",
-    "`consume`"
+    "The first written",
+    "The last written",
+    "A random one"
    ],
-   "answer": 2,
-   "why": "The closed account will not be used again, so ownership is taken over: `consume`."
+   "answer": 1,
+   "why": "`defer`s run in reverse order (LIFO)."
   }
  ]
 }

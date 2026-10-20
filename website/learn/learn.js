@@ -133,6 +133,9 @@
   function setCode(src, exercise) {
     editor.value = src; currentStarter = src; currentExercise = exercise || null;
     out.textContent = ""; verdict.hidden = true; paint();
+    Array.prototype.forEach.call(document.querySelectorAll(".exercise"), function (e) {
+      e.classList.toggle("active", !!exercise && e.dataset.id === exercise.id);
+    });
   }
   function norm(s) { return s.replace(/\r/g, "").split("\n").map(function (l) { return l.replace(/\s+$/, ""); }).join("\n").replace(/\n+$/, ""); }
 
@@ -264,7 +267,7 @@
       if (miss && !skipped(manifest.chapters.filter(function (c) { return c.lessons.indexOf(id) >= 0; })[0])) {
         main.appendChild(el("p", "notice", T("review") + ': <a href="#/' + miss + '">' + H.esc(titles[miss] || miss) + "</a>"));
       }
-      var firstCode = null;
+      var firstCode = null, startEx = null;
       d.blocks.forEach(function (b) {
         if (b.t === "p") main.appendChild(el("p", "", inline(b.text)));
         else if (b.t === "h") main.appendChild(el("h3", "", inline(b.text)));
@@ -279,7 +282,10 @@
             if (firstCode === null) firstCode = src;
           }
           main.appendChild(box);
-        } else if (b.t === "exercise") exercise(main, b);
+        } else if (b.t === "exercise") {
+          exercise(main, b);
+          if (!startEx || (progress.exercises[startEx.id] && !progress.exercises[b.id])) startEx = b;   // first exercise not yet solved
+        }
         else if (b.t === "quiz") quiz(main, b);
       });
       var ids = lessonIds(), i = ids.indexOf(id), nav = el("div", "lesson-nav");
@@ -291,14 +297,16 @@
       });
       nav.appendChild(fin);
       main.appendChild(nav);
-      setCode(firstCode || "fn main():\n    print(\"\")\n", null);
+      // the editor opens with the exercise (the first one not yet solved), or with the first example
+      if (startEx) setCode(startEx.starter.join("\n"), startEx);
+      else setCode(firstCode || "fn main():\n    print(\"\")\n", null);
       side(id);
       window.scrollTo(0, 0);
     }).catch(function (e) { $("learn-main").textContent = String(e); });
   }
 
   function exercise(main, b) {
-    var box = el("div", "exercise" + (progress.exercises[b.id] ? " done" : ""));
+    var box = el("div", "exercise" + (progress.exercises[b.id] ? " done" : "")); box.dataset.id = b.id;
     box.innerHTML = "<h4>" + T("exercise") + (progress.exercises[b.id] ? " ✓" : "") + "</h4><p>" + inline(b.prompt) + "</p>";
     var row = el("div", "row");
     var edit = el("button", "btn btn-ghost", T("openEx")); edit.type = "button";

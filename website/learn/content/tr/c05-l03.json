@@ -28,6 +28,10 @@
   },
   {
    "t": "p",
+   "text": "Not: `consume`'ü bu örnekte açıkça yazdık, ama heap'e sahip tiplerde parametre gövdede başka bir sahibe taşınıyorsa (örneğin bir struct'ın içine konuyorsa) derleyici bunu da **kendisi tespit eder**; bir sonraki derslerde göreceksin."
+  },
+  {
+   "t": "p",
    "text": "Yukarıda `archive(hero)` çağrısından sonra `hero` geçersizdi; ama yeniden atama onu canlandırdı. `archive`'den sonra `print(hero.health)` yazsaydın derleme hatası alırdın."
   },
   {

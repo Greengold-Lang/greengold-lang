@@ -1,97 +1,100 @@
 {
- "title": "Automatic cleanup and defer",
+ "title": "The compiler finds the mode",
  "blocks": [
   {
    "t": "p",
-   "text": "Greengold has no garbage collector. When a Move type reaches the end of the scope it was defined in, the compiler frees the memory **by itself** (`drop`). You never write `free` and you cannot forget it."
+   "text": "Good news: most of the time you **do not have to write** these three modes. For a heap-owning type (`List`, `string`, `Box` and structs containing them), if you write no mode on the parameter the compiler **looks at the function body and detects the mode itself**:"
   },
   {
    "t": "p",
-   "text": "**`defer`** marks cleanup code to run when a scope is left (a normal exit, `return`, `break`, `continue`, an error: all the same). Several `defer`s run in **reverse order** (the last written runs first)."
+   "text": "If the body only **reads** the parameter → `read`; if it **changes** it → `lend`; if it **moves** it to another owner → `consume`."
   },
   {
    "t": "code",
    "code": [
-    "fn main():",
-    "    print(\"started\")",
-    "    defer print(\"cleanup 1 (written first, runs last)\")",
-    "    defer print(\"cleanup 2\")",
-    "    defer print(\"cleanup 3 (written last, runs first)\")",
-    "    print(\"working...\")"
-   ],
-   "run": true,
-   "output": [
-    "started",
-    "working...",
-    "cleanup 3 (written last, runs first)",
-    "cleanup 2",
-    "cleanup 1 (written first, runs last)"
-   ]
-  },
-  {
-   "t": "code",
-   "code": [
-    "fn process(code: i32):",
-    "    print(\"resource opened\")",
-    "    defer print(\"resource closed\")",
-    "    if code < 0:",
-    "        print(\"error, returning early\")",
-    "        return",
-    "    print(\"processed\")",
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn add(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn wrap(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
     "",
     "fn main():",
-    "    process(1)",
-    "    process(-1)"
+    "    v = List[i32]()",
+    "    add(v)",
+    "    add(v)",
+    "    print(total(v))",
+    "    b = wrap(v)",
+    "    print(b.items.len)"
    ],
    "run": true,
    "output": [
-    "resource opened",
-    "processed",
-    "resource closed",
-    "resource opened",
-    "error, returning early",
-    "resource closed"
+    "2",
+    "2"
    ]
+  },
+  {
+   "t": "p",
+   "text": "None of the three functions has a mode written. `add` became `lend` because it changes the list, `total` became `read` because it only reads, and `wrap` became `consume` because it puts the list inside `Bag`. After `wrap(v)` the variable `v` can no longer be used; if you try, the compiler reports the error and also tells you **the mode it detected and why**."
+  },
+  {
+   "t": "p",
+   "text": "With Copy types such as numbers and plain structs, if no mode is written the value is **copied** and cannot be changed inside the function; to change it in place you write `lend` out (`n: lend i32`). You can always write the mode yourself (for readability, or to pin the decision down)."
   },
   {
    "t": "exercise",
    "id": "c05-l05-x1",
-   "prompt": "In `run()` print the messages `open`, `use` and `close`; but write `close` with `defer`, right after `open`. The expected order is: open, use, close.",
+   "prompt": "Without writing any mode, write `keep(xs: List[i32]) -> Bag`: it puts the list inside a `Bag` (the compiler detects this as `consume`). In `main` call it with a 3-element list and print `b.items.len`.",
    "starter": [
-    "fn run():",
-    "    print(\"open\")",
-    "    print(\"use\")",
+    "struct Bag:",
+    "    items: List[i32]",
     "",
     "fn main():",
-    "    run()"
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    print(0)"
    ],
    "solution": [
-    "fn run():",
-    "    print(\"open\")",
-    "    defer print(\"close\")",
-    "    print(\"use\")",
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn keep(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
     "",
     "fn main():",
-    "    run()"
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    b = keep(v)",
+    "    print(b.items.len)"
    ],
-   "hint": "Add `defer print(\"close\")` below `print(\"open\")`.",
+   "hint": "`return Bag{ items: xs }`; then `b = keep(v)` and `print(b.items.len)`.",
    "expected": [
-    "open",
-    "use",
-    "close"
+    "3"
    ]
   },
   {
    "t": "quiz",
    "id": "c05-l05-q1",
-   "q": "With three `defer`s written, which runs first?",
+   "q": "You wrote no mode on a heap-owning `List` parameter and the body calls `xs.push(1)`. Which mode does the compiler detect?",
    "options": [
-    "The first written",
-    "The last written",
-    "A random one"
+    "`read`",
+    "`lend`",
+    "`consume`"
    ],
    "answer": 1,
-   "why": "`defer`s run in reverse order (LIFO)."
+   "why": "The body changes the list, so the mode is `lend`; you do not have to write it."
   }
  ]
 }

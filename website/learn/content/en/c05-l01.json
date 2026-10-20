@@ -31,7 +31,7 @@
   },
   {
    "t": "p",
-   "text": "For heap-owning types such as `List`, if no mode is written the compiler **infers it from the body**: if it is only read, it becomes `read`. Many `read`s can exist at once; it is safe because nobody changes the data."
+   "text": "**You usually do not need to write the mode: the compiler detects it automatically.** For heap-owning types such as `List`, if no mode is written the compiler looks at the function body: if the parameter is only read, it becomes `read`. Many `read`s can exist at once; it is safe because nobody changes the data."
   },
   {
    "t": "code",

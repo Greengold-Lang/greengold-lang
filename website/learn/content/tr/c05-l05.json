@@ -1,97 +1,100 @@
 {
- "title": "Otomatik temizlik ve defer",
+ "title": "Modu derleyici bulur",
  "blocks": [
   {
    "t": "p",
-   "text": "Greengold'da çöp toplayıcı yoktur. Bir Move tipi tanımlandığı kapsamın sonuna gelince derleyici belleği **kendiliğinden** serbest bırakır (`drop`). Sen `free` yazmazsın ve unutamazsın."
+   "text": "İyi haber: bu üç modu çoğu zaman **yazmak zorunda değilsin**. Heap'e sahip bir tipte (`List`, `string`, `Box` ve bunları içeren struct'lar) parametreye mod yazmazsan derleyici fonksiyonun **gövdesine bakıp modu kendisi tespit eder**:"
   },
   {
    "t": "p",
-   "text": "**`defer`**, bir kapsamdan çıkılırken çalışacak temizlik kodunu işaretler (normal çıkış, `return`, `break`, `continue`, hata fark etmez). Birden çok `defer` **ters sırada** (son yazılan ilk çalışır) yürür."
+   "text": "Gövde parametreyi yalnızca **okuyorsa** → `read`; **değiştiriyorsa** → `lend`; **başka bir sahibe taşıyorsa** → `consume`."
   },
   {
    "t": "code",
    "code": [
-    "fn main():",
-    "    print(\"started\")",
-    "    defer print(\"cleanup 1 (written first, runs last)\")",
-    "    defer print(\"cleanup 2\")",
-    "    defer print(\"cleanup 3 (written last, runs first)\")",
-    "    print(\"working...\")"
-   ],
-   "run": true,
-   "output": [
-    "started",
-    "working...",
-    "cleanup 3 (written last, runs first)",
-    "cleanup 2",
-    "cleanup 1 (written first, runs last)"
-   ]
-  },
-  {
-   "t": "code",
-   "code": [
-    "fn process(code: i32):",
-    "    print(\"resource opened\")",
-    "    defer print(\"resource closed\")",
-    "    if code < 0:",
-    "        print(\"error, returning early\")",
-    "        return",
-    "    print(\"processed\")",
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn add(xs: List[i32]):",
+    "    xs.push(1)",
+    "",
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn wrap(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
     "",
     "fn main():",
-    "    process(1)",
-    "    process(-1)"
+    "    v = List[i32]()",
+    "    add(v)",
+    "    add(v)",
+    "    print(total(v))",
+    "    b = wrap(v)",
+    "    print(b.items.len)"
    ],
    "run": true,
    "output": [
-    "resource opened",
-    "processed",
-    "resource closed",
-    "resource opened",
-    "error, returning early",
-    "resource closed"
+    "2",
+    "2"
    ]
+  },
+  {
+   "t": "p",
+   "text": "Üç fonksiyonda da hiç mod yazılmadı. `add` listeyi değiştirdiği için `lend`, `total` yalnızca okuduğu için `read`, `wrap` ise listeyi `Bag`'in içine koyduğu için `consume` oldu. `wrap(v)` çağrısından sonra `v` artık kullanılamaz; kullanmaya kalkarsan derleyici hatayı gösterir ve hatanın yanında **tespit ettiği modu ve nedenini** de yazar."
+  },
+  {
+   "t": "p",
+   "text": "Sayılar ve düz struct'lar gibi Copy tiplerinde ise mod yazılmazsa değer **kopyalanır** ve fonksiyon içinde değiştirilemez; yerinde değiştirmek istiyorsan `lend`'i açıkça yazarsın (`n: lend i32`). Modu kendin yazmak istersen (okunurluk için ya da kararı sabitlemek için) her zaman yazabilirsin."
   },
   {
    "t": "exercise",
    "id": "c05-l05-x1",
-   "prompt": "`run()` içinde `open`, `use` ve `close` mesajlarını yazdır; ama `close`'u `defer` ile, `open`'dan hemen sonra yaz. Beklenen sıra: open, use, close.",
+   "prompt": "Hiç mod yazmadan `keep(xs: List[i32]) -> Bag` fonksiyonunu yaz: listeyi `Bag`'in içine koysun (derleyici bunu `consume` olarak tespit eder). `main`'de 3 elemanlı bir listeyle çağır ve `b.items.len` yazdır.",
    "starter": [
-    "fn run():",
-    "    print(\"open\")",
-    "    print(\"use\")",
+    "struct Bag:",
+    "    items: List[i32]",
     "",
     "fn main():",
-    "    run()"
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    print(0)"
    ],
    "solution": [
-    "fn run():",
-    "    print(\"open\")",
-    "    defer print(\"close\")",
-    "    print(\"use\")",
+    "struct Bag:",
+    "    items: List[i32]",
+    "",
+    "fn keep(xs: List[i32]) -> Bag:",
+    "    return Bag{ items: xs }",
     "",
     "fn main():",
-    "    run()"
+    "    v = List[i32]()",
+    "    v.push(1)",
+    "    v.push(2)",
+    "    v.push(3)",
+    "    b = keep(v)",
+    "    print(b.items.len)"
    ],
-   "hint": "`print(\"open\")` satırının altına `defer print(\"close\")` ekle.",
+   "hint": "`return Bag{ items: xs }`; sonra `b = keep(v)` ve `print(b.items.len)`.",
    "expected": [
-    "open",
-    "use",
-    "close"
+    "3"
    ]
   },
   {
    "t": "quiz",
    "id": "c05-l05-q1",
-   "q": "Üç `defer` yazıldığında hangisi ilk çalışır?",
+   "q": "Heap'e sahip bir `List` parametresine mod yazmadın ve gövde `xs.push(1)` çağırıyor. Derleyici hangi modu tespit eder?",
    "options": [
-    "İlk yazılan",
-    "Son yazılan",
-    "Rastgele biri"
+    "`read`",
+    "`lend`",
+    "`consume`"
    ],
    "answer": 1,
-   "why": "`defer`'ler ters sırada çalışır (LIFO)."
+   "why": "Gövde listeyi değiştirdiği için mod `lend` olur; bunu senin yazman gerekmez."
   }
  ]
 }
