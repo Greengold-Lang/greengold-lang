@@ -1,0 +1,72 @@
+{
+ "title": "Copy and Move types",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A type falls into one of two groups. **Copy types** (numbers, `bool`, `str`, plain structs, arrays of Copy elements) live on the stack and are cheap to copy. **Move types** (`List`, `Box`, `string`, and anything that contains them) own heap memory; they are never copied, only **moved** (so there is no double free)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 5",
+    "    b = a",
+    "    b += 1",
+    "    print(a, b)",
+    "",
+    "    list_a = List[i32]()",
+    "    list_a.push(10)",
+    "    list_b = list_a",
+    "    list_c = list_b.clone()",
+    "    list_c.push(20)",
+    "    print(list_b.len, list_c.len)"
+   ],
+   "run": true,
+   "output": [
+    "5 6",
+    "1 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "With numbers, `b = a` copies; `a` stays usable. With lists, `list_b = list_a` moves ownership: only `list_b` is valid now. If you want an independent copy you write `.clone()`."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l04-x1",
+   "prompt": "Take a `.clone()` of the list `original` named `dup`, push 99 onto `dup`, and print the length of both lists.",
+   "starter": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    print(original.len)"
+   ],
+   "solution": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    dup = original.clone()",
+    "    dup.push(99)",
+    "    print(original.len, dup.len)"
+   ],
+   "hint": "`dup = original.clone()` and `dup.push(99)`.",
+   "expected": [
+    "2 3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l04-q1",
+   "q": "Which is a Move type?",
+   "options": [
+    "`i32`",
+    "`List[i32]`",
+    "`bool`"
+   ],
+   "answer": 1,
+   "why": "`List` lives on the heap so it is moved; numbers are copied."
+  }
+ ]
+}

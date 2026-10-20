@@ -1,0 +1,89 @@
+{
+ "title": "Structs",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "To gather related values under one name you use a **`struct`**. Fields are listed as `name: type`; to create a value you write `Type{ field: value, ... }` and reach a field with `.`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Point:",
+    "    x: f64",
+    "    y: f64",
+    "",
+    "fn main():",
+    "    p = Point{ x: 1.0, y: 2.5 }",
+    "    print(\"x:\", p.x)",
+    "    print(\"y:\", p.y)",
+    "    p.x = 10.0",
+    "    print(\"new x:\", p.x)"
+   ],
+   "run": true,
+   "output": [
+    "x: 1",
+    "y: 2.5",
+    "new x: 10"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Fields can be changed unless the variable is `fixed`. Structs can be passed to functions as parameters and returned from them."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rect:",
+    "    w: i32",
+    "    h: i32",
+    "",
+    "fn area(r: Rect) -> i32:",
+    "    return r.w * r.h",
+    "",
+    "fn main():",
+    "    room = Rect{ w: 4, h: 5 }",
+    "    print(area(room))"
+   ],
+   "run": true,
+   "output": [
+    "20"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l01-x1",
+   "prompt": "Define a `Person` struct with `name: str` and `age: i32`. Create `Person{ name: \"Ada\", age: 36 }` and print the name, then the age.",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Person:",
+    "    name: str",
+    "    age: i32",
+    "",
+    "fn main():",
+    "    p = Person{ name: \"Ada\", age: 36 }",
+    "    print(p.name)",
+    "    print(p.age)"
+   ],
+   "hint": "Write `struct Person:` and its two fields above `main`.",
+   "expected": [
+    "Ada",
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l01-q1",
+   "q": "How do you reach the field `x` of a struct?",
+   "options": [
+    "p->x",
+    "p.x",
+    "p[x]"
+   ],
+   "answer": 1,
+   "why": "Field access uses a dot: `p.x`."
+  }
+ ]
+}

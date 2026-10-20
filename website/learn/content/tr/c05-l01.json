@@ -1,0 +1,109 @@
+{
+ "title": "Parametre modları: read",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold'da bellek güvenliği, karmaşık \"lifetime\" yazımları olmadan, bir fonksiyona veri verirken seçtiğin **üç moddan** gelir: `read` (sadece oku), `lend` (ödünç al ve yerinde değiştir) ve `consume` (sahipliği devral). Bu derste ilkini göreceksin."
+  },
+  {
+   "t": "p",
+   "text": "Bir mod yazmazsan sayılar ve düz struct'lar **kopyalanır** ve fonksiyon içinde değiştirilemez. Yığında yaşayan (heap'e sahip olmayan) bu tiplere **Copy tipleri** denir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn show_health(p: Player):",
+    "    print(\"Current health:\", p.health)",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    show_health(hero)",
+    "    print(\"Still:\", hero.health)"
+   ],
+   "run": true,
+   "output": [
+    "Current health: 100",
+    "Still: 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`List` gibi heap'e sahip tiplerde mod yazılmazsa derleyici **gövdeden çıkarır**: yalnızca okunuyorsa `read` olur. `read` birçok yerde aynı anda olabilir, kimse değiştirmediği için güvenlidir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(total(v))",
+    "    print(total(v))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l01-x1",
+   "prompt": "`count_positive(xs: List[i32]) -> i32` yaz: listedeki pozitif sayıların sayısını döndürsün. Liste hâlâ kullanılabilir olduğundan iki kez çağır ve ikisini de yazdır.",
+   "starter": [
+    "fn count_positive(xs: List[i32]) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(-2)",
+    "    v.push(7)",
+    "    print(count_positive(v))",
+    "    print(count_positive(v))"
+   ],
+   "solution": [
+    "fn count_positive(xs: List[i32]) -> i32:",
+    "    n = 0",
+    "    for x in xs:",
+    "        if x > 0:",
+    "            n += 1",
+    "    return n",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(-2)",
+    "    v.push(7)",
+    "    print(count_positive(v))",
+    "    print(count_positive(v))"
+   ],
+   "hint": "`n` sayacını `x > 0` iken artır.",
+   "expected": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l01-q1",
+   "q": "`read` modundaki bir parametre fonksiyonda ne yapabilir?",
+   "options": [
+    "Değiştirilebilir",
+    "Yalnızca okunabilir",
+    "Silinebilir"
+   ],
+   "answer": 1,
+   "why": "`read` yalnızca okumadır; değiştirmeye çalışmak derleme hatasıdır."
+  }
+ ]
+}

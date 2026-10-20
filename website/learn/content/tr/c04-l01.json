@@ -1,0 +1,89 @@
+{
+ "title": "Struct",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Birbiriyle ilgili değerleri tek bir isim altında toplamak için **`struct`** kullanılır. Alanlar `isim: tip` olarak sıralanır; değer oluştururken `Tip{ alan: değer, ... }` yazılır ve alana `.` ile ulaşılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Point:",
+    "    x: f64",
+    "    y: f64",
+    "",
+    "fn main():",
+    "    p = Point{ x: 1.0, y: 2.5 }",
+    "    print(\"x:\", p.x)",
+    "    print(\"y:\", p.y)",
+    "    p.x = 10.0",
+    "    print(\"new x:\", p.x)"
+   ],
+   "run": true,
+   "output": [
+    "x: 1",
+    "y: 2.5",
+    "new x: 10"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Alanlar, değişken `fixed` değilse değiştirilebilir. Struct'lar fonksiyonlara parametre olarak verilebilir ve fonksiyondan döndürülebilir."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Rect:",
+    "    w: i32",
+    "    h: i32",
+    "",
+    "fn area(r: Rect) -> i32:",
+    "    return r.w * r.h",
+    "",
+    "fn main():",
+    "    room = Rect{ w: 4, h: 5 }",
+    "    print(area(room))"
+   ],
+   "run": true,
+   "output": [
+    "20"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l01-x1",
+   "prompt": "`Person` struct'ı tanımla: `name: str` ve `age: i32`. `Person{ name: \"Ada\", age: 36 }` oluşturup önce adı, sonra yaşı yazdır.",
+   "starter": [
+    "fn main():",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Person:",
+    "    name: str",
+    "    age: i32",
+    "",
+    "fn main():",
+    "    p = Person{ name: \"Ada\", age: 36 }",
+    "    print(p.name)",
+    "    print(p.age)"
+   ],
+   "hint": "`main`'in üstüne `struct Person:` ve iki alan yaz.",
+   "expected": [
+    "Ada",
+    "36"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l01-q1",
+   "q": "Bir struct'ın `x` alanına nasıl erişilir?",
+   "options": [
+    "p->x",
+    "p.x",
+    "p[x]"
+   ],
+   "answer": 1,
+   "why": "Alan erişimi noktayla yapılır: `p.x`."
+  }
+ ]
+}

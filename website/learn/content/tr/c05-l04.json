@@ -1,0 +1,72 @@
+{
+ "title": "Copy ve Move tipleri",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bir tip iki gruptan birine girer. **Copy tipleri** (sayılar, `bool`, `str`, düz struct'lar, Copy elemanlı diziler) yığında yaşar ve kopyalanması ucuzdur. **Move tipleri** (`List`, `Box`, `string` ve bunları içeren her şey) heap belleğine sahiptir; hiç kopyalanmazlar, yalnızca **taşınırlar** (böylece çift silme olmaz)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    a = 5",
+    "    b = a",
+    "    b += 1",
+    "    print(a, b)",
+    "",
+    "    list_a = List[i32]()",
+    "    list_a.push(10)",
+    "    list_b = list_a",
+    "    list_c = list_b.clone()",
+    "    list_c.push(20)",
+    "    print(list_b.len, list_c.len)"
+   ],
+   "run": true,
+   "output": [
+    "5 6",
+    "1 2"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Sayılarda `b = a` kopyalar; `a` kullanılabilir kalır. Listede `list_b = list_a` sahipliği taşır: artık yalnızca `list_b` geçerli. Bağımsız bir kopya istiyorsan `.clone()` yazarsın."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l04-x1",
+   "prompt": "`original` listesinin bir `.clone()`'unu `dup` adıyla al, `dup`'ye 99 ekle ve iki listenin uzunluğunu yazdır.",
+   "starter": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    print(original.len)"
+   ],
+   "solution": [
+    "fn main():",
+    "    original = List[i32]()",
+    "    original.push(1)",
+    "    original.push(2)",
+    "    dup = original.clone()",
+    "    dup.push(99)",
+    "    print(original.len, dup.len)"
+   ],
+   "hint": "`dup = original.clone()` ve `dup.push(99)`.",
+   "expected": [
+    "2 3"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l04-q1",
+   "q": "Hangisi bir Move tipidir?",
+   "options": [
+    "`i32`",
+    "`List[i32]`",
+    "`bool`"
+   ],
+   "answer": 1,
+   "why": "`List` heap'te yaşadığı için taşınır; sayılar kopyalanır."
+  }
+ ]
+}

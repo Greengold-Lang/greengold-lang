@@ -1,0 +1,93 @@
+{
+ "title": "Parameters and results",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Functions can call each other; the result of one function can be an argument of another. `return` leaves the function at once, so it is also used for an **early return**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn abs_value(x: i32) -> i32:",
+    "    if x < 0:",
+    "        return -x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(square(abs_value(-4)))"
+   ],
+   "run": true,
+   "output": [
+    "16"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Functions that return `bool` read like questions (`is_even`, `is_positive`) and fit nicely inside `if`."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn is_even(n: i32) -> bool:",
+    "    return n % 2 == 0",
+    "",
+    "fn main():",
+    "    for i in 1..=4:",
+    "        if is_even(i):",
+    "            print(i, \"is even\")",
+    "        else:",
+    "            print(i, \"is odd\")"
+   ],
+   "run": true,
+   "output": [
+    "1 is odd",
+    "2 is even",
+    "3 is odd",
+    "4 is even"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l02-x1",
+   "prompt": "Write `max_of(a, b)`: it returns the bigger one.",
+   "starter": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "solution": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "hint": "Return `a` if `a > b`, otherwise return `b`.",
+   "expected": [
+    "12",
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l02-q1",
+   "q": "What happens when `return` runs in the middle of a function?",
+   "options": [
+    "The function ends at once",
+    "The next line runs",
+    "It is an error"
+   ],
+   "answer": 0,
+   "why": "`return` leaves the function immediately; the lines below do not run."
+  }
+ ]
+}

@@ -44,6 +44,49 @@
     "c02-l05",
     "c02-l06"
    ]
+  },
+  {
+   "id": "c03",
+   "title": {
+    "tr": "Fonksiyonlar",
+    "en": "Functions"
+   },
+   "lessons": [
+    "c03-l01",
+    "c03-l02",
+    "c03-l03",
+    "c03-l04"
+   ]
+  },
+  {
+   "id": "c04",
+   "title": {
+    "tr": "Veri yapıları ve metotlar",
+    "en": "Data structures and methods"
+   },
+   "lessons": [
+    "c04-l01",
+    "c04-l02",
+    "c04-l03",
+    "c04-l04",
+    "c04-l05",
+    "c04-l06"
+   ]
+  },
+  {
+   "id": "c05",
+   "title": {
+    "tr": "Sahiplik, modlar ve bellek",
+    "en": "Ownership, modes and memory"
+   },
+   "lessons": [
+    "c05-l01",
+    "c05-l02",
+    "c05-l03",
+    "c05-l04",
+    "c05-l05",
+    "c05-l06"
+   ]
   }
  ]
 }

@@ -1,0 +1,86 @@
+{
+ "title": "Practice: a bank account",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "An example using all three modes: `deposit` changes the account in place (`lend`), `close_and_transfer` closes the account and hands its money over (`consume`), and `defer` guarantees the closing message."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Account:",
+    "    id: i32",
+    "    balance: f64",
+    "",
+    "fn deposit(acc: lend Account, amount: f64):",
+    "    acc.balance += amount",
+    "",
+    "fn close_and_transfer(acc: consume Account, target: lend Account):",
+    "    defer print(\"Account\", acc.id, \"closed.\")",
+    "    target.balance += acc.balance",
+    "",
+    "fn main():",
+    "    mine = Account{ id: 101, balance: 500.0 }",
+    "    savings = Account{ id: 202, balance: 1000.0 }",
+    "    deposit(mine, 250.0)",
+    "    print(\"after deposit:\", mine.balance)",
+    "    close_and_transfer(mine, savings)",
+    "    print(\"savings:\", savings.balance)"
+   ],
+   "run": true,
+   "output": [
+    "after deposit: 750",
+    "Account 101 closed.",
+    "savings: 1750"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l06-x1",
+   "prompt": "Write `withdraw(acc: lend Account, amount: f64)`: subtract when the balance is enough, otherwise do nothing. From a balance of 100 withdraw 30, then 90, and print the balance.",
+   "starter": [
+    "struct Account:",
+    "    balance: f64",
+    "",
+    "fn withdraw(acc: lend Account, amount: f64):",
+    "    pass",
+    "",
+    "fn main():",
+    "    a = Account{ balance: 100.0 }",
+    "    withdraw(a, 30.0)",
+    "    withdraw(a, 90.0)",
+    "    print(a.balance)"
+   ],
+   "solution": [
+    "struct Account:",
+    "    balance: f64",
+    "",
+    "fn withdraw(acc: lend Account, amount: f64):",
+    "    if acc.balance >= amount:",
+    "        acc.balance -= amount",
+    "",
+    "fn main():",
+    "    a = Account{ balance: 100.0 }",
+    "    withdraw(a, 30.0)",
+    "    withdraw(a, 90.0)",
+    "    print(a.balance)"
+   ],
+   "hint": "If `acc.balance >= amount` then `acc.balance -= amount`.",
+   "expected": [
+    "70"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l06-q1",
+   "q": "When closing an account and handing over its money, which mode should the account parameter use?",
+   "options": [
+    "`read`",
+    "`lend`",
+    "`consume`"
+   ],
+   "answer": 2,
+   "why": "The closed account will not be used again, so ownership is taken over: `consume`."
+  }
+ ]
+}

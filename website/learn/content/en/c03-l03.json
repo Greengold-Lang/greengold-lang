@@ -1,0 +1,66 @@
+{
+ "title": "Recursion",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A function can call itself; this is called **recursion**. Every recursive function needs a **base case** where it stops calling itself and gives a result; otherwise it goes on forever."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn factorial(n: i32) -> i32:",
+    "    if n <= 1:",
+    "        return 1",
+    "    return n * factorial(n - 1)",
+    "",
+    "fn main():",
+    "    print(factorial(5))"
+   ],
+   "run": true,
+   "output": [
+    "120"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`factorial(5)` means `5 * factorial(4)`, and so on down to `factorial(1)`; then the products come back up: 5 · 4 · 3 · 2 · 1 = 120."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l03-x1",
+   "prompt": "Compute a Fibonacci number with recursion: `fib(0)` = 0, `fib(1)` = 1, and every other one is the sum of the two before it. Print `fib(10)`.",
+   "starter": [
+    "fn fib(n: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "solution": [
+    "fn fib(n: i32) -> i32:",
+    "    if n < 2:",
+    "        return n",
+    "    return fib(n - 1) + fib(n - 2)",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "hint": "If `n < 2` return `n`; otherwise `fib(n - 1) + fib(n - 2)`.",
+   "expected": [
+    "55"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l03-q1",
+   "q": "What happens in a recursive function without a base case?",
+   "options": [
+    "It never runs",
+    "It calls itself forever (the stack overflows)",
+    "It returns 0"
+   ],
+   "answer": 1,
+   "why": "With no stopping point the calls pile up and the stack overflows."
+  }
+ ]
+}

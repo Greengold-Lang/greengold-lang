@@ -1,0 +1,74 @@
+{
+ "title": "consume: sahipliği devretmek",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "`consume` verinin **sahipliğini** fonksiyona devreder. Çağrıdan sonra o değişken **geçersizdir**; okunamaz. Böylece aynı bellek iki yerden silinemez ve elde \"asılı\" bir referans kalmaz. Çağrıda `consume` yazılmaz, yalnızca parametrede yazılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn archive(p: consume Player):",
+    "    print(\"archived with health\", p.health)",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    archive(hero)",
+    "    hero = Player{ health: 50 }",
+    "    print(hero.health)"
+   ],
+   "run": true,
+   "output": [
+    "archived with health 100",
+    "50"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Yukarıda `archive(hero)` çağrısından sonra `hero` geçersizdi; ama yeniden atama onu canlandırdı. `archive`'den sonra `print(hero.health)` yazsaydın derleme hatası alırdın."
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l03-x1",
+   "prompt": "`Task` (`title: str`) için `finish(t: consume Task)` yaz: `done: ` ve ardından başlığı yazdırsın. `main`'de çağır.",
+   "starter": [
+    "struct Task:",
+    "    title: str",
+    "",
+    "fn main():",
+    "    t = Task{ title: \"write docs\" }",
+    "    print(\"?\")"
+   ],
+   "solution": [
+    "struct Task:",
+    "    title: str",
+    "",
+    "fn finish(t: consume Task):",
+    "    print(\"done:\", t.title)",
+    "",
+    "fn main():",
+    "    t = Task{ title: \"write docs\" }",
+    "    finish(t)"
+   ],
+   "hint": "`print(\"done:\", t.title)` yapan `finish` fonksiyonunu ekle ve `main`'de `finish(t)` çağır.",
+   "expected": [
+    "done: write docs"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l03-q1",
+   "q": "`consume` edilen değişken çağrıdan sonra ne olur?",
+   "options": [
+    "Aynen kullanılabilir",
+    "Geçersiz olur; yeniden atanmadıkça okunamaz",
+    "Sıfırlanır"
+   ],
+   "answer": 1,
+   "why": "Sahiplik fonksiyona geçti; eski değişkenin artık verisi yok."
+  }
+ ]
+}

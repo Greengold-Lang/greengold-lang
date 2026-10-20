@@ -1,0 +1,109 @@
+{
+ "title": "Parameter modes: read",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "In Greengold, memory safety comes without complicated lifetime syntax, from the **three modes** you choose when handing data to a function: `read` (only read), `lend` (borrow and change in place) and `consume` (take over ownership). In this lesson you will see the first."
+  },
+  {
+   "t": "p",
+   "text": "If you write no mode, numbers and plain structs are **copied** and cannot be changed inside the function. Such types, which live on the stack and own no heap memory, are called **Copy types**."
+  },
+  {
+   "t": "code",
+   "code": [
+    "struct Player:",
+    "    health: i32",
+    "",
+    "fn show_health(p: Player):",
+    "    print(\"Current health:\", p.health)",
+    "",
+    "fn main():",
+    "    hero = Player{ health: 100 }",
+    "    show_health(hero)",
+    "    print(\"Still:\", hero.health)"
+   ],
+   "run": true,
+   "output": [
+    "Current health: 100",
+    "Still: 100"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "For heap-owning types such as `List`, if no mode is written the compiler **infers it from the body**: if it is only read, it becomes `read`. Many `read`s can exist at once; it is safe because nobody changes the data."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn total(xs: List[i32]) -> i32:",
+    "    t = 0",
+    "    for x in xs:",
+    "        t += x",
+    "    return t",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(4)",
+    "    v.push(5)",
+    "    print(total(v))",
+    "    print(total(v))"
+   ],
+   "run": true,
+   "output": [
+    "9",
+    "9"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l01-x1",
+   "prompt": "Write `count_positive(xs: List[i32]) -> i32` returning how many numbers in the list are positive. Since the list is still usable, call it twice and print both results.",
+   "starter": [
+    "fn count_positive(xs: List[i32]) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(-2)",
+    "    v.push(7)",
+    "    print(count_positive(v))",
+    "    print(count_positive(v))"
+   ],
+   "solution": [
+    "fn count_positive(xs: List[i32]) -> i32:",
+    "    n = 0",
+    "    for x in xs:",
+    "        if x > 0:",
+    "            n += 1",
+    "    return n",
+    "",
+    "fn main():",
+    "    v = List[i32]()",
+    "    v.push(5)",
+    "    v.push(-2)",
+    "    v.push(7)",
+    "    print(count_positive(v))",
+    "    print(count_positive(v))"
+   ],
+   "hint": "Increase the counter `n` when `x > 0`.",
+   "expected": [
+    "2",
+    "2"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l01-q1",
+   "q": "What can a `read` parameter do inside the function?",
+   "options": [
+    "Be changed",
+    "Only be read",
+    "Be deleted"
+   ],
+   "answer": 1,
+   "why": "`read` is read-only; trying to change it is a compile error."
+  }
+ ]
+}

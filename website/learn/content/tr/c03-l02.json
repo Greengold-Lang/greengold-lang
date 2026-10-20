@@ -1,0 +1,93 @@
+{
+ "title": "Parametreler ve dönüş",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Fonksiyonlar birbirini çağırabilir; bir fonksiyonun sonucu başka bir fonksiyona argüman olabilir. `return` fonksiyondan hemen çıkar, bu yüzden **erken dönüş** için de kullanılır."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn square(x: i32) -> i32:",
+    "    return x * x",
+    "",
+    "fn abs_value(x: i32) -> i32:",
+    "    if x < 0:",
+    "        return -x",
+    "    return x",
+    "",
+    "fn main():",
+    "    print(square(abs_value(-4)))"
+   ],
+   "run": true,
+   "output": [
+    "16"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`bool` döndüren fonksiyonlar soru gibi okunur (`is_even`, `is_positive`) ve `if` içinde güzel durur."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn is_even(n: i32) -> bool:",
+    "    return n % 2 == 0",
+    "",
+    "fn main():",
+    "    for i in 1..=4:",
+    "        if is_even(i):",
+    "            print(i, \"is even\")",
+    "        else:",
+    "            print(i, \"is odd\")"
+   ],
+   "run": true,
+   "output": [
+    "1 is odd",
+    "2 is even",
+    "3 is odd",
+    "4 is even"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l02-x1",
+   "prompt": "`max_of(a, b)` fonksiyonunu yaz: büyük olanı döndürsün.",
+   "starter": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "solution": [
+    "fn max_of(a: i32, b: i32) -> i32:",
+    "    if a > b:",
+    "        return a",
+    "    return b",
+    "",
+    "fn main():",
+    "    print(max_of(7, 12))",
+    "    print(max_of(30, 4))"
+   ],
+   "hint": "`a > b` ise `a`'yı, değilse `b`'yi döndür.",
+   "expected": [
+    "12",
+    "30"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l02-q1",
+   "q": "`return` bir fonksiyonun ortasında çalışırsa ne olur?",
+   "options": [
+    "Fonksiyon hemen biter",
+    "Sonraki satır çalışır",
+    "Hata verir"
+   ],
+   "answer": 0,
+   "why": "`return` fonksiyondan hemen çıkar; altındaki satırlar çalışmaz."
+  }
+ ]
+}

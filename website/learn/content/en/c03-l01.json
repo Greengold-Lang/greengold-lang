@@ -1,0 +1,65 @@
+{
+ "title": "Declaring functions",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "A function is declared with `fn`. Parameter types are written with `:`, the return type with `->`. If there is no `-> Type`, the function returns no value (`void`)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn add(a: i32, b: i32) -> i32:",
+    "    return a + b",
+    "",
+    "fn log_message(msg: str):",
+    "    print(\"[LOG]\", msg)",
+    "",
+    "fn main():",
+    "    result = add(15, 27)",
+    "    log_message(\"addition finished\")",
+    "    print(\"Result:\", result)"
+   ],
+   "run": true,
+   "output": [
+    "[LOG] addition finished",
+    "Result: 42"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Rule: every function with `-> Type` must end in a `return` on **every path** of the code. Otherwise the compiler reports an error."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l01-x1",
+   "prompt": "Write the function `subtract(a, b)`: it returns `a - b`. `main` calls it and prints the result.",
+   "starter": [
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "solution": [
+    "fn subtract(a: i32, b: i32) -> i32:",
+    "    return a - b",
+    "",
+    "fn main():",
+    "    print(subtract(50, 8))"
+   ],
+   "hint": "Write `fn subtract(a: i32, b: i32) -> i32:` above `main`.",
+   "expected": [
+    "42"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l01-q1",
+   "q": "What does a function without `-> Type` return?",
+   "options": [
+    "0",
+    "No value (void)",
+    "An empty string"
+   ],
+   "answer": 1,
+   "why": "With no return type the function returns no value."
+  }
+ ]
+}

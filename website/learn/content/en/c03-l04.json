@@ -1,0 +1,71 @@
+{
+ "title": "Practice: a program from functions",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Splitting a big job into small functions makes code readable and testable. Below, a temperature converter is built from functions that each do one thing."
+  },
+  {
+   "t": "code",
+   "code": [
+    "const FREEZING_F: f64 = 32.0",
+    "",
+    "fn to_fahrenheit(c: f64) -> f64:",
+    "    return c * 9.0 / 5.0 + FREEZING_F",
+    "",
+    "fn to_celsius(f: f64) -> f64:",
+    "    return (f - FREEZING_F) * 5.0 / 9.0",
+    "",
+    "fn main():",
+    "    print(\"25 C =\", to_fahrenheit(25.0), \"F\")",
+    "    print(\"212 F =\", to_celsius(212.0), \"C\")"
+   ],
+   "run": true,
+   "output": [
+    "25 C = 77 F",
+    "212 F = 100 C"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l04-x1",
+   "prompt": "Write `is_leap(year)`: `true` when the year is divisible by 4 but not by 100, or divisible by 400. Print 2024, 1900 and 2000.",
+   "starter": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return false",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "solution": [
+    "fn is_leap(year: i32) -> bool:",
+    "    return (year % 4 == 0 and year % 100 != 0) or year % 400 == 0",
+    "",
+    "fn main():",
+    "    print(is_leap(2024))",
+    "    print(is_leap(1900))",
+    "    print(is_leap(2000))"
+   ],
+   "hint": "Combine the three conditions with `and` and `or`; use parentheses.",
+   "expected": [
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l04-q1",
+   "q": "What is the main benefit of small functions?",
+   "options": [
+    "The program takes more space",
+    "Code is readable, reusable and testable",
+    "The compiler runs slower"
+   ],
+   "answer": 1,
+   "why": "When each function does one job, it is easy to understand and try on its own."
+  }
+ ]
+}

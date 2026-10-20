@@ -1,0 +1,97 @@
+{
+ "title": "Otomatik temizlik ve defer",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Greengold'da çöp toplayıcı yoktur. Bir Move tipi tanımlandığı kapsamın sonuna gelince derleyici belleği **kendiliğinden** serbest bırakır (`drop`). Sen `free` yazmazsın ve unutamazsın."
+  },
+  {
+   "t": "p",
+   "text": "**`defer`**, bir kapsamdan çıkılırken çalışacak temizlik kodunu işaretler (normal çıkış, `return`, `break`, `continue`, hata fark etmez). Birden çok `defer` **ters sırada** (son yazılan ilk çalışır) yürür."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn main():",
+    "    print(\"started\")",
+    "    defer print(\"cleanup 1 (written first, runs last)\")",
+    "    defer print(\"cleanup 2\")",
+    "    defer print(\"cleanup 3 (written last, runs first)\")",
+    "    print(\"working...\")"
+   ],
+   "run": true,
+   "output": [
+    "started",
+    "working...",
+    "cleanup 3 (written last, runs first)",
+    "cleanup 2",
+    "cleanup 1 (written first, runs last)"
+   ]
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn process(code: i32):",
+    "    print(\"resource opened\")",
+    "    defer print(\"resource closed\")",
+    "    if code < 0:",
+    "        print(\"error, returning early\")",
+    "        return",
+    "    print(\"processed\")",
+    "",
+    "fn main():",
+    "    process(1)",
+    "    process(-1)"
+   ],
+   "run": true,
+   "output": [
+    "resource opened",
+    "processed",
+    "resource closed",
+    "resource opened",
+    "error, returning early",
+    "resource closed"
+   ]
+  },
+  {
+   "t": "exercise",
+   "id": "c05-l05-x1",
+   "prompt": "`run()` içinde `open`, `use` ve `close` mesajlarını yazdır; ama `close`'u `defer` ile, `open`'dan hemen sonra yaz. Beklenen sıra: open, use, close.",
+   "starter": [
+    "fn run():",
+    "    print(\"open\")",
+    "    print(\"use\")",
+    "",
+    "fn main():",
+    "    run()"
+   ],
+   "solution": [
+    "fn run():",
+    "    print(\"open\")",
+    "    defer print(\"close\")",
+    "    print(\"use\")",
+    "",
+    "fn main():",
+    "    run()"
+   ],
+   "hint": "`print(\"open\")` satırının altına `defer print(\"close\")` ekle.",
+   "expected": [
+    "open",
+    "use",
+    "close"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c05-l05-q1",
+   "q": "Üç `defer` yazıldığında hangisi ilk çalışır?",
+   "options": [
+    "İlk yazılan",
+    "Son yazılan",
+    "Rastgele biri"
+   ],
+   "answer": 1,
+   "why": "`defer`'ler ters sırada çalışır (LIFO)."
+  }
+ ]
+}

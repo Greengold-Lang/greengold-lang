@@ -1,0 +1,73 @@
+{
+ "title": "Dilimler",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "**Dilim** (`[]T`), bir dizinin (ya da bellek bloğunun) üzerindeki, uzunluğu esnek bir **görünümdür**. Fonksiyon parametresi `[]i32` yazarsan her boyuttaki diziyi alabilir. Alt aralık için `dizi[a..b]` yazılır (`b` dahil değil)."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn sum(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total",
+    "",
+    "fn main():",
+    "    data: [5]i32 = [1, 2, 3, 4, 5]",
+    "    print(\"total:\", sum(data))",
+    "    print(\"part:\", sum(data[1..4]))"
+   ],
+   "run": true,
+   "output": [
+    "total: 15",
+    "part: 9"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "Dilim bir görünüm olduğu için, üzerinde durduğu dizi dilim kullanıldığı sürece değişemez, taşınamaz ya da yok olamaz. Derleyici bunu denetler; yani dilim asla \"asılı kalmaz\"."
+  },
+  {
+   "t": "exercise",
+   "id": "c04-l05-x1",
+   "prompt": "`average(items: []i32) -> i32` yaz: elemanların toplamının eleman sayısına bölümü (`items.len` bir `usize`'dır, `i32(items.len)` ile çevir). `[2, 4, 6, 8]` için yazdır.",
+   "starter": [
+    "fn average(items: []i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "solution": [
+    "fn average(items: []i32) -> i32:",
+    "    total = 0",
+    "    for x in items:",
+    "        total += x",
+    "    return total / i32(items.len)",
+    "",
+    "fn main():",
+    "    data: [4]i32 = [2, 4, 6, 8]",
+    "    print(average(data))"
+   ],
+   "hint": "Önce toplamı bul, sonra `i32(items.len)`'e böl.",
+   "expected": [
+    "5"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c04-l05-q1",
+   "q": "`[]i32` parametresine hangisi verilebilir?",
+   "options": [
+    "Yalnızca 5 elemanlı dizi",
+    "Her boyuttaki `[N]i32` dizisi ya da alt aralığı",
+    "Yalnızca metin"
+   ],
+   "answer": 1,
+   "why": "Dilim uzunluğu bilmez; bu yüzden her boyutla çalışır."
+  }
+ ]
+}

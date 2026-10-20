@@ -1,0 +1,66 @@
+{
+ "title": "Özyineleme",
+ "blocks": [
+  {
+   "t": "p",
+   "text": "Bir fonksiyon kendini çağırabilir; buna **özyineleme** (recursion) denir. Her özyinelemeli fonksiyonun, kendini çağırmayı bırakıp sonuç veren bir **taban durumu** olmalıdır; yoksa sonsuza kadar sürer."
+  },
+  {
+   "t": "code",
+   "code": [
+    "fn factorial(n: i32) -> i32:",
+    "    if n <= 1:",
+    "        return 1",
+    "    return n * factorial(n - 1)",
+    "",
+    "fn main():",
+    "    print(factorial(5))"
+   ],
+   "run": true,
+   "output": [
+    "120"
+   ]
+  },
+  {
+   "t": "p",
+   "text": "`factorial(5)`, `5 * factorial(4)` demektir ve böyle `factorial(1)`'e kadar iner; sonra çarpımlar geri döner: 5 · 4 · 3 · 2 · 1 = 120."
+  },
+  {
+   "t": "exercise",
+   "id": "c03-l03-x1",
+   "prompt": "Fibonacci sayısını özyinelemeyle hesapla: `fib(0)` = 0, `fib(1)` = 1, diğerleri önceki ikisinin toplamı. `fib(10)` yazdır.",
+   "starter": [
+    "fn fib(n: i32) -> i32:",
+    "    return 0",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "solution": [
+    "fn fib(n: i32) -> i32:",
+    "    if n < 2:",
+    "        return n",
+    "    return fib(n - 1) + fib(n - 2)",
+    "",
+    "fn main():",
+    "    print(fib(10))"
+   ],
+   "hint": "`n < 2` ise `n`'i döndür; değilse `fib(n - 1) + fib(n - 2)`.",
+   "expected": [
+    "55"
+   ]
+  },
+  {
+   "t": "quiz",
+   "id": "c03-l03-q1",
+   "q": "Taban durumu olmayan bir özyinelemeli fonksiyonda ne olur?",
+   "options": [
+    "Hiç çalışmaz",
+    "Sonsuza kadar kendini çağırır (yığın taşar)",
+    "0 döndürür"
+   ],
+   "answer": 1,
+   "why": "Durma noktası olmadığı için çağrılar birikir ve yığın taşar."
+  }
+ ]
+}
